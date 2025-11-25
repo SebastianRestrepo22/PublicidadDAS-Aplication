@@ -6,12 +6,9 @@ import { Routers } from './routes/routes'
 
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
     <>
       <Routers/>
-
     </>
   )
 }

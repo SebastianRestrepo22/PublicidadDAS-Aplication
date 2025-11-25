@@ -5,10 +5,20 @@ import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 
 import { toast, ToastContainer } from "react-toastify";
+import { useAuth } from "../../../context/AuthContext";
+import { Eye, EyeOff } from "lucide-react";
+import { Redirector } from "../../redirector/redirector";
 
 export const Login = () => {
+  //Estado para ver o ocultar la contraseña
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordRegister, setShowPasswordRegister] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+
+
   const [isLogin, setIsLogin] = useState(true);
   const navigate = useNavigate();
+  const { setUser } = useAuth();
 
   const [tiposDocumento, setTiposDocumento] = useState([]);
 
@@ -148,22 +158,22 @@ export const Login = () => {
       localStorage.setItem("token", token);
 
       const decoded = jwtDecode(token);
+
+      // Guardamos en localStorage los datos base
+      localStorage.setItem("usuario", JSON.stringify(decoded));
+
+      setUser(decoded);
+      
       if (decoded.Role.toLowerCase() === "administrador") {
         navigate("/dashboard/graficosEstadisticos");
-      } else if (decoded.Role.toLowerCase() === "cliente"){
-        navigate("/cliente/Clientehome");
-      }
-      else {
-        alert("Rol no permitido ")
+      } else if (decoded.Role.toLowerCase() === "cliente") {
+        navigate("/cliente/productos");
       }
 
-      setValuesLogin({
-        CorreoElectronico: "",
-        Contrasena: "",
-      });
+
     } catch (error) {
       console.error("Error en login:", error);
-      alert(error.response?.data?.message || "Error al iniciar sesión");
+      toast.error(error.response?.data?.message || "Error al iniciar sesión");
     }
   };
 
@@ -196,21 +206,34 @@ export const Login = () => {
                     onChange={handleChangesLogin}
                     required
                   />
-                  <input
-                    type="password"
-                    placeholder="Contraseña"
-                    className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none"
-                    value={valuesLogin.Contrasena}
-                    name="Contrasena"
-                    onChange={handleChangesLogin}
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Contraseña"
+                      className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none pr-10"
+                      value={valuesLogin.Contrasena}
+                      name="Contrasena"
+                      onChange={handleChangesLogin}
+                      required
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+
                   <button
                     type="submit"
                     className="w-full bg-blue-900 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition"
                   >
                     Iniciar Sesión
                   </button>
+
+
                 </form>
 
                 {/* Link para recuperar contraseña */}
@@ -224,7 +247,7 @@ export const Login = () => {
 
                 <button
                   onClick={() => setIsLogin(false)}
-                  className="mt-4 text-violet-600 hover:underline text-sm"
+                  className="mt-4 text-blue-700 hover:underline text-sm"
                 >
                   ¿No tienes cuenta? Regístrate
                 </button>
@@ -332,25 +355,33 @@ export const Login = () => {
                   </div>
 
                   {/* Contraseña */}
-                  <div className="flex flex-col gap-1">
+                  <div className="relative flex flex-col gap-1">
                     <input
-                      type="password"
+                      type={showPasswordRegister ? "text" : "password"}
                       placeholder="Contraseña"
-                      className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none"
+                      className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none pr-10"
                       value={values.Contrasena}
                       name="Contrasena"
                       onChange={handleChanges}
                       required
                     />
-                    <p className="min-h-[16px] text-sm"></p>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordRegister(!showPasswordRegister)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                    >
+                      {showPasswordRegister ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
                   </div>
 
+
                   {/* Confirmar contraseña */}
-                  <div className="flex flex-col gap-1">
+                  <div className="relative flex flex-col gap-1">
                     <input
-                      type="password"
+                      type={showPasswordConfirm ? "text" : "password"}
                       placeholder="Confirmar contraseña"
-                      className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none"
+                      className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none pr-10"
                       value={confirmarContrasena}
                       onChange={(e) => {
                         setConfirmarContrasena(e.target.value);
@@ -362,12 +393,22 @@ export const Login = () => {
                       }}
                       required
                     />
-                    <p className="text-red-500 text-xs min-h-[16px] leading-none">{contrasenaError}</p>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                    >
+                      {showPasswordConfirm ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+
                   </div>
+                  <p className="text-red-500 text-xs min-h-[16px] leading-none">{contrasenaError}</p>
+
 
                   <button
                     type="submit"
-                    className="w-full bg-blue-900 text-white py-2 rounded-xl font-semibold hover:bg-violet-700 transition"
+                    className="w-full bg-blue-900 text-white py-2 rounded-xl font-semibold hover:bg-blue-700 transition"
                   >
                     Registrarse
                   </button>

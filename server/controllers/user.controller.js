@@ -116,34 +116,52 @@ export const getUserById = async (req, res) => {
 // Actualizar usuario
 export const updateUser = async (req, res) => {
     const { id } = req.params;
-    const {
-        TipoDocumentoId,
-        NombreCompleto,
-        Telefono,
-        CorreoElectronico,
-        Direccion,
-        RoleId
-    } = req.body;
 
     try {
         const connection = await connectDB();
-        const [result] = await connection.execute(
-            `UPDATE usuarios 
-        SET TipoDocumentoId = ?, NombreCompleto = ?, Telefono = ?, CorreoElectronico = ?, Direccion = ?, RoleId = ? 
-        WHERE CedulaId = ?`,
-            [TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, RoleId, id]
+
+        // Traer datos actuales
+        const [rows] = await connection.execute(
+            'SELECT * FROM usuarios WHERE CedulaId = ?',
+            [id]
         );
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'Usuario no encontrado' });
-        }
+        if (rows.length === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+        const currentUser = rows[0];
+
+        // Crear objeto con campos actualizados
+        const updatedUser = {
+            TipoDocumentoId: req.body.TipoDocumentoId ?? currentUser.TipoDocumentoId,
+            NombreCompleto: req.body.NombreCompleto ?? currentUser.NombreCompleto,
+            Telefono: req.body.Telefono ?? currentUser.Telefono,
+            CorreoElectronico: req.body.CorreoElectronico ?? currentUser.CorreoElectronico,
+            Direccion: req.body.Direccion ?? currentUser.Direccion,
+            RoleId: currentUser.RoleId // no se modifica
+        };
+
+        // Ejecutar update
+        await connection.execute(
+            `UPDATE usuarios SET TipoDocumentoId=?, NombreCompleto=?, Telefono=?, CorreoElectronico=?, Direccion=?, RoleId=? WHERE CedulaId=?`,
+            [
+                updatedUser.TipoDocumentoId,
+                updatedUser.NombreCompleto,
+                updatedUser.Telefono,
+                updatedUser.CorreoElectronico,
+                updatedUser.Direccion,
+                updatedUser.RoleId,
+                id
+            ]
+        );
 
         res.status(200).json({ message: 'Usuario actualizado correctamente' });
+
     } catch (error) {
         console.error('Error al actualizar usuario:', error);
         res.status(500).json({ message: 'Error interno del servidor' });
     }
 };
+
 
 // Eliminar usuario
 export const deleteUser = async (req, res) => {

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Modal from "./modals/modal";
 import { Label } from "recharts";
+import { useAuth } from "../../../context/AuthContext";
 
 const menuItems = [
   { icon: BarChart3, label: "Gráficos Estadísticos", to: "/dashboard/graficosEstadisticos" },
@@ -35,20 +36,23 @@ const menuItems = [
     ],
   },
   { icon: Palette, label: "Diseño", to: "/dashboard/Diseño" },
-  { icon: ShoppingCart,
-    label: "Gestión de Ventas", 
+  {
+    icon: ShoppingCart,
+    label: "Gestión de Ventas",
     to: "/dashboard/gestionVentas",
     hasSubmenu: true,
     submenu: [
-      { label: "Pedidos", to: "/dashboard/pedidos"},
-      { label: "Produccion", to: "/dashboard/produccion"},
-      { label: "Venta", to: "/dashboard/ventas"}
+      { label: "Pedidos", to: "/dashboard/pedidos" },
+      { label: "Produccion", to: "/dashboard/produccion" },
+      { label: "Venta", to: "/dashboard/ventas" }
     ]
-   },
+  },
   { icon: CalendarDays, label: "Agenda", to: "/dashboard/agenda" }
 ];
 
 export const Sidebar = () => {
+  const { logout } = useAuth();
+
   const [openModal, setOpenModal] = useState(false);
 
   const [expandedItems, setExpandedItems] = useState([]);
@@ -60,15 +64,6 @@ export const Sidebar = () => {
         : [...prev, index]
     );
   };
-
-  const renderModalForm = (type = "modal") => {
-    return (
-      <div className="flex flex-col text-left">
-
-      </div>
-    );
-  };
-
 
   return (
     <div className="w-48 min-h-screen bg-gray-900 space-y-3 py-4 text-white flex flex-col justify-between">
@@ -139,6 +134,8 @@ export const Sidebar = () => {
 
         </Link>
 
+        {/*Modales */}
+
         <Modal
           open={openModal}
           onClose={() => setOpenModal(false)}
@@ -150,9 +147,9 @@ export const Sidebar = () => {
               <Link
                 className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 transition-colors"
                 onClick={() => {
-                  localStorage.removeItem("token");
+                  logout(); //borra token y setea user(null)
                 }}
-                to='/login'
+                to="/login"
               >
                 Cerrar sesión
               </Link>
@@ -169,27 +166,9 @@ export const Sidebar = () => {
 
       </div>
 
-      {/*Modales */}
+      
 
-      <Modal open={openModal} onClose={() => setOpenModal(false)}>
-        <div className="w-[400px] p-6 mx-auto text-center">
-          <p className="mb-6 text-black">¿Está seguro que quiere cerrar sesión?</p>
-          <div className="flex gap-4">
-            <Link className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 transition-colors"
-              onClick={() => {
-                // Eliminar token
-                localStorage.removeItem("token");
-              }}
-              to='/login'>Cerrar sesión</Link>
-            <button
-              className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition-colors"
-              onClick={() => setOpenModal(false)}
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      </Modal>
+      
 
     </div>
 

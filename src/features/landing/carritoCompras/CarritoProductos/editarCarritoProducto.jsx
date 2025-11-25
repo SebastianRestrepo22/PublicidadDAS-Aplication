@@ -1,6 +1,6 @@
 import React from "react";
-import { Navbar } from "../../landing/components/Navbar";
-import { Footer } from "../../landing/components/footer";
+import { Navbar } from "../../components/Navbar";
+import { Footer } from "../../components/footer";
 import { Link } from "react-router-dom";
 
 export const EditarCarritoProducto = () => {

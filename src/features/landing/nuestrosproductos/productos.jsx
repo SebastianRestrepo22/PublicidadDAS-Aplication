@@ -2,11 +2,14 @@ import React, { useRef, useState, useEffect } from "react";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer";
 import { Search } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { GetDataServices } from "../../dashboard/servicios/services/services.servicios";
 import { getAllCategorias } from "../../dashboard/categoriadediseño/services/services.categoria";
+import { useCart } from "../../../context/CartContext";
 
 export const Productos = () => {
+  const navigate = useNavigate();
+  const { addToCart } = useCart();
   const products = [
     { name: "Tarjetas de Presentación", price: "$49", image: "https://images.unsplash.com/photo-1581092588429-14f0d3f8df8e?crop=entropy&cs=tinysrgb&fit=crop&w=600&h=400", rating: 4.8 },
     { name: "Volantes Publicitarios", price: "$79", image: "https://images.unsplash.com/photo-1557683316-973673baf926?crop=entropy&cs=tinysrgb&fit=crop&w=600&h=400", rating: 4.6 },
@@ -60,10 +63,23 @@ export const Productos = () => {
   // Filtrar solo productos con descuento
   const productosConDescuento = productos.filter(producto => producto.Descuento > 0);
 
-  // Seleccionamos aleatoriamente 3 productos
-  const productosDescuentoRandom = productosConDescuento
-    .sort(() => 0.5 - Math.random()) // mezcla aleatoriamente
-    .slice(0, 3);
+  const [productosDescuentoRandom, setProductosDescuentoRandom] = useState([]);
+
+  useEffect(() => {
+    const fetchProductos = async () => {
+      const response = await GetDataServices();
+      const productosSolo = response.data.filter(p => p.Tipo === 'producto');
+      setProductos(productosSolo);
+
+      // aquí calculamos los aleatorios **una sola vez**
+      const productosConDesc = productosSolo.filter(p => p.Descuento > 0);
+      const seleccion = productosConDesc.sort(() => 0.5 - Math.random()).slice(0, 3);
+      setProductosDescuentoRandom(seleccion);
+    };
+
+    fetchProductos();
+  }, []);
+
 
   //Traer las categorias
 
@@ -90,6 +106,18 @@ export const Productos = () => {
     return coincideCategoria && coincideBusqueda;
   });
 
+  const handleAddClick = (producto) => {
+    if (producto.EsPersonalizado) {
+      // Redirige al formulario de personalización
+      navigate("/carritoproducto", { state: { item: producto, from: "/productos" } });
+    } else {
+      // Añade directo al carrito
+      addToCart(producto, {}, 1); // <-- función que agrega el producto directamente
+      toast.success(`${producto.Nombre} agregado al carrito`);
+    }
+  };
+
+
   return (
     <>
       <nav className="sticky top-0 z-50 bg-white shadow-md">
@@ -98,7 +126,7 @@ export const Productos = () => {
 
       {/* Sección de categoria y la barra de busqueda */}
 
-      <div className="sticky top-[64px] z-40 bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="sticky top-[55px] z-40 bg-gradient-to-br from-slate-50 to-blue-50">
         <div className="flex justify-center bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
           <select
             value={categoriaSeleccionada}
@@ -184,16 +212,13 @@ export const Productos = () => {
                       producto.Precio - (producto.Precio * producto.Descuento / 100)
                     )}
                   </p>
-                  <Link
-                    to="/carritoproducto"
-                    state={{
-                      item: producto,
-                      from: "/productos"
-                    }}
+                  <button
                     className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition"
+                    onClick={() => handleAddClick(producto)}
                   >
                     Comprar
-                  </Link>
+                  </button>
+
                 </div>
               ))
             )}
@@ -220,7 +245,12 @@ export const Productos = () => {
                 <p className="description">{producto.Descripcion}</p>
 
                 <div className="card-actions">
-                  <Link className="btn" to="/carritoproducto" state={{ item: producto, from: "/productos" }}>Añadir</Link>
+                  <button
+                    className="btn"
+                    onClick={() => handleAddClick(producto)}
+                  >
+                    {producto.EsPersonalizado ? "Personalizar" : "Añadir"}
+                  </button>
 
                   <div className="price-section">
                     {producto.Descuento > 0 && (

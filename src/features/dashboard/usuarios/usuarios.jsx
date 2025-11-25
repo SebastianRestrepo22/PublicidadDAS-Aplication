@@ -33,7 +33,7 @@ export const Usuarios = () => {
   const [openVer, setOpenVer] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
 
-  //Tarer los tipos de documentos
+  //Traer los tipos de documentos
 
   const [tiposDocumento, setTiposDocumento] = useState([]);
   useEffect(() => {
