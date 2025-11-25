@@ -19,10 +19,10 @@ import Agenda from "../features/dashboard/agenda/agenda"
 import { Diseño } from "../features/dashboard/categoriadediseño/diseño"
 import { RecuperarContrasena } from "../features/landing/login/RecuperarContrasena"
 import { RestablecerContrasena } from "../features/landing/login/RestablecerContrasena"
-import { Compras } from "../features/dashboard/compras/compras"
 import { Navbarcliente } from "../features/navbarCliente/navbarCliente"
 import { Clientehome } from "../features/navbarCliente/clientehome"
-import { Pedidos } from "../features/dashboard/gestionventas/pedidos/pedidos"
+import { Compras } from "../features/dashboard/constrolinsumos/compras/compras"
+import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidos"
 
 export const Routers = () => {
     return (
@@ -55,7 +55,7 @@ export const Routers = () => {
                 <Route path="diseño" element={<Diseño />} />
                 <Route path="productoServicio" element={<ProductoServicios />} />
                 <Route path="proveedores" element={<Proveedores />} />
-                <Route path="pedidos" element={<Pedidos/>}/>
+                <Route path="pedidos" element={<PedidosClientes/>}/>
                 <Route path="categoriaDeDiseño" element={<Diseño/>}/>
                 <Route path="agenda" element={<Agenda/>}/>
             </Route>

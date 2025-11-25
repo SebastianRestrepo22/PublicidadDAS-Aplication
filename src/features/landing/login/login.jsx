@@ -16,7 +16,7 @@ export const Login = () => {
   useEffect(() => {
     const fetchTiposDocumento = async () => {
       try {
-        const response = await axios.get("http://localhost:3000/tipos-documento");
+        const response = await axios.get("http://localhost:3000/tipoS-documento");
         setTiposDocumento(response.data);
       } catch (error) {
         console.error("Error obteniendo tipos de documento:", error);

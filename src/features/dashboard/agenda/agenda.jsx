@@ -1,64 +1,78 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Calendar from "./calendar";
 import CitaForm from "./cita-form";
 import CitaList from "./cita-list";
 
 export default function Agenda() {
-  const [appointments, setAppointments] = useState([
-    {
-      id: "1",
-      title: "Impresión Tarjetas de Presentación",
-      description: "Cliente solicita 500 tarjetas de presentación en papel couché",
-      date: new Date(2025, 8, 25),
-      time: "10:00",
-      client: "Juan Pérez",
-      service: "Tarjetas de Presentación",
-      status: "confirmado",
-      priority: "media",
-    },
-    {
-      id: "2",
-      title: "Banner Publicitario",
-      description: "Banner 2x1 metros para evento corporativo",
-      date: new Date(2025, 8, 26),
-      time: "14:30",
-      client: "Empresa ABC",
-      service: "Banner",
-      status: "pendiente",
-      priority: "alta",
-    },
-  ]);
-
+  const [appointments, setAppointments] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [viewMode, setViewMode] = useState("calendar");
 
-  const handleCreateAppointment = (appointmentData) => {
-    const newAppointment = {
+  // 🔵 Cargar citas desde backend
+  useEffect(() => {
+    fetch("http://localhost:4000/citas")
+      .then((res) => res.json())
+      .then((data) => {
+        const formatted = data.map((apt) => ({
+          ...apt,
+          date: new Date(apt.date), // convierte sea el formato que sea
+        }));
+        setAppointments(formatted);
+      })
+      .catch((err) => console.error("Error al cargar citas:", err));
+  }, []);
+
+  // 🔵 Crear cita (validación incluida)
+  const handleCreateAppointment = async (appointmentData) => {
+    const formatted = {
       ...appointmentData,
-      id: Date.now().toString(),
+      date: appointmentData.date.toISOString().split("T")[0],
     };
-    setAppointments([...appointments, newAppointment]);
-    setIsFormOpen(false);
-  };
 
-  const handleUpdateAppointment = (appointmentData) => {
-    if (editingAppointment) {
-      setAppointments(
-        appointments.map((apt) =>
-          apt.id === editingAppointment.id
-            ? { ...appointmentData, id: editingAppointment.id }
-            : apt
-        )
-      );
-      setEditingAppointment(null);
-      setIsFormOpen(false);
+    const res = await fetch("http://localhost:4000/citas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formatted),
+    });
+
+    if (!res.ok) {
+      alert("Ya existe una cita en esa fecha y hora");
+      return;
     }
+
+    window.location.reload();
   };
 
-  const handleDeleteAppointment = (id) => {
-    setAppointments(appointments.filter((apt) => apt.id !== id));
+  // 🔵 Actualizar cita
+  const handleUpdateAppointment = async (appointmentData) => {
+    const formatted = {
+      ...appointmentData,
+      date: appointmentData.date.toISOString().split("T")[0],
+    };
+
+    const res = await fetch(
+      `http://localhost:4000/citas/${editingAppointment.id}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formatted),
+      }
+    );
+
+    if (!res.ok) {
+      alert("Ya existe otra cita en esa fecha y hora");
+      return;
+    }
+
+    window.location.reload();
+  };
+
+  // 🔵 Eliminar cita
+  const handleDeleteAppointment = async (id) => {
+    await fetch(`http://localhost:4000/citas/${id}`, { method: "DELETE" });
+    window.location.reload();
   };
 
   const handleEditAppointment = (appointment) => {
@@ -82,7 +96,6 @@ export default function Agenda() {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Toggle vista */}
           <div className="flex items-center border rounded-lg overflow-hidden">
             <button
               onClick={() => setViewMode("calendar")}
@@ -106,7 +119,6 @@ export default function Agenda() {
             </button>
           </div>
 
-          {/* Botón nueva cita */}
           <button
             onClick={() => {
               setEditingAppointment(null);
@@ -121,15 +133,14 @@ export default function Agenda() {
 
       {/* Modal formulario */}
       {isFormOpen && (
-        <div
-          className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50"
-        >
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-lg">
             <h2 className="text-xl font-bold mb-4">
               {editingAppointment ? "Editar Cita" : "Nueva Cita"}
             </h2>
             <CitaForm
               appointment={editingAppointment}
+              appointments={appointments}
               onSubmit={
                 editingAppointment
                   ? handleUpdateAppointment
@@ -144,7 +155,6 @@ export default function Agenda() {
         </div>
       )}
 
-      {/* Contenido principal → solo si no está abierto el modal */}
       {!isFormOpen &&
         (viewMode === "calendar" ? (
           <div className="flex justify-center mt-6">

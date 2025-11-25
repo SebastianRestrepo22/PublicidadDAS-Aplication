@@ -83,23 +83,6 @@ export const deleteCategoria = async (req, res) => {
   }
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Actualizar categoría
 export const updateCategoria = async (req, res) => {
   const id = req.params.id;

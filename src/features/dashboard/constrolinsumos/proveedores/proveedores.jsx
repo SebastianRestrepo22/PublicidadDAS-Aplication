@@ -13,6 +13,8 @@ export const Proveedores = () => {
   const [openEditar, setOpenEditar] = useState(false);
   const [openVer, setOpenVer] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
+  const [filtroCampo, setFiltroCampo] = useState("");
+  const [filtroText, setFiltroText] = useState("");
 
   const [formCrear, setFormCrear] = useState({
     nombreProveedor: "",
@@ -38,14 +40,24 @@ export const Proveedores = () => {
     try {
       const { data } = await axios.get("http://localhost:3000/api/proveedores");
       setProveedores(data);
+
       const estados = {};
-      data.forEach((p) => (estados[p.ProveedorId] = p.Estado));
+      data.forEach((p) => {
+        const val = Number(p.Estado) === 1 ? 1 : 0;
+        estados[p.ProveedorId] = val;
+      });
       setEstadoActivo(estados);
     } catch (err) {
       console.error("Error al cargar proveedores:", err);
     }
   };
 
+  const proveedoresFiltrados = proveedores.filter((p) => {
+    if (!filtroCampo || !filtroText.trim()) return true;
+
+    const valor = String(p[filtroCampo] || "").toLowerCase();
+    return valor.includes(filtroText.toLowerCase());
+  })
   const handleCreate = async () => {
     try {
       await axios.post("http://localhost:3000/api/proveedores", formCrear);
@@ -62,8 +74,6 @@ export const Proveedores = () => {
       console.log("Error al crear proveedor:", err);
     }
   };
-
-
 
 
   const handleUpdate = async () => {
@@ -98,23 +108,43 @@ export const Proveedores = () => {
       telefono: p.Telefono,
       correo: p.Correo,
       direccion: p.Direccion,
-      estado: p.Estado,
+      estado: Number(p.Estado) === 1 ? 1 : 0,
     });
     setOpenEditar(true);
   };
 
-  const toggleEstado = async (idProveedor, estadoNuevo) => {
+  const toggleEstado = async (idProveedor, estadoNuevoBoolean) => {
+    const nuevoEstadoNum = estadoNuevoBoolean ? 1 : 0;
+
+    const provActual = proveedores.find(p => p.ProveedorId === idProveedor);
+    if (!provActual) {
+      console.error("Proveedor no encontrado");
+      return;
+    }
+    
     try {
       await axios.put(`http://localhost:3000/api/proveedores/${idProveedor}`, {
-        estado: estadoNuevo ? 1 : 0, 
+        nombreProveedor: provActual.NombreProveedor,
+        telefono: provActual.Telefono,
+        correo: provActual.Correo,
+        direccion: provActual.Direccion,
+        estado: nuevoEstadoNum 
+
+
       });
 
       setEstadoActivo((prev) => ({
         ...prev,
-        [idProveedor]: estadoNuevo,
+        [idProveedor]: nuevoEstadoNum
       }));
+
+      setProveedores((prev) => 
+        prev.map((p) =>
+          p.ProveedorId === idProveedor ? { ...p, Estado: nuevoEstadoNum } : p
+        )
+      );
     } catch (error) {
-      alert("Error al actualizar estado:", err)
+      alert("Error al actualizar estado:", error)
 
       
     }
@@ -139,19 +169,27 @@ export const Proveedores = () => {
                 <Plus size={18} /> Nuevo proveedor
               </Link>
 
-              <select className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[140px]">
+              <select 
+              value={filtroCampo}
+              onChange={(e) => setFiltroCampo(e.target.value)}
+              className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700"
+              >
                 <option value="">Filtrar por campo</option>
-                <option value="id">ID</option>
-                <option value="cedula">Cédula</option>
-                <option value="nombre">Nombre</option>
+                <option value="ProveedorId">ID</option>
+                <option value="nombreProveedor">Nombre</option>
+                <option value="Correo">Correo</option>
+
+                
               </select>
 
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
+                  value={filtroText}
+                  onChange={(e) => setFiltroText(e.target.value)}
                   placeholder="Buscar proveedor"
-                  className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-700"
+                  className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full"
                 />
               </div>
             </div>
@@ -186,7 +224,7 @@ export const Proveedores = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {proveedores.map((p) => (
+                {proveedoresFiltrados.map((p) => (
                   <tr
                     key={p.ProveedorId}
                     className="hover:bg-slate-50 transition-colors duration-150 "
@@ -207,24 +245,26 @@ export const Proveedores = () => {
                       {p.Direccion}
                     </td>
                     <td className="py-4 px-6 text-sm font-medium text-slate-900">
-                      <label className="inline-flex items-center cursor-pointer select-none">
+                      <label className="inline-flex items-center cursor-pointer">
                         <div className="relative">
                           <input
                             id={`switch-${p.ProveedorId}`}
                             type="checkbox"
                             className="sr-only peer"
-                            checked={Boolean(estadoActivos[p.ProveedorId])}
-                            onChange={(e) => toggleEstado(p.ProveedorId, e.target.checked)}
-                            aia-checked={Boolean(estadoActivos[p.ProveedorId])}
+                            checked={estadoActivos[p.ProveedorId] === 1}
+                            onChange={(e) => 
+                              toggleEstado(p.ProveedorId, e.target.checked)
+                            }
                           />
-                          <div className="w-11 h-6 rounded-full bg-gray-300 peer-checked:bg-green-500 transition-colors pointer-events-none"></div>
-                          <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform transform peer-checked:translate-x-5 pointer-events-none"></div>
+                          <div className="w-11 h-6 rounded-full bg-gray-300 peer-checked:bg-green-500 transition-colors"></div>
+                          <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform transform peer-checked:translate-x-5"></div>
                         </div>
-                        <span className="ml-3 text-sm text-slate-700 ">
-                          {estadoActivos[p.ProveedorId]}
+                        <span className="ml-3 text-sm text-slate-700">
+                          {estadoActivos[p.ProveedorId] === 1}
                         </span>
                       </label>
                     </td>
+
                     <td className="py-4 px-6">
                       <div className="flex gap-2">
                         <Link

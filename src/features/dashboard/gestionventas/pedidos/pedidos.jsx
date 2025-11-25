@@ -1,224 +1,536 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { ChevronDown, Edit, Plus, Trash2, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Plus, Edit, Eye, Trash2, ChevronDown } from "lucide-react";
 import Modal from "../../components/modals/modal";
 
-export const Pedidos = () => {
-  // Estados de modales y filas expandidas
+const API_URL = `http://localhost:3000/api/pedidos-clientes`;
+const API_DETALLE_URL = "http://localhost:3000/api/detalle-pedido-clientes";
+
+export const PedidosClientes = () => {
+  const [pedidos, setPedidos] = useState([]);
+  const [estadoActivo, setEstadoActivo] = useState({});
+  const [filtroCampo, setFiltroCampo] = useState("");
+  const [filtroText, setFiltroText] = useState("");
+
   const [openCreate, setOpenCreate] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
   const [openVer, setOpenVer] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
-  const [expandeRow, setExpandedRow] = useState(null);
 
-  // Datos de ejemplo
-  const pedidos = [
+  const [expandedRow, setExpandedRow] = useState(null);
+  const [selectedPedido, setSelectedPedido] = useState(null);
+
+  const [formCrear, setFormCrear] = useState({
+    ClienteId: "",
+    FechaRegistro: "",
+    Total: 0,
+    Estado: 1,
+  });
+
+  const [detalles, setDetalles] = useState([
     {
-      id: 1,
-      cedula: "1001",
-      fecha: "2025-09-01",
-      total: 250,
-      estado: "Activo",
-      detalle: [
-        {
-          id: "P001",
-          tipoDetalle: "Producto",
-          insumo: 100,
-          cantidad: "9 cm",
-          unidadMedida: "5 cm",
-          precioUnitario: "5 cm",
-          subtotal: "5 cm",
-          estado: "Activo",
-        },
-      ],
+      ProductoServicioId: "",
+      Cantidad: 1,
+      Alto: "",
+      Ancho: "",
+      Descripcion: "",
+      UrlImagen: "",
     },
-  ];
+  ]);
+
+  const [formEditar, setFormEditar] = useState({
+    PedidoClienteId: "",
+    ClienteId: "",
+    FechaRegistro: "",
+    Total: 0,
+    Estado: 1,
+    detalle: [],
+  });
+
+  
+  const fetchPedidos = async () => {
+    try {
+      const { data } = await axios.get(API_URL);
+      const arr = Array.isArray(data) ? data : [];
+      setPedidos(arr);
+
+      const estados = {};
+      arr.forEach((p) => {
+        estados[p.PedidoClienteId] = Number(p.Estado) === 1 ? 1 : 0;
+      });
+      setEstadoActivo(estados);
+    } catch (err) {
+      console.error("Error al cargar pedidos:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPedidos();
+  }, []);
+
+
+  const pedidosFiltrados = pedidos.filter((p) => {
+    if (!filtroCampo || !filtroText.trim()) return true;
+    const valor = String(p[filtroCampo] || "").toLowerCase();
+    return valor.includes(filtroText.toLowerCase());
+  });
+
 
   const toggleExpand = (id) => {
-    setExpandedRow(expandeRow === id ? null : id);
+    setExpandedRow(expandedRow === id ? null : id);
+  };
+
+  const añadirDetalle = () => {
+    setDetalles((prev) => [
+      ...prev,
+      {
+        ProductoServicioId: "",
+        Cantidad: 1,
+        Alto: "",
+        Ancho: "",
+        Descripcion: "",
+        UrlImagen: "",
+      },
+    ]);
+  };
+
+  const eliminarDetalle = (index) => {
+    if (detalles.length === 1) return;
+    setDetalles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const actualizarDetalle = (index, campo, valor) => {
+    setDetalles((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [campo]: valor };
+      return copy;
+    });
+  };
+
+  const handleCreate = async () => {
+    try {
+      const payload = { ...formCrear, detalle: detalles };
+      await axios.post(API_URL, payload);
+
+      setOpenCreate(false);
+      setFormCrear({ ClienteId: "", FechaRegistro: "", Total: 0, Estado: 1 });
+      setDetalles([
+        { ProductoServicioId: "", Cantidad: 1, Alto: "", Ancho: "", Descripcion: "", UrlImagen: "" },
+      ]);
+      fetchPedidos();
+    } catch (err) {
+      console.error("Error al crear pedido:", err);
+    }
+  };
+
+
+  const handleEdit = async () => {
+    try {
+      const payload = {
+        ClienteId: formEditar.ClienteId,
+        FechaRegistro: formEditar.FechaRegistro,
+        Total: formEditar.Total,
+        Estado: formEditar.Estado,
+        detalle: formEditar.detalle,
+      };
+
+      await axios.put(`${API_URL}/${formEditar.PedidoClienteId}`, payload);
+
+      setOpenEditar(false);
+      fetchPedidos();
+    } catch (err) {
+      console.error("Error al editar pedido:", err);
+    }
+  };
+
+
+  const handleToggleEstado = async (idPedido, nuevoEstadoBoolean) => {
+    const nuevoEstadoNum = nuevoEstadoBoolean ? 1 : 0;
+    const pedidoActual = pedidos.find((p) => p.PedidoClienteId === idPedido);
+    if (!pedidoActual) return;
+
+    try {
+      await axios.put(`${API_URL}/${idPedido}`, {
+        ClienteId: pedidoActual.ClienteId,
+        FechaRegistro: pedidoActual.FechaRegistro,
+        Total: pedidoActual.Total,
+        Estado: nuevoEstadoNum,
+      });
+
+      setEstadoActivo((prev) => ({ ...prev, [idPedido]: nuevoEstadoNum }));
+      setPedidos((prev) =>
+        prev.map((p) => (p.PedidoClienteId === idPedido ? { ...p, Estado: nuevoEstadoNum } : p))
+      );
+    } catch (err) {
+      console.error("Error al actualizar estado:", err);
+    }
+  };
+
+  const openVerModal = (p) => {
+    setSelectedPedido(p);
+
+    setFormEditar({
+      PedidoClienteId: p.PedidoClienteId,
+      ClienteId: p.ClienteId,
+      FechaRegistro: p.FechaRegistro,
+      Total: p.Total,
+      Estado: p.Estado,
+      detalle: p.detalle || [],
+    });
+
+    setOpenVer(true);
+  };
+
+ 
+  const openEliminarModal = (p) => {
+    setSelectedPedido(p);
+    setOpenEliminar(true);
+  };
+
+  const handleDelete = async () => {
+    try {
+      if (!selectedPedido) return;
+
+      await axios.delete(`${API_URL}/${selectedPedido.PedidoClienteId}`);
+      setOpenEliminar(false);
+      fetchPedidos();
+    } catch (err) {
+      console.error("Error al eliminar pedido:", err);
+    }
   };
 
   const renderModalForm = (type = "create") => {
     const isReadOnly = type === "ver";
-    const buttonLabel =
-      type === "create" ? "Crear" : type === "editar" ? "Editar" : "Cerrar";
+
+    const formState = type === "create" ? formCrear : formEditar;
+    const formSetter = type === "create" ? setFormCrear : setFormEditar;
+
+    const detallesParaRender = type === "create" ? detalles : formState.detalle || [];
 
     return (
-      <form className="flex flex-col gap-6 p-4 bg-white rounded-lg shadow-md">
-        {/* Datos principales */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="flex flex-col gap-2">
-            <label className="font-medium">Compra ID</label>
-            <input
-              type="text"
-              placeholder="1"
-              readOnly={isReadOnly}
-              className="w-full h-10 px-3 border border-gray-300 rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="font-medium">Proveedor ID</label>
-            <input
-              type="text"
-              placeholder="1001"
-              readOnly={isReadOnly}
-              className="w-full h-10 px-3 border border-gray-300 rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
+      <form className="flex flex-col gap-8 p-6 bg-white rounded-lg ">
 
-        {/* Fecha y total */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="flex flex-col gap-2">
             <label className="font-medium">Fecha de registro</label>
             <input
               type="date"
               readOnly={isReadOnly}
-              defaultValue="2025-09-01"
-              className="w-full h-10 px-3 border border-gray-300 rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formState.FechaRegistro}
+              onChange={(e) => formSetter({ ...formState, FechaRegistro: e.target.value })}
+              className="w-full h-11 px-3 border rounded bg-gray-100"
             />
           </div>
           <div className="flex flex-col gap-2">
             <label className="font-medium">Total</label>
             <input
-              type="text"
-              placeholder="$250.00"
+              type="number"
               readOnly={isReadOnly}
-              className="w-full h-10 px-3 border border-gray-300 rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formState.Total}
+              onChange={(e) => formSetter({ ...formState, Total: Number(e.target.value) })}
+              className="w-full h-11 px-3 border rounded bg-gray-100"
             />
           </div>
         </div>
 
-        {/* Botón agregar item */}
-        <div className="flex justify-end">
-          <Link className="inline-flex h-10 items-center gap-2 bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-all duration-200 shadow-md hover:shadow-lg font-medium">
-            <Plus size={15} /> Añadir item
-          </Link>
-        </div>
+        {!isReadOnly && (
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                if (type === "create") añadirDetalle();
+                else
+                  formSetter({
+                    ...formState,
+                    detalle: [
+                      ...formState.detalle,
+                      {
+                        ProductoServicioId: "",
+                        Cantidad: 1,
+                        Alto: "",
+                        Ancho: "",
+                        Descripcion: "",
+                        UrlImagen: "",
+                      },
+                    ],
+                  });
+              }}
+              className="bg-blue-500 text-white px-6 py-2 rounded-lg"
+            >
+              <Plus size={15} /> Añadir detalle
+            </button>
+          </div>
+        )}
 
-        {/* Campos detalle */}
-        <div className="grid grid-cols-1 md:grid-cols-8 gap-4">
-          {[
-            "id",
-            "tipoDetalle",
-            "insumo",
-            "cantidad",
-            "unidadMedida",
-            "precioUnitario",
-            "total",
-            "estado",
-          ].map((label, idx) => (
-            <div key={idx} className="flex flex-col gap-2">
-              <label className="font-medium">{label}</label>
-              <input
-                type="text"
-                placeholder={`Ingrese ${label.toLowerCase()}`}
-                readOnly={isReadOnly}
-                className="w-full h-10 px-3 border border-gray-300 rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+        <div className="grid grid-cols-1 gap-4">
+          {detallesParaRender.map((d, index) => (
+            <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-3 border p-3 rounded">
+
+              <div className="flex flex-col gap-2">
+                <label>ProductoServicioId</label>
+                <input
+                  type="text"
+                  readOnly={isReadOnly}
+                  value={d.ProductoServicioId || ""}
+                  onChange={(e) => {
+                    if (type === "create") actualizarDetalle(index, "ProductoServicioId", e.target.value);
+                    else {
+                      const copy = [...formState.detalle];
+                      copy[index].ProductoServicioId = e.target.value;
+                      formSetter({ ...formState, detalle: copy });
+                    }
+                  }}
+                  className="h-10 px-2 border rounded"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label>Cantidad</label>
+                <input
+                  type="number"
+                  readOnly={isReadOnly}
+                  value={d.Cantidad ?? ""}
+                  onChange={(e) => {
+                    const num = Number(e.target.value);
+                    if (type === "create") actualizarDetalle(index, "Cantidad", num);
+                    else {
+                      const copy = [...formState.detalle];
+                      copy[index].Cantidad = num;
+                      formSetter({ ...formState, detalle: copy });
+                    }
+                  }}
+                  className="h-10 px-2 border rounded"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label>Alto</label>
+                <input
+                  type="text"
+                  readOnly={isReadOnly}
+                  value={d.Alto || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (type === "create") actualizarDetalle(index, "Alto", val);
+                    else {
+                      const copy = [...formState.detalle];
+                      copy[index].Alto = val;
+                      formSetter({ ...formState, detalle: copy });
+                    }
+                  }}
+                  className="h-10 px-2 border rounded"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label>Ancho</label>
+                <input
+                  type="text"
+                  readOnly={isReadOnly}
+                  value={d.Ancho || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (type === "create") actualizarDetalle(index, "Ancho", val);
+                    else {
+                      const copy = [...formState.detalle];
+                      copy[index].Ancho = val;
+                      formSetter({ ...formState, detalle: copy });
+                    }
+                  }}
+                  className="h-10 px-2 border rounded"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label>Descripción</label>
+                <input
+                  type="text"
+                  readOnly={isReadOnly}
+                  value={d.Descripcion || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (type === "create") actualizarDetalle(index, "Descripcion", val);
+                    else {
+                      const copy = [...formState.detalle];
+                      copy[index].Descripcion = val;
+                      formSetter({ ...formState, detalle: copy });
+                    }
+                  }}
+                  className="h-10 px-2 border rounded"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label>UrlImagen</label>
+                <input
+                  type="text"
+                  readOnly={isReadOnly}
+                  value={d.UrlImagen || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (type === "create") actualizarDetalle(index, "UrlImagen", val);
+                    else {
+                      const copy = [...formState.detalle];
+                      copy[index].UrlImagen = val;
+                      formSetter({ ...formState, detalle: copy });
+                    }
+                  }}
+                  className="h-10 px-2 border rounded"
+                />
+
+                {d.UrlImagen && (
+                  <img
+                    src={d.UrlImagen}
+                    alt="preview"
+                    className="w-20 h-20 object-cover rounded mt-1"
+                  />
+                )}
+              </div>
+
+              {!isReadOnly && (
+                <div className="md:col-span-6 flex justify-end">
+                  <Trash2
+                    size={18}
+                    className="text-red-600 cursor-pointer"
+                    onClick={() => {
+                      if (type === "create") eliminarDetalle(index);
+                      else {
+                        const copy = [...formState.detalle];
+                        copy.splice(index, 1);
+                        formSetter({ ...formState, detalle: copy });
+                      }
+                    }}
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
 
-        {/* Botones del modal */}
-        <div className="flex flex-col md:flex-row gap-4 mt-4 items-center">
-          {type !== "ver" && (
-            <button className="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 transition-colors">
-              {buttonLabel}
+        {/* BOTONES ABAJO */}
+        <div className="flex flex-col md:flex-row gap-4 mt-6">
+          {type === "create" && (
+            <button
+              type="button"
+              onClick={handleCreate}
+              className="flex-1 bg-green-500 text-white h-11 rounded"
+            >
+              Crear
             </button>
           )}
+
+          {type === "editar" && (
+            <button
+              type="button"
+              onClick={handleEdit}
+              className="flex-1 bg-blue-500 text-white h-11 rounded"
+            >
+              Guardar cambios
+            </button>
+          )}
+
           <button
             type="button"
-            className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition-colors"
             onClick={() => {
               if (type === "create") setOpenCreate(false);
-              else if (type === "editar") setOpenEditar(false);
-              else if (type === "ver") setOpenVer(false);
+              if (type === "editar") setOpenEditar(false);
+              if (type === "ver") setOpenVer(false);
             }}
+            className="flex-1 bg-gray-200 text-gray-700 h-11 rounded"
           >
             {type === "ver" ? "Cerrar" : "Cancelar"}
           </button>
-          <h1 className="font-bold text-lg">Total: $30,000</h1>
         </div>
       </form>
     );
   };
 
+ 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-slate-800 mb-6">
-          Gestión de pedidos
-        </h1>
+        <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Pedidos</h1>
 
-        {/* Barra de acciones */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        {/* =================== FILTROS =================== */}
+        <div className="bg-white rounded-xl shadow-sm border p-6 mb-6 flex flex-col sm:flex-row gap-4">
+
           <Link
-            onClick={() => setOpenCreate(true)}
-            className="inline-flex items-center gap-2 bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-all duration-200 shadow-md hover:shadow-lg font-medium"
+            onClick={() => {
+              setFormCrear({ ClienteId: "", FechaRegistro: "", Total: 0, Estado: 1 });
+              setDetalles([
+                { ProductoServicioId: "", Cantidad: 1, Alto: "", Ancho: "", Descripcion: "", UrlImagen: "" },
+              ]);
+              setOpenCreate(true);
+            }}
+            className="bg-green-800 text-white px-6 py-3 rounded-lg flex items-center gap-2"
           >
             <Plus size={18} /> Nuevo pedido
           </Link>
 
-          <select className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px] transition-all duration-200">
-            <option value="">Filtrar por campo</option>
-            <option value="id">CompraID</option>
-            <option value="cedula">ProveedorID</option>
-            <option value="fecha">Fecha</option>
+          <select
+            value={filtroCampo}
+            onChange={(e) => setFiltroCampo(e.target.value)}
+            className="border rounded-lg px-4 py-3 bg-white text-slate-700"
+          >
+            <option value="">Filtrar por Campo</option>
+            <option value="PedidoClienteId">PedidoId</option>
+            <option value="ClienteId">ClienteId</option>
+            <option value="FechaRegistro">Fecha</option>
           </select>
 
           <div className="relative flex-1 max-w-md">
             <input
               type="text"
               placeholder="Buscar pedido"
-              className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700"
+              value={filtroText}
+              onChange={(e) => setFiltroText(e.target.value)}
+              className="border rounded-lg pl-10 pr-4 py-3 w-full"
             />
             <img
-              src="/public/multimedia/lupa.png"
+              src="/multimedia/lupa.png"
               alt="Buscar"
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-5"
             />
           </div>
         </div>
 
-        {/* Modales */}
+
         <Modal open={openCreate} onClose={() => setOpenCreate(false)}>
-          <div className="w-[750px] p-6 mx-auto text-center">
-            <h3 className="text-lg font-black text-gray-800 mb-6">
-              Nueva compra
-            </h3>
+          <div className="w-[850px] max-h-[90vh] overflow-y-auto p-6 rounded-xl">
+            <h3 className="text-lg font-bold mb-6">Nuevo pedido</h3>
             {renderModalForm("create")}
           </div>
         </Modal>
 
         <Modal open={openEditar} onClose={() => setOpenEditar(false)}>
-          <div className="w-[750px] p-6 mx-auto text-center">
-            <h3 className="text-lg font-black text-gray-800 mb-6">
-              Editar pedido
-            </h3>
+          <div className="w-[850px] max-h-[90vh] overflow-y-auto p-6 rounded-xl">
+            <h3 className="text-lg font-bold mb-6">Editar pedido</h3>
             {renderModalForm("editar")}
           </div>
         </Modal>
 
         <Modal open={openVer} onClose={() => setOpenVer(false)}>
-          <div className="w-[750px] p-6 mx-auto text-center">
-            <h3 className="text-lg font-black text-gray-800 mb-6">Ver compra</h3>
-            {renderModalForm("ver")}
+          <div className="w-[850px] max-h-[90vh] overflow-y-auto p-6 rounded-xl">
+            <h3 className="text-lg font-bold mb-6">Ver pedido</h3>
+            {selectedPedido ? renderModalForm("ver") : <p>Cargando...</p>}
           </div>
         </Modal>
 
         <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
-          <div className="w-[400px] p-6 mx-auto text-center">
-            <h3 className="text-lg font-black text-gray-800 mb-4">
-              Eliminar compra
-            </h3>
-            <p className="mb-6">¿Está seguro de eliminar este pedido?</p>
+          <div className="w-[750px] max-h-[90vh] overflow-y-auto p-6 rounded-xl">
+            <h3 className="text-lg font-bold mb-4">Eliminar pedido</h3>
+            <p className="mb-6">¿Está seguro de eliminar el pedido?</p>
             <div className="flex gap-4">
-              <button className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 transition-colors">
+              <button
+                className="flex-1 bg-red-500 text-white py-2 rounded"
+                onClick={handleDelete}
+              >
                 Eliminar
               </button>
               <button
-                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition-colors"
+                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded"
                 onClick={() => setOpenEliminar(false)}
               >
                 Cancelar
@@ -227,147 +539,145 @@ export const Pedidos = () => {
           </div>
         </Modal>
 
-        {/* Tabla principal */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto overflow-y-auto max-h-[600px] w-full">
-          <table className="min-w-full table-auto text-sm">
-            <thead className="bg-gradient-to-r from-slate-800 to-slate-700 sticky top-0 z-10">
+        {/* =================== TABLA =================== */}
+        <div className="bg-white rounded-xl shadow-sm border overflow-auto max-h-[600px]">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-800 sticky top-0">
               <tr>
-                <th className="px-4 py-3 w-10"></th>
-                <th className="px-4 py-3 text-left text-white font-semibold">
-                  Compra ID
-                </th>
-                <th className="px-4 py-3 text-left text-white font-semibold">
-                  Proveedor ID
-                </th>
-                <th className="px-4 py-3 text-left text-white font-semibold">
-                  Fecha Registro
-                </th>
-                <th className="px-4 py-3 text-center text-white font-semibold">
-                  Total
-                </th>
-                <th className="px-4 py-3 text-center text-white font-semibold">
-                  Estado
-                </th>
-                <th className="px-4 py-3 text-center text-white font-semibold">
-                  Acciones
-                </th>
+                <th className="px-4 py-3"></th>
+                <th className="px-4 py-3 text-white text-left">Pedido ID</th>
+                <th className="px-4 py-3 text-white text-left">Cliente ID</th>
+                <th className="px-4 py-3 text-white text-left">Fecha Registro</th>
+                <th className="px-4 py-3 text-white text-left">Total</th>
+                <th className="px-4 py-3 text-white text-left">Estado</th>
+                <th className="px-4 py-3 text-white text-left">Acciones</th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-100">
-              {pedidos.map((pedido) => (
-                <React.Fragment key={pedido.id}>
-                  <tr className="hover:bg-slate-50 transition-colors">
+            <tbody className="divide-y">
+
+              {pedidosFiltrados.map((pedido) => (
+                <React.Fragment key={pedido.PedidoClienteId}>
+                  <tr className="hover:bg-slate-50">
+
+                    {/* Expandir */}
                     <td className="py-4 px-6 text-center">
-                      <button onClick={() => toggleExpand(pedido.id)}>
+                      <button onClick={() => toggleExpand(pedido.PedidoClienteId)}>
                         <ChevronDown
                           size={18}
-                          className={`transform transition-transform ${
-                            expandeRow === pedido.id ? "rotate-180" : ""
+                          className={`transition-transform ${
+                            expandedRow === pedido.PedidoClienteId ? "rotate-180" : ""
                           }`}
                         />
                       </button>
                     </td>
-                    <td className="py-4 px-6">{pedido.id}</td>
-                    <td className="py-4 px-6">{pedido.cedula}</td>
-                    <td className="py-4 px-6">{pedido.fecha}</td>
-                    <td className="py-4 px-6 text-center">
-                      ${pedido.total.toFixed(2)}
+
+                    <td className="py-4 px-6">{pedido.PedidoClienteId}</td>
+                    <td className="py-4 px-6">{pedido.ClienteId}</td>
+                    <td className="py-4 px-6">{pedido.FechaRegistro}</td>
+                    <td className="py-4 px-6">S/ {Number(pedido.Total || 0).toFixed(2)}</td>
+
+                    {/* Switch */}
+                    <td className="py-4 px-6">
+                      <label className="inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={Number(estadoActivo[pedido.PedidoClienteId]) === 1}
+                          onChange={(e) =>
+                            handleToggleEstado(pedido.PedidoClienteId, e.target.checked)
+                          }
+                        />
+                        <div className="w-12 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-all"></div>
+                        <span className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-md peer-checked:translate-x-6 transition-all"></span>
+                      </label>
                     </td>
-                    <td className="py-4 px-6 text-center">
-                      <span
-                        className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          pedido.estado === "Activo"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {pedido.estado}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-center">
-                      <div className="flex justify-center gap-3">
-                        <Link onClick={() => setOpenEditar(true)}>
-                          <Edit
-                            size={16}
-                            className="text-blue-600 hover:text-blue-800"
-                          />
-                        </Link>
-                        <Link onClick={() => setOpenVer(true)}>
-                          <Eye
-                            size={16}
-                            className="text-emerald-600 hover:text-emerald-800"
-                          />
-                        </Link>
-                        <Link onClick={() => setOpenEliminar(true)}>
-                          <Trash2
-                            size={16}
-                            className="text-red-600 hover:text-red-800"
-                          />
-                        </Link>
+
+                    {/* ACCIONES */}
+                    <td className="py-4 px-6">
+                      <div className="flex gap-3">
+                        <button onClick={() => openVerModal(pedido)}>
+                          <Eye size={16} className="text-emerald-600" />
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setSelectedPedido(pedido);
+                            setFormEditar({
+                              PedidoClienteId: pedido.PedidoClienteId,
+                              ClienteId: pedido.ClienteId,
+                              FechaRegistro: pedido.FechaRegistro,
+                              Total: pedido.Total,
+                              Estado: pedido.Estado,
+                              detalle: pedido.detalle || [],
+                            });
+                            setOpenEditar(true);
+                          }}
+                        >
+                          <Edit size={16} className="text-blue-600" />
+                        </button>
+
+                        <button onClick={() => openEliminarModal(pedido)}>
+                          <Trash2 size={16} className="text-red-600" />
+                        </button>
                       </div>
                     </td>
                   </tr>
 
-                  {/* Fila expandida */}
-                  {expandeRow === pedido.id && (
+                  {/* FILA EXPANDIDA */}
+                  {expandedRow === pedido.PedidoClienteId && (
                     <tr className="bg-gray-50">
                       <td colSpan={7} className="py-3 px-6">
-                        <div className="overflow-x-auto w-full">
-                          <table className="min-w-full text-sm border border-gray-200">
+                        <div className="overflow-auto">
+                          <table className="min-w-full text-sm border">
                             <thead className="bg-gray-200">
                               <tr>
-                                <th className="py-2 px-4">ID</th>
-                                <th className="py-2 px-4">TipoDetalle</th>
-                                <th className="py-2 px-4">Insumo</th>
+                                <th className="py-2 px-4">DetallePedidoClienteId</th>
+                                <th className="py-2 px-4">ProductoServicioId</th>
                                 <th className="py-2 px-4">Cantidad</th>
-                                <th className="py-2 px-4">Unidadmedida</th>
-                                <th className="py-2 px-4">PrecioUnitario</th>
-                                <th className="py-2 px-4">Subtotal</th>
-                                <th className="py-2 px-4">Estado</th>
-                                <th className="py-2 px-4 text-center">
-                                  Acciones
-                                </th>
+                                <th className="py-2 px-4">Alto</th>
+                                <th className="py-2 px-4">Ancho</th>
+                                <th className="py-2 px-4">Descripción</th>
+                                <th className="py-2 px-4">Imagen</th>
+                                <th className="py-2 px-4">Acciones</th>
                               </tr>
                             </thead>
+
                             <tbody>
-                              {pedido.detalle.map((item, idx) => (
-                                <tr key={idx} className="hover:bg-gray-100">
-                                  <td className="py-2 px-4">{item.id}</td>
-                                  <td className="py-2 px-4">{item.tipo}</td>
-                                  <td className="py-2 px-4 truncate max-w-[200px]">
-                                    {item.descripcion}
+                              {(pedido.detalle || []).map((item) => (
+                                <tr key={item.DetallePedidoClienteId}>
+                                  <td className="py-2 px-4">{item.DetallePedidoClienteId}</td>
+                                  <td className="py-2 px-4">{item.ProductoServicioId}</td>
+                                  <td className="py-2 px-4">{item.Cantidad}</td>
+                                  <td className="py-2 px-4">{item.Alto}</td>
+                                  <td className="py-2 px-4">{item.Ancho}</td>
+                                  <td className="py-2 px-4">{item.Descripcion}</td>
+                                  <td className="py-2 px-4">
+                                    {item.UrlImagen ? (
+                                      <img
+                                        src={item.UrlImagen}
+                                        className="w-20 h-20 object-cover rounded"
+                                      />
+                                    ) : (
+                                      "Sin imagen"
+                                    )}
                                   </td>
-                                  <td className="py-2 px-4">{item.ProductoServicio}</td>
-                                  <td className="py-2 px-4">{item.insumo}</td>
-                                  <td className="py-2 px-4">{item.cantidad}</td>
-                                  <td className="py-2 px-4">{item.descripcion}</td>
+
                                   <td className="py-2 px-4 text-center">
-                                    <div className="flex justify-center gap-2">
-                                      <Link onClick={() => setOpenEditar(true)}>
-                                        <Edit
-                                          size={14}
-                                          className="text-blue-600 hover:text-blue-800"
-                                        />
-                                      </Link>
-                                      <Link onClick={() => setOpenVer(true)}>
-                                        <Eye
-                                          size={14}
-                                          className="text-emerald-600 hover:text-emerald-800"
-                                        />
-                                      </Link>
-                                      <Link
-                                        onClick={() => setOpenEliminar(true)}
-                                      >
-                                        <Trash2
-                                          size={14}
-                                          className="text-red-600 hover:text-red-800"
-                                        />
-                                      </Link>
-                                    </div>
+                                    <button onClick={() => openVerModal(pedido)}>
+                                      <Eye size={14} className="text-emerald-600" />
+                                    </button>
                                   </td>
                                 </tr>
                               ))}
+
+                              {(pedido.detalle || []).length === 0 && (
+                                <tr>
+                                  <td colSpan={8} className="py-2 text-center text-gray-500">
+                                    Sin detalles
+                                  </td>
+                                </tr>
+                              )}
                             </tbody>
                           </table>
                         </div>
@@ -376,6 +686,14 @@ export const Pedidos = () => {
                   )}
                 </React.Fragment>
               ))}
+
+              {pedidosFiltrados.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-6 text-center text-gray-500">
+                    No hay pedidos a mostrar
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

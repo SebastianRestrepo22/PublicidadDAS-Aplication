@@ -1,16 +1,18 @@
-// import express from 'express';
-// import {
-//   getAllProveedores,
-//   getProveedorById,
-//   createProveedor,
-//   deleteProveedor
-// } from '../controllers/proveedores.controller.js';
+import express from 'express';
+import {
+   getAllProveedores,
+   getProveedorById,
+   createProveedor,
+   deleteProveedor,
+   updateProveedor
+} from '../controllers/proveedores.controller.js';
 
-// const router = express.Router();
+const router = express.Router();
 
-// router.get('/', getAllProveedores);
-// router.get('/:id', getProveedorById);
-// router.post('/', createProveedor);
-// router.delete('/:id', deleteProveedor);
+router.get('/', getAllProveedores);
+router.get('/:id', getProveedorById);
+router.post('/', createProveedor);
+router.put("/:id" , updateProveedor);
+router.delete('/:id', deleteProveedor);
 
-// export default router;
+export default router;
