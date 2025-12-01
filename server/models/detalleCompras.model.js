@@ -20,14 +20,15 @@ export const getDetalleByIdModel = async (id) => {
 
 export const getDetalleByCompraIdModel = async (CompraId) => {
   const connection = await connectDB();
+  // Corrección: Typo en el alias de TipoDetalle (antes estaba "TpoDetalle")
   const [rows] = await connection.execute(
-    'SELECT *, TpoDetalle AS TipoDetalle  FROM DetalleCompras WHERE CompraId = ?',
+    'SELECT *, TipoDetalle AS TipoDetalle FROM DetalleCompras WHERE CompraId = ?',
     [CompraId]
-); 
+  ); 
   return rows;
 };
 
-// Crear un nuevo proveedor
+// Crear un nuevo detalle
 export const createDetalleCompra = async ({  
     CompraId,
     TipoDetalle, 
@@ -88,11 +89,7 @@ export const deleteDetalleCompra = async (id) => {
   return result;
 };
 
+// Alias para nombres que usa el controlador
 export const createDetalleModel = createDetalleCompra;
 export const updateDetalleModel = updateDetalleCompra;
 export const deleteDetalleModel = deleteDetalleCompra;
-
-
-
-
-

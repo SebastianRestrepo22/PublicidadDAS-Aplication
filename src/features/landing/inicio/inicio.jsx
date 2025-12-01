@@ -29,46 +29,28 @@ export const Inicio = () => {
                 {/* Carrusel */}
                 <div className="container">
                     <div className="slide">
-                        <div className="item" style={{ backgroundImage: `url(/multimedia/litografia1.png)` }}>
-                            <div className="content">
-                                <div className="name">Imágen 1</div>
-                                <div className="des">Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nostrum sit corporis nam! Illo architecto similique veritatis ad dolore magni nisi, eveniet, voluptatum dicta id repudiandae earum dolorum excepturi tempore placeat?</div>
-                            </div>
+                        <div className="item" style={{ backgroundImage: `url(/multimedia/carru2.jpg)` }}>
+
                         </div>
 
-                        <div className="item" style={{ backgroundImage: `url(/multimedia/litografia2.png)` }}>
-                            <div className="content">
-                                <div className="name">Imágen 2</div>
-                                <div className="des">Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nostrum sit corporis nam! Illo architecto similique veritatis ad dolore magni nisi, eveniet, voluptatum dicta id repudiandae earum dolorum excepturi tempore placeat?</div>
-                            </div>
+                        <div className="item" style={{ backgroundImage: `url(/multimedia/carru5-.jpg)` }}>
+                           
                         </div>
 
-                        <div className="item" style={{ backgroundImage: `url(/multimedia/litografia3.png)` }}>
-                            <div className="content">
-                                <div className="name">Imágen 3</div>
-                                <div className="des">Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nostrum sit corporis nam! Illo architecto similique veritatis ad dolore magni nisi, eveniet, voluptatum dicta id repudiandae earum dolorum excepturi tempore placeat?</div>
-                            </div>
+                        <div className="item" style={{ backgroundImage: `url(/multimedia/carru4.jpg)` }}>
+                            
                         </div>
 
-                        <div className="item" style={{ backgroundImage: `url(/multimedia/litografia4.png)` }}>
-                            <div className="content">
-                                <div className="name">Imágen 4</div>
-                                <div className="des">Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nostrum sit corporis nam! Illo architecto similique veritatis ad dolore magni nisi, eveniet, voluptatum dicta id repudiandae earum dolorum excepturi tempore placeat?</div>
-                            </div>
+                        <div className="item" style={{ backgroundImage: `url(/multimedia/carru6.jpeg)` }}>
+                           
                         </div>
 
-                        <div className="item" style={{ backgroundImage: `url(/multimedia/litografia5.png)` }}>
-                            <div className="content">
-                                <div className="name">Imágen 5</div>
-                                <div className="des">Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nostrum sit corporis nam! Illo architecto similique veritatis ad dolore magni nisi, eveniet, voluptatum dicta id repudiandae earum dolorum excepturi tempore placeat?</div>
-                            </div>
+                        <div className="item" style={{ backgroundImage: `url(/multimedia/carru8.png)` }}>
+                            
                         </div>
 
-                        <div className="item" style={{ backgroundImage: `url(/multimedia/litografia6.png)` }}>
-                            <div className="content">
-                                <div className="name">Imágen 6</div>
-                                <div className="des">Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nostrum sit corporis nam! Illo architecto similique veritatis ad dolore magni nisi, eveniet, voluptatum dicta id repudiandae earum dolorum excepturi tempore placeat?</div>
-                            </div>
+                        <div className="item" style={{ backgroundImage: `url(/multimedia/carru7.jpg)` }}>
+                        
                         </div>
                     </div>
                     {/* <div className="button">
@@ -135,7 +117,7 @@ export const Inicio = () => {
                             </div>
 
                             <div className="bg-red-500 w-[675px] h-[400px]">
-                                <img src="/multimedia/tarjeta1.png" className="w-full h-full object-cover" />
+                                <img src="/multimedia/espacio_2.png" className="w-full h-full object-cover" />
                             </div>
                         </div>
                     </section>
@@ -144,7 +126,7 @@ export const Inicio = () => {
                         <div className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 justify-items-center">
 
                             <div className="bg-red-500 w-[676px] h-[400px]">
-                                <img src="/multimedia/tarjeta2.png" className="w-full h-full object-cover" />
+                                <img src="/multimedia/espacio_1.jpg" className="w-full h-full object-cover" />
                             </div>
 
                             <div className="bg-[#25395C] flex flex-col justify-center items-center text-center px-6 py-10 h-[400px]">

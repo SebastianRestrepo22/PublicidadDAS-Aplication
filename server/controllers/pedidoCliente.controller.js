@@ -12,9 +12,7 @@ import {
   deleteDetallePedidoModel
 } from "../models/detallePedidoCliente.model.js";
 
-/**
- * Obtener todos los pedidos con sus detalles
- */
+
 export const getPedidosClientes = async (req, res) => {
   try {
     const pedidos = await getAllPedidosClientesModel();
@@ -54,10 +52,21 @@ export const getPedidoClienteById = async (req, res) => {
  * Crear pedido + detalles
  */
 export const createPedidoCliente = async (req, res) => {
-  const { ClienteId, FechaRegistro, Total, Estado, detalle } = req.body;
-
   try {
-    // Crear pedido
+    let { ClienteId, FechaRegistro, Total, Estado, detalle } = req.body;
+
+    console.log("CLIENTE ID RECIBIDO (crudo):", ClienteId);
+
+    // 🔥 LIMPIA espacios y tabs
+    ClienteId = ClienteId?.toString().trim();
+
+    console.log("CLIENTE ID LIMPIO:", ClienteId);
+    console.log("BODY COMPLETO:", req.body);
+
+    if (!ClienteId) {
+      return res.status(400).json({ error: "ClienteId es obligatorio" });
+    }
+
     const nuevoPedido = await createPedidoClienteModel({
       ClienteId,
       FechaRegistro,
@@ -65,19 +74,25 @@ export const createPedidoCliente = async (req, res) => {
       Estado
     });
 
-    // Insertar detalles
     if (Array.isArray(detalle) && detalle.length > 0) {
       for (let d of detalle) {
-        await createDetallePedidoModel({
-          PedidoClienteId: nuevoPedido.PedidoClienteId,
-          ProductoServicioId: d.ProductoServicioId,
-          Cantidad: d.Cantidad,
-          Alto: d.Alto,
-          Ancho: d.Ancho,
-          Descripcion: d.Descripcion,
-          UrlImagen: d.UrlImagen
-        });
-      }
+
+  // Limpieza de ProductoServicioId
+  const ProductoServicioId = d.ProductoServicioId?.toString().trim();
+
+  console.log("PRODUCTO SERVICIO ID LIMPIO:", ProductoServicioId);
+
+  await createDetallePedidoModel({
+    PedidoClienteId: nuevoPedido.PedidoClienteId,
+    ProductoServicioId,
+    Cantidad: d.Cantidad,
+    Alto: d.Alto,
+    Ancho: d.Ancho,
+    Descripcion: d.Descripcion,
+    UrlImagen: d.UrlImagen
+  });
+}
+
     }
 
     const pedidoCreado = {
@@ -86,16 +101,23 @@ export const createPedidoCliente = async (req, res) => {
     };
 
     res.status(201).json(pedidoCreado);
+
   } catch (error) {
     console.error("Error al crear pedido:", error);
     res.status(500).json({ error: "Error al crear pedido" });
   }
 };
 
+
 /**
  * Actualizar pedido
  */
 export const updatePedidoCliente = async (req, res) => {
+
+  if (req.body.FechaRegistro) {
+  req.body.FechaRegistro = req.body.FechaRegistro.split("T")[0];
+}
+
   try {
     const result = await updatePedidoClienteModel(req.params.id, req.body);
 

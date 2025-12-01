@@ -47,7 +47,7 @@ export const initRolesAndAdmin = async () => {
              (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                uuidv4(),
+                "1000000000", 
                 tipoDoc[0].TipoDocumentoId,
                 'Administrador',
                 '0000000000',

@@ -5,8 +5,11 @@ import  proveedorRoutes from './routes/proveedores.routes.js';
 import insumosRoutes from './routes/insumos.routes.js';
 import categoriaRoutes from './routes/categoria.routes.js';
 import comprasRoutes from './routes/compras.routes.js';
+import  detalleComprasRoutes from './routes/detalleCompras.routes.js';
 import pedidoClienteRoutes from "./routes/pedidoCliente.routes.js";
 import detallePedidoClienteRoutes from "./routes/detallePedidoCliente.routes.js";
+import detalleProduccionRoutes from "./routes/detalleProduccion.routes.js";
+import produccionRoutes from "./routes/produccion.routes.js";
 import citaRoutes from "./routes/cita.routes.js";
 
 
@@ -43,8 +46,11 @@ app.use('/api/categorias', categoriaRoutes)
 app.use('/api/proveedores', proveedorRoutes)
 app.use('/api/insumos', insumosRoutes)
 app.use('/api/compras', comprasRoutes)
+app.use('/api/detalle-compras', detalleComprasRoutes)
 app.use("/api/pedidos-clientes", pedidoClienteRoutes);
 app.use("/api/detalle-pedido", detallePedidoClienteRoutes);
+app.use("/api/detalle-produccion", detalleProduccionRoutes)
+app.use("/api/produccion", produccionRoutes)
 app.use("/api/cita", citaRoutes)
 
 

@@ -8,7 +8,7 @@ export const ProtectedRouteAdmin = ({ children }) => {
     return <Navigate to="/login" />;
   } 
 
-  if (user?.Role !== "Administrador") {
+  if (user?.Role !== "administrador") {
     return <Navigate to="/" />;
   }
 

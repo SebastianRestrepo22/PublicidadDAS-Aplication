@@ -7,6 +7,10 @@ import { GetDataServices } from "../../dashboard/servicios/services/services.ser
 import { getAllCategorias } from "../../dashboard/categoriadediseño/services/services.categoria";
 import { useCart } from "../../../context/CartContext";
 
+
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 export const Productos = () => {
   const navigate = useNavigate();
   const { addToCart } = useCart();

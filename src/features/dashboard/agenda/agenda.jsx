@@ -10,28 +10,28 @@ export default function Agenda() {
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [viewMode, setViewMode] = useState("calendar");
 
-  // 🔵 Cargar citas desde backend
+  // 🔵 Cargar citas desde backend (CORREGIDO: /api/cita)
   useEffect(() => {
-    fetch("http://localhost:4000/citas")
+    fetch("http://localhost:3000/api/cita")
       .then((res) => res.json())
       .then((data) => {
         const formatted = data.map((apt) => ({
           ...apt,
-          date: new Date(apt.date), // convierte sea el formato que sea
+          date: new Date(apt.date),
         }));
         setAppointments(formatted);
       })
       .catch((err) => console.error("Error al cargar citas:", err));
   }, []);
 
-  // 🔵 Crear cita (validación incluida)
+  // 🔵 Crear cita (CORREGIDO: /api/cita)
   const handleCreateAppointment = async (appointmentData) => {
     const formatted = {
       ...appointmentData,
       date: appointmentData.date.toISOString().split("T")[0],
     };
 
-    const res = await fetch("http://localhost:4000/citas", {
+    const res = await fetch("http://localhost:3000/api/cita", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formatted),
@@ -45,7 +45,7 @@ export default function Agenda() {
     window.location.reload();
   };
 
-  // 🔵 Actualizar cita
+  // 🔵 Actualizar cita (CORREGIDO: /api/cita/:id)
   const handleUpdateAppointment = async (appointmentData) => {
     const formatted = {
       ...appointmentData,
@@ -53,7 +53,7 @@ export default function Agenda() {
     };
 
     const res = await fetch(
-      `http://localhost:4000/citas/${editingAppointment.id}`,
+      `http://localhost:3000/api/cita/${editingAppointment.id}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -69,9 +69,9 @@ export default function Agenda() {
     window.location.reload();
   };
 
-  // 🔵 Eliminar cita
+  // 🔵 Eliminar cita (CORREGIDO: /api/cita/:id)
   const handleDeleteAppointment = async (id) => {
-    await fetch(`http://localhost:4000/citas/${id}`, { method: "DELETE" });
+    await fetch(`http://localhost:3000/api/cita/${id}`, { method: "DELETE" });
     window.location.reload();
   };
 

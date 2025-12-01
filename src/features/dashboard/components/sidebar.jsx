@@ -42,7 +42,7 @@ const menuItems = [
     to: "/dashboard/gestionVentas",
     hasSubmenu: true,
     submenu: [
-      { label: "Pedidos", to: "/dashboard/pedidos" },
+      { label: "Pedidos", to: "/dashboard/pedidosClientes" },
       { label: "Produccion", to: "/dashboard/produccion" },
       { label: "Venta", to: "/dashboard/ventas" }
     ]

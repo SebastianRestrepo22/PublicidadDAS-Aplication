@@ -25,6 +25,5 @@ export const Redirector = () => {
 
   if (loading) return <p>Cargando...</p>;
 
-  // Si quieres, podrías renderizar algo aquí mientras decide
   return <Inicio />;
 };

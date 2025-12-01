@@ -16,20 +16,20 @@ import Agenda from "../features/dashboard/agenda/agenda"
 import { Diseño } from "../features/dashboard/categoriadediseño/diseño"
 import { RecuperarContrasena } from "../features/landing/login/RecuperarContrasena"
 import { RestablecerContrasena } from "../features/landing/login/RestablecerContrasena"
-import { Navbarcliente } from "../features/navbarCliente/navbarCliente"
-import { Clientehome } from "../features/navbarCliente/clientehome"
-import { Compras } from "../features/dashboard/constrolinsumos/compras/compras"
-import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidos"
-import { Compras } from "../features/dashboard/compras/compras"
 // import { Navbarcliente } from "../features/navbarCliente/navbarCliente"
 // import { Clientehome } from "../features/navbarCliente/clientehome"
-import { Pedidos } from "../features/dashboard/gestionventas/pedidos/pedidos"
 import { CarritoCompras } from "../features/landing/carritoCompras/carritoCompras"
 import { EditarCarritoProducto } from "../features/landing/carritoCompras/CarritoProductos/editarCarritoProducto"
 import { CarritoProducto } from "../features/landing/carritoCompras/CarritoProductos/carritoProducto"
 import { PrivateRoute } from "./PrivateRoute"
 import { ProtectedRouteAdmin } from "./ProtectedRouteAdmin"
 import { Perfil } from "../features/landing/carritoCompras/perfil/perfil"
+import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidosClientes"
+import { Compras } from "../features/dashboard/constrolinsumos/compras/compras"
+import { Ventas } from "../features/dashboard/gestionventas/venta/ventas"
+import { Produccion } from "../features/dashboard/gestionventas/produccion/produccion"
+import { Checkout } from "../features/landing/carritoCompras/checkout/checkout"
+import { PedidoExitoso } from "../features/dashboard/gestionventas/pedidos/pedidoExitoso/pedidoExitoso"
 
 export const Routers = () => {
     return (
@@ -61,6 +61,15 @@ export const Routers = () => {
                     <Perfil />
                 </PrivateRoute>
             } />
+            <Route path="/checkout" element={<Checkout/>} />
+
+            
+            { <Route path="/pedido-exitoso" element={
+            <PrivateRoute role="cliente">
+            <PedidoExitoso />
+            </PrivateRoute>
+            } /> }
+
 
             <Route path="/dashboard" element={
                 <ProtectedRouteAdmin>
@@ -70,16 +79,15 @@ export const Routers = () => {
                 <Route path="graficosEstadisticos" element={<GraficosEstadisticos />} />
                 <Route path="usuarios" element={<Usuarios />} />
                 <Route path="roles" element={<Roles />} />
-                <Route path="compras" element={<Compras />} />
                 <Route path="insumos" element={<Insumos />} />
+                <Route path="pedidosClientes" element={<PedidosClientes/>}/>
                 <Route path="diseño" element={<Diseño />} />
                 <Route path="productoServicio" element={<ProductoServicios />} />
+                <Route path="compras" element={<Compras />} />
                 <Route path="proveedores" element={<Proveedores />} />
-                <Route path="pedidos" element={<PedidosClientes/>}/>
-                <Route path="categoriaDeDiseño" element={<Diseño/>}/>
-                <Route path="agenda" element={<Agenda/>}/>
-                <Route path="pedidos" element={<Pedidos />} />
                 <Route path="categoriaDeDiseño" element={<Diseño />} />
+                <Route path="produccion" element={<Produccion/>} />
+                <Route path="ventas" element={<Ventas />} />
                 <Route path="agenda" element={<Agenda />} />
             </Route>
 

@@ -1,26 +1,38 @@
-import { data } from "react-router-dom";
-import * as proveedoresModel from "../models/"
+import * as proveedoresModel from "../models/proveedores.model.js";
 
+// Obtener todos los proveedores
 export const getAllProveedores = async () => {
     return await proveedoresModel.getAllProveedores();
 };
 
-export const getAllProveedoresById = async () => {
-    return await proveedoresModel.getAllProveedoresById(id);
+// Obtener proveedor por ID
+export const getProveedorById = async (id) => {
+    return await proveedoresModel.getProveedorById(id);
 };
 
-export const createProveedores = async () => {
-    return await proveedoresModel.createProveedores(data);
+// Crear un proveedor
+export const createProveedor = async (data) => {
+    return await proveedoresModel.createProveedor(data);
 };
 
-export const updateProveedores = async () => {
-    const result = await proveedoresModel.updateProveedores(id, data)
-    if (result.affectedRows === 0) throw new Error(" Proveedor no encontrado");
-    return result;  
+// Actualizar proveedor
+export const updateProveedor = async (id, data) => {
+    const result = await proveedoresModel.updateProveedor(id, data);
+
+    if (result.affectedRows === 0) {
+        throw new Error("Proveedor no encontrado");
+    }
+
+    return result;
 };
 
-export const deleteProveedores = async () => {
-    const result = await proveedoresModel.deleteProveedores(id);
-    if (result.affectedRows === 0) throw new Error("Proveedor no encontrado");
+// Eliminar proveedor
+export const deleteProveedor = async (id) => {
+    const result = await proveedoresModel.deleteProveedor(id);
+
+    if (result.affectedRows === 0) {
+        throw new Error("Proveedor no encontrado");
+    }
+
     return result;
 };
