@@ -1,25 +1,20 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
+import { toast } from "react-hot-toast";
 
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState(() => {
-    const saved = localStorage.getItem("cart");
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Cargar carrito al iniciar
-  useEffect(() => {
     try {
       const saved = localStorage.getItem("cart");
-      if (saved) setCart(JSON.parse(saved));
-    } catch (e) {
-      console.error("Error leyendo carrito de localStorage", e);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
     }
-  }, []);
+  });
 
-  // Guardar carrito cuando cambia
+  // Guardar carrito
   useEffect(() => {
     try {
       localStorage.setItem("cart", JSON.stringify(cart));
@@ -28,25 +23,63 @@ export const CartProvider = ({ children }) => {
     }
   }, [cart]);
 
-  // ➕ AGREGAR PRODUCTO AL CARRITO
+  // ✔ AGREGAR PRODUCTO AL CARRITO (CON STOCK)
   const addToCart = (product, options = {}, quantity = 1) => {
+    const stock = product.Stock ?? product.stock ?? null;
+
+    // Validar stock inicial
+    if (stock !== null && stock <= 0) {
+      toast.error("Producto sin stock disponible");
+      return;
+    }
+
+    const itemId =
+      product.ProductoServicioId ??
+      product.ServiceId ??
+      product.id ??
+      null;
+
+    // Si ya existe en carrito, solo aumenta cantidad
+    const existingLine = cart.find((l) => l.ProductoServicioId === itemId);
+
+    if (existingLine) {
+      const newQuantity = existingLine.quantity + quantity;
+
+      if (stock !== null && newQuantity > stock) {
+        toast.error(`Solo hay ${stock} unidades disponibles`);
+        return;
+      }
+
+      updateQuantity(existingLine.id, newQuantity);
+      toast.success(`${product.Nombre} actualizado en el carrito`);
+      return;
+    }
+
+    // Calcular precio con descuento
     const discount = product.Descuento || product.descuento || 0;
     const originalPrice = product.Precio || product.precio || 0;
 
     const finalPrice =
-      discount > 0 ? originalPrice - (originalPrice * discount) / 100 : originalPrice;
+      discount > 0
+        ? originalPrice - (originalPrice * discount) / 100
+        : originalPrice;
 
+    // Crear línea nueva
     const cartLine = {
       id: uuidv4(),
-      ProductoServicioId:
-        product.ProductoServicioId ??
-        product.ServiceId ??
-        product.id ??
-        null,
-      Nombre: product.Nombre ?? product.name ?? "Producto",
+      ProductoServicioId: itemId,
+      Nombre: product.Nombre || "Producto",
       Precio: finalPrice,
-      UrlImagen: options.urlImagen || product.UrlImagen || product.Url || "",
+      UrlImagen:
+        options.urlImagen || product.UrlImagen || product.Url || "",
       quantity: Math.max(1, parseInt(quantity, 10) || 1),
+      Stock: stock,
+      EsPersonalizado:
+        product.EsPersonalizado ??
+        product.esPersonalizado ??
+        product.Customizable ??
+        options.EsPersonalizado ??
+        false,
       options: {
         alto: options.alto || null,
         ancho: options.ancho || null,
@@ -55,24 +88,40 @@ export const CartProvider = ({ children }) => {
       },
     };
 
+    // Verificación de stock inicial
+    if (stock !== null && cartLine.quantity > stock) {
+      toast.error(`Solo hay ${stock} unidades disponibles`);
+      return;
+    }
+
     setCart((prev) => [...prev, cartLine]);
+    toast.success(`${product.Nombre} agregado al carrito`);
   };
 
-  //  ELIMINAR ITEM DEL CARRITO
+  // ELIMINAR ITEM
   const removeFromCart = (lineId) => {
     setCart((prev) => prev.filter((l) => l.id !== lineId));
   };
 
-  //  ACTUALIZAR SOLO LA CANTIDAD
+  // ACTUALIZAR CANTIDAD (CON STOCK)
   const updateQuantity = (lineId, newQuantity) => {
     setCart((prev) =>
-      prev.map((l) =>
-        l.id === lineId ? { ...l, quantity: Math.max(1, newQuantity) } : l
-      )
+      prev.map((l) => {
+        if (l.id !== lineId) return l;
+
+        const stock = l.Stock ?? null;
+
+        if (stock !== null && newQuantity > stock) {
+          toast.error(`Solo hay ${stock} unidades disponibles`);
+          return l;
+        }
+
+        return { ...l, quantity: Math.max(1, newQuantity) };
+      })
     );
   };
 
-  // ✏️ **ACTUALIZAR ITEM COMPLETO (USADO EN EDITAR PRODUCTO)**
+  // ACTUALIZAR ITEM COMPLETO
   const updateItem = (lineId, changes) => {
     setCart((prev) =>
       prev.map((item) =>
@@ -87,10 +136,10 @@ export const CartProvider = ({ children }) => {
     );
   };
 
-  // 🧹 VACIAR CARRITO
+  // VACIAR CARRITO
   const clearCart = () => setCart([]);
 
-  // 💰 TOTAL
+  // TOTAL
   const getTotal = () =>
     cart.reduce(
       (sum, l) => sum + (Number(l.Precio) || 0) * (l.quantity || 1),
