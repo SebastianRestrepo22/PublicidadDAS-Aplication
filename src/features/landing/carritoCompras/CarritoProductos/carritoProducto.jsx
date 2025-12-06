@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Navbar } from "../../components/Navbar"; // ajusta la ruta si la tienes en otra carpeta
+import { Navbar } from "../../components/Navbar";
 import { Footer } from "../../components/footer";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useCart } from "../../../../context/CartContext"; // ruta relativa según tu estructura
+import { useCart } from "../../../../context/CartContext";
 
-//importamos toastify
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -16,8 +15,7 @@ export const CarritoProducto = () => {
 
     const { addToCart } = useCart();
 
-    // Form state (inicia con valores útiles si vienen del producto)
-    const [cantidad, setCantidad] = useState(1);
+    const [cantidad, setCantidad] = useState("1");
     const [alto, setAlto] = useState("");
     const [ancho, setAncho] = useState("");
     const [descripcion, setDescripcion] = useState("");
@@ -25,12 +23,10 @@ export const CarritoProducto = () => {
 
     const [errors, setErrors] = useState({});
 
-    // Detectar si el servicio es personalizado
     const esPersonalizado = item?.EsPersonalizado === true;
 
     useEffect(() => {
         if (item) {
-            // si quieres precargar algo del item al form, lo haces aquí
             setUrlImagen(item.UrlImagen || item.Url || "");
         }
     }, [item]);
@@ -40,7 +36,8 @@ export const CarritoProducto = () => {
 
         const newErrors = {};
 
-        if (!cantidad || cantidad < 1) newErrors.cantidad = "La cantidad debe ser mínimo 1";
+        if (!cantidad || Number(cantidad) < 1)
+            newErrors.cantidad = "La cantidad debe ser mínimo 1";
 
         if (!descripcion.trim())
             newErrors.descripcion = "La descripción es obligatoria";
@@ -52,7 +49,6 @@ export const CarritoProducto = () => {
 
         setErrors(newErrors);
 
-        // Si hay errores, no continúa
         if (Object.keys(newErrors).length > 0) return;
 
         const options = {
@@ -67,10 +63,9 @@ export const CarritoProducto = () => {
             options.ancho = ancho;
         }
 
-        addToCart(item, options, cantidad);
+        addToCart(item, options, Number(cantidad));
         navigate(from);
     };
-
 
     if (!item) {
         return (
@@ -92,102 +87,171 @@ export const CarritoProducto = () => {
             <Navbar />
 
             <div className="mx-auto px-4 pt-[70px] flex-1 max-w-5xl">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
-                    <h1 className="font-serif text-3xl font-bold text-gray-900">{item.Nombre}</h1>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+                    <h1 className="font-serif text-4xl font-bold text-gray-900 tracking-tight">
+                        {item.Nombre}
+                    </h1>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                    <div className="rounded-2xl overflow-hidden shadow-lg">
+                    <div className="rounded-3xl overflow-hidden shadow-xl bg-white p-2">
                         <img
-                            className="w-full h-[420px] object-cover"
-                            src={urlImagen || item.UrlImagen || item.Url || item.UrlImagen || "https://via.placeholder.com/800x600"}
+                            className="w-full h-[420px] object-cover rounded-2xl"
+                            src={
+                                urlImagen ||
+                                item.UrlImagen ||
+                                item.Url ||
+                                "https://via.placeholder.com/800x600"
+                            }
                             alt={item.Nombre}
                         />
                     </div>
 
                     <form
                         onSubmit={handleAdd}
-                        className="bg-white p-8 rounded-3xl shadow-lg flex flex-col gap-4"
+                        className="bg-white p-8 rounded-3xl shadow-xl flex flex-col gap-6 border border-gray-100"
                     >
-                        {/* Cantidad */}
-                        <label className="font-semibold">Cantidad</label>
-                        <input
-                            type="number"
-                            min="1"
-                            value={cantidad}
-                            onChange={(e) => setCantidad(Number(e.target.value))}
-                            className={`h-12 px-4 border rounded-lg ${errors.cantidad ? "border-red-500" : ""}`}
-                        />
-                        {errors.cantidad && (
-                            <p className="text-red-600 text-sm mt-1">{errors.cantidad}</p>
-                        )}
+                        <div className="flex flex-col gap-1">
+                            <label className="font-semibold text-gray-700">Cantidad</label>
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                value={cantidad}
+                                onChange={(e) => {
+                                    let v = e.target.value;
 
-                        {/* CAMPOS SOLO SI ES PERSONALIZADO */}
+                                    if (v === "") {
+                                        setCantidad("");
+                                        return;
+                                    }
+
+                                    v = v.replace(/^0+(?=\d)/, "");
+
+                                    if (/^\d+$/.test(v)) {
+                                        setCantidad(v);
+                                    }
+                                }}
+                                onBlur={() => {
+                                    if (cantidad.trim() === "") {
+                                        setCantidad("1");
+                                    }
+                                }}
+                                className={`h-12 px-4 border rounded-xl shadow-sm focus:ring-2 focus:ring-black focus:outline-none ${
+                                    errors.cantidad ? "border-red-500" : "border-gray-300"
+                                }`}
+                            />
+                            {errors.cantidad && (
+                                <p className="text-red-600 text-sm">{errors.cantidad}</p>
+                            )}
+                        </div>
+
                         {esPersonalizado && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="font-semibold">Alto (cm)</label>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="flex flex-col gap-1">
+                                    <label className="font-semibold text-gray-700">Alto (cm)</label>
                                     <input
-                                        type="number"
+                                        type="text"
+                                        inputMode="numeric"
                                         value={alto}
-                                        onChange={(e) => setAlto(e.target.value)}
-                                        className={`h-12 px-4 border rounded-lg ${
-                                            errors.alto ? "border-red-500" : ""
+                                        onChange={(e) => {
+                                            let v = e.target.value;
+
+                                            if (v === "") {
+                                                setAlto("");
+                                                return;
+                                            }
+
+                                            v = v.replace(/^0+(?=\d)/, "");
+
+                                            if (/^\d+$/.test(v)) {
+                                                setAlto(v);
+                                            }
+                                        }}
+                                        onBlur={() => {
+                                            if (alto.trim() === "") {
+                                                setAlto("");
+                                            }
+                                        }}
+                                        className={`h-12 px-4 border rounded-xl shadow-sm focus:ring-2 focus:ring-black focus:outline-none ${
+                                            errors.alto ? "border-red-500" : "border-gray-300"
                                         }`}
                                     />
-                                    {errors.alto && (
-                                        <p className="text-red-600 text-sm mt-1">{errors.alto}</p>
-                                    )}
+                                    {errors.alto && <p className="text-red-600 text-sm">{errors.alto}</p>}
                                 </div>
 
-                                <div>
-                                    <label className="font-semibold">Ancho (cm)</label>
+                                <div className="flex flex-col gap-1">
+                                    <label className="font-semibold text-gray-700">Ancho (cm)</label>
                                     <input
-                                        type="number"
+                                        type="text"
+                                        inputMode="numeric"
                                         value={ancho}
-                                        onChange={(e) => setAncho(e.target.value)}
-                                        className={`h-12 px-4 border rounded-lg ${
-                                            errors.ancho ? "border-red-500" : ""
+                                        onChange={(e) => {
+                                            let v = e.target.value;
+
+                                            if (v === "") {
+                                                setAncho("");
+                                                return;
+                                            }
+
+                                            v = v.replace(/^0+(?=\d)/, "");
+
+                                            if (/^\d+$/.test(v)) {
+                                                setAncho(v);
+                                            }
+                                        }}
+                                        onBlur={() => {
+                                            if (ancho.trim() === "") {
+                                                setAncho("");
+                                            }
+                                        }}
+                                        className={`h-12 px-4 border rounded-xl shadow-sm focus:ring-2 focus:ring-black focus:outline-none ${
+                                            errors.ancho ? "border-red-500" : "border-gray-300"
                                         }`}
                                     />
-                                    {errors.ancho && (
-                                        <p className="text-red-600 text-sm mt-1">{errors.ancho}</p>
-                                    )}
+                                    {errors.ancho && <p className="text-red-600 text-sm">{errors.ancho}</p>}
                                 </div>
                             </div>
                         )}
 
-                        {/* Descripción */}
-                        <div>
-                            <label className="font-semibold">Descripción / Observaciones</label>
+                        <div className="flex flex-col gap-1">
+                            <label className="font-semibold text-gray-700">Descripción / Observaciones</label>
                             <textarea
                                 rows={4}
                                 value={descripcion}
                                 onChange={(e) => setDescripcion(e.target.value)}
-                                className={`w-full px-4 py-2 border rounded-lg ${errors.descripcion ? "border-red-500" : ""}`}
+                                className={`w-full px-4 py-3 border rounded-xl shadow-sm focus:ring-2 focus:ring-black focus:outline-none ${
+                                    errors.descripcion ? "border-red-500" : "border-gray-300"
+                                }`}
                                 placeholder="Ej: papel couché 200gr, acabado brillante, etc."
                             />
-                            {errors.descripcion && <p className="text-red-600 text-sm mt-1">{errors.descripcion}</p>}
-
+                            {errors.descripcion && (
+                                <p className="text-red-600 text-sm">{errors.descripcion}</p>
+                            )}
                         </div>
 
-                        {/* Imagen opcional */}
-                        <div>
-                            <label className="font-semibold">URL imagen (opcional)</label>
+                        <div className="flex flex-col gap-1">
+                            <label className="font-semibold text-gray-700">URL imagen (opcional)</label>
                             <input
                                 type="text"
                                 value={urlImagen}
                                 onChange={(e) => setUrlImagen(e.target.value)}
-                                className="h-12 px-4 border rounded-lg"
+                                className="h-12 px-4 border rounded-xl shadow-sm border-gray-300 focus:ring-2 focus:ring-black focus:outline-none"
                                 placeholder="https://..."
                             />
                         </div>
 
-                        <div className="flex gap-3 mt-4">
-                            <button type="submit" className="flex-1 bg-gradient-to-r from-black to-gray-800 text-white text-white py-3 rounded-xl font-semibold">
+                        <div className="flex gap-4 mt-4">
+                            <button
+                                type="submit"
+                                className="flex-1 bg-black text-white py-3 rounded-xl font-semibold shadow-md hover:bg-gray-900 transition"
+                            >
                                 Añadir al carrito
                             </button>
-                            <Link to={from} className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-xl text-center">
+
+                            <Link
+                                to={from}
+                                className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-xl text-center font-medium shadow-md hover:bg-gray-300 transition"
+                            >
                                 Volver sin añadir
                             </Link>
                         </div>
@@ -196,8 +260,7 @@ export const CarritoProducto = () => {
             </div>
 
             <Footer />
-            
-            {/* El contenedor de notificaciones (una sola vez) */}
+
             <ToastContainer
                 position="top-right"
                 autoClose={3000}

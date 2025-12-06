@@ -23,7 +23,7 @@ export const CartProvider = ({ children }) => {
     }
   }, [cart]);
 
-  // ✔ AGREGAR PRODUCTO AL CARRITO (CON STOCK)
+  // Agregar producto al carrito (con stock)
   const addToCart = (product, options = {}, quantity = 1) => {
     const stock = product.Stock ?? product.stock ?? null;
 
@@ -39,8 +39,18 @@ export const CartProvider = ({ children }) => {
       product.id ??
       null;
 
-    // Si ya existe en carrito, solo aumenta cantidad
-    const existingLine = cart.find((l) => l.ProductoServicioId === itemId);
+    // Nueva lógica para encontrar líneas existentes
+    const existingLine = cart.find((l) => {
+      if (l.ProductoServicioId !== itemId) return false;
+
+      if (!l.EsPersonalizado) return true;
+
+      return (
+        l.options?.alto === options.alto &&
+        l.options?.ancho === options.ancho &&
+        l.options?.descripcion === options.descripcion
+      );
+    });
 
     if (existingLine) {
       const newQuantity = existingLine.quantity + quantity;
@@ -98,12 +108,12 @@ export const CartProvider = ({ children }) => {
     toast.success(`${product.Nombre} agregado al carrito`);
   };
 
-  // ELIMINAR ITEM
+  // Eliminar item
   const removeFromCart = (lineId) => {
     setCart((prev) => prev.filter((l) => l.id !== lineId));
   };
 
-  // ACTUALIZAR CANTIDAD (CON STOCK)
+  // Actualizar cantidad (con stock)
   const updateQuantity = (lineId, newQuantity) => {
     setCart((prev) =>
       prev.map((l) => {
@@ -121,25 +131,25 @@ export const CartProvider = ({ children }) => {
     );
   };
 
-  // ACTUALIZAR ITEM COMPLETO
+  // Actualizar item completo
   const updateItem = (lineId, changes) => {
     setCart((prev) =>
       prev.map((item) =>
         item.id === lineId
           ? {
-            ...item,
-            ...changes,
-            options: { ...item.options, ...(changes.options || {}) },
-          }
+              ...item,
+              ...changes,
+              options: { ...item.options, ...(changes.options || {}) },
+            }
           : item
       )
     );
   };
 
-  // VACIAR CARRITO
+  // Vaciar carrito
   const clearCart = () => setCart([]);
 
-  // TOTAL
+  // Total
   const getTotal = () =>
     cart.reduce(
       (sum, l) => sum + (Number(l.Precio) || 0) * (l.quantity || 1),
