@@ -51,7 +51,7 @@ export const Proveedores = () => {
       });
       setEstadoActivo(estados);
     } catch (err) {
-      console.error("Error al cargar proveedores:", err);
+      toast.error("Error al cargar proveedores:", err);
     }
   };
 
@@ -73,6 +73,7 @@ export const Proveedores = () => {
         estado: 1,
       });
       fetchProveedores();
+      toast.success("Proveedor creado exitosamente")
     } catch (err) {
       toast.error("Error al crear proveedor:", err);
     }
@@ -87,8 +88,9 @@ export const Proveedores = () => {
       );
       setOpenEditar(false);
       fetchProveedores();
+      toast.success("Proveedor actualizado exitosamente")
     } catch (err) {
-      console.error("Error al actualizar proveedor:", err);
+      toast.error("Error al actualizar proveedor:", err);
     }
   };
 
@@ -121,7 +123,7 @@ export const Proveedores = () => {
 
     const provActual = proveedores.find(p => p.ProveedorId === idProveedor);
     if (!provActual) {
-      console.error("Proveedor no encontrado");
+      toast.error("Proveedor no encontrado");
       return;
     }
 
@@ -146,8 +148,9 @@ export const Proveedores = () => {
           p.ProveedorId === idProveedor ? { ...p, Estado: nuevoEstadoNum } : p
         )
       );
+      toast.success("Estado actualizado correctamente")
     } catch (error) {
-      alert("Error al actualizar estado:", error)
+      toast.error("Error al actualizar estado:", error)
 
 
     }
