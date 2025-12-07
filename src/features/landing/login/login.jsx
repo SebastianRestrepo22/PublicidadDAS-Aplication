@@ -15,7 +15,6 @@ export const Login = () => {
   const [showPasswordRegister, setShowPasswordRegister] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
-
   const [isLogin, setIsLogin] = useState(true);
   const navigate = useNavigate();
   const { setUser } = useAuth();
@@ -36,10 +35,8 @@ export const Login = () => {
   }, []);
 
   //Confirmar constraseña
-
   const [confirmarContrasena, setConfirmarContrasena] = useState("");
   const [contrasenaError, setContrasenaError] = useState("");
-
 
   //Validar correo
   const [correoError, setCorreoError] = useState('');
@@ -92,6 +89,86 @@ export const Login = () => {
     }
   };
 
+  // Estados para errores de validación de campos vacíos
+  const [fieldErrors, setFieldErrors] = useState({
+    NombreCompleto: '',
+    CorreoElectronico: '',
+    TipoDocumentoId: '',
+    CedulaId: '',
+    Direccion: '',
+    Telefono: '',
+    Contrasena: '',
+    ConfirmarContrasena: ''
+  });
+
+  // Validar campos individuales cuando pierden el foco
+  const validateField = (fieldName, value) => {
+    let error = '';
+    if (!value.trim()) {
+      error = 'Este campo es requerido';
+    } else {
+      // Validaciones específicas por campo
+      switch (fieldName) {
+        case 'CorreoElectronico':
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(value)) {
+            error = 'Correo electrónico no válido';
+          }
+          break;
+        case 'Telefono':
+          const phoneRegex = /^[0-9]{10}$/;
+          if (!phoneRegex.test(value.replace(/\D/g, ''))) {
+            error = 'Teléfono debe tener 10 dígitos';
+          }
+          break;
+        case 'Contrasena':
+          if (value.length < 6) {
+            error = 'La contraseña debe tener al menos 6 caracteres';
+          }
+          break;
+        case 'CedulaId':
+          if (!/^\d+$/.test(value)) {
+            error = 'La cédula solo debe contener números';
+          }
+          break;
+      }
+    }
+    
+    setFieldErrors(prev => ({
+      ...prev,
+      [fieldName]: error
+    }));
+    
+    return !error;
+  };
+
+  // Validar confirmación de contraseña
+  const validateConfirmPassword = (value) => {
+    let error = '';
+    if (!value.trim()) {
+      error = 'Este campo es requerido';
+    } else if (values.Contrasena !== value) {
+      error = 'Las contraseñas no coinciden';
+    }
+    
+    setFieldErrors(prev => ({
+      ...prev,
+      ConfirmarContrasena: error
+    }));
+    setContrasenaError(error);
+    
+    return !error;
+  };
+
+  // Función para manejar blur en campos
+  const handleFieldBlur = (fieldName, value) => {
+    if (fieldName === 'ConfirmarContrasena') {
+      validateConfirmPassword(value);
+    } else {
+      validateField(fieldName, value);
+    }
+  };
+
   // Registro
   const [values, setValues] = useState({
     CedulaId: "",
@@ -104,11 +181,44 @@ export const Login = () => {
   });
 
   const handleChanges = (e) => {
-    setValues({ ...values, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setValues({ ...values, [name]: value });
+    
+    // Limpiar error cuando el usuario empieza a escribir
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validar todos los campos antes de enviar
+    let isValid = true;
+    const newErrors = { ...fieldErrors };
+
+    // Validar campos del formulario principal
+    Object.keys(values).forEach(key => {
+      if (!validateField(key, values[key])) {
+        isValid = false;
+        newErrors[key] = fieldErrors[key] || 'Este campo es requerido';
+      }
+    });
+
+    // Validar confirmación de contraseña
+    if (!validateConfirmPassword(confirmarContrasena)) {
+      isValid = false;
+    }
+
+    setFieldErrors(newErrors);
+
+    if (!isValid) {
+      toast.error("Por favor, complete todos los campos correctamente");
+      return;
+    }
 
     if (values.Contrasena !== confirmarContrasena) {
       setContrasenaError("Las contraseñas no coinciden");
@@ -132,11 +242,21 @@ export const Login = () => {
           Contrasena: "",
         });
         setConfirmarContrasena("");
-
+        // Limpiar errores después del registro exitoso
+        setFieldErrors({
+          NombreCompleto: '',
+          CorreoElectronico: '',
+          TipoDocumentoId: '',
+          CedulaId: '',
+          Direccion: '',
+          Telefono: '',
+          Contrasena: '',
+          ConfirmarContrasena: ''
+        });
       }
     } catch (error) {
       console.error("Error en registro:", error);
-      alert(error.response?.data?.message || "Error al registrar");
+      toast.error(error.response?.data?.message || "Error al registrar");
     }
   };
 
@@ -170,18 +290,35 @@ export const Login = () => {
         navigate("/cliente/productos");
       }
 
-
     } catch (error) {
       console.error("Error en login:", error);
       toast.error(error.response?.data?.message || "Error al iniciar sesión");
     }
   };
 
+  // Determinar si un campo tiene error
+  const hasError = (fieldName) => {
+    return fieldErrors[fieldName] || 
+           (fieldName === 'CorreoElectronico' && correoError) ||
+           (fieldName === 'CedulaId' && cedulaError) ||
+           (fieldName === 'Telefono' && telefonoError) ||
+           (fieldName === 'ConfirmarContrasena' && contrasenaError);
+  };
+
+  // Obtener mensaje de error combinado
+  const getErrorMessage = (fieldName) => {
+    if (fieldName === 'CorreoElectronico' && correoError) return correoError;
+    if (fieldName === 'CedulaId' && cedulaError) return cedulaError;
+    if (fieldName === 'Telefono' && telefonoError) return telefonoError;
+    if (fieldName === 'ConfirmarContrasena' && contrasenaError) return contrasenaError;
+    return fieldErrors[fieldName] || '';
+  };
+
   return (
     <>
       <Navbar />
       <div className="flex items-center justify-center bg-gray-100 pt-20">
-        <div className="w-[90%] max-w-2xl h-[500px] bg-white rounded-2xl shadow-2xl overflow-hidden relative">
+        <div className="w-[90%] max-w-4xl h-[600px] bg-white rounded-2xl shadow-2xl overflow-hidden relative">
           <div
             className={`flex w-[200%] h-full transition-transform duration-700 ease-in-out ${isLogin ? "translate-x-0" : "-translate-x-1/2"
               }`}
@@ -204,7 +341,7 @@ export const Login = () => {
                     value={valuesLogin.CorreoElectronico}
                     name="CorreoElectronico"
                     onChange={handleChangesLogin}
-                    required
+                  
                   />
                   <div className="relative">
                     <input
@@ -214,7 +351,7 @@ export const Login = () => {
                       value={valuesLogin.Contrasena}
                       name="Contrasena"
                       onChange={handleChangesLogin}
-                      required
+                    
                     />
 
                     <button
@@ -233,7 +370,6 @@ export const Login = () => {
                     Iniciar Sesión
                   </button>
 
-
                 </form>
 
                 {/* Link para recuperar contraseña */}
@@ -243,7 +379,6 @@ export const Login = () => {
                 >
                   ¿Olvidaste tu contraseña?
                 </button>
-
 
                 <button
                   onClick={() => setIsLogin(false)}
@@ -257,158 +392,193 @@ export const Login = () => {
             {/* Registro */}
             <div className="w-1/2 flex flex-col md:flex-row">
               <div className="w-full md:w-1/2 p-10 flex flex-col justify-center">
-                <h1 className="text-2xl font-bold text-center mb-1">Crear Cuenta</h1>
+                <h1 className="text-2xl font-bold text-center mb-4">Crear Cuenta</h1>
                 <form
-                  className="space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide"
+                  className="space-y-4"
                   onSubmit={handleSubmit}
                 >
-                  {/* Nombre */}
-                  <div className="flex flex-col gap-1">
-                    <input
-                      type="text"
-                      placeholder="Nombre Completo"
-                      className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none"
-                      value={values.NombreCompleto}
-                      name="NombreCompleto"
-                      onChange={handleChanges}
-                      required
-                    />
-                    <p className="min-h-[16px] text-sm"></p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Columna Izquierda */}
+                    <div className="space-y-4">
+                      {/* Nombre */}
+                      <div className="flex flex-col gap-1">
+                        <input
+                          type="text"
+                          placeholder="Nombre Completo"
+                          className={`w-full border-2 rounded-xl p-2 bg-transparent focus:outline-none ${hasError('NombreCompleto') ? 'border-red-500' : 'border-gray-200 focus:border-violet-500'}`}
+                          value={values.NombreCompleto}
+                          name="NombreCompleto"
+                          onChange={handleChanges}
+                          onBlur={(e) => handleFieldBlur('NombreCompleto', e.target.value)}
+                        
+                        />
+                        <p className="text-red-500 text-xs min-h-[16px] leading-none">
+                          {getErrorMessage('NombreCompleto')}
+                        </p>
+                      </div>
+
+                      {/* Correo */}
+                      <div className="flex flex-col gap-1">
+                        <input
+                          type="email"
+                          placeholder="Correo electrónico"
+                          className={`w-full border-2 rounded-xl p-2 bg-transparent focus:outline-none ${hasError('CorreoElectronico') ? 'border-red-500' : 'border-gray-200 focus:border-violet-500'}`}
+                          value={values.CorreoElectronico}
+                          name="CorreoElectronico"
+                          onChange={handleChanges}
+                          onBlur={(e) => {
+                            handleFieldBlur('CorreoElectronico', e.target.value);
+                            handleCorreoBlur();
+                          }}
+                        
+                        />
+                        <p className="text-red-500 text-xs min-h-[16px] leading-none">
+                          {getErrorMessage('CorreoElectronico')}
+                        </p>
+                      </div>
+
+                      {/* Tipo documento */}
+                      <div className="flex flex-col gap-1">
+                        <select
+                          name="TipoDocumentoId"
+                          value={values.TipoDocumentoId}
+                          onChange={handleChanges}
+                          onBlur={(e) => handleFieldBlur('TipoDocumentoId', e.target.value)}
+                          className={`w-full border-2 rounded-xl p-2 bg-transparent focus:outline-none ${hasError('TipoDocumentoId') ? 'border-red-500' : 'border-gray-200 focus:border-violet-500'}`}
+                        
+                        >
+                          <option value="">Tipo de documento</option>
+                          {tiposDocumento.map((tipo) => (
+                            <option key={tipo.TipoDocumentoId} value={tipo.TipoDocumentoId}>
+                              {tipo.Nombre}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-red-500 text-xs min-h-[16px] leading-none">
+                          {getErrorMessage('TipoDocumentoId')}
+                        </p>
+                      </div>
+
+                      {/* Cédula */}
+                      <div className="flex flex-col gap-1">
+                        <input
+                          type="text"
+                          placeholder="Cédula"
+                          className={`w-full border-2 rounded-xl p-2 bg-transparent focus:outline-none ${hasError('CedulaId') ? 'border-red-500' : 'border-gray-200 focus:border-violet-500'}`}
+                          value={values.CedulaId}
+                          name="CedulaId"
+                          onChange={handleChanges}
+                          onBlur={(e) => {
+                            handleFieldBlur('CedulaId', e.target.value);
+                            handleCedulaBlur();
+                          }}
+                        
+                        />
+                        <p className="text-red-500 text-xs min-h-[16px] leading-none">
+                          {getErrorMessage('CedulaId')}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Columna Derecha */}
+                    <div className="space-y-4">
+                      {/* Dirección */}
+                      <div className="flex flex-col gap-1">
+                        <input
+                          type="text"
+                          placeholder="Dirección"
+                          className={`w-full border-2 rounded-xl p-2 bg-transparent focus:outline-none ${hasError('Direccion') ? 'border-red-500' : 'border-gray-200 focus:border-violet-500'}`}
+                          value={values.Direccion}
+                          name="Direccion"
+                          onChange={handleChanges}
+                          onBlur={(e) => handleFieldBlur('Direccion', e.target.value)}
+                        
+                        />
+                        <p className="text-red-500 text-xs min-h-[16px] leading-none">
+                          {getErrorMessage('Direccion')}
+                        </p>
+                      </div>
+
+                      {/* Teléfono */}
+                      <div className="flex flex-col gap-1">
+                        <input
+                          type="text"
+                          placeholder="Teléfono"
+                          className={`w-full border-2 rounded-xl p-2 bg-transparent focus:outline-none ${hasError('Telefono') ? 'border-red-500' : 'border-gray-200 focus:border-violet-500'}`}
+                          value={values.Telefono}
+                          name="Telefono"
+                          onChange={handleChanges}
+                          onBlur={(e) => {
+                            handleFieldBlur('Telefono', e.target.value);
+                            handleTelefonoBlur();
+                          }}
+                        
+                        />
+                        <p className="text-red-500 text-xs min-h-[16px] leading-none">
+                          {getErrorMessage('Telefono')}
+                        </p>
+                      </div>
+
+                      {/* Contraseña */}
+                      <div className="relative flex flex-col gap-1">
+                        <input
+                          type={showPasswordRegister ? "text" : "password"}
+                          placeholder="Contraseña"
+                          className={`w-full border-2 rounded-xl p-2 bg-transparent focus:outline-none pr-10 ${hasError('Contrasena') ? 'border-red-500' : 'border-gray-200 focus:border-violet-500'}`}
+                          value={values.Contrasena}
+                          name="Contrasena"
+                          onChange={handleChanges}
+                          onBlur={(e) => handleFieldBlur('Contrasena', e.target.value)}
+                        
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswordRegister(!showPasswordRegister)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2"
+                        >
+                          {showPasswordRegister ? <EyeOff size={20} /> : <Eye size={20} />}
+                        </button>
+                        <p className="text-red-500 text-xs min-h-[16px] leading-none">
+                          {getErrorMessage('Contrasena')}
+                        </p>
+                      </div>
+
+                      {/* Confirmar contraseña */}
+                      <div className="relative flex flex-col gap-1">
+                        <input
+                          type={showPasswordConfirm ? "text" : "password"}
+                          placeholder="Confirmar contraseña"
+                          className={`w-full border-2 rounded-xl p-2 bg-transparent focus:outline-none pr-10 ${hasError('ConfirmarContrasena') ? 'border-red-500' : 'border-gray-200 focus:border-violet-500'}`}
+                          value={confirmarContrasena}
+                          onChange={(e) => {
+                            setConfirmarContrasena(e.target.value);
+                            if (values.Contrasena !== e.target.value) {
+                              setContrasenaError("Las contraseñas no coinciden");
+                            } else {
+                              setContrasenaError("");
+                            }
+                          }}
+                          onBlur={(e) => handleFieldBlur('ConfirmarContrasena', e.target.value)}
+                        
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2"
+                        >
+                          {showPasswordConfirm ? <EyeOff size={20} /> : <Eye size={20} />}
+                        </button>
+                        <p className="text-red-500 text-xs min-h-[16px] leading-none">
+                          {getErrorMessage('ConfirmarContrasena')}
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Correo */}
-                  <div className="flex flex-col gap-1">
-                    <input
-                      type="email"
-                      placeholder="Correo electrónico"
-                      className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none"
-                      value={values.CorreoElectronico}
-                      name="CorreoElectronico"
-                      onChange={handleChanges}
-                      onBlur={handleCorreoBlur}
-                      required
-                    />
-                    <p className="text-red-500 text-xs min-h-[16px] leading-none">{correoError}</p>
-                  </div>
-
-                  {/* Tipo documento */}
-                  <div className="flex flex-col gap-1">
-                    <select
-                      name="TipoDocumentoId"
-                      value={values.TipoDocumentoId}
-                      onChange={handleChanges}
-                      className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none"
-                      required
-                    >
-                      <option value="">Seleccione un tipo de documento</option>
-                      {tiposDocumento.map((tipo) => (
-                        <option key={tipo.TipoDocumentoId} value={tipo.TipoDocumentoId}>
-                          {tipo.Nombre}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="min-h-[16px] text-sm"></p>
-                  </div>
-
-                  {/* Cédula */}
-                  <div className="flex flex-col gap-1">
-                    <input
-                      type="text"
-                      placeholder="Cédula"
-                      className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none"
-                      value={values.CedulaId}
-                      name="CedulaId"
-                      onChange={handleChanges}
-                      onBlur={handleCedulaBlur}
-                      required
-                    />
-                    <p className="text-red-500 text-xs min-h-[16px] leading-none">{cedulaError}</p>
-                  </div>
-
-                  {/* Dirección */}
-                  <div className="flex flex-col gap-1">
-                    <input
-                      type="text"
-                      placeholder="Dirección"
-                      className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none"
-                      value={values.Direccion}
-                      name="Direccion"
-                      onChange={handleChanges}
-                      required
-                    />
-                    <p className="min-h-[16px] text-sm"></p>
-                  </div>
-
-                  {/* Teléfono */}
-                  <div className="flex flex-col gap-1">
-                    <input
-                      type="text"
-                      placeholder="Teléfono"
-                      className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none"
-                      value={values.Telefono}
-                      name="Telefono"
-                      onChange={handleChanges}
-                      onBlur={handleTelefonoBlur}
-                      required
-                    />
-                    <p className="text-red-500 text-xs min-h-[16px] leading-none">{telefonoError}</p>
-                  </div>
-
-                  {/* Contraseña */}
-                  <div className="relative flex flex-col gap-1">
-                    <input
-                      type={showPasswordRegister ? "text" : "password"}
-                      placeholder="Contraseña"
-                      className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none pr-10"
-                      value={values.Contrasena}
-                      name="Contrasena"
-                      onChange={handleChanges}
-                      required
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => setShowPasswordRegister(!showPasswordRegister)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2"
-                    >
-                      {showPasswordRegister ? <EyeOff size={20} /> : <Eye size={20} />}
-                    </button>
-                  </div>
-
-
-                  {/* Confirmar contraseña */}
-                  <div className="relative flex flex-col gap-1">
-                    <input
-                      type={showPasswordConfirm ? "text" : "password"}
-                      placeholder="Confirmar contraseña"
-                      className="w-full border-2 border-gray-200 rounded-xl p-2 bg-transparent focus:border-violet-500 focus:outline-none pr-10"
-                      value={confirmarContrasena}
-                      onChange={(e) => {
-                        setConfirmarContrasena(e.target.value);
-                        if (values.Contrasena !== e.target.value) {
-                          setContrasenaError("Las contraseñas no coinciden");
-                        } else {
-                          setContrasenaError("");
-                        }
-                      }}
-                      required
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2"
-                    >
-                      {showPasswordConfirm ? <EyeOff size={20} /> : <Eye size={20} />}
-                    </button>
-
-                  </div>
-                  <p className="text-red-500 text-xs min-h-[16px] leading-none">{contrasenaError}</p>
-
-
+                  {/* Botón de registro */}
                   <button
                     type="submit"
-                    className="w-full bg-blue-900 text-white py-2 rounded-xl font-semibold hover:bg-blue-700 transition"
+                    className="w-full bg-blue-900 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition mt-2"
                   >
                     Registrarse
                   </button>
@@ -416,7 +586,7 @@ export const Login = () => {
 
                 <button
                   onClick={() => setIsLogin(true)}
-                  className="mt-1 text-blue-800 hover:underline text-sm"
+                  className="mt-4 text-blue-800 hover:underline text-sm text-center"
                 >
                   ¿Ya tienes cuenta? Inicia sesión
                 </button>
