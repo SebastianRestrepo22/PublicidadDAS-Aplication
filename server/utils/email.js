@@ -31,12 +31,8 @@ export const sendWelcomeEmail = async (to, password) => {
     return false;
   }
 };
-<<<<<<< HEAD
 
-// backend/utils/email.js
-// ... tu código actual ...
-
-//  NUEVA FUNCIÓN: notificar cambio de estado de pedido
+// NUEVA FUNCIÓN: notificar cambio de estado de pedido
 export const sendPedidoEstadoEmail = async (to, nombreCliente, pedidoId, nuevoEstado, motivo = "") => {
   let subject = "";
   let html = "";
@@ -45,21 +41,21 @@ export const sendPedidoEstadoEmail = async (to, nombreCliente, pedidoId, nuevoEs
     case "pendiente":
       subject = `📄 Pedido #${pedidoId} recibido`;
       html = `
-    <p>Hola ${nombreCliente} 👋,</p>
-    <p>Hemos recibido tu pedido <strong>#${pedidoId}</strong> y está en revisión.</p>
-    <p>Te notificaremos cuando sea aprobado.</p>
-    `;
+        <p>Hola ${nombreCliente} 👋,</p>
+        <p>Hemos recibido tu pedido <strong>#${pedidoId}</strong> y está en revisión.</p>
+        <p>Te notificaremos cuando sea aprobado.</p>
+      `;
       break;
     case "aprobado":
       subject = `✅ Pedido #${pedidoId} aprobado`;
       html = `
-    <p>¡Hola ${nombreCliente}!</p>
-    <p>Tu pedido <strong>#${pedidoId}</strong> ha sido aprobado.</p>
-    <p>Ahora pasará a producción.</p>
-    `;
+        <p>¡Hola ${nombreCliente}!</p>
+        <p>Tu pedido <strong>#${pedidoId}</strong> ha sido aprobado.</p>
+        <p>Ahora pasará a producción.</p>
+      `;
       break;
     case "en_produccion":
-      subject = `✅ Pedido #${pedidoId} aprobado`;
+      subject = `🏭 Pedido #${pedidoId} en producción`;
       html = `
         <p>¡Hola ${nombreCliente}!</p>
         <p>Tu pedido <strong>#${pedidoId}</strong> ha sido aprobado y ya está en producción.</p>
@@ -106,5 +102,3 @@ export const sendPedidoEstadoEmail = async (to, nombreCliente, pedidoId, nuevoEs
     // No detener la app si falla el correo
   }
 };
-=======
->>>>>>> origin/main
