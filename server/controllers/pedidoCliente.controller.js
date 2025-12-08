@@ -1,4 +1,4 @@
-import { sendPedidoEstadoEmail } from "../utils/email.js";
+import { sendPedidoEstadoEmail, sendVoucherEmail } from "../utils/email.js";
 
 import {
   getAllPedidosClientesModel,
@@ -56,15 +56,15 @@ export const getPedidoClienteById = async (req, res) => {
 /**
  * Crear pedido + detalles
  */
+/**
+ * Crear pedido + detalles + enviar voucher por correo
+ */
 export const createPedidoCliente = async (req, res) => {
   try {
     let { ClienteId, FechaRegistro, Total, Estado, detalle } = req.body;
 
     console.log("CLIENTE ID RECIBIDO (crudo):", ClienteId);
-
-    // LIMPIA espacios y tabs
     ClienteId = ClienteId?.toString().trim();
-
     console.log("CLIENTE ID LIMPIO:", ClienteId);
     console.log("BODY COMPLETO:", req.body);
 
@@ -72,19 +72,18 @@ export const createPedidoCliente = async (req, res) => {
       return res.status(400).json({ error: "ClienteId es obligatorio" });
     }
 
+    // Crear el pedido
     const nuevoPedido = await createPedidoClienteModel({
       ClienteId,
       FechaRegistro,
       Total,
-      Estado
+      Estado: "pendiente" // Forzar estado inicial
     });
 
+    // Crear detalles
     if (Array.isArray(detalle) && detalle.length > 0) {
       for (let d of detalle) {
-
-        // Limpieza de ProductoServicioId
         const ProductoServicioId = d.ProductoServicioId?.toString().trim();
-
         console.log("PRODUCTO SERVICIO ID LIMPIO:", ProductoServicioId);
 
         await createDetallePedidoModel({
@@ -99,6 +98,25 @@ export const createPedidoCliente = async (req, res) => {
       }
     }
 
+    // Obtener datos del cliente para el correo
+    let cliente = null;
+    try {
+      cliente = await getClienteByIdModel(ClienteId);
+    } catch (err) {
+      console.warn("No se pudo cargar el cliente para el email:", err.message);
+    }
+
+    // ✅ ENVIAR VOUCHER POR CORREO
+    if (cliente && cliente.CorreoElectronico) {
+      await sendVoucherEmail(
+        cliente.CorreoElectronico,
+        cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
+        nuevoPedido.PedidoClienteId,
+        nuevoPedido.Total
+      );
+    }
+
+    // Preparar respuesta
     const pedidoCreado = {
       ...nuevoPedido,
       detalle: await getDetallePedidoByPedidoIdModel(nuevoPedido.PedidoClienteId)
@@ -111,8 +129,6 @@ export const createPedidoCliente = async (req, res) => {
     res.status(500).json({ error: "Error al crear pedido" });
   }
 };
-
-
 /**
  * Actualizar pedido + enviar correo si el estado cambia
  */

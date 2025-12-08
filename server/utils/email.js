@@ -102,3 +102,60 @@ export const sendPedidoEstadoEmail = async (to, nombreCliente, pedidoId, nuevoEs
     // No detener la app si falla el correo
   }
 };
+
+// Envía el voucher de pago al cliente
+export const sendVoucherEmail = async (to, nombreCliente, pedidoId, total) => {
+  const totalFormateado = new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 2
+  }).format(total);
+
+  const subject = `📄 Voucher de pago - Pedido #${pedidoId}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h2 style="color: #333;">¡Gracias por tu pedido!</h2>
+        <p style="color: #666;">Aquí tienes tu orden de pago</p>
+      </div>
+
+      <div style="background-color: #f9f9f9; padding: 20px; border-radius: 10px; margin-bottom: 25px;">
+        <h3 style="margin-top: 0; color: #222;">Detalles del pedido</h3>
+        <p><strong>Pedido:</strong> ${pedidoId}</p>
+        <p><strong>Monto a pagar:</strong> ${totalFormateado}</p>
+        <p><strong>Fecha:</strong> ${new Date().toLocaleDateString("es-CO")}</p>
+        <p><strong>Cliente:</strong> ${nombreCliente}</p>
+      </div>
+
+      <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; border-left: 4px solid #2196f3;">
+        <h3 style="margin-top: 0; color: #0d47a1;">Instrucciones de pago</h3>
+        <ol style="padding-left: 20px;">
+          <li>Realiza una transferencia por el monto exacto: <strong>${totalFormateado}</strong>.</li>
+          <li>En el <strong>concepto o referencia</strong> de la transferencia, escribe: 
+            <span style="background-color: #bbdefb; padding: 2px 6px; border-radius: 4px; font-weight: bold;">
+              ${pedidoId}
+            </span>
+          </li>
+          <li>Adjunta el comprobante bancario en tu panel de cliente para que podamos verificarlo.</li>
+        </ol>
+      </div>
+
+      <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee; color: #888; font-size: 14px;">
+        <p>Este es un mensaje automático. Por favor, no respondas a este correo.</p>
+        <p>© ${new Date().getFullYear()} Tu Empresa. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: '"Tu Empresa" <no-reply@tuempresa.com>',
+      to,
+      subject,
+      html,
+    });
+    console.log(`Voucher de pago enviado a ${to} para pedido ${pedidoId}`);
+  } catch (error) {
+    console.error("Error al enviar voucher por correo:", error);
+  }
+};

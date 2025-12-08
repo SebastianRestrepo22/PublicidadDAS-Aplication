@@ -30,6 +30,9 @@ import { Produccion } from "../features/dashboard/gestionventas/produccion/produ
 import { Checkout } from "../features/landing/carritoCompras/checkout/checkout";
 import { PedidoExitoso } from "../features/dashboard/gestionventas/pedidos/pedidoExitoso/pedidoExitoso";
 import { ScrollToTop } from "../features/landing/components/ScrollToTop";
+import { SubirComprobante } from "../features/landing/carritoCompras/comprobante/SubirComprobante";
+import { PagoPendiente } from "../features/landing/carritoCompras/checkout/PagoPendiente";
+import Comprobante from "../features/dashboard/comprobantes/comprobante";
 
 export const Routers = () => {
   return (
@@ -78,8 +81,6 @@ export const Routers = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/recuperar-contrasena" element={<RecuperarContrasena />} />
         <Route path="/reset-password/:token" element={<RestablecerContrasena />} />
-
-        {/* Carrito y checkout */}
         <Route path="/carritodecompras" element={<CarritoCompras />} />
         <Route path="/carritoproducto" element={<CarritoProducto />} />
         <Route path="/editarcarritoproducto" element={<EditarCarritoProducto />} />
@@ -89,6 +90,22 @@ export const Routers = () => {
           element={
             <PrivateRoute role="cliente">
               <PedidoExitoso />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/subir-comprobante/:pedidoId"
+          element={
+            <PrivateRoute role="cliente">
+              <SubirComprobante/>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/pago-pendiente/:pedidoId"
+          element={
+            <PrivateRoute role="cliente">
+              <PagoPendiente/>
             </PrivateRoute>
           }
         />
@@ -112,24 +129,21 @@ export const Routers = () => {
           <Route path="categoriaDeDiseño" element={<Diseño />} />
           <Route path="agenda" element={<Agenda />} />
           <Route path="ventas" element={<Ventas />} />
-
-          {/* Gestión de Pedidos */}
           <Route path="pedidosClientes" element={<PedidosClientes />} />
           <Route path="pedidosClientes/nuevo" element={<PedidosClientes />} />
           <Route path="pedidosClientes/:id" element={<PedidosClientes />} />
           <Route path="pedidosClientes/:id/editar" element={<PedidosClientes />} />
-
-          {/* Gestión de Compras */}
           <Route path="compras" element={<Compras />} />
           <Route path="compras/nueva" element={<Compras />} />
           <Route path="compras/:id" element={<Compras />} />
           <Route path="compras/:id/editar" element={<Compras />} />
-
-          {/* Gestión de Producción */}
           <Route path="produccion" element={<Produccion />} />
           <Route path="produccion/nuevo" element={<Produccion />} />
           <Route path="produccion/:id" element={<Produccion />} />
           <Route path="produccion/:id/editar" element={<Produccion />} />
+          <Route path="comprobante" element={<Comprobante />} />
+
+
         </Route>
 
         {/* Página no encontrada */}
