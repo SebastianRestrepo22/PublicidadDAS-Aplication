@@ -3,18 +3,16 @@ import { Navbar } from "../components/Navbar";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
-
 import { toast, ToastContainer } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 import { Eye, EyeOff } from "lucide-react";
 import { Redirector } from "../../redirector/redirector";
 
 export const Login = () => {
-  //Estado para ver o ocultar la contraseña
+  // Estado para ver u ocultar la contraseña
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordRegister, setShowPasswordRegister] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
-
 
   const [isLogin, setIsLogin] = useState(true);
   const navigate = useNavigate();
@@ -35,13 +33,11 @@ export const Login = () => {
     fetchTiposDocumento();
   }, []);
 
-  //Confirmar constraseña
-
+  // Confirmar contraseña
   const [confirmarContrasena, setConfirmarContrasena] = useState("");
   const [contrasenaError, setContrasenaError] = useState("");
 
-
-  //Validar correo
+  // Validar correo
   const [correoError, setCorreoError] = useState('');
 
   const handleCorreoBlur = async () => {
@@ -58,7 +54,7 @@ export const Login = () => {
     }
   };
 
-  //Validar cedula
+  // Validar cedula
   const [cedulaError, setCedulaError] = useState('');
 
   const handleCedulaBlur = async () => {
@@ -75,7 +71,7 @@ export const Login = () => {
     }
   };
 
-  //Validar telefono
+  // Validar telefono
   const [telefonoError, setTelefonoError] = useState('');
 
   const handleTelefonoBlur = async () => {
@@ -132,7 +128,6 @@ export const Login = () => {
           Contrasena: "",
         });
         setConfirmarContrasena("");
-
       }
     } catch (error) {
       console.error("Error en registro:", error);
@@ -163,13 +158,12 @@ export const Login = () => {
       localStorage.setItem("usuario", JSON.stringify(decoded));
 
       setUser(decoded);
-      
+
       if (decoded.Role.toLowerCase() === "administrador") {
         navigate("/dashboard/graficosEstadisticos");
       } else if (decoded.Role.toLowerCase() === "cliente") {
         navigate("/cliente/productos");
       }
-
 
     } catch (error) {
       console.error("Error en login:", error);
@@ -195,7 +189,6 @@ export const Login = () => {
 
               <div className="w-full md:w-1/2 p-10 flex flex-col justify-center">
                 <h1 className="text-4xl font-bold text-center mb-6">Iniciar Sesión</h1>
-                {/* Login */}
                 <form onSubmit={handleSubmitLogin} className="space-y-5">
                   <input
                     type="email"
@@ -233,7 +226,6 @@ export const Login = () => {
                     Iniciar Sesión
                   </button>
 
-
                 </form>
 
                 {/* Link para recuperar contraseña */}
@@ -243,7 +235,6 @@ export const Login = () => {
                 >
                   ¿Olvidaste tu contraseña?
                 </button>
-
 
                 <button
                   onClick={() => setIsLogin(false)}
@@ -375,7 +366,6 @@ export const Login = () => {
                     </button>
                   </div>
 
-
                   {/* Confirmar contraseña */}
                   <div className="relative flex flex-col gap-1">
                     <input
@@ -401,10 +391,8 @@ export const Login = () => {
                     >
                       {showPasswordConfirm ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
-
                   </div>
                   <p className="text-red-500 text-xs min-h-[16px] leading-none">{contrasenaError}</p>
-
 
                   <button
                     type="submit"
@@ -431,7 +419,6 @@ export const Login = () => {
         </div>
       </div>
 
-      {/* El contenedor de notificaciones (una sola vez) */}
       <ToastContainer
         position="top-right"
         autoClose={3000}

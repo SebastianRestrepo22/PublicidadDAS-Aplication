@@ -1,12 +1,12 @@
 import { sendPedidoEstadoEmail } from "../utils/email.js";
+
 import {
   getAllPedidosClientesModel,
   getPedidoClienteByIdModel,
   createPedidoClienteModel,
   updatePedidoClienteModel,
   deletePedidoClienteModel,
-  getClienteByIdModel 
-
+  getClienteByIdModel
 } from "../models/pedidoCliente.model.js";
 
 import {
@@ -14,7 +14,6 @@ import {
   getDetallePedidoByPedidoIdModel,
   deleteDetallePedidoModel
 } from "../models/detallePedidoCliente.model.js";
-
 
 
 export const getPedidosClientes = async (req, res) => {
@@ -31,6 +30,7 @@ export const getPedidosClientes = async (req, res) => {
     res.status(500).json({ error: "Error al obtener pedidos" });
   }
 };
+
 
 /**
  * Obtener pedido por ID
@@ -51,6 +51,7 @@ export const getPedidoClienteById = async (req, res) => {
     res.status(500).json({ error: "Error al obtener pedido" });
   }
 };
+
 
 /**
  * Crear pedido + detalles
@@ -81,22 +82,21 @@ export const createPedidoCliente = async (req, res) => {
     if (Array.isArray(detalle) && detalle.length > 0) {
       for (let d of detalle) {
 
-  // Limpieza de ProductoServicioId
-  const ProductoServicioId = d.ProductoServicioId?.toString().trim();
+        // Limpieza de ProductoServicioId
+        const ProductoServicioId = d.ProductoServicioId?.toString().trim();
 
-  console.log("PRODUCTO SERVICIO ID LIMPIO:", ProductoServicioId);
+        console.log("PRODUCTO SERVICIO ID LIMPIO:", ProductoServicioId);
 
-  await createDetallePedidoModel({
-    PedidoClienteId: nuevoPedido.PedidoClienteId,
-    ProductoServicioId,
-    Cantidad: d.Cantidad,
-    Alto: d.Alto,
-    Ancho: d.Ancho,
-    Descripcion: d.Descripcion,
-    UrlImagen: d.UrlImagen
-  });
-}
-
+        await createDetallePedidoModel({
+          PedidoClienteId: nuevoPedido.PedidoClienteId,
+          ProductoServicioId,
+          Cantidad: d.Cantidad,
+          Alto: d.Alto,
+          Ancho: d.Ancho,
+          Descripcion: d.Descripcion,
+          UrlImagen: d.UrlImagen
+        });
+      }
     }
 
     const pedidoCreado = {
@@ -114,12 +114,8 @@ export const createPedidoCliente = async (req, res) => {
 
 
 /**
- * Actualizar pedido
- */
-/**
  * Actualizar pedido + enviar correo si el estado cambia
  */
-
 export const updatePedidoCliente = async (req, res) => {
   if (req.body.FechaRegistro) {
     req.body.FechaRegistro = req.body.FechaRegistro.split("T")[0];
@@ -137,26 +133,28 @@ export const updatePedidoCliente = async (req, res) => {
     const estadoAnterior = pedidoActual.Estado;
 
     const result = await updatePedidoClienteModel(id, { Estado, ...otrosCampos });
+
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: "Pedido no encontrado" });
     }
 
-    // ✅ Envío de correo si el estado cambió
+    // Envío de correo si el estado cambió
     if (Estado && Estado !== estadoAnterior) {
-      const cliente = await getClienteByIdModel(pedidoActual.ClienteId); // ← Ahora sí existe
+      const cliente = await getClienteByIdModel(pedidoActual.ClienteId);
       if (cliente && cliente.CorreoElectronico) {
         await sendPedidoEstadoEmail(
           cliente.CorreoElectronico,
-          cliente.NombreCompleto, // o cliente.Nombre, según tu DB
+          cliente.NombreCompleto,
           id,
           Estado,
-          "" // o algún campo como pedidoActual.Motivo si lo tienes
+          ""
         );
       }
     }
 
     const pedidoActualizado = await getPedidoClienteByIdModel(id);
     pedidoActualizado.detalle = await getDetallePedidoByPedidoIdModel(id);
+
     res.status(200).json(pedidoActualizado);
 
   } catch (error) {
@@ -164,6 +162,8 @@ export const updatePedidoCliente = async (req, res) => {
     res.status(500).json({ error: "Error al actualizar pedido" });
   }
 };
+
+
 /**
  * Eliminar pedido + detalles
  */
@@ -188,9 +188,10 @@ export const deletePedidoCliente = async (req, res) => {
   }
 };
 
+
 export const getMisPedidos = async (req, res) => {
   try {
-    const clienteId = req.user.CedulaId; // ✅ Viene del token, validado por authMiddleware
+    const clienteId = req.user.CedulaId;
 
     if (!clienteId) {
       return res.status(401).json({ error: "Usuario no autenticado" });

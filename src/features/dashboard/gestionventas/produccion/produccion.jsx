@@ -18,7 +18,6 @@ export const Produccion = () => {
   const [producciones, setProducciones] = useState([]);
   const [filtroCampo, setFiltroCampo] = useState("");
   const [filtroText, setFiltroText] = useState("");
-
   const [formCrear, setFormCrear] = useState({
     PedidoClienteId: "",
     Estado: "En Proceso",
@@ -29,7 +28,6 @@ export const Produccion = () => {
     { _tempId: crypto.randomUUID(), InsumoId: "", CantidadUsada: 1 },
   ]);
   const [formEditar, setFormEditar] = useState(null);
-
   const [pedidos, setPedidos] = useState([]);
   const [insumos, setInsumos] = useState([]);
 
@@ -55,7 +53,6 @@ export const Produccion = () => {
     try {
       const res = await axios.get("http://localhost:3000/api/produccion");
       const produccionesBase = Array.isArray(res.data) ? res.data : [];
-
       const produccionesConDetalles = await Promise.all(
         produccionesBase.map(async (p) => {
           try {
@@ -91,7 +88,6 @@ export const Produccion = () => {
           const detalle = Array.isArray(detalleRes.data)
             ? detalleRes.data.map(item => ({ ...item, _tempId: item.DetalleProduccionId || crypto.randomUUID() }))
             : [];
-
           const produccionCompleta = { ...res.data, detalle };
           if (mode === "edit") setFormEditar(produccionCompleta);
         } catch (err) {
@@ -160,18 +156,14 @@ export const Produccion = () => {
         alert("Debe ingresar la fecha de inicio.");
         return;
       }
-
       const detallesLimpios = detallesCrear
         .map(d => ({ InsumoId: d.InsumoId?.trim(), CantidadUsada: Number(d.CantidadUsada) || 1 }))
         .filter(d => d.InsumoId);
-
       if (detallesLimpios.length === 0) {
         alert("Debe agregar al menos un insumo.");
         return;
       }
-
       await axios.post("http://localhost:3000/api/produccion", { ...formCrear, detalle: detallesLimpios });
-
       goToBackToList();
       fetchProducciones();
     } catch (err) {
@@ -191,7 +183,6 @@ export const Produccion = () => {
         alert("Debe ingresar la fecha de inicio.");
         return;
       }
-
       await axios.put(`http://localhost:3000/api/produccion/${formEditar.ProduccionId}`, {
         PedidoClienteId: formEditar.PedidoClienteId,
         Estado: formEditar.Estado,
@@ -212,7 +203,6 @@ export const Produccion = () => {
           });
         }
       }
-
       goToBackToList();
       fetchProducciones();
     } catch (err) {
@@ -236,9 +226,7 @@ export const Produccion = () => {
     try {
       const produccion = producciones.find(p => p.ProduccionId === idProduccion);
       if (!produccion) return;
-
       await axios.put(`http://localhost:3000/api/produccion/${idProduccion}`, { ...produccion, Estado: nuevoEstado });
-
       setProducciones(prev => prev.map(p => p.ProduccionId === idProduccion ? { ...p, Estado: nuevoEstado } : p));
     } catch (err) {
       console.error("Error al actualizar estado:", err);
@@ -283,7 +271,6 @@ export const Produccion = () => {
                 <img src="/multimedia/lupa.png" alt="Buscar" className="absolute left-3 top-1/2 -translate-y-1/2 w-5" />
               </div>
             </div>
-
             <div className="bg-white rounded-xl shadow-sm border overflow-auto max-h-[600px]">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-800 sticky top-0">
@@ -337,7 +324,6 @@ export const Produccion = () => {
               </button>
               <h3 className="text-lg font-bold">Nueva producción</h3>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Pedido Cliente</label>
@@ -354,7 +340,6 @@ export const Produccion = () => {
                   ))}
                 </select>
               </div>
-
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Estado</label>
                 <select
@@ -366,7 +351,6 @@ export const Produccion = () => {
                   <option value="Finalizado">Finalizado</option>
                 </select>
               </div>
-
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Fecha Inicio</label>
                 <input
@@ -376,7 +360,6 @@ export const Produccion = () => {
                   className="w-full h-11 px-3 border rounded"
                 />
               </div>
-
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Fecha Fin</label>
                 <input
@@ -387,13 +370,11 @@ export const Produccion = () => {
                 />
               </div>
             </div>
-
             <div className="flex justify-end mb-4">
               <button type="button" onClick={añadirDetalleCrear} className="bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-2">
                 <Plus size={15} /> Añadir insumo
               </button>
             </div>
-
             <div className="grid grid-cols-1 gap-4 mb-6">
               {detallesCrear.map((d, index) => (
                 <div key={d._tempId} className="grid grid-cols-1 md:grid-cols-2 gap-3 border p-3 rounded bg-gray-50">
@@ -428,7 +409,6 @@ export const Produccion = () => {
                 </div>
               ))}
             </div>
-
             <div className="flex gap-4">
               <button type="button" onClick={handleCreate} className="flex-1 bg-green-500 text-white h-11 rounded">Crear</button>
               <button type="button" onClick={goToBackToList} className="flex-1 bg-gray-200 text-gray-700 h-11 rounded">Cancelar</button>
@@ -459,7 +439,6 @@ export const Produccion = () => {
                     </span>
                   </div>
                 </div>
-
                 <div>
                   <h4 className="font-bold mb-2">Insumos utilizados:</h4>
                   <div className="overflow-auto">
@@ -501,7 +480,6 @@ export const Produccion = () => {
               </button>
               <h3 className="text-lg font-bold">Editar producción #{id}</h3>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Pedido Cliente</label>
@@ -518,7 +496,6 @@ export const Produccion = () => {
                   ))}
                 </select>
               </div>
-
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Estado</label>
                 <select
@@ -530,7 +507,6 @@ export const Produccion = () => {
                   <option value="Finalizado">Finalizado</option>
                 </select>
               </div>
-
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Fecha Inicio</label>
                 <input
@@ -540,7 +516,6 @@ export const Produccion = () => {
                   className="w-full h-11 px-3 border rounded"
                 />
               </div>
-
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Fecha Fin</label>
                 <input
@@ -551,13 +526,11 @@ export const Produccion = () => {
                 />
               </div>
             </div>
-
             <div className="flex justify-end mb-4">
               <button type="button" onClick={añadirDetalleEditar} className="bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-2">
                 <Plus size={15} /> Añadir insumo
               </button>
             </div>
-
             <div className="grid grid-cols-1 gap-4 mb-6">
               {formEditar.detalle.map((d, index) => (
                 <div key={d._tempId} className="grid grid-cols-1 md:grid-cols-2 gap-3 border p-3 rounded bg-gray-50">
@@ -592,7 +565,6 @@ export const Produccion = () => {
                 </div>
               ))}
             </div>
-
             <div className="flex gap-4">
               <button type="button" onClick={handleEdit} className="flex-1 bg-blue-500 text-white h-11 rounded">Guardar cambios</button>
               <button type="button" onClick={goToBackToList} className="flex-1 bg-gray-200 text-gray-700 h-11 rounded">Cancelar</button>

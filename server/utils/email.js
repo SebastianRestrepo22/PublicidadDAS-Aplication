@@ -31,6 +31,7 @@ export const sendWelcomeEmail = async (to, password) => {
     return false;
   }
 };
+<<<<<<< HEAD
 
 // backend/utils/email.js
 // ... tu código actual ...
@@ -105,3 +106,5 @@ export const sendPedidoEstadoEmail = async (to, nombreCliente, pedidoId, nuevoEs
     // No detener la app si falla el correo
   }
 };
+=======
+>>>>>>> origin/main

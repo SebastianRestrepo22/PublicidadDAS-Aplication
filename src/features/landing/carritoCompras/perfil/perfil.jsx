@@ -267,6 +267,10 @@ export const Perfil = () => {
             </form>
 
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
             <ToastContainer
                 position="top-right"
                 autoClose={3000}

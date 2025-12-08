@@ -51,7 +51,7 @@ export const Proveedores = () => {
       });
       setEstadoActivo(estados);
     } catch (err) {
-      toast.error("Error al cargar proveedores:", err);
+      toast.error("Error al cargar proveedores: " + (err.message || err));
     }
   };
 
@@ -60,7 +60,8 @@ export const Proveedores = () => {
 
     const valor = String(p[filtroCampo] || "").toLowerCase();
     return valor.includes(filtroText.toLowerCase());
-  })
+  });
+
   const handleCreate = async () => {
     try {
       await axios.post("http://localhost:3000/api/proveedores", formCrear);
@@ -73,12 +74,11 @@ export const Proveedores = () => {
         estado: 1,
       });
       fetchProveedores();
-      toast.success("Proveedor creado exitosamente")
+      toast.success("Proveedor creado exitosamente");
     } catch (err) {
-      toast.error("Error al crear proveedor:", err);
+      toast.error("Error al crear proveedor: " + (err.message || err));
     }
   };
-
 
   const handleUpdate = async () => {
     try {
@@ -88,9 +88,9 @@ export const Proveedores = () => {
       );
       setOpenEditar(false);
       fetchProveedores();
-      toast.success("Proveedor actualizado exitosamente")
+      toast.success("Proveedor actualizado exitosamente");
     } catch (err) {
-      toast.error("Error al actualizar proveedor:", err);
+      toast.error("Error al actualizar proveedor: " + (err.message || err));
     }
   };
 
@@ -102,7 +102,7 @@ export const Proveedores = () => {
       setOpenEliminar(false);
       fetchProveedores();
     } catch (err) {
-      toast.error("Error al eliminar el proveedor:", err);
+      toast.error("Error al eliminar el proveedor: " + (err.message || err));
     }
   };
 
@@ -134,8 +134,6 @@ export const Proveedores = () => {
         correo: provActual.Correo,
         direccion: provActual.Direccion,
         estado: nuevoEstadoNum
-
-
       });
 
       setEstadoActivo((prev) => ({
@@ -148,27 +146,25 @@ export const Proveedores = () => {
           p.ProveedorId === idProveedor ? { ...p, Estado: nuevoEstadoNum } : p
         )
       );
-      toast.success("Estado actualizado correctamente")
+      toast.success("Estado actualizado correctamente");
     } catch (error) {
-      toast.error("Error al actualizar estado:", error)
-
-
+      toast.error("Error al actualizar estado: " + (error.message || error));
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-500 p-6">
       <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-6">
             Gestión de proveedores
           </h1>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 ">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               <Link
                 onClick={() => setOpenCreate(true)}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald"
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600"
               >
                 <Plus size={18} /> Nuevo proveedor
               </Link>
@@ -182,8 +178,6 @@ export const Proveedores = () => {
                 <option value="ProveedorId">ID</option>
                 <option value="NombreProveedor">Nombre</option>
                 <option value="Correo">Correo</option>
-
-
               </select>
 
               <div className="relative flex-1 max-w-md">
@@ -231,7 +225,7 @@ export const Proveedores = () => {
                 {proveedoresFiltrados.map((p) => (
                   <tr
                     key={p.ProveedorId}
-                    className="hover:bg-slate-50 transition-colors duration-150 "
+                    className="hover:bg-slate-50 transition-colors duration-150"
                   >
                     <td className="py-4 px-6 text-sm font-medium text-slate-900">
                       {p.ProveedorId}
@@ -264,7 +258,7 @@ export const Proveedores = () => {
                           <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform transform peer-checked:translate-x-5"></div>
                         </div>
                         <span className="ml-3 text-sm text-slate-700">
-                          {estadoActivos[p.ProveedorId] === 1}
+                          {estadoActivos[p.ProveedorId] === 1 ? "Activo" : "Inactivo"}
                         </span>
                       </label>
                     </td>
@@ -314,7 +308,7 @@ export const Proveedores = () => {
                   <input
                     placeholder="Ingrese su nombre"
                     value={formCrear.nombreProveedor}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-[#EEECEC focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) =>
                       setFormCrear({ ...formCrear, nombreProveedor: e.target.value })
                     }
@@ -325,7 +319,7 @@ export const Proveedores = () => {
                   <input
                     placeholder="Ingrese su telefono"
                     value={formCrear.telefono}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-[#EEECEC focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) =>
                       setFormCrear({ ...formCrear, telefono: e.target.value })
                     }
@@ -336,7 +330,7 @@ export const Proveedores = () => {
                   <input
                     placeholder="Ingrese su correo"
                     value={formCrear.correo}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-[#EEECEC focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) =>
                       setFormCrear({ ...formCrear, correo: e.target.value })
                     }
@@ -347,7 +341,7 @@ export const Proveedores = () => {
                   <input
                     placeholder="Ingrese su direccion"
                     value={formCrear.direccion}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-[#EEECEC focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) =>
                       setFormCrear({ ...formCrear, direccion: e.target.value })
                     }
@@ -384,7 +378,7 @@ export const Proveedores = () => {
                   <input
                     placeholder="Ingrese su nombre"
                     value={formEditar.nombreProveedor}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-[#EEECEC focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) =>
                       setFormEditar({ ...formEditar, nombreProveedor: e.target.value })
                     }
@@ -395,7 +389,7 @@ export const Proveedores = () => {
                   <input
                     placeholder="Ingrese su telefono"
                     value={formEditar.telefono}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-[#EEECEC focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) =>
                       setFormEditar({ ...formEditar, telefono: e.target.value })
                     }
@@ -406,7 +400,7 @@ export const Proveedores = () => {
                   <input
                     placeholder="Ingrese su correo"
                     value={formEditar.correo}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-[#EEECEC focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) =>
                       setFormEditar({ ...formEditar, correo: e.target.value })
                     }
@@ -417,7 +411,7 @@ export const Proveedores = () => {
                   <input
                     placeholder="Ingrese su direccion"
                     value={formEditar.direccion}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-[#EEECEC focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) =>
                       setFormEditar({ ...formEditar, direccion: e.target.value })
                     }
@@ -467,7 +461,7 @@ export const Proveedores = () => {
           </Modal>
 
           <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
-            <div className="w-[400px] p-6 mx-auto text-center ">
+            <div className="w-[400px] p-6 mx-auto text-center">
               <h3 className="text-lg font-black text-gray-800 mb-4">
                 Eliminar proveedor
               </h3>

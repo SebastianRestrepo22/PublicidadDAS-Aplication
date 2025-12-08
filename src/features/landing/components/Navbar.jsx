@@ -30,6 +30,7 @@ export const Navbar = () => {
                     {!user ? (
                         <>
                             <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to='/'>Inicio</Link></li>
+<<<<<<< HEAD
 
                             <li className="relative group">
                                 <span className="text-white font-bold text-[17px] cursor-pointer hover:text-cyan-500 duration-500">
@@ -41,14 +42,21 @@ export const Navbar = () => {
                                 </ul>
                             </li>
 
+=======
+                            <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to="/productos">Productos</Link></li>
+                            <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to="/servicios">Servicios</Link></li>
+>>>>>>> origin/main
                             <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to='/quienessomos'>¿Quiénes somos?</Link></li>
                         </>
                     ) : (
                         <>
                             <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to='/cliente/productos'>Productos</Link></li>
                             <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to='/cliente/servicios'>Servicios</Link></li>
+<<<<<<< HEAD
                             <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to='/cliente/MisPedidos'>Mis pedidos</Link></li>
 
+=======
+>>>>>>> origin/main
                         </>
                     )}
 
@@ -115,6 +123,7 @@ export const Navbar = () => {
             <ul className={`md:hidden bg-[#25395C] text-white w-full absolute left-0 top-14 flex flex-col items-center gap-6 py-6 text-lg font-bold transition-all duration-500 
                 ${menuOpen ? "opacity-100 visible" : "opacity-0 invisible"}`}>
 
+<<<<<<< HEAD
                 <li><Link to='/' onClick={() => setMenuOpen(false)}>Inicio</Link></li>
 
                 <li><Link to='/productos' onClick={() => setMenuOpen(false)}>Productos</Link></li>
@@ -125,6 +134,27 @@ export const Navbar = () => {
                 <li className="bg-blue-500 text-white px-5 py-1 rounded-lg">
                     <Link to='/login' onClick={() => setMenuOpen(false)}>Registro</Link>
                 </li>
+=======
+                {!user ? (
+                    <>
+                        <li><Link to='/' onClick={() => setMenuOpen(false)}>Inicio</Link></li>
+
+                        <li><Link to='/productos' onClick={() => setMenuOpen(false)}>Productos</Link></li>
+                        <li><Link to='/servicios' onClick={() => setMenuOpen(false)}>Servicios</Link></li>
+
+                        <li><Link to='/quienessomos' onClick={() => setMenuOpen(false)}>¿Quiénes somos?</Link></li>
+
+                        <li className="bg-blue-500 text-white px-5 py-1 rounded-lg">
+                            <Link to='/login' onClick={() => setMenuOpen(false)}>Registro</Link>
+                        </li>
+                    </>
+                ) : (
+                    <>
+                        <li><Link to='/cliente/productos' onClick={() => setMenuOpen(false)}>Productos</Link></li>
+                        <li><Link to='/cliente/servicios' onClick={() => setMenuOpen(false)}>Servicios</Link></li>
+                    </>
+                )}
+>>>>>>> origin/main
             </ul>
 
             <Modal

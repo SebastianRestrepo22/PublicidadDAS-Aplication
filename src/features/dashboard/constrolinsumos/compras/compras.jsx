@@ -23,18 +23,15 @@ export const Compras = () => {
   const [filtroText, setFiltroText] = useState("");
   const [viewMode, setViewMode] = useState("list");
   const [selectedCompra, setSelectedCompra] = useState(null);
-
   const [formCrear, setFormCrear] = useState({
     ProveedorId: "",
     Total: 0,
     FechaRegistro: "",
     Estado: 1,
   });
-
   const [detallesCrear, setDetallesCrear] = useState([
     { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }
   ]);
-
   const [productos, setProductos] = useState([]);
   const [insumos, setInsumos] = useState([]);
 
@@ -60,7 +57,6 @@ export const Compras = () => {
     try {
       const { data } = await axios.get(`http://localhost:3000/api/compras`);
       const comprasBase = Array.isArray(data) ? data : [];
-
       const comprasConDetalles = await Promise.all(
         comprasBase.map(async (compra) => {
           try {
@@ -71,7 +67,6 @@ export const Compras = () => {
           }
         })
       );
-
       setCompras(comprasConDetalles);
       const estados = {};
       comprasConDetalles.forEach((c) => {
@@ -99,17 +94,14 @@ export const Compras = () => {
     setDetallesCrear([{ TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }]);
     setViewMode("create");
   };
-
   const goToView = (compra) => {
     setSelectedCompra(compra);
     setViewMode("view");
   };
-
   const goToEdit = (compra) => {
     setSelectedCompra(compra);
     setViewMode("edit");
   };
-
   const goToBackToList = () => {
     setViewMode("list");
     setSelectedCompra(null);
@@ -122,12 +114,10 @@ export const Compras = () => {
       { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }
     ]);
   };
-
   const eliminarDetalleCrear = (index) => {
     if (detallesCrear.length === 1) return;
     setDetallesCrear(prev => prev.filter((_, i) => i !== index));
   };
-
   const actualizarDetalleCrear = (index, campo, valor) => {
     setDetallesCrear(prev => {
       const nuevos = [...prev];
@@ -148,7 +138,6 @@ export const Compras = () => {
       detalle: [...prev.detalle, { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }]
     }));
   };
-
   const eliminarDetalleEditar = (index) => {
     if (!selectedCompra?.detalle || selectedCompra.detalle.length <= 1) return;
     setSelectedCompra(prev => ({
@@ -156,21 +145,17 @@ export const Compras = () => {
       detalle: prev.detalle.filter((_, i) => i !== index),
     }));
   };
-
   const actualizarDetalleEditar = (index, campo, valor) => {
     setSelectedCompra(prev => {
       if (!prev) return prev;
       const nuevos = [...prev.detalle];
       nuevos[index][campo] = valor;
-
       if (campo === "Cantidad" || campo === "PrecioUnitario") {
         const cantidad = parseFloat(nuevos[index].Cantidad) || 0;
         const precio = parseFloat(nuevos[index].PrecioUnitario) || 0;
         nuevos[index].Subtotal = cantidad * precio;
       }
-
       const nuevoTotal = nuevos.reduce((sum, item) => sum + (item.Subtotal || 0), 0);
-
       return {
         ...prev,
         detalle: nuevos,
@@ -188,22 +173,18 @@ export const Compras = () => {
         InsumoId: d.InsumoId?.trim() || null,
         Subtotal: undefined,
       }));
-
       const total = detallesLimpios.reduce((sum, item) => sum + ((item.Cantidad || 0) * (item.PrecioUnitario || 0)), 0);
-
       const { data: compraCreada } = await axios.post(API_URL, {
         ...formCrear,
         FechaRegistro: formatearFecha(formCrear.FechaRegistro),
         Total: total,
       });
-
       for (const d of detallesLimpios) {
         await axios.post(API_DETALLE_URL, {
           CompraId: compraCreada.CompraId,
           ...d,
         });
       }
-
       goToBackToList();
       fetchCompras();
     } catch (err) {
@@ -215,35 +196,29 @@ export const Compras = () => {
   const handleEdit = async () => {
     try {
       if (!selectedCompra) return;
-
       const total = selectedCompra.detalle.reduce((sum, item) => sum + (item.Subtotal || 0), 0);
-
       await axios.put(`${API_URL}/${selectedCompra.CompraId}`, {
         ProveedorId: selectedCompra.ProveedorId,
         Total: total,
         FechaRegistro: formatearFecha(selectedCompra.FechaRegistro),
         Estado: selectedCompra.Estado,
       });
-
       const { data: detallesActuales } = await axios.get(`${API_DETALLE_URL}/compra/${selectedCompra.CompraId}`);
       for (const d of detallesActuales) {
         await axios.delete(`${API_DETALLE_URL}/${d.DetalleCompraId}`);
       }
-
       const detallesLimpios = selectedCompra.detalle.map((d) => ({
         ...d,
         ProductoServicioId: d.ProductoServicioId?.trim() || null,
         InsumoId: d.InsumoId?.trim() || null,
         Subtotal: undefined,
       }));
-
       for (const d of detallesLimpios) {
         await axios.post(API_DETALLE_URL, {
           CompraId: selectedCompra.CompraId,
           ...d,
         });
       }
-
       goToBackToList();
       fetchCompras();
     } catch (err) {
@@ -268,7 +243,6 @@ export const Compras = () => {
     const nuevoEstadoNum = nuevoEstadoBoolean ? 1 : 0;
     const compraActual = compras.find((c) => c.CompraId === idCompra);
     if (!compraActual) return;
-
     try {
       await axios.put(`${API_URL}/${idCompra}`, {
         ProveedorId: compraActual.ProveedorId,
@@ -276,7 +250,6 @@ export const Compras = () => {
         FechaRegistro: formatearFecha(compraActual.FechaRegistro),
         Estado: nuevoEstadoNum,
       });
-
       setEstadoActivo((prev) => ({ ...prev, [idCompra]: nuevoEstadoNum }));
       setCompras((prev) =>
         prev.map((c) =>
@@ -305,7 +278,6 @@ export const Compras = () => {
               >
                 <Plus size={18} /> Nueva compra
               </button>
-
               <select
                 value={filtroCampo}
                 onChange={(e) => setFiltroCampo(e.target.value)}
@@ -316,7 +288,6 @@ export const Compras = () => {
                 <option value="ProveedorId">ProveedorID</option>
                 <option value="FechaRegistro">Fecha</option>
               </select>
-
               <div className="relative flex-1 max-w-md">
                 <input
                   type="text"
@@ -332,7 +303,6 @@ export const Compras = () => {
                 />
               </div>
             </div>
-
             <div className="bg-white rounded-xl shadow-sm border overflow-x-auto max-h-[600px] w-full">
               <table className="min-w-full table-auto text-sm">
                 <thead className="bg-gradient-to-r from-slate-800 to-slate-700 sticky top-0">
@@ -345,7 +315,6 @@ export const Compras = () => {
                     <th className="px-4 py-3 text-center text-white">Acciones</th>
                   </tr>
                 </thead>
-
                 <tbody className="divide-y">
                   {comprasFiltradas.map((compra) => (
                     <tr key={compra.CompraId} className="hover:bg-slate-50">
@@ -353,7 +322,6 @@ export const Compras = () => {
                       <td className="py-4 px-6">{compra.ProveedorId}</td>
                       <td className="py-4 px-6">{compra.FechaRegistro}</td>
                       <td className="py-4 px-6 text-center">S/ {(Number(compra.Total) || 0).toFixed(2)}</td>
-
                       <td className="py-4 px-6 text-center">
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input
@@ -368,7 +336,6 @@ export const Compras = () => {
                           <span className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-md transform peer-checked:translate-x-6 transition-all"></span>
                         </label>
                       </td>
-
                       <td className="py-4 px-6 text-center">
                         <div className="flex justify-center gap-3">
                           <button onClick={() => goToView(compra)}>
@@ -387,7 +354,6 @@ export const Compras = () => {
                       </td>
                     </tr>
                   ))}
-
                   {comprasFiltradas.length === 0 && (
                     <tr>
                       <td colSpan={6} className="py-6 text-center text-gray-500">
@@ -413,7 +379,6 @@ export const Compras = () => {
               </button>
               <h3 className="text-lg font-bold">Nueva compra</h3>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Proveedor ID</label>
@@ -427,7 +392,6 @@ export const Compras = () => {
                   className="w-full h-11 px-3 border rounded"
                 />
               </div>
-
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Fecha de registro</label>
                 <input
@@ -439,7 +403,6 @@ export const Compras = () => {
                   className="w-full h-11 px-3 border rounded"
                 />
               </div>
-
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Total (Calculado)</label>
                 <input
@@ -450,7 +413,6 @@ export const Compras = () => {
                 />
               </div>
             </div>
-
             <div className="flex justify-end mb-4">
               <button
                 type="button"
@@ -460,7 +422,6 @@ export const Compras = () => {
                 <Plus size={16} /> Agregar Artículo
               </button>
             </div>
-
             <div className="bg-gray-50 p-4 rounded-lg">
               <h4 className="font-semibold mb-4">Artículos de la Compra</h4>
               <div className="overflow-x-auto">
@@ -475,7 +436,6 @@ export const Compras = () => {
                       <th className="py-2 px-4">Acciones</th>
                     </tr>
                   </thead>
-
                   <tbody>
                     {detallesCrear.map((d, index) => (
                       <tr key={index} className="border-t">
@@ -487,7 +447,6 @@ export const Compras = () => {
                             className="w-full px-2 py-1 border rounded"
                           />
                         </td>
-
                         <td className="py-2 px-4">
                           <select
                             value={d.TipoDetalle || ""}
@@ -499,7 +458,6 @@ export const Compras = () => {
                             <option value="Insumo">Insumo</option>
                           </select>
                         </td>
-
                         <td className="py-2 px-4">
                           <select
                             disabled={d.TipoDetalle !== "Producto"}
@@ -515,7 +473,6 @@ export const Compras = () => {
                             ))}
                           </select>
                         </td>
-
                         <td className="py-2 px-4">
                           <select
                             disabled={d.TipoDetalle !== "Insumo"}
@@ -531,7 +488,6 @@ export const Compras = () => {
                             ))}
                           </select>
                         </td>
-
                         <td className="py-2 px-4">
                           <input
                             type="number"
@@ -540,7 +496,6 @@ export const Compras = () => {
                             className="w-full px-2 py-1 border rounded"
                           />
                         </td>
-
                         <td className="py-2 px-4">
                           <input
                             type="number"
@@ -549,7 +504,6 @@ export const Compras = () => {
                             className="w-full px-2 py-1 border rounded"
                           />
                         </td>
-
                         <td className="py-2 px-4">
                           <input
                             type="number"
@@ -558,7 +512,6 @@ export const Compras = () => {
                             className="w-full px-2 py-1 border rounded bg-gray-100"
                           />
                         </td>
-
                         <td className="py-2 px-4 text-center">
                           <Trash2
                             size={18}
@@ -572,7 +525,6 @@ export const Compras = () => {
                 </table>
               </div>
             </div>
-
             <div className="bg-gray-50 p-4 rounded-lg mt-4">
               <div className="flex justify-between text-lg font-bold">
                 <span>Subtotal:</span>
@@ -583,7 +535,6 @@ export const Compras = () => {
                 <span>{detallesCrear.reduce((sum, item) => sum + (item.Subtotal || 0), 0).toFixed(2)} US$</span>
               </div>
             </div>
-
             <div className="flex flex-col md:flex-row gap-4 mt-6">
               <button
                 type="button"
@@ -615,7 +566,6 @@ export const Compras = () => {
               </button>
               <h3 className="text-lg font-bold">Editar compra #{selectedCompra.CompraId}</h3>
             </div>
-
             <div className="flex justify-end mb-4">
               <button
                 type="button"
@@ -625,7 +575,6 @@ export const Compras = () => {
                 <Plus size={16} /> Agregar Artículo
               </button>
             </div>
-
             <div className="bg-gray-50 p-4 rounded-lg">
               <h4 className="font-semibold mb-4">Artículos de la Compra</h4>
               <div className="overflow-x-auto">
@@ -640,7 +589,6 @@ export const Compras = () => {
                       <th className="py-2 px-4">Acciones</th>
                     </tr>
                   </thead>
-
                   <tbody>
                     {selectedCompra.detalle?.map((d, index) => (
                       <tr key={index} className="border-t">
@@ -652,7 +600,6 @@ export const Compras = () => {
                             className="w-full px-2 py-1 border rounded"
                           />
                         </td>
-
                         <td className="py-2 px-4">
                           <select
                             value={d.TipoDetalle || ""}
@@ -664,7 +611,6 @@ export const Compras = () => {
                             <option value="Insumo">Insumo</option>
                           </select>
                         </td>
-
                         <td className="py-2 px-4">
                           <select
                             disabled={d.TipoDetalle !== "Producto"}
@@ -680,7 +626,6 @@ export const Compras = () => {
                             ))}
                           </select>
                         </td>
-
                         <td className="py-2 px-4">
                           <select
                             disabled={d.TipoDetalle !== "Insumo"}
@@ -696,7 +641,6 @@ export const Compras = () => {
                             ))}
                           </select>
                         </td>
-
                         <td className="py-2 px-4">
                           <input
                             type="number"
@@ -705,7 +649,6 @@ export const Compras = () => {
                             className="w-full px-2 py-1 border rounded"
                           />
                         </td>
-
                         <td className="py-2 px-4">
                           <input
                             type="number"
@@ -714,7 +657,6 @@ export const Compras = () => {
                             className="w-full px-2 py-1 border rounded"
                           />
                         </td>
-
                         <td className="py-2 px-4">
                           <input
                             type="number"
@@ -723,7 +665,6 @@ export const Compras = () => {
                             className="w-full px-2 py-1 border rounded bg-gray-100"
                           />
                         </td>
-
                         <td className="py-2 px-4 text-center">
                           <Trash2
                             size={18}
@@ -737,7 +678,6 @@ export const Compras = () => {
                 </table>
               </div>
             </div>
-
             <div className="bg-gray-50 p-4 rounded-lg mt-4">
               <div className="flex justify-between text-lg font-bold">
                 <span>Subtotal:</span>
@@ -748,7 +688,6 @@ export const Compras = () => {
                 <span>{Number(selectedCompra.Total || 0).toFixed(2)} US$</span>
               </div>
             </div>
-
             <div className="flex flex-col md:flex-row gap-4 mt-6">
               <button
                 type="button"
@@ -780,7 +719,6 @@ export const Compras = () => {
               </button>
               <h3 className="text-lg font-bold">Ver compra #{selectedCompra.CompraId}</h3>
             </div>
-
             <div className="bg-gray-50 p-4 rounded-lg">
               <h4 className="font-semibold mb-4">Artículos de la Compra</h4>
               <div className="overflow-x-auto">
@@ -794,7 +732,6 @@ export const Compras = () => {
                       <th className="py-2 px-4">Subtotal</th>
                     </tr>
                   </thead>
-
                   <tbody>
                     {selectedCompra.detalle?.map((d, index) => (
                       <tr key={index} className="border-t">
@@ -811,7 +748,6 @@ export const Compras = () => {
                 </table>
               </div>
             </div>
-
             <div className="bg-gray-50 p-4 rounded-lg mt-4">
               <div className="flex justify-between text-lg font-bold">
                 <span>Subtotal:</span>
@@ -822,7 +758,6 @@ export const Compras = () => {
                 <span>{Number(selectedCompra.Total || 0).toFixed(2)} US$</span>
               </div>
             </div>
-
             <div className="mt-6">
               <button
                 type="button"

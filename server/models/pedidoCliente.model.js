@@ -4,7 +4,7 @@ import connectDB from "../lib/db.js";
 const sanitize = (v) => (v === undefined ? null : v);
 
 // ✔ TABLA REAL: pedidosclientes
-// Reemplaza tu función actual por esta:
+
 export const getAllPedidosClientesModel = async (clienteId = null) => {
   const connection = await connectDB();
 
@@ -57,10 +57,8 @@ export const getPedidoClienteByIdModel = async (pedidoId) => {
     `,
     [pedidoId]
   );
-  return rows[0]; // Devuelve el pedido (con datos del cliente) o undefined
+  return rows[0];
 };
-
-
 
 export const createPedidoClienteModel = async ({
   ClienteId,
@@ -99,33 +97,34 @@ export const createPedidoClienteModel = async ({
 
   return rows[0]; 
 };
+
 export const updatePedidoClienteModel = async (id, data) => {
-    const connection = await connectDB();
-    const { ClienteId, FechaRegistro, Total, Estado } = data;
+  const connection = await connectDB();
+  const { ClienteId, FechaRegistro, Total, Estado } = data;
 
-    const [result] = await connection.execute(
-        `
-        UPDATE pedidosclientes
-        SET ClienteId = ?, FechaRegistro = ?, Total = ?, Estado = ?
-        WHERE PedidoClienteId = ? 
-        `,
-        [
-            sanitize(ClienteId),
-            sanitize(FechaRegistro),
-            sanitize(Total),
-            sanitize(Estado),
-            id,
-        ]
-    );
+  const [result] = await connection.execute(
+    `
+    UPDATE pedidosclientes
+    SET ClienteId = ?, FechaRegistro = ?, Total = ?, Estado = ?
+    WHERE PedidoClienteId = ? 
+    `,
+    [
+      sanitize(ClienteId),
+      sanitize(FechaRegistro),
+      sanitize(Total),
+      sanitize(Estado),
+      id,
+    ]
+  );
 
-    return result;
+  return result;
 };
 
 export const deletePedidoClienteModel = async (id) => {
-    const connection = await connectDB();
-    const [result] = await connection.execute(
-        "DELETE FROM pedidosclientes WHERE PedidoClienteId = ?",
-        [id]
-    );
-    return result;
+  const connection = await connectDB();
+  const [result] = await connection.execute(
+    "DELETE FROM pedidosclientes WHERE PedidoClienteId = ?",
+    [id]
+  );
+  return result;
 };
