@@ -30,8 +30,6 @@ import { Produccion } from "../features/dashboard/gestionventas/produccion/produ
 import { Checkout } from "../features/landing/carritoCompras/checkout/checkout";
 import { PedidoExitoso } from "../features/dashboard/gestionventas/pedidos/pedidoExitoso/pedidoExitoso";
 import { ScrollToTop } from "../features/landing/components/ScrollToTop";
-import { SubirComprobante } from "../features/landing/carritoCompras/comprobante/SubirComprobante";
-import { PagoPendiente } from "../features/landing/carritoCompras/checkout/PagoPendiente";
 import Comprobante from "../features/dashboard/comprobantes/comprobante";
 
 export const Routers = () => {
@@ -93,22 +91,7 @@ export const Routers = () => {
             </PrivateRoute>
           }
         />
-        <Route
-          path="/subir-comprobante/:pedidoId"
-          element={
-            <PrivateRoute role="cliente">
-              <SubirComprobante/>
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/pago-pendiente/:pedidoId"
-          element={
-            <PrivateRoute role="cliente">
-              <PagoPendiente/>
-            </PrivateRoute>
-          }
-        />
+        
 
         {/* Dashboard Admin */}
         <Route

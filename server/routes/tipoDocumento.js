@@ -1,6 +1,5 @@
 import express from 'express';
-import { connectDB } from '../lib/db.js';
-
+import connectDB from '../lib/db.js';
 const router = express.Router();
 
 // Obtener todos los tipos de documento

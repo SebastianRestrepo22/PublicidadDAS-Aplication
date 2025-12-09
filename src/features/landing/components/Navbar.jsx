@@ -30,17 +30,8 @@ export const Navbar = () => {
                     {!user ? (
                         <>
                             <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to='/'>Inicio</Link></li>
-
-                            <li className="relative group">
-                                <span className="text-white font-bold text-[17px] cursor-pointer hover:text-cyan-500 duration-500">
-                                    Nuestros productos
-                                </span>
-                                <ul className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
-                                    <li><Link className="block px-4 py-2 hover:bg-cyan-500 hover:text-white" to="/productos">Productos</Link></li>
-                                    <li><Link className="block px-4 py-2 hover:bg-cyan-500 hover:text-white" to="/servicios">Servicios</Link></li>
-                                </ul>
-                            </li>
-
+                            <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to="/productos">Productos</Link></li>
+                            <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to="/servicios">Servicios</Link></li>
                             <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to='/quienessomos'>¿Quiénes somos?</Link></li>
                         </>
                     ) : (
@@ -115,16 +106,25 @@ export const Navbar = () => {
             <ul className={`md:hidden bg-[#25395C] text-white w-full absolute left-0 top-14 flex flex-col items-center gap-6 py-6 text-lg font-bold transition-all duration-500 
                 ${menuOpen ? "opacity-100 visible" : "opacity-0 invisible"}`}>
 
-                <li><Link to='/' onClick={() => setMenuOpen(false)}>Inicio</Link></li>
+                {!user ? (
+                    <>
+                        <li><Link to='/' onClick={() => setMenuOpen(false)}>Inicio</Link></li>
 
-                <li><Link to='/productos' onClick={() => setMenuOpen(false)}>Productos</Link></li>
-                <li><Link to='/servicios' onClick={() => setMenuOpen(false)}>Servicios</Link></li>
+                        <li><Link to='/productos' onClick={() => setMenuOpen(false)}>Productos</Link></li>
+                        <li><Link to='/servicios' onClick={() => setMenuOpen(false)}>Servicios</Link></li>
 
-                <li><Link to='/quienessomos' onClick={() => setMenuOpen(false)}>¿Quiénes somos?</Link></li>
+                        <li><Link to='/quienessomos' onClick={() => setMenuOpen(false)}>¿Quiénes somos?</Link></li>
 
-                <li className="bg-blue-500 text-white px-5 py-1 rounded-lg">
-                    <Link to='/login' onClick={() => setMenuOpen(false)}>Registro</Link>
-                </li>
+                        <li className="bg-blue-500 text-white px-5 py-1 rounded-lg">
+                            <Link to='/login' onClick={() => setMenuOpen(false)}>Registro</Link>
+                        </li>
+                    </>
+                ) : (
+                    <>
+                        <li><Link to='/cliente/productos' onClick={() => setMenuOpen(false)}>Productos</Link></li>
+                        <li><Link to='/cliente/servicios' onClick={() => setMenuOpen(false)}>Servicios</Link></li>
+                    </>
+                )}
             </ul>
 
             <Modal
@@ -156,3 +156,16 @@ export const Navbar = () => {
         </header>
     );
 };
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,5 +1,5 @@
-  import { connectDB } from '../lib/db.js';
-  import { v4 as uuidv4 } from 'uuid';
+import connectDB from '../lib/db.js';
+import { v4 as uuidv4 } from 'uuid';
 
   // Crear rol
   export const createRole = async (req, res) => {

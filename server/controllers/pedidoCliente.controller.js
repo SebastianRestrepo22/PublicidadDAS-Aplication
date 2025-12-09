@@ -1,5 +1,4 @@
 import { sendPedidoEstadoEmail, sendVoucherEmail } from "../utils/email.js";
-
 import {
   getAllPedidosClientesModel,
   getPedidoClienteByIdModel,
@@ -8,12 +7,12 @@ import {
   deletePedidoClienteModel,
   getClienteByIdModel
 } from "../models/pedidoCliente.model.js";
-
 import {
   createDetallePedidoModel,
   getDetallePedidoByPedidoIdModel,
   deleteDetallePedidoModel
 } from "../models/detallePedidoCliente.model.js";
+import { QrCode } from "lucide-react";
 
 
 export const getPedidosClientes = async (req, res) => {
@@ -53,12 +52,6 @@ export const getPedidoClienteById = async (req, res) => {
 };
 
 
-/**
- * Crear pedido + detalles
- */
-/**
- * Crear pedido + detalles + enviar voucher por correo
- */
 export const createPedidoCliente = async (req, res) => {
   try {
     let { ClienteId, FechaRegistro, Total, Estado, detalle } = req.body;
@@ -98,6 +91,20 @@ export const createPedidoCliente = async (req, res) => {
       }
     }
 
+    // 🔑 GENERAR EL QR DINÁMICO PARA BANCOLOMBIA
+    const cuentaBancolombia = "24079288086"; // ← Tu cuenta real
+    const monto = Math.round(nuevoPedido.Total); // Asegurar que sea entero
+    const concepto = `PEDIDO-${nuevoPedido.PedidoClienteId}`; // ID del pedido como referencia
+
+    const qrData = `https://www.bancolombia.com/pagosmovil?cuenta=${cuentaBancolombia}&monto=${monto}&concepto=${encodeURIComponent(concepto)}`;
+
+    let qrCodeBase64 = null;
+    try {
+      qrCodeBase64 = await QrCode.toDataURL(qrData, { errorCorrectionLevel: "H" });
+    } catch (qrError) {
+      console.warn("No se pudo generar el QR, pero el pedido se creó:", qrError.message);
+    }
+
     // Obtener datos del cliente para el correo
     let cliente = null;
     try {
@@ -122,16 +129,18 @@ export const createPedidoCliente = async (req, res) => {
       detalle: await getDetallePedidoByPedidoIdModel(nuevoPedido.PedidoClienteId)
     };
 
-    res.status(201).json(pedidoCreado);
+    // 🔑 Incluir el QR en la respuesta
+    res.status(201).json({
+      ...pedidoCreado,
+      qrCode: qrCodeBase64 // ← ¡Esto es lo que tu frontend necesita!
+    });
 
   } catch (error) {
     console.error("Error al crear pedido:", error);
     res.status(500).json({ error: "Error al crear pedido" });
   }
 };
-/**
- * Actualizar pedido + enviar correo si el estado cambia
- */
+
 export const updatePedidoCliente = async (req, res) => {
   if (req.body.FechaRegistro) {
     req.body.FechaRegistro = req.body.FechaRegistro.split("T")[0];
