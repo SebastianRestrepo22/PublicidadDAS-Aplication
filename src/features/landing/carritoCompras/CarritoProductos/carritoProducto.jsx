@@ -53,8 +53,7 @@ export const CarritoProducto = () => {
         const options = {
             descripcion,
             urlImagen,
-            ProductoServicioId: item.ProductoServicioId || item.ServiceId,
-            Tipo: item.Tipo // Producto o Servicio
+            ProductoServicioId: item.ProductoServicioId,
         };
 
         if (esPersonalizado) {
@@ -62,13 +61,14 @@ export const CarritoProducto = () => {
             options.ancho = ancho;
         }
 
-        addToCart(item, options, cantidad);
+        // Corregido: aseguramos que item tenga Tipo definido
+        const itemConTipo = {
+            ...item,
+            Tipo: item.Tipo || "Servicio", // si no viene, asumimos servicio
+        };
 
-        toast.success("Producto añadido al carrito", { autoClose: 1500 });
-
-        setTimeout(() => {
-            navigate(from);
-        }, 1200);
+        addToCart(itemConTipo, options, Number(cantidad));
+        navigate(from);
     };
 
     if (!item) {
@@ -117,8 +117,25 @@ export const CarritoProducto = () => {
                                 type="number"
                                 min="1"
                                 value={cantidad}
-                                onChange={(e) => setCantidad(Number(e.target.value) || 1)}
-                                className={`h-12 px-4 border rounded-lg ${errors.cantidad ? "border-red-500" : ""}`}
+                                onChange={(e) => {
+                                    let v = e.target.value;
+                                    if (v === "") {
+                                        setCantidad("");
+                                        return;
+                                    }
+                                    v = v.replace(/^0+(?=\d)/, "");
+                                    if (/^\d+$/.test(v)) {
+                                        setCantidad(v);
+                                    }
+                                }}
+                                onBlur={() => {
+                                    if (cantidad.trim() === "") {
+                                        setCantidad("1");
+                                    }
+                                }}
+                                className={`h-12 px-4 border rounded-xl shadow-sm focus:ring-2 focus:ring-black focus:outline-none ${
+                                    errors.cantidad ? "border-red-500" : "border-gray-300"
+                                }`}
                             />
                             {errors.cantidad && <p className="text-red-600 text-sm mt-1">{errors.cantidad}</p>}
                         </div>
@@ -130,8 +147,25 @@ export const CarritoProducto = () => {
                                     <input
                                         type="number"
                                         value={alto}
-                                        onChange={(e) => setAlto(e.target.value)}
-                                        className={`h-12 px-4 border rounded-lg ${errors.alto ? "border-red-500" : ""}`}
+                                        onChange={(e) => {
+                                            let v = e.target.value;
+                                            if (v === "") {
+                                                setAlto("");
+                                                return;
+                                            }
+                                            v = v.replace(/^0+(?=\d)/, "");
+                                            if (/^\d+$/.test(v)) {
+                                                setAlto(v);
+                                            }
+                                        }}
+                                        onBlur={() => {
+                                            if (alto.trim() === "") {
+                                                setAlto("");
+                                            }
+                                        }}
+                                        className={`h-12 px-4 border rounded-xl shadow-sm focus:ring-2 focus:ring-black focus:outline-none ${
+                                            errors.alto ? "border-red-500" : "border-gray-300"
+                                        }`}
                                     />
                                     {errors.alto && <p className="text-red-600 text-sm mt-1">{errors.alto}</p>}
                                 </div>
@@ -141,8 +175,25 @@ export const CarritoProducto = () => {
                                     <input
                                         type="number"
                                         value={ancho}
-                                        onChange={(e) => setAncho(e.target.value)}
-                                        className={`h-12 px-4 border rounded-lg ${errors.ancho ? "border-red-500" : ""}`}
+                                        onChange={(e) => {
+                                            let v = e.target.value;
+                                            if (v === "") {
+                                                setAncho("");
+                                                return;
+                                            }
+                                            v = v.replace(/^0+(?=\d)/, "");
+                                            if (/^\d+$/.test(v)) {
+                                                setAncho(v);
+                                            }
+                                        }}
+                                        onBlur={() => {
+                                            if (ancho.trim() === "") {
+                                                setAncho("");
+                                            }
+                                        }}
+                                        className={`h-12 px-4 border rounded-xl shadow-sm focus:ring-2 focus:ring-black focus:outline-none ${
+                                            errors.ancho ? "border-red-500" : "border-gray-300"
+                                        }`}
                                     />
                                     {errors.ancho && <p className="text-red-600 text-sm mt-1">{errors.ancho}</p>}
                                 </div>

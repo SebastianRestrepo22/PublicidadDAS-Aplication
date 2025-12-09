@@ -28,8 +28,43 @@ export const CartProvider = ({ children }) => {
     }
   }, [cart]);
 
-  // ➕ AGREGAR PRODUCTO AL CARRITO
   const addToCart = (product, options = {}, quantity = 1) => {
+    const stock = product.Stock ?? product.stock ?? null;
+
+    const itemId =
+      product.ProductoServicioId ?? product.ServiceId ?? product.id ?? null;
+
+    const existingLine = cart.find((l) => {
+      if (l.ProductoServicioId !== itemId) return false;
+
+      if (!l.EsPersonalizado) return true;
+
+      return (
+        l.options?.alto === options.alto &&
+        l.options?.ancho === options.ancho &&
+        l.options?.descripcion === options.descripcion
+      );
+    });
+
+    if (existingLine) {
+      const newQuantity = existingLine.quantity + quantity;
+
+      // Validación de stock solo para productos
+      if (
+        typeof stock === "number" &&
+        stock > 0 &&
+        product.Tipo === "Producto" &&
+        newQuantity > stock
+      ) {
+        toast.error(`Solo hay ${stock} unidades disponibles`);
+        return;
+      }
+
+      updateQuantity(existingLine.id, newQuantity);
+      toast.success(`${product.Nombre} actualizado en el carrito`);
+      return;
+    }
+
     const discount = product.Descuento || product.descuento || 0;
     const originalPrice = product.Precio || product.precio || 0;
 
@@ -47,6 +82,14 @@ export const CartProvider = ({ children }) => {
       Precio: finalPrice,
       UrlImagen: options.urlImagen || product.UrlImagen || product.Url || "",
       quantity: Math.max(1, parseInt(quantity, 10) || 1),
+      Stock: stock,
+      Tipo: product.Tipo || "Producto",
+      EsPersonalizado:
+        product.EsPersonalizado ??
+        product.esPersonalizado ??
+        product.Customizable ??
+        options.EsPersonalizado ??
+        false,
       options: {
         alto: options.alto || null,
         ancho: options.ancho || null,
@@ -54,6 +97,17 @@ export const CartProvider = ({ children }) => {
         ...options,
       },
     };
+
+    // Validación de stock inicial solo para productos
+    if (
+      typeof stock === "number" &&
+      stock > 0 &&
+      product.Tipo === "Producto" &&
+      cartLine.quantity > stock
+    ) {
+      toast.error(`Solo hay ${stock} unidades disponibles`);
+      return;
+    }
 
     setCart((prev) => [...prev, cartLine]);
   };
@@ -63,16 +117,27 @@ export const CartProvider = ({ children }) => {
     setCart((prev) => prev.filter((l) => l.id !== lineId));
   };
 
-  //  ACTUALIZAR SOLO LA CANTIDAD
   const updateQuantity = (lineId, newQuantity) => {
     setCart((prev) =>
-      prev.map((l) =>
-        l.id === lineId ? { ...l, quantity: Math.max(1, newQuantity) } : l
-      )
+      prev.map((l) => {
+        const stock = l.Stock ?? null;
+
+        // Validación de stock solo para productos
+        if (
+          typeof stock === "number" &&
+          stock > 0 &&
+          l.Tipo === "Producto" &&
+          newQuantity > stock
+        ) {
+          toast.error(`Solo hay ${stock} unidades disponibles`);
+          return l;
+        }
+
+        return { ...l, quantity: Math.max(1, newQuantity) };
+      })
     );
   };
 
-  // ✏️ **ACTUALIZAR ITEM COMPLETO (USADO EN EDITAR PRODUCTO)**
   const updateItem = (lineId, changes) => {
     setCart((prev) =>
       prev.map((item) =>
@@ -87,10 +152,8 @@ export const CartProvider = ({ children }) => {
     );
   };
 
-  // 🧹 VACIAR CARRITO
   const clearCart = () => setCart([]);
 
-  // 💰 TOTAL
   const getTotal = () =>
     cart.reduce(
       (sum, l) => sum + (Number(l.Precio) || 0) * (l.quantity || 1),
