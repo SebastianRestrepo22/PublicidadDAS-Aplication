@@ -1,42 +1,40 @@
-import { connectionToDatabase } from '../lib/db.js';
+// src/models/categorias.model.js
+import connectDB from '../lib/db.js'; // ← Importación correcta en ES Modules
 import { v4 as uuidv4 } from 'uuid';
 
-
 export const getAllCategorias = async () => {
-  const db = await connectionToDatabase();
-  const [rows] = await db.query('SELECT * FROM Categorias'); 
+  const connection = await connectDB();
+  const [rows] = await connection.execute('SELECT * FROM Categorias');
   return rows;
 };
 
 export const getCategoriaById = async (id) => {
-  const db = await connectionToDatabase();
-  const [rows] = await db.query('SELECT * FROM Categorias WHERE CategoriaId = ?', [id]);
-  return rows[0];
+  const connection = await connectDB();
+  const [rows] = await connection.execute('SELECT * FROM Categorias WHERE CategoriaId = ?', [id]);
+  return rows[0] || null;
 };
 
 export const createCategoria = async ({ nombreCategoria, descripcion }) => {
-  const db = await connectionToDatabase();
+  const connection = await connectDB();
   const categoriaId = uuidv4();
-  await db.query(
+  await connection.execute(
     'INSERT INTO Categorias (CategoriaId, Nombre, Descripcion) VALUES (?, ?, ?)',
     [categoriaId, nombreCategoria, descripcion]
   );
-  return { CategoriaId: categoriaId, Nombre: nombreCategoria, Descripcion: descripcion};
+  return { CategoriaId: categoriaId, Nombre: nombreCategoria, Descripcion: descripcion };
 };
 
 export const deleteCategoria = async (id) => {
-  const db = await connectionToDatabase();
-  const [result] = await db.query('DELETE FROM Categorias WHERE CategoriaId = ?', [id]);
+  const connection = await connectDB();
+  const [result] = await connection.execute('DELETE FROM Categorias WHERE CategoriaId = ?', [id]);
   return result;
 };
 
 export const updateCategoria = async (id, { nombreCategoria, descripcion }) => {
-  const db = await connectionToDatabase();
-  const [result] = await db.query(
+  const connection = await connectDB();
+  const [result] = await connection.execute(
     'UPDATE Categorias SET Nombre = ?, Descripcion = ? WHERE CategoriaId = ?',
     [nombreCategoria, descripcion, id]
   );
-  return result
-
-
-}
+  return result;
+};

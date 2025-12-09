@@ -1,49 +1,42 @@
-// src/routes/comprobante.routes.js
+// src/routes/comprobantes.routes.js
 import { Router } from "express";
+import { uploadComprobante, getComprobanteByPedidoId, updateComprobanteEstado } from "../controllers/comprobante.controller.js";
 import multer from "multer";
 import path from "path";
+import fs from "fs";
 
-// 📥 Importar controladores
-import {
-  uploadComprobante,
-  getComprobanteByPedidoId,
-  updateComprobanteEstado
-} from "../controllers/comprobante.controller.js";
+// Crear carpeta si no existe
+const uploadDir = path.join(process.cwd(), "public", "comprobantes");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
-
-// Configuración de multer para subir archivos
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "public/comprobantes"); // carpeta de destino
-  },
+  destination: "public/comprobantes",
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, `comprobante-${uniqueSuffix}${path.extname(file.originalname)}`);
+    const cleanName = file.originalname.replace(/\s+/g, "-");
+    cb(null, `${Date.now()}-${cleanName}`);
   }
 });
 
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|pdf/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
-
-  if (mimetype && extname) {
-    cb(null, true);
-  } else {
-    cb(new Error("Solo se permiten imágenes (jpg, png) o archivos PDF"));
-  }
-};
-
 const upload = multer({
   storage,
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5 MB máximo
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB máximo
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|pdf/;
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.test(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo se permiten archivos JPG, PNG o PDF"));
+    }
+  }
 });
 
 const router = Router();
 
 router.post("/", upload.single("comprobante"), uploadComprobante);
-router.get("/pedido/:id", getComprobanteByPedidoId); // :id = UUID del pedido
-router.patch("/:id", updateComprobanteEstado);       // :id = UUID del comprobante
+router.get("/:id", getComprobanteByPedidoId);
+router.put("/:id", updateComprobanteEstado);
 
 export default router;

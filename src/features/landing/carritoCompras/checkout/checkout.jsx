@@ -51,6 +51,7 @@ export const Checkout = () => {
 
       const data = await res.json();
       const pedidoId = data.PedidoClienteId;
+      const qrCode = data.qrCode || null; // ← Recibe el QR del backend
 
       if (!pedidoId) {
         throw new Error("No se recibió el ID del pedido");
@@ -58,14 +59,15 @@ export const Checkout = () => {
 
       clearCart();
 
-      // ✅ Guarda el voucher (no redirige)
+      // ✅ Guarda el voucher con el QR
       setVoucher({
         id: pedidoId,
         total: getTotal(),
         fecha: new Date().toLocaleDateString("es-CO"),
         nombreTitular: `${user.Nombre} ${user.Apellido}`,
-        numeroCuenta: "1234 5678 9012 3456", // ← Reemplaza con tu cuenta real
-        tipoCuenta: "Ahorro"
+        numeroCuenta: "24079288086", // ← ¡Tu cuenta real de Bancolombia!
+        tipoCuenta: "Ahorro",
+        qrCode // ← Incluye el QR en el voucher
       });
 
     } catch (e) {
@@ -173,7 +175,24 @@ export const Checkout = () => {
             </div>
           </div>
 
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          {/* ✅ Mostrar QR Dinámico */}
+          {voucher.qrCode && (
+            <div className="mt-6 text-center">
+              <p className="text-sm font-medium text-gray-700 mb-2">O escanea para pagar</p>
+              <div className="flex justify-center">
+                <img
+                  src={voucher.qrCode}
+                  alt="QR de pago Bancolombia"
+                  className="w-32 h-32 object-contain border border-gray-300 rounded-lg p-2 bg-white"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Abre la app de Bancolombia y escanea este código
+              </p>
+            </div>
+          )}
+
+          <div className="mt-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-blue-800 text-sm">
               <strong>Importante:</strong> Al pagar, incluye el <strong>número de pedido</strong> en el concepto o referencia de la transferencia.
             </p>
@@ -270,7 +289,7 @@ export const Checkout = () => {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">NÚMERO DE CUENTA</label>
-                <div className="text-sm font-medium">1234 5678 9012 3456</div>
+                <div className="text-sm font-medium">24079288086</div> {/* ← ¡Tu cuenta real! */}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">TIPO DE CUENTA</label>
@@ -279,26 +298,13 @@ export const Checkout = () => {
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="rounded-lg shadow p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              <h2 className="font-semibold">Escanea para pagar</h2>
-            </div>
-            <div className="flex justify-center mb-3">
-              <div className="bg-gray-200 p-4 rounded-md">
-                <img
-                  src="https://placehold.co/150?text=QR+Pago"
-                  alt="QR de pago"
-                  className="w-24 h-24 object-contain"
-                />
-              </div>
-            </div>
-            <div className="text-center text-xs text-gray-500">
-              Usa tu aplicación bancaria para escanear
+            {/* Mensaje de instrucciones */}
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-blue-800 text-sm">
+                <strong>¿Cómo pagar?</strong> Copia los datos arriba o, después de confirmar tu pedido, 
+                escanearás un QR personalizado para pagar desde la app de Bancolombia.
+              </p>
             </div>
           </div>
 
