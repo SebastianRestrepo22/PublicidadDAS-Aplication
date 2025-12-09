@@ -6,7 +6,7 @@ import {
     updateCompra as updateCompraModel
 } from '../models/compras.model.js';
 
-// 🔥 Normalizar Estado para evitar Buffer, Array, etc.
+//  Normalizar Estado para evitar Buffer, Array, etc.
 const normalizeEstado = (estado) => {
   if (estado === null || estado === undefined) return 0;
   if (typeof estado === "number") return estado;

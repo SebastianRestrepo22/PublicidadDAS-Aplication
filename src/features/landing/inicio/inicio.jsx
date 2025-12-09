@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 
 export const Inicio = () => {
     const navigate = useNavigate();
-
     const [currentIndex, setCurrentIndex] = useState(0);
 
     const handleNext = () => {
@@ -21,6 +20,15 @@ export const Inicio = () => {
         return () => clearInterval(auto);
     }, []);
 
+    const images = [
+        "/multimedia/carru2.jpg",
+        "/multimedia/carru5-.jpg",
+        "/multimedia/carru4.jpg",
+        "/multimedia/carru6.jpeg",
+        "/multimedia/carru8.png",
+        "/multimedia/carru7.jpg"
+    ];
+
     return (
         <>
             <Navbar />
@@ -29,15 +37,7 @@ export const Inicio = () => {
                 {/* CARRUSEL */}
                 <div className="relative w-full">
                     <div className="slide">
-
-                        {[
-                            "/multimedia/carru2.jpg",
-                            "/multimedia/carru5-.jpg",
-                            "/multimedia/carru4.jpg",
-                            "/multimedia/carru6.jpeg",
-                            "/multimedia/carru8.png",
-                            "/multimedia/carru7.jpg"
-                        ].map((src, i) => (
+                        {images.map((src, i) => (
                             <div
                                 key={i}
                                 className={`item ${i === currentIndex ? "active" : ""}`}
@@ -66,7 +66,7 @@ export const Inicio = () => {
                         </button>
 
                         <div className="carousel-dots">
-                            {Array.from({ length: 6 }).map((_, i) => (
+                            {images.map((_, i) => (
                                 <div
                                     key={i}
                                     onClick={() => setCurrentIndex(i)}
@@ -76,7 +76,6 @@ export const Inicio = () => {
                         </div>
                     </div>
                 </div>
-
 
                 {/* QUIÉNES SOMOS / VALORES */}
                 <div>
@@ -91,7 +90,6 @@ export const Inicio = () => {
 
                     <section className="flex justify-center items-start py-10">
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:px-12 px-6">
-
                             <div className="bg-white rounded-lg shadow-lg p-6 flex flex-col items-center text-center hover:shadow-xl transition-shadow duration-300">
                                 <span className="material-icons text-4xl text-black-500 mb-4">verified</span>
                                 <h1 className="text-2xl md:text-3xl text-[#25395C] font-bold mb-2">Calidad Premium</h1>
@@ -118,17 +116,14 @@ export const Inicio = () => {
                                     que conectan con tu público.
                                 </p>
                             </div>
-
                         </div>
                     </section>
                 </div>
 
                 {/* SECCIÓN PRODUCTOS */}
-
                 <section className="py-14 bg-gray-50">
                     <h2 className="text-3xl font-bold text-center mb-8">Lo más pedido</h2>
                     <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 px-6">
-
                         <div className="bg-white rounded-xl shadow-lg p-6 text-center hover:shadow-2xl transition">
                             <img src="/multimedia/tarjetas.jpg" className="w-full h-48 object-cover rounded-lg mb-4" />
                             <h3 className="text-xl font-semibold mb-2">Tarjetas de Presentación</h3>
@@ -155,29 +150,21 @@ export const Inicio = () => {
                                 Personalizar
                             </button>
                         </div>
-
                     </div>
                 </section>
 
-
-
                 {/* SECCIÓN INFORMATIVA */}
                 <div>
-
                     <section className="flex justify-center items-center text-white">
                         <div className="grid grid-cols-1 md:grid-cols-2 justify-items-center w-full">
-
                             <div className="bg-gray-900 flex flex-col justify-center items-center text-center px-6 py-10 h-[350px] sm:h-[400px] w-full">
                                 <div className="my-6 h-px w-full bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
-
                                 <p className="p-5 italic text-base md:text-lg text-center mb-6 text-white">
                                     Usamos tecnología de impresión que garantiza resultados limpios y profesionales.
                                     Nos enfocamos en rapidez, buena comunicación y un cuidado especial por cada detalle.
                                 </p>
-
                                 <div className="my-6 h-px w-full bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
                             </div>
-
                             <div className="bg-red-500 w-full h-[350px] sm:h-[400px]">
                                 <img src="/multimedia/espacio_2.png" className="w-full h-full object-cover" />
                             </div>
@@ -186,38 +173,30 @@ export const Inicio = () => {
 
                     <section className="flex justify-center items-center text-white">
                         <div className="grid grid-cols-1 md:grid-cols-2 justify-items-center w-full">
-
                             <div className="bg-red-500 w-full h-[350px] sm:h-[400px]">
                                 <img src="/multimedia/espacio_1.jpg" className="w-full h-full object-cover" />
                             </div>
-
                             <div className="bg-[#25395C] flex flex-col justify-center items-center text-center px-6 py-10 h-[350px] sm:h-[400px] w-full">
                                 <div className="my-6 h-px w-full bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
-
                                 <p className="p-5 italic text-base md:text-lg text-center mb-6 text-white">
                                     Queremos ser ese aliado confiable que siempre responde.
                                     Creatividad, calidad y compromiso para que tu marca luzca increíble.
                                 </p>
-
                                 <div className="my-6 h-px w-full bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
                             </div>
                         </div>
                     </section>
                 </div>
 
-
                 {/* OPINIONES */}
                 <div>
                     <h1 className="p-5 text-2xl md:text-3xl font-bold text-center mb-6">
                         Lo que dicen quienes confían en nosotros
                     </h1>
-
                     <p className="text-gray-500 text-center mb-5">
                         Nada nos hace más felices que ver a nuestros clientes satisfechos con el resultado final.
                     </p>
-
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:px-12 px-6">
-
                         <div className="h-auto max-w-sm mx-auto bg-white rounded-xl shadow-lg overflow-hidden p-6">
                             <div className="flex items-center space-x-4 mb-4">
                                 <img
@@ -248,11 +227,9 @@ export const Inicio = () => {
                                     <p className="text-sm text-gray-500">Cliente Satisfecho</p>
                                 </div>
                             </div>
-
                             <p className="text-gray-700 italic mb-4">
                                 “Servicio ágil, profesional y con excelente atención. Muy recomendados.”
                             </p>
-
                             <p className="text-2xl text-yellow-400">★★★★★</p>
                         </div>
 
@@ -268,18 +245,14 @@ export const Inicio = () => {
                                     <p className="text-sm text-gray-500">Cliente Satisfecho</p>
                                 </div>
                             </div>
-
                             <p className="text-gray-700 italic mb-4">
                                 “Trabajo con ellos desde hace tiempo. Siempre entregan calidad y excelentes resultados.”
                             </p>
-
                             <p className="text-2xl text-yellow-400">★★★★★</p>
                         </div>
-
                     </div>
 
                     {/* SECCIÓN IR A PRODUCTOS */}
-
                     <section className="bg-[#25395C] mt-[40px] py-14 text-white text-center">
                         <h2 className="text-3xl font-bold mb-4">¿Listo para darle vida a tus ideas?</h2>
                         <p className="text-lg mb-6 opacity-90">
@@ -292,9 +265,7 @@ export const Inicio = () => {
                             Ver nuestros productos
                         </button>
                     </section>
-
                 </div>
-
             </main>
             <Footer />
         </>
