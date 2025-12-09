@@ -1,8 +1,16 @@
 import React from "react";
 import { Link } from "react-router-dom";
 
-
 const Comprobante = ({ comprobante, onEliminar }) => {
+  // ✅ Protección temprana
+  if (!comprobante) {
+    return (
+      <div className="border border-gray-200 rounded-lg p-5 bg-white shadow-sm">
+        <p className="text-gray-500 italic">Comprobante no disponible</p>
+      </div>
+    );
+  }
+
   const {
     id,
     codigo,

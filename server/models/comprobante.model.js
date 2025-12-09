@@ -1,23 +1,27 @@
-// server/models/comprobante.model.js
+// src/models/comprobante.model.js
 import { v4 as uuidv4 } from "uuid";
-import connection from "../lib/db.js";
+import connectDB from "../lib/db.js"; // ← Usa la función, no la conexión directa
 
 /**
  * Crea un nuevo comprobante de pago
- * @param {Object} comprobanteData - { PedidoClienteId (CHAR(36)), RutaArchivo (string) }
- * @returns {Object} Comprobante creado con ComprobanteId (UUID)
  */
 export const createComprobanteModel = async (comprobanteData) => {
   const { PedidoClienteId, RutaArchivo } = comprobanteData;
   const ComprobanteId = uuidv4();
 
+  const connection = await connectDB(); // ← Obtén una conexión segura
+
   const query = `
     INSERT INTO comprobantes_pago 
-    (ComprobanteId, PedidoClienteId, RutaArchivo) 
-    VALUES (?, ?, ?)
+    (ComprobanteId, PedidoClienteId, RutaArchivo, Estado) 
+    VALUES (?, ?, ?, 'pendiente')
   `;
 
-  await connection.promise().execute(query, [ComprobanteId, PedidoClienteId, RutaArchivo]);
+  const [result] = await connection.execute(query, [ComprobanteId, PedidoClienteId, RutaArchivo]);
+
+  if (result.affectedRows === 0) {
+    throw new Error("No se pudo insertar el comprobante en la base de datos");
+  }
 
   return {
     ComprobanteId,
@@ -30,28 +34,31 @@ export const createComprobanteModel = async (comprobanteData) => {
 };
 
 /**
- * Obtiene el comprobante asociado a un pedido (por PedidoClienteId = UUID)
+ * Obtiene el comprobante asociado a un pedido
  */
 export const getComprobanteByPedidoIdModel = async (pedidoClienteId) => {
+  const connection = await connectDB();
   const query = "SELECT * FROM comprobantes_pago WHERE PedidoClienteId = ?";
-  const [rows] = await connection.promise().execute(query, [pedidoClienteId]);
+  const [rows] = await connection.execute(query, [pedidoClienteId]);
   return rows.length ? rows[0] : null;
 };
 
 /**
- * Obtiene un comprobante por su ComprobanteId (UUID)
+ * Obtiene un comprobante por su ID
  */
 export const getComprobanteByComprobanteIdModel = async (comprobanteId) => {
+  const connection = await connectDB();
   const query = "SELECT * FROM comprobantes_pago WHERE ComprobanteId = ?";
-  const [rows] = await connection.promise().execute(query, [comprobanteId]);
+  const [rows] = await connection.execute(query, [comprobanteId]);
   return rows.length ? rows[0] : null;
 };
 
 /**
- * Actualiza el estado de un comprobante (usado por admin)
+ * Actualiza el estado de un comprobante
  */
 export const updateComprobanteModel = async (comprobanteId, updateData) => {
   const { Estado, Notas } = updateData;
+  const connection = await connectDB();
 
   const query = `
     UPDATE comprobantes_pago 
@@ -59,6 +66,6 @@ export const updateComprobanteModel = async (comprobanteId, updateData) => {
     WHERE ComprobanteId = ?
   `;
 
-  const [result] = await connection.promise().execute(query, [Estado, Notas, comprobanteId]);
+  const [result] = await connection.execute(query, [Estado, Notas, comprobanteId]);
   return result.affectedRows > 0;
 };

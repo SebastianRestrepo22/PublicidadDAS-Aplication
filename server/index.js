@@ -26,8 +26,7 @@ import tipoDocumentoRoutes from './routes/tipoDocumento.js';
 
 // Scripts y DB
 import { initRolesAndAdmin } from './scripts/initRolesAndAdmin.js';
-import { connectDB } from './lib/db.js';
-
+import connectDB from './lib/db.js';
 dotenv.config();
 
 const app = express();
@@ -36,11 +35,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 👇 Configuración de __dirname para ES Modules
+//  Configuración de __dirname para ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 👇 Servir archivos estáticos (comprobantes de pago)
+//  Servir archivos estáticos (comprobantes de pago)
 app.use('/comprobantes', express.static(path.join(__dirname, '../public/comprobantes')));
 
 // Rutas de autenticación
@@ -61,7 +60,8 @@ app.use("/api/detalle-pedido", detallePedidoClienteRoutes);
 app.use("/api/detalle-produccion", detalleProduccionRoutes);
 app.use("/api/produccion", produccionRoutes);
 app.use("/api/cita", citaRoutes);
-app.use("/api/comprobantes", comprobanteRoutes); // ✅ ¡CORREGIDO AQUÍ!
+app.use("/api/comprobantes", comprobanteRoutes); 
+app.use(express.static("public")); 
 
 // Iniciar servidor
 const startServer = async () => {

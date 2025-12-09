@@ -1,4 +1,4 @@
-import { connectDB } from '../lib/db.js';
+import connectDB from '../lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
 
 // Normalizador para EsPersonalizado y futuros campos especiales
@@ -8,6 +8,7 @@ const normalizeProducto = (row) => ({
 });
 
 // Crear producto/servicio
+
 export const createProductoServicio = async (req, res) => {
   const {
     Tipo,
@@ -56,6 +57,7 @@ export const createProductoServicio = async (req, res) => {
 };
 
 // Obtener todos los productos
+
 export const getAllProductoServicios = async (req, res) => {
   try {
     const connection = await connectDB();
@@ -71,6 +73,7 @@ export const getAllProductoServicios = async (req, res) => {
 };
 
 // Obtener producto por ID
+
 export const getProductoServicioById = async (req, res) => {
   const { id } = req.params;
 
@@ -94,6 +97,7 @@ export const getProductoServicioById = async (req, res) => {
 };
 
 // Actualizar producto
+
 export const updateProductoServicio = async (req, res) => {
   const { id } = req.params;
   const {
@@ -141,6 +145,7 @@ export const updateProductoServicio = async (req, res) => {
 };
 
 // Eliminar producto
+
 export const deleteProductoServicio = async (req, res) => {
   const { id } = req.params;
 
@@ -165,6 +170,7 @@ export const deleteProductoServicio = async (req, res) => {
 };
 
 // Validar nombre duplicado
+
 export const validarNombre = async (req, res) => {
   const { nombre } = req.query;
 
@@ -184,6 +190,7 @@ export const validarNombre = async (req, res) => {
 };
 
 // Búsqueda dinámica
+
 export const buscarProductoServicios = async (req, res) => {
   const { campo, valor } = req.query;
 
@@ -235,6 +242,7 @@ export const buscarProductoServicios = async (req, res) => {
 };
 
 // NUEVO: Descontar stock (para pedidos)
+
 export const descontarStock = async (productoId, cantidad) => {
   const connection = await connectDB();
 

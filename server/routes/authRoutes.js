@@ -1,8 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { connectDB } from '../lib/db.js';
-
+import connectDB from '../lib/db.js';
 const router = express.Router();
 
 // Registro

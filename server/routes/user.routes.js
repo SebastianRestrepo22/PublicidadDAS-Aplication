@@ -8,21 +8,17 @@ import {
   validarCorreo,
   validarCedula,
   validarTelefono,
-  buscarUsuarios
+  buscarUsuarios,
+  resetPassword,
+  showResetForm 
 } from '../controllers/user.controller.js';
 
 const router = express.Router();
 
-// Validar si el correo ya existe
+// Rutas de validación y búsqueda
 router.get('/validar-correo', validarCorreo);
-
-// Validar si la cedula ya existe
 router.get('/validar-cedula', validarCedula);
-
-// Validar si el telefono ya existe
-router.get('/validar-telefono', validarTelefono );
-
-//Buscar
+router.get('/validar-telefono', validarTelefono);
 router.get('/buscar', buscarUsuarios);
 
 // Crear usuario
@@ -31,13 +27,18 @@ router.post('/', createUser);
 // Obtener todos los usuarios
 router.get('/', getAllUsers);
 
+// Mostrar formulario de restablecimiento
+router.get('/restablecer/:token', showResetForm);
+
 // Obtener usuario por ID
 router.get('/:id', getUserById);
 
 // Actualizar usuario
 router.put('/:id', updateUser);
-
-// Eliminar usuario
 router.delete('/:id', deleteUser);
+
+// Actualizar contraseña
+router.post('/auth/reset-password/:token', resetPassword);
+
 
 export default router;
