@@ -1,12 +1,10 @@
-import React, { useEffect, useState } from "react";
-import { Plus, Edit, Eye, Trash2, ChevronDown } from "lucide-react";
-import Modal from "../../components/modals/modal";
+import React, { useEffect, useState, useCallback } from "react";
+import { Plus, Edit, Eye, Trash2, ArrowLeft } from "lucide-react";
 import axios from "axios";
 
 const API_URL = `http://localhost:3000/api/compras`;
 const API_DETALLE_URL = `http://localhost:3000/api/detalle-compras`;
 
-// --- NUEVA VERSIÓN ROBUSTA DE FORMATEAR FECHA ---
 const formatearFecha = (f) => {
   if (!f) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(f)) return f;
@@ -23,37 +21,21 @@ export const Compras = () => {
   const [estadoActivo, setEstadoActivo] = useState({});
   const [filtroCampo, setFiltroCampo] = useState("");
   const [filtroText, setFiltroText] = useState("");
-  const [openCreate, setOpenCreate] = useState(false);
-  const [openEditar, setOpenEditar] = useState(false);
-  const [openVer, setOpenVer] = useState(false);
-  const [openEliminar, setOpenEliminar] = useState(false);
-  const [expandedRow, setExpandedRow] = useState(null);
+  const [viewMode, setViewMode] = useState("list");
   const [selectedCompra, setSelectedCompra] = useState(null);
-
   const [formCrear, setFormCrear] = useState({
     ProveedorId: "",
     Total: 0,
     FechaRegistro: "",
     Estado: 1,
   });
-
-  const [formEditar, setFormEditar] = useState({
-    CompraId: "",
-    ProveedorId: "",
-    Total: 0,
-    FechaRegistro: "",
-    Estado: 1,
-    detalle: [],
-  });
-
-  const [detalles, setDetalles] = useState([
-    { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "" }
+  const [detallesCrear, setDetallesCrear] = useState([
+    { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }
   ]);
-
   const [productos, setProductos] = useState([]);
   const [insumos, setInsumos] = useState([]);
 
-  // Cargar productos e insumos
+  // --- Carga de productos e insumos ---
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -61,44 +43,35 @@ export const Compras = () => {
           axios.get("http://localhost:3000/service"),
           axios.get("http://localhost:3000/api/insumos")
         ]);
-
         setProductos(Array.isArray(resProductos.data) ? resProductos.data : []);
         setInsumos(Array.isArray(resInsumos.data) ? resInsumos.data : []);
       } catch (err) {
         console.error("Error cargando datos:", err);
       }
     };
-
     fetchData();
   }, []);
 
-  // Cargar compras con detalles
+  // --- Carga de compras ---
   const fetchCompras = async () => {
     try {
-      const { data } = await axios.get(API_URL);
+      const { data } = await axios.get(`http://localhost:3000/api/compras`);
       const comprasBase = Array.isArray(data) ? data : [];
-
       const comprasConDetalles = await Promise.all(
         comprasBase.map(async (compra) => {
           try {
-            const { data: detalles } = await axios.get(
-              `${API_DETALLE_URL}/compra/${compra.CompraId}`
-            );
-
+            const { data: detalles } = await axios.get(`${API_DETALLE_URL}/compra/${compra.CompraId}`);
             return { ...compra, detalle: detalles || [] };
           } catch {
             return { ...compra, detalle: [] };
           }
         })
       );
-
       setCompras(comprasConDetalles);
-
       const estados = {};
       comprasConDetalles.forEach((c) => {
         estados[c.CompraId] = Number(c.Estado) === 1 ? 1 : 0;
       });
-
       setEstadoActivo(estados);
     } catch (err) {
       console.error("Error al cargar compras:", err);
@@ -115,55 +88,104 @@ export const Compras = () => {
     return valor.includes(filtroText.toLowerCase());
   });
 
-  // --- toggleExpand (FALTABA Y ROMPÍA TODO) ---
-  const toggleExpand = (id) => {
-    setExpandedRow(expandedRow === id ? null : id);
+  // --- Navegación ---
+  const goToCreate = () => {
+    setFormCrear({ ProveedorId: "", Total: 0, FechaRegistro: "", Estado: 1 });
+    setDetallesCrear([{ TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }]);
+    setViewMode("create");
+  };
+  const goToView = (compra) => {
+    setSelectedCompra(compra);
+    setViewMode("view");
+  };
+  const goToEdit = (compra) => {
+    setSelectedCompra(compra);
+    setViewMode("edit");
+  };
+  const goToBackToList = () => {
+    setViewMode("list");
+    setSelectedCompra(null);
   };
 
-  // Manejo del detalle
-  const añadirDetalle = () => {
-    setDetalles([
-      ...detalles,
-      { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "" }
+  // --- Manejo de detalles en Crear ---
+  const añadirDetalleCrear = () => {
+    setDetallesCrear(prev => [
+      ...prev,
+      { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }
     ]);
   };
-
-  const eliminarDetalle = (index) => {
-    if (detalles.length === 1) return;
-    setDetalles(detalles.filter((_, i) => i !== index));
+  const eliminarDetalleCrear = (index) => {
+    if (detallesCrear.length === 1) return;
+    setDetallesCrear(prev => prev.filter((_, i) => i !== index));
+  };
+  const actualizarDetalleCrear = (index, campo, valor) => {
+    setDetallesCrear(prev => {
+      const nuevos = [...prev];
+      nuevos[index][campo] = valor;
+      if (campo === "Cantidad" || campo === "PrecioUnitario") {
+        const cantidad = parseFloat(nuevos[index].Cantidad) || 0;
+        const precio = parseFloat(nuevos[index].PrecioUnitario) || 0;
+        nuevos[index].Subtotal = cantidad * precio;
+      }
+      return nuevos;
+    });
   };
 
-  const actualizarDetalle = (index, campo, valor) => {
-    const nuevos = [...detalles];
-    nuevos[index][campo] = valor;
-    setDetalles(nuevos);
+  // --- Manejo de detalles en Editar ---
+  const añadirDetalleEditar = () => {
+    setSelectedCompra(prev => ({
+      ...prev,
+      detalle: [...prev.detalle, { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }]
+    }));
+  };
+  const eliminarDetalleEditar = (index) => {
+    if (!selectedCompra?.detalle || selectedCompra.detalle.length <= 1) return;
+    setSelectedCompra(prev => ({
+      ...prev,
+      detalle: prev.detalle.filter((_, i) => i !== index),
+    }));
+  };
+  const actualizarDetalleEditar = (index, campo, valor) => {
+    setSelectedCompra(prev => {
+      if (!prev) return prev;
+      const nuevos = [...prev.detalle];
+      nuevos[index][campo] = valor;
+      if (campo === "Cantidad" || campo === "PrecioUnitario") {
+        const cantidad = parseFloat(nuevos[index].Cantidad) || 0;
+        const precio = parseFloat(nuevos[index].PrecioUnitario) || 0;
+        nuevos[index].Subtotal = cantidad * precio;
+      }
+      const nuevoTotal = nuevos.reduce((sum, item) => sum + (item.Subtotal || 0), 0);
+      return {
+        ...prev,
+        detalle: nuevos,
+        Total: nuevoTotal,
+      };
+    });
   };
 
-  // CREAR COMPRA + DETALLES
+  // --- Guardado ---
   const handleCreate = async () => {
     try {
-      const detallesLimpios = detalles.map((d) => ({
+      const detallesLimpios = detallesCrear.map((d) => ({
         ...d,
         ProductoServicioId: d.ProductoServicioId?.trim() || null,
         InsumoId: d.InsumoId?.trim() || null,
+        Subtotal: undefined,
       }));
-
+      const total = detallesLimpios.reduce((sum, item) => sum + ((item.Cantidad || 0) * (item.PrecioUnitario || 0)), 0);
       const { data: compraCreada } = await axios.post(API_URL, {
         ...formCrear,
         FechaRegistro: formatearFecha(formCrear.FechaRegistro),
+        Total: total,
       });
-
       for (const d of detallesLimpios) {
         await axios.post(API_DETALLE_URL, {
           CompraId: compraCreada.CompraId,
           ...d,
         });
       }
-
-      setOpenCreate(false);
-      setFormCrear({ ProveedorId: "", Total: 0, FechaRegistro: "", Estado: 1 });
-      setDetalles([{ TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "" }]);
-
+      goToBackToList();
       fetchCompras();
     } catch (err) {
       console.error("Error al crear compra:", err);
@@ -171,38 +193,33 @@ export const Compras = () => {
     }
   };
 
-  // EDITAR COMPRA + DETALLES
   const handleEdit = async () => {
     try {
-      const payloadCompra = {
-        ProveedorId: formEditar.ProveedorId,
-        Total: formEditar.Total,
-        FechaRegistro: formatearFecha(formEditar.FechaRegistro),
-        Estado: formEditar.Estado,
-      };
-
-      await axios.put(`${API_URL}/${formEditar.CompraId}`, payloadCompra);
-
-      const { data: detallesActuales } = await axios.get(`${API_DETALLE_URL}/compra/${formEditar.CompraId}`);
-
+      if (!selectedCompra) return;
+      const total = selectedCompra.detalle.reduce((sum, item) => sum + (item.Subtotal || 0), 0);
+      await axios.put(`${API_URL}/${selectedCompra.CompraId}`, {
+        ProveedorId: selectedCompra.ProveedorId,
+        Total: total,
+        FechaRegistro: formatearFecha(selectedCompra.FechaRegistro),
+        Estado: selectedCompra.Estado,
+      });
+      const { data: detallesActuales } = await axios.get(`${API_DETALLE_URL}/compra/${selectedCompra.CompraId}`);
       for (const d of detallesActuales) {
         await axios.delete(`${API_DETALLE_URL}/${d.DetalleCompraId}`);
       }
-
-      const detallesLimpios = formEditar.detalle.map((d) => ({
+      const detallesLimpios = selectedCompra.detalle.map((d) => ({
         ...d,
         ProductoServicioId: d.ProductoServicioId?.trim() || null,
         InsumoId: d.InsumoId?.trim() || null,
+        Subtotal: undefined,
       }));
-
       for (const d of detallesLimpios) {
         await axios.post(API_DETALLE_URL, {
-          CompraId: formEditar.CompraId,
+          CompraId: selectedCompra.CompraId,
           ...d,
         });
       }
-
-      setOpenEditar(false);
+      goToBackToList();
       fetchCompras();
     } catch (err) {
       console.error("Error al editar compra:", err);
@@ -214,7 +231,7 @@ export const Compras = () => {
     try {
       if (!selectedCompra) return;
       await axios.delete(`${API_URL}/${selectedCompra.CompraId}`);
-      setOpenEliminar(false);
+      goToBackToList();
       fetchCompras();
     } catch (err) {
       console.error("Error al eliminar compra:", err);
@@ -222,42 +239,10 @@ export const Compras = () => {
     }
   };
 
-  const openEditarModal = (c) => {
-    setSelectedCompra(c);
-    setFormEditar({
-      CompraId: c.CompraId,
-      ProveedorId: c.ProveedorId,
-      Total: c.Total,
-      FechaRegistro: formatearFecha(c.FechaRegistro),  
-      Estado: Number(c.Estado),
-      detalle: c.detalle || [],
-    });
-    setOpenEditar(true);
-  };
-
-  const openVerModal = (c) => {
-    setSelectedCompra(c);
-    setFormEditar({
-      CompraId: c.CompraId,
-      ProveedorId: c.ProveedorId,
-      Total: c.Total,
-      FechaRegistro: formatearFecha(c.FechaRegistro),
-      Estado: Number(c.Estado),
-      detalle: c.detalle || [],
-    });
-    setOpenVer(true);
-  };
-
-  const openEliminarModal = (c) => {
-    setSelectedCompra(c);
-    setOpenEliminar(true);
-  };
-
   const handleToggleEstado = async (idCompra, nuevoEstadoBoolean) => {
     const nuevoEstadoNum = nuevoEstadoBoolean ? 1 : 0;
     const compraActual = compras.find((c) => c.CompraId === idCompra);
     if (!compraActual) return;
-
     try {
       await axios.put(`${API_URL}/${idCompra}`, {
         ProveedorId: compraActual.ProveedorId,
@@ -265,9 +250,7 @@ export const Compras = () => {
         FechaRegistro: formatearFecha(compraActual.FechaRegistro),
         Estado: nuevoEstadoNum,
       });
-
       setEstadoActivo((prev) => ({ ...prev, [idCompra]: nuevoEstadoNum }));
-
       setCompras((prev) =>
         prev.map((c) =>
           c.CompraId === idCompra ? { ...c, Estado: nuevoEstadoNum } : c
@@ -279,468 +262,513 @@ export const Compras = () => {
     }
   };
 
-  const renderModalForm = (type = "create") => {
-    const isReadOnly = type === "ver";
-    const formState = type === "create" ? formCrear : formEditar;
-    const formSetter = type === "create" ? setFormCrear : setFormEditar;
-    const detallesParaRender = type === "create" ? detalles : formState.detalle || [];
-
-    return (
-      <form className="flex flex-col gap-8 p-6 bg-white rounded-lg">
-        {/* MASTER */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="flex flex-col gap-2">
-            <label className="font-medium">Proveedor ID</label>
-            <input
-              type="text"
-              placeholder="P001"
-              readOnly={isReadOnly}
-              value={formState.ProveedorId}
-              onChange={(e) =>
-                formSetter({ ...formState, ProveedorId: e.target.value })
-              }
-              className="w-full h-11 px-3 border rounded bg-gray-100"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="font-medium">Fecha de registro</label>
-            <input
-              type="date"
-              readOnly={isReadOnly}
-              value={formState.FechaRegistro}
-              onChange={(e) =>
-                formSetter({ ...formState, FechaRegistro: e.target.value })
-              }
-              className="w-full h-11 px-3 border rounded bg-gray-100"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="font-medium">Total</label>
-            <input
-              type="number"
-              readOnly={isReadOnly}
-              value={formState.Total}
-              onChange={(e) =>
-                formSetter({ ...formState, Total: Number(e.target.value) })
-              }
-              className="w-full h-11 px-3 border rounded bg-gray-100"
-            />
-          </div>
-        </div>
-
-        {/* BOTÓN AÑADIR DETALLE */}
-        {!isReadOnly && (
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                if (type === "create") añadirDetalle();
-                else {
-                  formSetter({
-                    ...formState,
-                    detalle: [
-                      ...formState.detalle,
-                      { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "" }
-                    ],
-                  });
-                }
-              }}
-              className="inline-flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg"
-            >
-              <Plus size={16} /> Añadir detalle
-            </button>
-          </div>
-        )}
-
-        {/* DETALLES DINÁMICOS */}
-        <div className="grid grid-cols-1 gap-4">
-          {detallesParaRender.map((d, index) => (
-            <div
-              key={index}
-              className="grid grid-cols-1 md:grid-cols-6 gap-3 border p-3 rounded bg-gray-50"
-            >
-              <div className="flex flex-col gap-2">
-                <label>Tipo Detalle</label>
-                <select
-                  disabled={isReadOnly}
-                  value={d.TipoDetalle || ""}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (type === "create") actualizarDetalle(index, "TipoDetalle", val);
-                    else {
-                      const copy = [...formState.detalle];
-                      copy[index].TipoDetalle = val;
-                      formSetter({ ...formState, detalle: copy });
-                    }
-                  }}
-                  className="h-10 px-2 border rounded bg-white"
-                >
-                  <option value="">Seleccione tipo</option>
-                  <option value="Producto">Producto</option>
-                  <option value="Insumo">Insumo</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label>Producto/Servicio</label>
-                <select
-                  disabled={isReadOnly || d.TipoDetalle !== "Producto"}
-                  value={d.ProductoServicioId || ""}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (type === "create") actualizarDetalle(index, "ProductoServicioId", val);
-                    else {
-                      const copy = [...formState.detalle];
-                      copy[index].ProductoServicioId = val;
-                      formSetter({ ...formState, detalle: copy });
-                    }
-                  }}
-                  className="h-10 px-2 border rounded bg-white"
-                >
-                  <option value="">Seleccione producto</option>
-                  {productos.map((p) => (
-                    <option key={p.ProductoServicioId} value={p.ProductoServicioId}>
-                      {p.Nombre} {p.Tipo ? `(${p.Tipo})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label>Insumo</label>
-                <select
-                  disabled={isReadOnly || d.TipoDetalle !== "Insumo"}
-                  value={d.InsumoId || ""}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (type === "create") actualizarDetalle(index, "InsumoId", val);
-                    else {
-                      const copy = [...formState.detalle];
-                      copy[index].InsumoId = val;
-                      formSetter({ ...formState, detalle: copy });
-                    }
-                  }}
-                  className="h-10 px-2 border rounded bg-white"
-                >
-                  <option value="">Seleccione insumo</option>
-                  {insumos.map((i) => (
-                    <option key={i.InsumoId} value={i.InsumoId}>
-                      {i.Nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label>Cantidad</label>
-                <input
-                  type="number"
-                  readOnly={isReadOnly}
-                  value={d.Cantidad ?? ""}
-                  onChange={(e) => {
-                    const num = Number(e.target.value);
-                    if (type === "create") actualizarDetalle(index, "Cantidad", num);
-                    else {
-                      const copy = [...formState.detalle];
-                      copy[index].Cantidad = num;
-                      formSetter({ ...formState, detalle: copy });
-                    }
-                  }}
-                  className="h-10 px-2 border rounded"
-                />
-              </div>
-
-              <div className="flex flex-col gap-2 md:col-span-2">
-                <label>Descripción</label>
-                <input
-                  type="text"
-                  readOnly={isReadOnly}
-                  value={d.Descripcion || ""}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (type === "create") actualizarDetalle(index, "Descripcion", val);
-                    else {
-                      const copy = [...formState.detalle];
-                      copy[index].Descripcion = val;
-                      formSetter({ ...formState, detalle: copy });
-                    }
-                  }}
-                  className="h-10 px-2 border rounded"
-                />
-              </div>
-
-              {!isReadOnly && (
-                <div className="md:col-span-6 flex justify-end">
-                  <Trash2
-                    size={18}
-                    className="text-red-600 cursor-pointer hover:text-red-800"
-                    onClick={() => {
-                      if (type === "create") eliminarDetalle(index);
-                      else {
-                        const copy = [...formState.detalle];
-                        copy.splice(index, 1);
-                        formSetter({ ...formState, detalle: copy });
-                      }
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* BOTONES */}
-        <div className="flex flex-col md:flex-row gap-4 mt-6">
-          {type === "create" && (
-            <button
-              type="button"
-              onClick={handleCreate}
-              className="flex-1 h-11 bg-green-500 text-white rounded hover:bg-green-600"
-            >
-              Crear
-            </button>
-          )}
-
-          {type === "editar" && (
-            <button
-              type="button"
-              onClick={handleEdit}
-              className="flex-1 h-11 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              Guardar cambios
-            </button>
-          )}
-
-          <button
-            type="button"
-            className="flex-1 h-11 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-            onClick={() => {
-              if (type === "create") setOpenCreate(false);
-              if (type === "editar") setOpenEditar(false);
-              if (type === "ver") setOpenVer(false);
-            }}
-          >
-            {type === "ver" ? "Cerrar" : "Cancelar"}
-          </button>
-        </div>
-      </form>
-    );
-  };
-
+  // === RENDER PRINCIPAL ===
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Compras</h1>
 
-        {/* BARRA DE ACCIONES */}
-        <div className="bg-white rounded-xl shadow-sm border p-6 mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-          <button
-            onClick={() => {
-              setFormCrear({ ProveedorId: "", Total: 0, FechaRegistro: "", Estado: 1 });
-              setDetalles([
-                { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "" }
-              ]);
-              setOpenCreate(true);
-            }}
-            className="inline-flex items-center gap-2 bg-green-800 text-white px-6 py-3 rounded-lg"
-          >
-            <Plus size={18} /> Nueva compra
-          </button>
-
-          <select
-            value={filtroCampo}
-            onChange={(e) => setFiltroCampo(e.target.value)}
-            className="border rounded-lg px-4 py-3 bg-white"
-          >
-            <option value="">Filtrar por campo</option>
-            <option value="CompraId">CompraID</option>
-            <option value="ProveedorId">ProveedorID</option>
-            <option value="FechaRegistro">Fecha</option>
-          </select>
-
-          <div className="relative flex-1 max-w-md">
-            <input
-              type="text"
-              placeholder="Buscar compra"
-              value={filtroText}
-              onChange={(e) => setFiltroText(e.target.value)}
-              className="border rounded-lg pl-10 pr-4 py-3 w-full"
-            />
-            <img
-              src="/multimedia/lupa.png"
-              alt="Buscar"
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5"
-            />
-          </div>
-        </div>
-
-        {/* MODALES */}
-        <Modal open={openCreate} onClose={() => setOpenCreate(false)}>
-          <div className="w-[850px] max-h-[90vh] overflow-y-auto p-6 rounded-xl">
-            <h3 className="text-lg font-bold mb-6">Nueva compra</h3>
-            {renderModalForm("create")}
-          </div>
-        </Modal>
-
-        <Modal open={openEditar} onClose={() => setOpenEditar(false)}>
-          <div className="w-[850px] max-h-[90vh] overflow-y-auto p-6 rounded-xl">
-            <h3 className="text-lg font-bold mb-6">Editar compra</h3>
-            {renderModalForm("editar")}
-          </div>
-        </Modal>
-
-        <Modal open={openVer} onClose={() => setOpenVer(false)}>
-          <div className="w-[850px] max-h-[90vh] overflow-y-auto p-6 rounded-xl">
-            <h3 className="text-lg font-bold mb-6">Ver compra</h3>
-            {selectedCompra ? renderModalForm("ver") : <p>Cargando...</p>}
-          </div>
-        </Modal>
-
-        <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
-          <div className="w-[750px] max-h-[90vh] overflow-y-auto p-6 rounded-xl">
-            <h3 className="text-lg font-bold mb-4">Eliminar compra</h3>
-            <p className="mb-6">¿Está seguro de eliminar la compra?</p>
-            <div className="flex gap-4">
+        {/* === LISTA === */}
+        {viewMode === "list" && (
+          <>
+            <div className="bg-white rounded-xl shadow-sm border p-6 mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               <button
-                className="flex-1 bg-red-500 text-white py-2 rounded"
-                onClick={handleDelete}
+                onClick={goToCreate}
+                className="inline-flex items-center gap-2 bg-green-800 text-white px-6 py-3 rounded-lg"
               >
-                Eliminar
+                <Plus size={18} /> Nueva compra
+              </button>
+              <select
+                value={filtroCampo}
+                onChange={(e) => setFiltroCampo(e.target.value)}
+                className="border rounded-lg px-4 py-3 bg-white"
+              >
+                <option value="">Filtrar por campo</option>
+                <option value="CompraId">CompraID</option>
+                <option value="ProveedorId">ProveedorID</option>
+                <option value="FechaRegistro">Fecha</option>
+              </select>
+              <div className="relative flex-1 max-w-md">
+                <input
+                  type="text"
+                  placeholder="Buscar compra"
+                  value={filtroText}
+                  onChange={(e) => setFiltroText(e.target.value)}
+                  className="border rounded-lg pl-10 pr-4 py-3 w-full"
+                />
+                <img
+                  src="/multimedia/lupa.png"
+                  alt="Buscar"
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5"
+                />
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border overflow-x-auto max-h-[600px] w-full">
+              <table className="min-w-full table-auto text-sm">
+                <thead className="bg-gradient-to-r from-slate-800 to-slate-700 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-white">Compra ID</th>
+                    <th className="px-4 py-3 text-left text-white">Proveedor ID</th>
+                    <th className="px-4 py-3 text-left text-white">Fecha Registro</th>
+                    <th className="px-4 py-3 text-center text-white">Total</th>
+                    <th className="px-4 py-3 text-center text-white">Estado</th>
+                    <th className="px-4 py-3 text-center text-white">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {comprasFiltradas.map((compra) => (
+                    <tr key={compra.CompraId} className="hover:bg-slate-50">
+                      <td className="py-4 px-6">{compra.CompraId}</td>
+                      <td className="py-4 px-6">{compra.ProveedorId}</td>
+                      <td className="py-4 px-6">{compra.FechaRegistro}</td>
+                      <td className="py-4 px-6 text-center">S/ {(Number(compra.Total) || 0).toFixed(2)}</td>
+                      <td className="py-4 px-6 text-center">
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="sr-only peer"
+                            checked={Number(estadoActivo[compra.CompraId]) === 1}
+                            onChange={(e) =>
+                              handleToggleEstado(compra.CompraId, e.target.checked)
+                            }
+                          />
+                          <div className="w-12 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-all"></div>
+                          <span className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-md transform peer-checked:translate-x-6 transition-all"></span>
+                        </label>
+                      </td>
+                      <td className="py-4 px-6 text-center">
+                        <div className="flex justify-center gap-3">
+                          <button onClick={() => goToView(compra)}>
+                            <Eye size={16} className="text-emerald-600 hover:text-emerald-800" />
+                          </button>
+                          <button onClick={() => goToEdit(compra)}>
+                            <Edit size={16} className="text-blue-600 hover:text-blue-800" />
+                          </button>
+                          <button onClick={() => {
+                            setSelectedCompra(compra);
+                            handleDelete();
+                          }}>
+                            <Trash2 size={16} className="text-red-600 hover:text-red-800" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {comprasFiltradas.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-6 text-center text-gray-500">
+                        No hay compras a mostrar
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {/* === CREAR === */}
+        {viewMode === "create" && (
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <button
+                onClick={goToBackToList}
+                className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <h3 className="text-lg font-bold">Nueva compra</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="flex flex-col gap-2">
+                <label className="font-medium">Proveedor ID</label>
+                <input
+                  type="text"
+                  placeholder="P001"
+                  value={formCrear.ProveedorId}
+                  onChange={(e) =>
+                    setFormCrear({ ...formCrear, ProveedorId: e.target.value })
+                  }
+                  className="w-full h-11 px-3 border rounded"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="font-medium">Fecha de registro</label>
+                <input
+                  type="date"
+                  value={formCrear.FechaRegistro}
+                  onChange={(e) =>
+                    setFormCrear({ ...formCrear, FechaRegistro: e.target.value })
+                  }
+                  className="w-full h-11 px-3 border rounded"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="font-medium">Total (Calculado)</label>
+                <input
+                  type="number"
+                  readOnly
+                  value={detallesCrear.reduce((sum, item) => sum + (item.Subtotal || 0), 0).toFixed(2)}
+                  className="w-full h-11 px-3 border rounded bg-gray-100"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end mb-4">
+              <button
+                type="button"
+                onClick={añadirDetalleCrear}
+                className="inline-flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg"
+              >
+                <Plus size={16} /> Agregar Artículo
+              </button>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-semibold mb-4">Artículos de la Compra</h4>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-200">
+                    <tr>
+                      <th className="py-2 px-4">Descripción</th>
+                      <th className="py-2 px-4">Tipo</th>
+                      <th className="py-2 px-4">Cantidad</th>
+                      <th className="py-2 px-4">Precio Unit.</th>
+                      <th className="py-2 px-4">Subtotal</th>
+                      <th className="py-2 px-4">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detallesCrear.map((d, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="py-2 px-4">
+                          <input
+                            type="text"
+                            value={d.Descripcion}
+                            onChange={(e) => actualizarDetalleCrear(index, "Descripcion", e.target.value)}
+                            className="w-full px-2 py-1 border rounded"
+                          />
+                        </td>
+                        <td className="py-2 px-4">
+                          <select
+                            value={d.TipoDetalle || ""}
+                            onChange={(e) => actualizarDetalleCrear(index, "TipoDetalle", e.target.value)}
+                            className="w-full px-2 py-1 border rounded"
+                          >
+                            <option value="">Seleccione tipo</option>
+                            <option value="Producto">Producto</option>
+                            <option value="Insumo">Insumo</option>
+                          </select>
+                        </td>
+                        <td className="py-2 px-4">
+                          <select
+                            disabled={d.TipoDetalle !== "Producto"}
+                            value={d.ProductoServicioId || ""}
+                            onChange={(e) => actualizarDetalleCrear(index, "ProductoServicioId", e.target.value)}
+                            className="w-full px-2 py-1 border rounded"
+                          >
+                            <option value="">Seleccione producto</option>
+                            {productos.map((p) => (
+                              <option key={p.ProductoServicioId} value={p.ProductoServicioId}>
+                                {p.Nombre} {p.Tipo ? `(${p.Tipo})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-2 px-4">
+                          <select
+                            disabled={d.TipoDetalle !== "Insumo"}
+                            value={d.InsumoId || ""}
+                            onChange={(e) => actualizarDetalleCrear(index, "InsumoId", e.target.value)}
+                            className="w-full px-2 py-1 border rounded"
+                          >
+                            <option value="">Seleccione insumo</option>
+                            {insumos.map((i) => (
+                              <option key={i.InsumoId} value={i.InsumoId}>
+                                {i.Nombre}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-2 px-4">
+                          <input
+                            type="number"
+                            value={d.Cantidad ?? ""}
+                            onChange={(e) => actualizarDetalleCrear(index, "Cantidad", e.target.value)}
+                            className="w-full px-2 py-1 border rounded"
+                          />
+                        </td>
+                        <td className="py-2 px-4">
+                          <input
+                            type="number"
+                            value={d.PrecioUnitario ?? ""}
+                            onChange={(e) => actualizarDetalleCrear(index, "PrecioUnitario", e.target.value)}
+                            className="w-full px-2 py-1 border rounded"
+                          />
+                        </td>
+                        <td className="py-2 px-4">
+                          <input
+                            type="number"
+                            readOnly
+                            value={((d.Subtotal || 0)).toFixed(2)}
+                            className="w-full px-2 py-1 border rounded bg-gray-100"
+                          />
+                        </td>
+                        <td className="py-2 px-4 text-center">
+                          <Trash2
+                            size={18}
+                            className="text-red-600 cursor-pointer hover:text-red-800"
+                            onClick={() => eliminarDetalleCrear(index)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg mt-4">
+              <div className="flex justify-between text-lg font-bold">
+                <span>Subtotal:</span>
+                <span>{detallesCrear.reduce((sum, item) => sum + (item.Subtotal || 0), 0).toFixed(2)} US$</span>
+              </div>
+              <div className="flex justify-between text-xl font-bold mt-2">
+                <span>Total:</span>
+                <span>{detallesCrear.reduce((sum, item) => sum + (item.Subtotal || 0), 0).toFixed(2)} US$</span>
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row gap-4 mt-6">
+              <button
+                type="button"
+                onClick={handleCreate}
+                className="flex-1 h-11 bg-green-500 text-white rounded hover:bg-green-600"
+              >
+                Crear Compra
               </button>
               <button
-                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded"
-                onClick={() => setOpenEliminar(false)}
+                type="button"
+                className="flex-1 h-11 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                onClick={goToBackToList}
               >
                 Cancelar
               </button>
             </div>
           </div>
-        </Modal>
+        )}
 
-        {/* TABLA PRINCIPAL */}
-        <div className="bg-white rounded-xl shadow-sm border overflow-x-auto max-h-[600px] w-full">
-          <table className="min-w-full table-auto text-sm">
-            <thead className="bg-gradient-to-r from-slate-800 to-slate-700 sticky top-0">
-              <tr>
-                <th className="px-4 py-3 w-10"></th>
-                <th className="px-4 py-3 text-left text-white">Compra ID</th>
-                <th className="px-4 py-3 text-left text-white">Proveedor ID</th>
-                <th className="px-4 py-3 text-left text-white">Fecha Registro</th>
-                <th className="px-4 py-3 text-center text-white">Total</th>
-                <th className="px-4 py-3 text-center text-white">Estado</th>
-                <th className="px-4 py-3 text-center text-white">Acciones</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y">
-              {comprasFiltradas.map((compra) => (
-                <React.Fragment key={compra.CompraId}>
-                  <tr className="hover:bg-slate-50">
-                    <td className="py-4 px-6 text-center">
-                      <button onClick={() => toggleExpand(compra.CompraId)}>
-                        <ChevronDown
-                          size={18}
-                          className={`transform transition-transform ${expandedRow === compra.CompraId ? "rotate-180" : ""}`}
-                        />
-                      </button>
-                    </td>
-
-                    <td className="py-4 px-6">{compra.CompraId}</td>
-                    <td className="py-4 px-6">{compra.ProveedorId}</td>
-                    <td className="py-4 px-6">{compra.FechaRegistro}</td>
-                    <td className="py-4 px-6 text-center">S/ {Number(compra.Total || 0).toFixed(2)}</td>
-
-                    <td className="py-4 px-6 text-center">
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="sr-only peer"
-                          checked={Number(estadoActivo[compra.CompraId]) === 1}
-                          onChange={(e) =>
-                            handleToggleEstado(compra.CompraId, e.target.checked)
-                          }
-                        />
-                        <div className="w-12 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-all"></div>
-                        <span className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-md transform peer-checked:translate-x-6 transition-all"></span>
-                      </label>
-                    </td>
-
-                    <td className="py-4 px-6 text-center">
-                      <div className="flex justify-center gap-3">
-                        <button onClick={() => openVerModal(compra)}>
-                          <Eye size={16} className="text-emerald-600 hover:text-emerald-800" />
-                        </button>
-                        <button onClick={() => openEliminarModal(compra)}>
-                          <Trash2 size={16} className="text-red-600 hover:text-red-800" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-
-                  {/* DETALLE */}
-                  {expandedRow === compra.CompraId && (
-                    <tr className="bg-gray-50">
-                      <td colSpan={7} className="py-3 px-6">
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full text-sm border">
-                            <thead className="bg-gray-200">
-                              <tr>
-                                <th className="py-2 px-4">DetalleCompraId</th>
-                                <th className="py-2 px-4">TipoDetalle</th>
-                                <th className="py-2 px-4">ProductoServicioId</th>
-                                <th className="py-2 px-4">InsumoId</th>
-                                <th className="py-2 px-4">Cantidad</th>
-                                <th className="py-2 px-4">Descripcion</th>
-                                <th className="py-2 px-4 text-center">Acciones</th>
-                              </tr>
-                            </thead>
-
-                            <tbody>
-                              {(compra.detalle || []).map((item) => (
-                                <tr key={item.DetalleCompraId}>
-                                  <td className="py-2 px-4">{item.DetalleCompraId}</td>
-                                  <td className="py-2 px-4">{item.TipoDetalle}</td>
-                                  <td className="py-2 px-4">{item.ProductoServicioId || "-"}</td>
-                                  <td className="py-2 px-4">{item.InsumoId || "-"}</td>
-                                  <td className="py-2 px-4">{item.Cantidad}</td>
-                                  <td className="py-2 px-4">{item.Descripcion}</td>
-
-                                  <td className="py-2 px-4 text-center">
-                                    <button onClick={() => openVerModal(compra)}>
-                                      <Eye size={14} className="text-emerald-600 hover:text-emerald-800" />
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-
-                              {(compra.detalle || []).length === 0 && (
-                                <tr>
-                                  <td colSpan={7} className="py-2 text-center text-gray-500">
-                                    Sin detalles
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </td>
+        {/* === EDITAR === */}
+        {viewMode === "edit" && selectedCompra && (
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <button
+                onClick={goToBackToList}
+                className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <h3 className="text-lg font-bold">Editar compra #{selectedCompra.CompraId}</h3>
+            </div>
+            <div className="flex justify-end mb-4">
+              <button
+                type="button"
+                onClick={añadirDetalleEditar}
+                className="inline-flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg"
+              >
+                <Plus size={16} /> Agregar Artículo
+              </button>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-semibold mb-4">Artículos de la Compra</h4>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-200">
+                    <tr>
+                      <th className="py-2 px-4">Descripción</th>
+                      <th className="py-2 px-4">Tipo</th>
+                      <th className="py-2 px-4">Cantidad</th>
+                      <th className="py-2 px-4">Precio Unit.</th>
+                      <th className="py-2 px-4">Subtotal</th>
+                      <th className="py-2 px-4">Acciones</th>
                     </tr>
-                  )}
-                </React.Fragment>
-              ))}
+                  </thead>
+                  <tbody>
+                    {selectedCompra.detalle?.map((d, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="py-2 px-4">
+                          <input
+                            type="text"
+                            value={d.Descripcion || ""}
+                            onChange={(e) => actualizarDetalleEditar(index, "Descripcion", e.target.value)}
+                            className="w-full px-2 py-1 border rounded"
+                          />
+                        </td>
+                        <td className="py-2 px-4">
+                          <select
+                            value={d.TipoDetalle || ""}
+                            onChange={(e) => actualizarDetalleEditar(index, "TipoDetalle", e.target.value)}
+                            className="w-full px-2 py-1 border rounded"
+                          >
+                            <option value="">Seleccione tipo</option>
+                            <option value="Producto">Producto</option>
+                            <option value="Insumo">Insumo</option>
+                          </select>
+                        </td>
+                        <td className="py-2 px-4">
+                          <select
+                            disabled={d.TipoDetalle !== "Producto"}
+                            value={d.ProductoServicioId || ""}
+                            onChange={(e) => actualizarDetalleEditar(index, "ProductoServicioId", e.target.value)}
+                            className="w-full px-2 py-1 border rounded"
+                          >
+                            <option value="">Seleccione producto</option>
+                            {productos.map((p) => (
+                              <option key={p.ProductoServicioId} value={p.ProductoServicioId}>
+                                {p.Nombre} {p.Tipo ? `(${p.Tipo})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-2 px-4">
+                          <select
+                            disabled={d.TipoDetalle !== "Insumo"}
+                            value={d.InsumoId || ""}
+                            onChange={(e) => actualizarDetalleEditar(index, "InsumoId", e.target.value)}
+                            className="w-full px-2 py-1 border rounded"
+                          >
+                            <option value="">Seleccione insumo</option>
+                            {insumos.map((i) => (
+                              <option key={i.InsumoId} value={i.InsumoId}>
+                                {i.Nombre}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-2 px-4">
+                          <input
+                            type="number"
+                            value={d.Cantidad ?? ""}
+                            onChange={(e) => actualizarDetalleEditar(index, "Cantidad", e.target.value)}
+                            className="w-full px-2 py-1 border rounded"
+                          />
+                        </td>
+                        <td className="py-2 px-4">
+                          <input
+                            type="number"
+                            value={d.PrecioUnitario ?? ""}
+                            onChange={(e) => actualizarDetalleEditar(index, "PrecioUnitario", e.target.value)}
+                            className="w-full px-2 py-1 border rounded"
+                          />
+                        </td>
+                        <td className="py-2 px-4">
+                          <input
+                            type="number"
+                            readOnly
+                            value={((d.Subtotal || 0)).toFixed(2)}
+                            className="w-full px-2 py-1 border rounded bg-gray-100"
+                          />
+                        </td>
+                        <td className="py-2 px-4 text-center">
+                          <Trash2
+                            size={18}
+                            className="text-red-600 cursor-pointer hover:text-red-800"
+                            onClick={() => eliminarDetalleEditar(index)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg mt-4">
+              <div className="flex justify-between text-lg font-bold">
+                <span>Subtotal:</span>
+                <span>{selectedCompra.detalle?.reduce((sum, item) => sum + (item.Subtotal || 0), 0).toFixed(2)} US$</span>
+              </div>
+              <div className="flex justify-between text-xl font-bold mt-2">
+                <span>Total:</span>
+                <span>{Number(selectedCompra.Total || 0).toFixed(2)} US$</span>
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row gap-4 mt-6">
+              <button
+                type="button"
+                onClick={handleEdit}
+                className="flex-1 h-11 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Guardar cambios
+              </button>
+              <button
+                type="button"
+                className="flex-1 h-11 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                onClick={goToBackToList}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
 
-              {comprasFiltradas.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-6 text-center text-gray-500">
-                    No hay compras a mostrar
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {/* === VER === */}
+        {viewMode === "view" && selectedCompra && (
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <button
+                onClick={goToBackToList}
+                className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <h3 className="text-lg font-bold">Ver compra #{selectedCompra.CompraId}</h3>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-semibold mb-4">Artículos de la Compra</h4>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-200">
+                    <tr>
+                      <th className="py-2 px-4">Descripción</th>
+                      <th className="py-2 px-4">Tipo</th>
+                      <th className="py-2 px-4">Cantidad</th>
+                      <th className="py-2 px-4">Precio Unit.</th>
+                      <th className="py-2 px-4">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedCompra.detalle?.map((d, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="py-2 px-4">{d.Descripcion || "-"}</td>
+                        <td className="py-2 px-4">
+                          <span className="px-2 py-1 bg-gray-200 rounded text-xs">{d.TipoDetalle || "-"}</span>
+                        </td>
+                        <td className="py-2 px-4">{d.Cantidad || 0}</td>
+                        <td className="py-2 px-4">{((d.PrecioUnitario || 0)).toFixed(2)} US$</td>
+                        <td className="py-2 px-4">{((d.Subtotal || 0)).toFixed(2)} US$</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg mt-4">
+              <div className="flex justify-between text-lg font-bold">
+                <span>Subtotal:</span>
+                <span>{selectedCompra.detalle?.reduce((sum, item) => sum + (item.Subtotal || 0), 0).toFixed(2)} US$</span>
+              </div>
+              <div className="flex justify-between text-xl font-bold mt-2">
+                <span>Total:</span>
+                <span>{Number(selectedCompra.Total || 0).toFixed(2)} US$</span>
+              </div>
+            </div>
+            <div className="mt-6">
+              <button
+                type="button"
+                className="w-full h-11 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                onClick={goToBackToList}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

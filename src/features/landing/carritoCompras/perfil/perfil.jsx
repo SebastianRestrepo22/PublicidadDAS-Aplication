@@ -3,6 +3,7 @@ import { Navbar } from '../../components/Navbar';
 import { Footer } from '../../components/footer';
 import axios from 'axios';
 import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export const Perfil = () => {
     const [user, setUser] = useState(null); // datos originales
@@ -78,21 +79,62 @@ export const Perfil = () => {
         if (!formData.Telefono.trim()) newErrors.Telefono = "El teléfono es obligatorio";
 
         setErrors(newErrors);
-
-        // Retorna true si no hay errores
         return Object.keys(newErrors).length === 0;
+    };
+
+    // Validar correo
+    const [correoError, setCorreoError] = useState('');
+
+    const handleCorreoBlur = async () => {
+        if (!formData.CorreoElectronico.trim()) return;
+        try {
+            const response = await axios.get(
+                `http://localhost:3000/auth/validar-correo?correo=${formData.CorreoElectronico}`
+            );
+
+            if (response.data.exists && formData.CorreoElectronico !== user?.CorreoElectronico) {
+                setCorreoError('Este correo ya está registrado');
+            } else {
+                setCorreoError('');
+            }
+        } catch (error) {
+            console.error('Error validando correo:', error);
+            setCorreoError('No se pudo validar el correo');
+        }
+    };
+
+    // Validar teléfono
+    const [telefonoError, setTelefonoError] = useState('');
+
+    const handleTelefonoBlur = async () => {
+        if (!formData.Telefono.trim()) return;
+        try {
+            const response = await axios.get(
+                `http://localhost:3000/auth/validar-telefono?telefono=${formData.Telefono}`
+            );
+
+            if (response.data.exists && formData.Telefono !== user?.Telefono) {
+                setTelefonoError('Este teléfono ya está registrado');
+            } else {
+                setTelefonoError('');
+            }
+        } catch (error) {
+            console.error('Error validando el teléfono:', error);
+            setTelefonoError('No se pudo validar el teléfono');
+        }
     };
 
     // Actualizar usuario
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!validate()) return; // si hay errores, no hace la petición
-        if (correoError || telefonoError) return; // bloquea envío si hay error de duplicado
+        if (!validate()) return;
+        if (correoError || telefonoError) return;
+
         try {
             const payload = {
-                ...user,       // toma todos los campos actuales
-                ...formData    // sobreescribe solo los editables
+                ...user,
+                ...formData
             };
 
             const response = await axios.put(
@@ -107,55 +149,11 @@ export const Perfil = () => {
 
             if (response.status === 200) {
                 toast.success("Usuario actualizado correctamente");
-                setUser(payload); // actualizar la vista con los datos editados
+                setUser(payload);
             }
         } catch (error) {
             console.error(error);
             toast.error("Error al actualizar el usuario");
-        }
-    };
-
-    //Validar correo
-    const [correoError, setCorreoError] = useState('');
-
-    const handleCorreoBlur = async () => {
-        if (!formData.CorreoElectronico.trim()) return;
-        try {
-            const response = await axios.get(
-                `http://localhost:3000/auth/validar-correo?correo=${formData.CorreoElectronico}`
-            );
-
-            // Solo mostrar error si el correo es diferente al del usuario actual
-            if (response.data.exists && formData.CorreoElectronico !== user.CorreoElectronico) {
-                setCorreoError('Este correo ya está registrado');
-            } else {
-                setCorreoError('');
-            }
-        } catch (error) {
-            console.error('Error validando correo:', error);
-            setCorreoError('No se pudo validar el correo');
-        }
-    };
-
-    //Validar telefono
-    const [telefonoError, setTelefonoError] = useState('');
-
-    const handleTelefonoBlur = async () => {
-        if (!formData.Telefono.trim()) return;
-        try {
-            const response = await axios.get(
-                `http://localhost:3000/auth/validar-telefono?telefono=${formData.Telefono}`
-            );
-
-            // Solo mostrar error si el teléfono es diferente al del usuario actual
-            if (response.data.exists && formData.Telefono !== user.Telefono) {
-                setTelefonoError('Este teléfono ya está registrado');
-            } else {
-                setTelefonoError('');
-            }
-        } catch (error) {
-            console.error('Error validando el teléfono:', error);
-            setTelefonoError('No se pudo validar el teléfono');
         }
     };
 
@@ -175,7 +173,7 @@ export const Perfil = () => {
                             value={formData.TipoDocumentoId}
                             onChange={handleChanges}
                             className={`w-full border-2 rounded-xl p-3 bg-white focus:outline-none transition 
-            ${errors.TipoDocumentoId ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-violet-500"}`}
+                                ${errors.TipoDocumentoId ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-violet-500"}`}
                             required
                         >
                             <option value="">Seleccione un tipo de documento</option>
@@ -197,7 +195,6 @@ export const Perfil = () => {
                             value={user.CedulaId}
                             readOnly
                         />
-                        <p className="min-h-[20px] text-sm text-red-500"></p>
                     </div>
 
                     <div className="flex flex-col gap-1">
@@ -205,7 +202,7 @@ export const Perfil = () => {
                             type="text"
                             placeholder="Nombre Completo"
                             className={`w-full border-2 rounded-xl p-3 bg-white focus:outline-none transition 
-            ${errors.NombreCompleto ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-violet-500"}`}
+                                ${errors.NombreCompleto ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-violet-500"}`}
                             name="NombreCompleto"
                             value={formData.NombreCompleto}
                             onChange={handleChanges}
@@ -221,7 +218,7 @@ export const Perfil = () => {
                             type="email"
                             placeholder="Correo electrónico"
                             className={`w-full border-2 rounded-xl p-3 bg-white focus:outline-none transition 
-            ${errors.CorreoElectronico || correoError ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-violet-500"}`}
+                                ${errors.CorreoElectronico || correoError ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-violet-500"}`}
                             name="CorreoElectronico"
                             value={formData.CorreoElectronico}
                             onChange={handleChanges}
@@ -235,7 +232,7 @@ export const Perfil = () => {
                             type="text"
                             placeholder="Dirección"
                             className={`w-full border-2 rounded-xl p-3 bg-white focus:outline-none transition 
-            ${errors.Direccion ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-violet-500"}`}
+                                ${errors.Direccion ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-violet-500"}`}
                             name="Direccion"
                             value={formData.Direccion}
                             onChange={handleChanges}
@@ -248,7 +245,7 @@ export const Perfil = () => {
                             type="text"
                             placeholder="Teléfono"
                             className={`w-full border-2 rounded-xl p-3 bg-white focus:outline-none transition 
-            ${errors.Telefono || telefonoError ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-violet-500"}`}
+                                ${errors.Telefono || telefonoError ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-violet-500"}`}
                             name="Telefono"
                             value={formData.Telefono}
                             onChange={handleChanges}
@@ -260,13 +257,14 @@ export const Perfil = () => {
 
                 {/* Botón centrado */}
                 <div className="md:col-span-2 flex justify-center mt-4">
-                    <button type='submit' className="w-full max-w-sm bg-blue-900 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition">
+                    <button
+                        type="submit"
+                        className="w-full max-w-sm bg-blue-900 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition"
+                    >
                         Editar perfil
                     </button>
                 </div>
             </form>
-
-
 
             <ToastContainer
                 position="top-right"
@@ -283,5 +281,5 @@ export const Perfil = () => {
 
             <Footer />
         </>
-    )
-}
+    );
+};

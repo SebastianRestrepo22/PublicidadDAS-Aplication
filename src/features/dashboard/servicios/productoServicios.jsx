@@ -34,6 +34,7 @@ export const ProductoServicios = () => {
   const [originalNombre, setOriginalNombre] = useState('');
   const [nombreError, setNombreError] = useState('');
 
+
   const [editData, setEditData] = useState(null);
   const [categorias, setCategorias] = useState([]);
 
@@ -71,27 +72,7 @@ export const ProductoServicios = () => {
 
   const handleChanges = (e) => {
     const { name, value } = e.target;
-    
-    // Si está cambiando el Tipo y selecciona "Servicio"
-    if (name === "Tipo" && value === "Servicio") {
-      setValues({ 
-        ...values, 
-        [name]: value,
-        Stock: "0" // Auto-completar stock en 0
-      });
-    } 
-    // Si está cambiando el Tipo y selecciona "Producto"
-    else if (name === "Tipo" && value === "Producto") {
-      setValues({ 
-        ...values, 
-        [name]: value,
-        Stock: values.Stock === "0" ? "" : values.Stock // Solo resetear si estaba en 0
-      });
-    }
-    // Para cualquier otro campo
-    else {
-      setValues({ ...values, [name]: value });
-    }
+    setValues({ ...values, [name]: value });
   };
 
   const handleNombreBlur = async () => {
@@ -126,12 +107,6 @@ export const ProductoServicios = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitted(true);
-
-    // Validación condicional para stock
-    if (values.Tipo === "Producto" && (!values.Stock || values.Stock <= 0)) {
-      toast.error("Para productos, debe ingresar un stock mayor a 0");
-      return;
-    }
 
     try {
       if (editData) {
@@ -358,20 +333,13 @@ export const ProductoServicios = () => {
               name="Stock"
               value={values.Stock}
               onChange={handleChanges}
-              disabled={values.Tipo === "Servicio"} // Deshabilitar si es servicio
-              className={`w-full h-10 px-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
-                ${values.Tipo === "Servicio" ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-white"}
-                ${submitted && values.Tipo === "Producto" && (!values.Stock || values.Stock <= 0) ? "border-red-500" : "border-gray-300"}`}
-            />
+              className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
+      ${submitted && (!values.Stock || values.Stock <= 0) ? "border-red-500" : "border-gray-300"}`} />
             <div className="min-h-[16px] mt-0.5">
-              {values.Tipo === "Servicio" && (
-                <p className="text-blue-600 text-[12px] leading-4">
-                  ⓘ Los servicios no requieren stock (automáticamente se establece en 0)
-                </p>
+              {submitted && (!values.Stock || values.Stock <= 0) && (
+                <p className="text-red-500 text-[12px] leading-4">Ingrese el stock</p>
               )}
-              {submitted && values.Tipo === "Producto" && (!values.Stock || values.Stock <= 0) && (
-                <p className="text-red-500 text-[12px] leading-4">Para productos, debe ingresar un stock mayor a 0</p>
-              )}
+
             </div>
           </div>
         </div>
@@ -485,7 +453,7 @@ export const ProductoServicios = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
-      <div className="max-w-full mx-auto">
+      <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">
           Gestión de productos/servicios
         </h1>
@@ -497,10 +465,11 @@ export const ProductoServicios = () => {
               resetForm(); // limpia valores y setSubmitted(false)
               setOpenCreate(true);
             }}
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg ..."
           >
             <Plus size={18} /> Nuevo producto/servicio
           </Link>
+
 
           <select
             value={filtroCampo}
@@ -564,17 +533,17 @@ export const ProductoServicios = () => {
           </div>
         </Modal>
 
-        {/* TABLA - SIN SCROLL HORIZONTAL */}
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full table-auto">
+        {/* TABLA */}
+        <div className="overflow-x-auto bg-white rounded-xl shadow-sm border">
+          <div className="w-full overflow-x-auto">
+            <table className="min-w-[1000px] table-auto">
               <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
                 <tr>
                   <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">ID</th>
                   <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Tipo</th>
                   <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Nombre</th>
                   <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Descripción</th>
-                  <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Imagen</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">URL</th>
                   <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Precio</th>
                   <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Descuento</th>
                   <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Stock</th>
@@ -587,103 +556,42 @@ export const ProductoServicios = () => {
                 {service.length > 0 ? (
                   service.map((p) => (
                     <tr key={p.ProductoServicioId} className="hover:bg-slate-50 transition-colors duration-150">
-                      <td className="py-3 px-4 text-sm text-gray-700 truncate max-w-[100px]" title={p.ProductoServicioId}>
-                        {p.ProductoServicioId.slice(0, 8)}...
+                      <td className="py-3 px-4 text-xs whitespace-nowrap">{p.ProductoServicioId.slice(0, 3)}</td>
+                      <td className="py-3 px-4 text-xs whitespace-nowrap">{p.Tipo}</td>
+                      <td className="py-3 px-4 text-xs whitespace-nowrap">{p.Nombre}</td>
+                      <td className="py-3 px-4 text-xs whitespace-nowrap">{p.Descripcion}</td>
+                      <td className="py-3 px-4 text-xs whitespace-nowrap">
+                        {p.UrlImagen ? <img src={p.UrlImagen} alt={p.Nombre} className="w-10 h-10 object-cover rounded" /> : "—"}
                       </td>
-                      <td className="py-3 px-4">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${p.Tipo === 'Producto' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
-                          {p.Tipo}
-                        </span>
+                      <td className="py-3 px-4 text-xs whitespace-nowrap">${p.Precio}</td>
+                      <td className="py-3 px-4 text-xs whitespace-nowrap">{p.Descuento}%</td>
+                      <td className="py-3 px-4 text-xs whitespace-nowrap">{p.Stock}</td>
+                      <td className="py-3 px-4 text-xs whitespace-nowrap">
+                        {p.EsPersonalizado ? "Sí" : "No"}
                       </td>
-                      <td className="py-3 px-4 text-sm font-medium text-gray-900 truncate max-w-[150px]" title={p.Nombre}>
-                        {p.Nombre}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-gray-600 truncate max-w-[200px]" title={p.Descripcion}>
-                        {p.Descripcion || "—"}
-                      </td>
-                      <td className="py-3 px-4">
-                        {p.UrlImagen ? (
-                          <div className="flex items-center justify-center">
-                            <img 
-                              src={p.UrlImagen} 
-                              alt={p.Nombre} 
-                              className="w-10 h-10 object-cover rounded-md border border-gray-200"
-                            />
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-sm">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-sm font-medium text-gray-900">
-                        ${parseFloat(p.Precio || 0).toFixed(2)}
-                      </td>
-                      <td className="py-3 px-4">
-                        {p.Descuento ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                            {p.Descuento}%
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 text-sm">0%</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        {p.Tipo === "Servicio" ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600" title="Servicio - Stock no aplica">
-                            N/A
-                          </span>
-                        ) : (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${p.Stock > 10 ? 'bg-green-100 text-green-800' : p.Stock > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                            {p.Stock}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        {p.EsPersonalizado ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            Sí
-                          </span>
-                        ) : (
-                          <span className="text-gray-500 text-sm">No</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-gray-700 truncate max-w-[120px]" title={categorias.find(c => c.CategoriaId === p.CategoriaId)?.Nombre}>
+
+                      <td className="py-3 px-4 text-xs whitespace-nowrap">
                         {categorias.find(c => c.CategoriaId === p.CategoriaId)?.Nombre || "—"}
                       </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleEditClick(p)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="Editar"
-                          >
-                            <Edit size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleViewClick(p)}
-                            className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
-                            title="Ver"
-                          >
-                            <Eye size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(p)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Eliminar"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                      <td className="py-3 px-4 text-xs whitespace-nowrap">
+                        <div className="flex gap-1">
+                          <Link onClick={() => handleEditClick(p)} className="p-1 text-blue-600 hover:bg-blue-50 rounded">
+                            <Edit size={14} />
+                          </Link>
+                          <Link onClick={() => handleViewClick(p)} className="p-1 text-green-600 hover:bg-green-50 rounded">
+                            <Eye size={14} />
+                          </Link>
+                          <Link onClick={() => handleDeleteClick(p)} className="p-1 text-red-600 hover:bg-red-50 rounded">
+                            <Trash2 size={14} />
+                          </Link>
                         </div>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={11} className="py-12 text-center">
-                      <div className="flex flex-col items-center justify-center text-gray-400">
-                        <Search size={48} className="mb-3 opacity-50" />
-                        <p className="text-lg font-medium">No hay productos o servicios registrados</p>
-                        <p className="text-sm mt-1">Comienza creando un nuevo producto o servicio</p>
-                      </div>
+                    <td colSpan={11} className="text-center py-4 text-gray-500">
+                      No hay productos o servicios registrados
                     </td>
                   </tr>
                 )}
@@ -705,6 +613,7 @@ export const ProductoServicios = () => {
           pauseOnHover
           theme="colored"
         />
+
       </div>
     </div>
   );

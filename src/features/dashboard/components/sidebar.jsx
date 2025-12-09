@@ -14,6 +14,7 @@ import {
   ChevronRight,
   CalendarDays,
   LogOut,
+  MonitorCheck,
 } from "lucide-react";
 import Modal from "./modals/modal";
 import { Label } from "recharts";
@@ -47,6 +48,7 @@ const menuItems = [
       { label: "Venta", to: "/dashboard/ventas" }
     ]
   },
+  { icon: MonitorCheck, label: "Comprobantes", to: "/dashboard/comprobante"},
   { icon: CalendarDays, label: "Agenda", to: "/dashboard/agenda" }
 ];
 
