@@ -11,36 +11,23 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-export const sendResetPasswordEmail = async (correo, token) => {
+export const sendWelcomeEmail = async (to, password) => {
   try {
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com", // Ajusta a tu SMTP
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    // Link apuntando al frontend (React)
-    const resetUrl = `http://localhost:5173/reset-password/${token}`;
-
-    const info = await transporter.sendMail({
-      from: '"Mi App" <tu_correo@ejemplo.com>',
-      to: correo,
-      subject: "Restablecer contraseña",
+    await transporter.sendMail({
+      from: '"Mi App" <no-reply@miapp.com>',
+      to,
+      subject: "Bienvenido a la plataforma",
+      text: `Hola! Tu cuenta ha sido creada. Tu contraseña es: ${password}`,
       html: `
-        <p>Haz clic en el enlace para restablecer tu contraseña:</p>
-        <a href="${resetUrl}">${resetUrl}</a>
-        <p>El enlace expira en 1 hora.</p>
-      `,
+        <p>Hola 👋,</p>
+        <p>Tu cuenta ha sido creada correctamente.</p>
+        <p><b>Contraseña:</b> ${password}</p>
+        <p>Por favor cámbiala en tu primer inicio de sesión.</p>
+      `
     });
-
-    console.log("Correo enviado: %s", info.messageId);
-    return true;
+    console.log("Correo enviado a:", to);
   } catch (error) {
-    console.error("Error enviando correo:", error);
+    console.error("Error al enviar correo:", error);
     return false;
   }
 };

@@ -1,8 +1,6 @@
 import { connectDB } from '../lib/db.js';
 import bcrypt from 'bcrypt';
-import { sendResetPasswordEmail  } from '../utils/email.js';
-import dayjs from "dayjs"; // para manejar expiraciones
-import crypto from "crypto";
+import { sendWelcomeEmail } from '../utils/email.js';
 
 // Crear usuario
 export const createUser = async (req, res) => {
@@ -39,35 +37,36 @@ export const createUser = async (req, res) => {
 
         const rol = roles[0];
 
-        if (!Contrasena) {
-            // Usuario creado por admin sin contraseña → enviar link de creación
-            const resetToken = crypto.randomBytes(32).toString("hex");
-            const resetTokenExpire = dayjs().add(1, "hour").toDate();
+        //Si viene contraseña desde el body (registro), la usamos
+        let passwordToUse = Contrasena;
+        //Si NO viene, usamos una predeterminada
+        if (!passwordToUse) {
+            passwordToUse = "Cliente123"; // Contraseña predeterminada
+        }
 
-            await connection.execute(
-                `INSERT INTO usuarios 
-                 (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId, resetToken, resetTokenExpire)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    CedulaId,
-                    TipoDocumentoId,
-                    NombreCompleto,
-                    Telefono,
-                    CorreoElectronico,
-                    Direccion,
-                    null,
-                    rol.RoleId,
-                    resetToken,
-                    resetTokenExpire
-                ]
-            );
-            // Enviar correo con link al frontend   
-            await sendResetPasswordEmail(CorreoElectronico, resetToken);
+        /*
+        // O si quieres generar una aleatoria más adelante:
+        import crypto from "crypto";
+        passwordToUse = crypto.randomBytes(6).toString("base64"); // Ej: "aB9dXz!"
+        */
 
-        } 
+        const hash = await bcrypt.hash(passwordToUse, 10);
+
+        await connection.execute(
+            `INSERT INTO usuarios 
+        (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, hash, rol.RoleId]
+        );
+
+        // Enviar correo con la contraseña generada/predeterminada
+        const correoEnviado = await sendWelcomeEmail(CorreoElectronico, passwordToUse);
+        if (!correoEnviado) {
+            console.warn("Usuario creado, pero el correo no se envió");
+        }
+
 
         res.status(201).json({ message: 'Usuario creado exitosamente' });
-
     } catch (error) {
         console.error('Error al crear usuario:', error);
         res.status(500).json({ message: 'Error interno del servidor' });
@@ -281,59 +280,3 @@ export const buscarUsuarios = async (req, res) => {
         res.status(500).json({ message: "Error interno del servidor" });
     }
 };
-
-export const resetPassword = async (req, res) => {
-  const { token } = req.params;
-  const { nuevaContrasena } = req.body; 
-
-  if (!nuevaContrasena) {
-    return res.status(400).json({ message: "Debe proporcionar una nueva contraseña" });
-  }
-
-  try {
-    const connection = await connectDB();
-    const [users] = await connection.execute(
-      'SELECT * FROM usuarios WHERE resetToken = ? AND resetTokenExpire > ?',
-      [token, new Date()]
-    );
-
-    if (users.length === 0) return res.status(400).json({ message: "Token inválido o expirado" });
-
-    const hash = await bcrypt.hash(nuevaContrasena, 10);
-    await connection.execute(
-      'UPDATE usuarios SET Contrasena = ?, resetToken = NULL, resetTokenExpire = NULL WHERE CedulaId = ?',
-      [hash, users[0].CedulaId]
-    );
-
-    res.status(200).json({ message: "Contraseña establecida correctamente" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Error interno del servidor" });
-  }
-};
-
-
-export const showResetForm = async (req, res) => {
-  const { token } = req.params;
-
-  try {
-    const connection = await connectDB();
-    const [users] = await connection.execute(
-      'SELECT * FROM usuarios WHERE resetToken = ? AND resetTokenExpire > ?',
-      [token, new Date()]
-    );
-
-    if (users.length === 0) {
-      // Token inválido o expirado → puedes redirigir a una página de error en frontend
-      return res.redirect('http://localhost:3000/reset-password-invalid');
-    }
-
-    // Redirigir al frontend pasando el token
-    // Por ejemplo, tu frontend React tendría una ruta /reset-password/:token
-    res.redirect(`http://localhost:3000/reset-password/${token}`);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Error interno del servidor');
-  }
-};
-
