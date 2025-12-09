@@ -55,7 +55,6 @@ export const CarritoProducto = () => {
             descripcion,
             urlImagen,
             ProductoServicioId: item.ProductoServicioId,
-            Tipo: item.Tipo
         };
 
         if (esPersonalizado) {
@@ -63,7 +62,13 @@ export const CarritoProducto = () => {
             options.ancho = ancho;
         }
 
-        addToCart(item, options, Number(cantidad));
+        // Corregido: aseguramos que item tenga Tipo definido
+        const itemConTipo = {
+            ...item,
+            Tipo: item.Tipo || "Servicio", // si no viene, asumimos servicio
+        };
+
+        addToCart(itemConTipo, options, Number(cantidad));
         navigate(from);
     };
 
@@ -119,14 +124,11 @@ export const CarritoProducto = () => {
                                 value={cantidad}
                                 onChange={(e) => {
                                     let v = e.target.value;
-
                                     if (v === "") {
                                         setCantidad("");
                                         return;
                                     }
-
                                     v = v.replace(/^0+(?=\d)/, "");
-
                                     if (/^\d+$/.test(v)) {
                                         setCantidad(v);
                                     }
@@ -155,14 +157,11 @@ export const CarritoProducto = () => {
                                         value={alto}
                                         onChange={(e) => {
                                             let v = e.target.value;
-
                                             if (v === "") {
                                                 setAlto("");
                                                 return;
                                             }
-
                                             v = v.replace(/^0+(?=\d)/, "");
-
                                             if (/^\d+$/.test(v)) {
                                                 setAlto(v);
                                             }
@@ -187,14 +186,11 @@ export const CarritoProducto = () => {
                                         value={ancho}
                                         onChange={(e) => {
                                             let v = e.target.value;
-
                                             if (v === "") {
                                                 setAncho("");
                                                 return;
                                             }
-
                                             v = v.replace(/^0+(?=\d)/, "");
-
                                             if (/^\d+$/.test(v)) {
                                                 setAncho(v);
                                             }

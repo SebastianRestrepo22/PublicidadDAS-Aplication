@@ -14,7 +14,6 @@ export const CartProvider = ({ children }) => {
     }
   });
 
-  // Guardar carrito
   useEffect(() => {
     try {
       localStorage.setItem("cart", JSON.stringify(cart));
@@ -23,23 +22,12 @@ export const CartProvider = ({ children }) => {
     }
   }, [cart]);
 
-  // Agregar producto al carrito (con stock)
   const addToCart = (product, options = {}, quantity = 1) => {
     const stock = product.Stock ?? product.stock ?? null;
 
-    // Validar stock inicial
-    if (stock !== null && stock <= 0) {
-      toast.error("Producto sin stock disponible");
-      return;
-    }
-
     const itemId =
-      product.ProductoServicioId ??
-      product.ServiceId ??
-      product.id ??
-      null;
+      product.ProductoServicioId ?? product.ServiceId ?? product.id ?? null;
 
-    // Nueva lógica para encontrar líneas existentes
     const existingLine = cart.find((l) => {
       if (l.ProductoServicioId !== itemId) return false;
 
@@ -55,7 +43,13 @@ export const CartProvider = ({ children }) => {
     if (existingLine) {
       const newQuantity = existingLine.quantity + quantity;
 
-      if (stock !== null && newQuantity > stock) {
+      // Validación de stock solo para productos
+      if (
+        typeof stock === "number" &&
+        stock > 0 &&
+        product.Tipo === "Producto" &&
+        newQuantity > stock
+      ) {
         toast.error(`Solo hay ${stock} unidades disponibles`);
         return;
       }
@@ -65,7 +59,6 @@ export const CartProvider = ({ children }) => {
       return;
     }
 
-    // Calcular precio con descuento
     const discount = product.Descuento || product.descuento || 0;
     const originalPrice = product.Precio || product.precio || 0;
 
@@ -74,16 +67,15 @@ export const CartProvider = ({ children }) => {
         ? originalPrice - (originalPrice * discount) / 100
         : originalPrice;
 
-    // Crear línea nueva
     const cartLine = {
       id: uuidv4(),
       ProductoServicioId: itemId,
       Nombre: product.Nombre || "Producto",
       Precio: finalPrice,
-      UrlImagen:
-        options.urlImagen || product.UrlImagen || product.Url || "",
+      UrlImagen: options.urlImagen || product.UrlImagen || product.Url || "",
       quantity: Math.max(1, parseInt(quantity, 10) || 1),
       Stock: stock,
+      Tipo: product.Tipo || "Producto",
       EsPersonalizado:
         product.EsPersonalizado ??
         product.esPersonalizado ??
@@ -98,8 +90,13 @@ export const CartProvider = ({ children }) => {
       },
     };
 
-    // Verificación de stock inicial
-    if (stock !== null && cartLine.quantity > stock) {
+    // Validación de stock inicial solo para productos
+    if (
+      typeof stock === "number" &&
+      stock > 0 &&
+      product.Tipo === "Producto" &&
+      cartLine.quantity > stock
+    ) {
       toast.error(`Solo hay ${stock} unidades disponibles`);
       return;
     }
@@ -108,20 +105,22 @@ export const CartProvider = ({ children }) => {
     toast.success(`${product.Nombre} agregado al carrito`);
   };
 
-  // Eliminar item
   const removeFromCart = (lineId) => {
     setCart((prev) => prev.filter((l) => l.id !== lineId));
   };
 
-  // Actualizar cantidad (con stock)
   const updateQuantity = (lineId, newQuantity) => {
     setCart((prev) =>
       prev.map((l) => {
-        if (l.id !== lineId) return l;
-
         const stock = l.Stock ?? null;
 
-        if (stock !== null && newQuantity > stock) {
+        // Validación de stock solo para productos
+        if (
+          typeof stock === "number" &&
+          stock > 0 &&
+          l.Tipo === "Producto" &&
+          newQuantity > stock
+        ) {
           toast.error(`Solo hay ${stock} unidades disponibles`);
           return l;
         }
@@ -131,7 +130,6 @@ export const CartProvider = ({ children }) => {
     );
   };
 
-  // Actualizar item completo
   const updateItem = (lineId, changes) => {
     setCart((prev) =>
       prev.map((item) =>
@@ -146,10 +144,8 @@ export const CartProvider = ({ children }) => {
     );
   };
 
-  // Vaciar carrito
   const clearCart = () => setCart([]);
 
-  // Total
   const getTotal = () =>
     cart.reduce(
       (sum, l) => sum + (Number(l.Precio) || 0) * (l.quantity || 1),
