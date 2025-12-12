@@ -1,6 +1,16 @@
 // backend/utils/email.js
 import nodemailer from "nodemailer";
 
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com", // si usas Gmail
+  port: 465,
+  secure: true,
+  auth: {
+    user: process.env.EMAIL_USER, // de .env
+    pass: process.env.EMAIL_PASS  // contraseña de aplicación
+  }
+});
+
 export const sendResetPasswordEmail = async (correo, token) => {
   try {
     const transporter = nodemailer.createTransport({

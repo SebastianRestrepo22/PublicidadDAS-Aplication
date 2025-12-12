@@ -1,10 +1,10 @@
 import bcrypt from 'bcrypt';
-import connectDB from '../lib/db.js';
 import { sendResetPasswordEmail  } from '../utils/email.js';
 import dayjs from "dayjs"; // para manejar expiraciones
 import crypto from "crypto";
+import connectDB from '../lib/db.js';
 
-// Crear usuari
+// Crear usuario
 export const createUser = async (req, res) => {
     const {
         CedulaId,

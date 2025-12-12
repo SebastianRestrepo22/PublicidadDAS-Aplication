@@ -8,7 +8,7 @@ export const PedidosClientes = () => {
   const { id } = useParams();
   const location = useLocation();
 
-  // Estabilizamos 'mode' con useMemo
+  //  Estabilizamos 'mode' con useMemo
   const mode = useMemo(() => {
     if (location.pathname === "/dashboard/pedidosClientes/nuevo") return "create";
     if (id && location.pathname === `/dashboard/pedidosClientes/${id}/editar`) return "edit";
@@ -20,15 +20,18 @@ export const PedidosClientes = () => {
   const [filtroCampo, setFiltroCampo] = useState("");
   const [filtroText, setFiltroText] = useState("");
   const [formEdit, setFormEdit] = useState(null);
+
   const [formCrear, setFormCrear] = useState({
     ClienteId: "",
     FechaRegistro: "",
     Total: 0,
     Estado: "pendiente",
   });
+
   const [detallesCrear, setDetallesCrear] = useState([
     { _tempId: crypto.randomUUID(), ProductoServicioId: "", Cantidad: 1, Alto: "", Ancho: "", Descripcion: "", UrlImagen: "" },
   ]);
+
   const [productos, setProductos] = useState([]);
 
   // Cargar productos
@@ -49,6 +52,7 @@ export const PedidosClientes = () => {
     try {
       const { data } = await axios.get(`http://localhost:3000/api/pedidos-clientes`);
       const pedidosBase = Array.isArray(data) ? data : [];
+
       const pedidosConDetalles = await Promise.all(
         pedidosBase.map(async (p) => {
           try {
@@ -83,8 +87,10 @@ export const PedidosClientes = () => {
         try {
           const pedidoRes = await axios.get(`http://localhost:3000/api/pedidos-clientes/${id}`);
           const detalleRes = await axios.get(`http://localhost:3000/api/detalle-pedido/${id}`);
+
           const pedido = pedidoRes.data;
           const detalle = detalleRes.data;
+
           const pedidoCompleto = {
             ...pedido,
             detalle: (Array.isArray(detalle) ? detalle : []).map(item => ({
@@ -92,6 +98,7 @@ export const PedidosClientes = () => {
               _tempId: item.DetallePedidoClienteId || crypto.randomUUID()
             }))
           };
+
           if (mode === "edit") setFormEdit(pedidoCompleto);
         } catch {
           navigate("/dashboard/pedidosClientes");
@@ -113,7 +120,6 @@ export const PedidosClientes = () => {
     setFormEdit(null);
     navigate("/dashboard/pedidosClientes");
   };
-
   const goToCreate = () => navigate("/dashboard/pedidosClientes/nuevo");
   const goToView = (pedido) => navigate(`/dashboard/pedidosClientes/${pedido.PedidoClienteId}`);
   const goToEdit = (pedido) => navigate(`/dashboard/pedidosClientes/${pedido.PedidoClienteId}/editar`);
@@ -185,6 +191,7 @@ export const PedidosClientes = () => {
         Descripcion: d.Descripcion || "",
         UrlImagen: d.UrlImagen || "",
       }));
+
       await axios.post(`http://localhost:3000/api/pedidos-clientes`, {
         ClienteId: formCrear.ClienteId.trim(),
         FechaRegistro: formCrear.FechaRegistro,
@@ -192,6 +199,7 @@ export const PedidosClientes = () => {
         Estado: formCrear.Estado,
         detalle: detallesLimpios,
       });
+
       goToBackToList();
       fetchPedidos();
     } catch (err) {
@@ -293,6 +301,7 @@ export const PedidosClientes = () => {
                 />
               </div>
             </div>
+
             <div className="bg-white rounded-xl shadow-sm border overflow-auto max-h-[600px]">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-800 sticky top-0">
@@ -324,6 +333,7 @@ export const PedidosClientes = () => {
                           <option value="terminado">Terminado</option>
                           <option value="entregado">Entregado</option>
                           <option value="cancelado">Cancelado</option>
+
                         </select>
                       </td>
                       <td className="py-4 px-6">

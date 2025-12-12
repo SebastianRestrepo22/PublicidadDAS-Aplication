@@ -1,5 +1,4 @@
 import { Route, Routes } from "react-router-dom";
-import { Inicio } from "../features/landing/inicio/inicio";
 import { Productos } from "../features/landing/nuestrosproductos/productos";
 import { Servicios } from "../features/landing/nuestrosproductos/servicios";
 import { QuienesSomos } from "../features/landing/quienessomos/quienesSomos";
@@ -31,6 +30,7 @@ import { Checkout } from "../features/landing/carritoCompras/checkout/checkout";
 import { PedidoExitoso } from "../features/dashboard/gestionventas/pedidos/pedidoExitoso/pedidoExitoso";
 import { ScrollToTop } from "../features/landing/components/ScrollToTop";
 import Comprobante from "../features/dashboard/comprobantes/comprobante";
+import { Inicio } from "../features/landing/inicio/inicio";
 
 export const Routers = () => {
   return (
@@ -91,7 +91,7 @@ export const Routers = () => {
             </PrivateRoute>
           }
         />
-        
+
 
         {/* Dashboard Admin */}
         <Route
@@ -125,6 +125,10 @@ export const Routers = () => {
           <Route path="produccion/:id" element={<Produccion />} />
           <Route path="produccion/:id/editar" element={<Produccion />} />
           <Route path="comprobante" element={<Comprobante />} />
+          <Route path="comprobante" element={<Comprobante />} />
+          <Route path="ventas/nuevo" element={<Ventas />} />
+          <Route path="ventas/:id" element={<Ventas />} />
+          <Route path="ventas/:id/editar" element={<Ventas />} />
 
 
         </Route>

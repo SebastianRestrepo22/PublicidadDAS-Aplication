@@ -3,9 +3,39 @@ import { Search, Plus, Edit, Eye, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Modal from "../../components/modals/modal";
 import axios from "axios";
-
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+
+// Función auxiliar para obtener las primeras 3 letras o dígitos
+const getShortId = (id) => {
+  const str = String(id);
+  return str.length > 3 ? str.substring(0, 3) : str;
+};
+
+// Validaciones
+const validateForm = (form, isEditing = false) => {
+  const errors = {};
+
+  if (!form.nombreProveedor || form.nombreProveedor.trim().length < 2) {
+    errors.nombreProveedor = "El nombre es obligatorio y debe tener al menos 2 caracteres.";
+  }
+
+  const phoneRegex = /^[0-9]{7,15}$/;
+  if (!form.telefono || !phoneRegex.test(form.telefono)) {
+    errors.telefono = "El teléfono debe contener entre 7 y 15 dígitos numéricos.";
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!form.correo || !emailRegex.test(form.correo)) {
+    errors.correo = "Ingrese un correo electrónico válido.";
+  }
+
+  if (!form.direccion || form.direccion.trim().length < 5) {
+    errors.direccion = "La dirección es obligatoria y debe tener al menos 5 caracteres.";
+  }
+
+  return errors;
+};
 
 export const Proveedores = () => {
   const [proveedores, setProveedores] = useState([]);
@@ -35,6 +65,9 @@ export const Proveedores = () => {
     estado: 1,
   });
 
+  const [errorsCrear, setErrorsCrear] = useState({});
+  const [errorsEditar, setErrorsEditar] = useState({});
+
   useEffect(() => {
     fetchProveedores();
   }, []);
@@ -57,12 +90,18 @@ export const Proveedores = () => {
 
   const proveedoresFiltrados = proveedores.filter((p) => {
     if (!filtroCampo || !filtroText.trim()) return true;
-
     const valor = String(p[filtroCampo] || "").toLowerCase();
     return valor.includes(filtroText.toLowerCase());
   });
 
   const handleCreate = async () => {
+    const errors = validateForm(formCrear);
+    if (Object.keys(errors).length > 0) {
+      setErrorsCrear(errors);
+      toast.error("Por favor corrige los errores en el formulario.");
+      return;
+    }
+    setErrorsCrear({});
     try {
       await axios.post("http://localhost:3000/api/proveedores", formCrear);
       setOpenCreate(false);
@@ -81,6 +120,13 @@ export const Proveedores = () => {
   };
 
   const handleUpdate = async () => {
+    const errors = validateForm(formEditar);
+    if (Object.keys(errors).length > 0) {
+      setErrorsEditar(errors);
+      toast.error("Por favor corrige los errores en el formulario.");
+      return;
+    }
+    setErrorsEditar({});
     try {
       await axios.put(
         `http://localhost:3000/api/proveedores/${selectedProveedor.ProveedorId}`,
@@ -101,6 +147,7 @@ export const Proveedores = () => {
       );
       setOpenEliminar(false);
       fetchProveedores();
+      toast.success("Proveedor eliminado correctamente");
     } catch (err) {
       toast.error("Error al eliminar el proveedor: " + (err.message || err));
     }
@@ -115,12 +162,12 @@ export const Proveedores = () => {
       direccion: p.Direccion,
       estado: Number(p.Estado) === 1 ? 1 : 0,
     });
+    setErrorsEditar({});
     setOpenEditar(true);
   };
 
   const toggleEstado = async (idProveedor, estadoNuevoBoolean) => {
     const nuevoEstadoNum = estadoNuevoBoolean ? 1 : 0;
-
     const provActual = proveedores.find(p => p.ProveedorId === idProveedor);
     if (!provActual) {
       toast.error("Proveedor no encontrado");
@@ -136,11 +183,7 @@ export const Proveedores = () => {
         estado: nuevoEstadoNum
       });
 
-      setEstadoActivo((prev) => ({
-        ...prev,
-        [idProveedor]: nuevoEstadoNum
-      }));
-
+      setEstadoActivo((prev) => ({ ...prev, [idProveedor]: nuevoEstadoNum }));
       setProveedores((prev) =>
         prev.map((p) =>
           p.ProveedorId === idProveedor ? { ...p, Estado: nuevoEstadoNum } : p
@@ -153,7 +196,7 @@ export const Proveedores = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-500 p-6">
+    <div className="min-h-screen bg-slate-50 p-6"> {/* ✅ Fondo neutro */}
       <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-6">
@@ -162,12 +205,12 @@ export const Proveedores = () => {
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <Link
+              <button
                 onClick={() => setOpenCreate(true)}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600"
+                className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors"
               >
                 <Plus size={18} /> Nuevo proveedor
-              </Link>
+              </button>
 
               <select
                 value={filtroCampo}
@@ -193,55 +236,30 @@ export const Proveedores = () => {
             </div>
           </div>
 
-          {/* tabla */}
+          {/* Tabla */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
             <table className="min-w-full">
-              <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
+              <thead className="bg-slate-800"> {/* ✅ Sin gradiente */}
                 <tr>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
-                    Nombre Empresa
-                  </th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
-                    Telefono
-                  </th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
-                    Correo Electrónico
-                  </th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
-                    Direccion
-                  </th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
-                    Estado
-                  </th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
-                    Acciones
-                  </th>
+                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">ID</th>
+                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Nombre Empresa</th>
+                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Teléfono</th>
+                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Correo Electrónico</th>
+                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Dirección</th>
+                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Estado</th>
+                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {proveedoresFiltrados.map((p) => (
-                  <tr
-                    key={p.ProveedorId}
-                    className="hover:bg-slate-50 transition-colors duration-150"
-                  >
+                  <tr key={p.ProveedorId} className="hover:bg-slate-50 transition-colors duration-150">
                     <td className="py-4 px-6 text-sm font-medium text-slate-900">
-                      {p.ProveedorId}
+                      {getShortId(p.ProveedorId)} {/* ✅ Solo primeras 3 letras/dígitos */}
                     </td>
-                    <td className="py-4 px-6 text-sm font-medium text-slate-900">
-                      {p.NombreProveedor}
-                    </td>
-                    <td className="py-4 px-6 text-sm font-medium text-slate-900">
-                      {p.Telefono}
-                    </td>
-                    <td className="py-4 px-6 text-sm font-medium text-slate-900">
-                      {p.Correo}
-                    </td>
-                    <td className="py-4 px-6 text-sm font-medium text-slate-900">
-                      {p.Direccion}
-                    </td>
+                    <td className="py-4 px-6 text-sm font-medium text-slate-900">{p.NombreProveedor}</td>
+                    <td className="py-4 px-6 text-sm font-medium text-slate-900">{p.Telefono}</td>
+                    <td className="py-4 px-6 text-sm font-medium text-slate-900">{p.Correo}</td>
+                    <td className="py-4 px-6 text-sm font-medium text-slate-900">{p.Direccion}</td>
                     <td className="py-4 px-6 text-sm font-medium text-slate-900">
                       <label className="inline-flex items-center cursor-pointer">
                         <div className="relative">
@@ -250,9 +268,7 @@ export const Proveedores = () => {
                             type="checkbox"
                             className="sr-only peer"
                             checked={estadoActivos[p.ProveedorId] === 1}
-                            onChange={(e) =>
-                              toggleEstado(p.ProveedorId, e.target.checked)
-                            }
+                            onChange={(e) => toggleEstado(p.ProveedorId, e.target.checked)}
                           />
                           <div className="w-11 h-6 rounded-full bg-gray-300 peer-checked:bg-green-500 transition-colors"></div>
                           <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform transform peer-checked:translate-x-5"></div>
@@ -262,16 +278,15 @@ export const Proveedores = () => {
                         </span>
                       </label>
                     </td>
-
                     <td className="py-4 px-6">
                       <div className="flex gap-2">
-                        <Link
+                        <button
                           onClick={() => openEditarModal(p)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-150"
                         >
                           <Edit size={16} />
-                        </Link>
-                        <Link
+                        </button>
+                        <button
                           onClick={() => {
                             setSelectedProveedor(p);
                             setOpenVer(true);
@@ -279,8 +294,8 @@ export const Proveedores = () => {
                           className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors duration-150"
                         >
                           <Eye size={16} />
-                        </Link>
-                        <Link
+                        </button>
+                        <button
                           onClick={() => {
                             setSelectedProveedor(p);
                             setOpenEliminar(true);
@@ -288,7 +303,7 @@ export const Proveedores = () => {
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-150"
                         >
                           <Trash2 size={16} />
-                        </Link>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -297,61 +312,65 @@ export const Proveedores = () => {
             </table>
           </div>
 
+          {/* Modal Crear */}
           <Modal open={openCreate} onClose={() => setOpenCreate(false)}>
             <div className="w-[450px] p-6 mx-auto text-center">
-              <h3 className="text-lg font-black text-gray-800 mb-6">
-                Nuevo proveedor
-              </h3>
-              <form className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+              <h3 className="text-lg font-black text-gray-800 mb-4">Nuevo proveedor</h3>
+              <form className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                 <div className="flex flex-col">
-                  <label>Nombre</label>
+                  <label className="text-sm font-medium text-gray-700">Nombre *</label>
                   <input
-                    placeholder="Ingrese su nombre"
+                    placeholder="Nombre del proveedor"
                     value={formCrear.nombreProveedor}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) =>
-                      setFormCrear({ ...formCrear, nombreProveedor: e.target.value })
-                    }
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errorsCrear.nombreProveedor ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                    onChange={(e) => setFormCrear({ ...formCrear, nombreProveedor: e.target.value })}
                   />
+                  {errorsCrear.nombreProveedor && <span className="text-red-500 text-xs mt-1">{errorsCrear.nombreProveedor}</span>}
                 </div>
                 <div className="flex flex-col">
-                  <label>Telefono</label>
+                  <label className="text-sm font-medium text-gray-700">Teléfono *</label>
                   <input
-                    placeholder="Ingrese su telefono"
+                    placeholder="Ej: 3001234567"
                     value={formCrear.telefono}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) =>
-                      setFormCrear({ ...formCrear, telefono: e.target.value })
-                    }
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errorsCrear.telefono ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                    onChange={(e) => setFormCrear({ ...formCrear, telefono: e.target.value.replace(/\D/g, "") })}
                   />
+                  {errorsCrear.telefono && <span className="text-red-500 text-xs mt-1">{errorsCrear.telefono}</span>}
                 </div>
                 <div className="flex flex-col">
-                  <label>Correo</label>
+                  <label className="text-sm font-medium text-gray-700">Correo *</label>
                   <input
-                    placeholder="Ingrese su correo"
+                    type="email"
+                    placeholder="proveedor@ejemplo.com"
                     value={formCrear.correo}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) =>
-                      setFormCrear({ ...formCrear, correo: e.target.value })
-                    }
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errorsCrear.correo ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                    onChange={(e) => setFormCrear({ ...formCrear, correo: e.target.value })}
                   />
+                  {errorsCrear.correo && <span className="text-red-500 text-xs mt-1">{errorsCrear.correo}</span>}
                 </div>
                 <div className="flex flex-col">
-                  <label>Direccion</label>
+                  <label className="text-sm font-medium text-gray-700">Dirección *</label>
                   <input
-                    placeholder="Ingrese su direccion"
+                    placeholder="Dirección completa"
                     value={formCrear.direccion}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) =>
-                      setFormCrear({ ...formCrear, direccion: e.target.value })
-                    }
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errorsCrear.direccion ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                    onChange={(e) => setFormCrear({ ...formCrear, direccion: e.target.value })}
                   />
+                  {errorsCrear.direccion && <span className="text-red-500 text-xs mt-1">{errorsCrear.direccion}</span>}
                 </div>
                 <div className="col-span-2 flex gap-4 mt-4">
                   <button
                     type="button"
                     onClick={handleCreate}
-                    className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
+                    className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 transition-colors"
                   >
                     Crear
                   </button>
@@ -367,61 +386,61 @@ export const Proveedores = () => {
             </div>
           </Modal>
 
+          {/* Modal Editar */}
           <Modal open={openEditar} onClose={() => setOpenEditar(false)}>
             <div className="w-[450px] p-6 mx-auto text-center">
-              <h3 className="text-lg font-black text-gray-800 mb-6">
-                Editar proveedor
-              </h3>
-              <form className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+              <h3 className="text-lg font-black text-gray-800 mb-4">Editar proveedor</h3>
+              <form className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                 <div className="flex flex-col">
-                  <label>Nombre</label>
+                  <label className="text-sm font-medium text-gray-700">Nombre *</label>
                   <input
-                    placeholder="Ingrese su nombre"
                     value={formEditar.nombreProveedor}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) =>
-                      setFormEditar({ ...formEditar, nombreProveedor: e.target.value })
-                    }
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errorsEditar.nombreProveedor ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                    onChange={(e) => setFormEditar({ ...formEditar, nombreProveedor: e.target.value })}
                   />
+                  {errorsEditar.nombreProveedor && <span className="text-red-500 text-xs mt-1">{errorsEditar.nombreProveedor}</span>}
                 </div>
                 <div className="flex flex-col">
-                  <label>Telefono</label>
+                  <label className="text-sm font-medium text-gray-700">Teléfono *</label>
                   <input
-                    placeholder="Ingrese su telefono"
                     value={formEditar.telefono}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) =>
-                      setFormEditar({ ...formEditar, telefono: e.target.value })
-                    }
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errorsEditar.telefono ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                    onChange={(e) => setFormEditar({ ...formEditar, telefono: e.target.value.replace(/\D/g, "") })}
                   />
+                  {errorsEditar.telefono && <span className="text-red-500 text-xs mt-1">{errorsEditar.telefono}</span>}
                 </div>
                 <div className="flex flex-col">
-                  <label>Correo</label>
+                  <label className="text-sm font-medium text-gray-700">Correo *</label>
                   <input
-                    placeholder="Ingrese su correo"
+                    type="email"
                     value={formEditar.correo}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) =>
-                      setFormEditar({ ...formEditar, correo: e.target.value })
-                    }
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errorsEditar.correo ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                    onChange={(e) => setFormEditar({ ...formEditar, correo: e.target.value })}
                   />
+                  {errorsEditar.correo && <span className="text-red-500 text-xs mt-1">{errorsEditar.correo}</span>}
                 </div>
                 <div className="flex flex-col">
-                  <label>Direccion</label>
+                  <label className="text-sm font-medium text-gray-700">Dirección *</label>
                   <input
-                    placeholder="Ingrese su direccion"
                     value={formEditar.direccion}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) =>
-                      setFormEditar({ ...formEditar, direccion: e.target.value })
-                    }
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errorsEditar.direccion ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                    onChange={(e) => setFormEditar({ ...formEditar, direccion: e.target.value })}
                   />
+                  {errorsEditar.direccion && <span className="text-red-500 text-xs mt-1">{errorsEditar.direccion}</span>}
                 </div>
                 <div className="col-span-2 flex gap-4 mt-4">
                   <button
                     type="button"
                     onClick={handleUpdate}
-                    className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
+                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors"
                   >
                     Guardar cambios
                   </button>
@@ -437,45 +456,47 @@ export const Proveedores = () => {
             </div>
           </Modal>
 
+          {/* Modal Ver */}
           <Modal open={openVer} onClose={() => setOpenVer(false)}>
             <div className="w-[450px] p-6 mx-auto text-center">
-              <h3 className="text-lg font-black text-gray-800 mb-6">
-                Ver proveedor
-              </h3>
+              <h3 className="text-lg font-black text-gray-800 mb-4">Ver proveedor</h3>
               {selectedProveedor && (
-                <div className="text-left space-y-2">
-                  <p>ID: {selectedProveedor.ProveedorId}</p>
-                  <p>Nombre: {selectedProveedor.NombreProveedor}</p>
-                  <p>Telefono: {selectedProveedor.Telefono}</p>
-                  <p>Correo: {selectedProveedor.Correo}</p>
-                  <p>Direccion: {selectedProveedor.Direccion}</p>
+                <div className="text-left space-y-2 text-gray-700">
+                  <p><strong>ID:</strong> {getShortId(selectedProveedor.ProveedorId)}</p>
+                  <p><strong>Nombre:</strong> {selectedProveedor.NombreProveedor}</p>
+                  <p><strong>Teléfono:</strong> {selectedProveedor.Telefono}</p>
+                  <p><strong>Correo:</strong> {selectedProveedor.Correo}</p>
+                  <p><strong>Dirección:</strong> {selectedProveedor.Direccion}</p>
                 </div>
               )}
               <button
                 onClick={() => setOpenVer(false)}
-                className="mt-4 bg-gray-200 px-4 py-2 rounded-lg"
+                className="mt-6 bg-gray-200 px-6 py-2 rounded-lg text-gray-700 hover:bg-gray-300 transition-colors"
               >
                 Cerrar
               </button>
             </div>
           </Modal>
 
+          {/* Modal Eliminar */}
           <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
             <div className="w-[400px] p-6 mx-auto text-center">
-              <h3 className="text-lg font-black text-gray-800 mb-4">
-                Eliminar proveedor
-              </h3>
-              <p className="mb-6">¿Estás seguro de eliminar este proveedor?</p>
+              <h3 className="text-lg font-black text-gray-800 mb-3">Eliminar proveedor</h3>
+              {selectedProveedor && (
+                <p className="mb-5 text-gray-600">
+                  ¿Estás seguro de eliminar a <strong>{selectedProveedor.NombreProveedor}</strong>?
+                </p>
+              )}
               <div className="flex gap-4">
                 <button
                   onClick={handleDelete}
-                  className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors"
+                  className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors"
                 >
                   Eliminar
                 </button>
                 <button
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
                   onClick={() => setOpenEliminar(false)}
+                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
                 >
                   Cancelar
                 </button>

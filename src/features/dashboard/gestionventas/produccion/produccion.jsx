@@ -1,7 +1,15 @@
 import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
-import { Plus, Edit, Eye, Trash2, ArrowLeft } from "lucide-react";
+import { Plus, Edit, Eye, Trash2, ArrowLeft, Search } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
+// Helper: solo primeras 3 letras o dígitos
+const getShortId = (id) => {
+  const str = String(id || "");
+  return str.length > 3 ? str.substring(0, 3) : str;
+};
 
 export const Produccion = () => {
   const navigate = useNavigate();
@@ -30,6 +38,8 @@ export const Produccion = () => {
   const [formEditar, setFormEditar] = useState(null);
   const [pedidos, setPedidos] = useState([]);
   const [insumos, setInsumos] = useState([]);
+  const [errores, setErrores] = useState({});
+  const [loading, setLoading] = useState(false);
 
   // === Cargar pedidos e insumos ===
   useEffect(() => {
@@ -42,35 +52,19 @@ export const Produccion = () => {
         setPedidos(Array.isArray(resPedidos.data) ? resPedidos.data : []);
         setInsumos(Array.isArray(resInsumos.data) ? resInsumos.data : []);
       } catch (err) {
-        console.error("Error cargando pedidos o insumos:", err);
+        toast.error("Error al cargar pedidos o insumos");
       }
     };
     fetchRelacionados();
   }, []);
 
-  // === Cargar producciones (solo en lista) ===
+  // === Cargar producciones (solo datos básicos en lista) ===
   const fetchProducciones = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/produccion");
-      const produccionesBase = Array.isArray(res.data) ? res.data : [];
-      const produccionesConDetalles = await Promise.all(
-        produccionesBase.map(async (p) => {
-          try {
-            const detalleRes = await axios.get(`http://localhost:3000/api/detalle-produccion/${p.ProduccionId}`);
-            return {
-              ...p,
-              detalle: Array.isArray(detalleRes.data)
-                ? detalleRes.data.map(item => ({ ...item, _tempId: item.DetalleProduccionId || crypto.randomUUID() }))
-                : [],
-            };
-          } catch {
-            return { ...p, detalle: [] };
-          }
-        })
-      );
-      setProducciones(produccionesConDetalles);
+      const { data } = await axios.get("http://localhost:3000/api/produccion");
+      setProducciones(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("Error al cargar producciones:", err);
+      toast.error("Error al cargar producciones");
     }
   };
 
@@ -78,9 +72,10 @@ export const Produccion = () => {
     if (mode === "list") fetchProducciones();
   }, [mode]);
 
-  // === Cargar para ver/editar ===
+  // === Cargar para ver/editar (con detalles) ===
   useEffect(() => {
     if (mode === "view" || mode === "edit") {
+      setLoading(true);
       const cargarProduccion = async () => {
         try {
           const res = await axios.get(`http://localhost:3000/api/produccion/${id}`);
@@ -90,9 +85,12 @@ export const Produccion = () => {
             : [];
           const produccionCompleta = { ...res.data, detalle };
           if (mode === "edit") setFormEditar(produccionCompleta);
+          if (mode === "view") setFormEditar(produccionCompleta);
         } catch (err) {
-          console.error("Error al cargar producción:", err);
+          toast.error("Error al cargar producción");
           navigate("/dashboard/produccion");
+        } finally {
+          setLoading(false);
         }
       };
       cargarProduccion();
@@ -107,8 +105,14 @@ export const Produccion = () => {
   });
 
   // === Navegación ===
-  const goToBackToList = () => navigate("/dashboard/produccion");
-  const goToCreate = () => navigate("/dashboard/produccion/nuevo");
+  const goToBackToList = () => {
+    setErrores({});
+    navigate("/dashboard/produccion");
+  };
+  const goToCreate = () => {
+    setErrores({});
+    navigate("/dashboard/produccion/nuevo");
+  };
   const goToView = (p) => navigate(`/dashboard/produccion/${p.ProduccionId}`);
   const goToEdit = (p) => navigate(`/dashboard/produccion/${p.ProduccionId}/editar`);
 
@@ -145,44 +149,52 @@ export const Produccion = () => {
     });
   };
 
+  // === Validación ===
+  const validarFormulario = (form, detalles) => {
+    const errores = {};
+    if (!form.PedidoClienteId?.trim()) errores.pedido = "Debe seleccionar un pedido";
+    if (!form.FechaInicio) errores.fechaInicio = "La fecha de inicio es obligatoria";
+    if (!detalles || detalles.length === 0) errores.detalles = "Debe agregar al menos un insumo";
+    for (let i = 0; i < detalles.length; i++) {
+      if (!detalles[i].InsumoId) errores[`insumo-${i}`] = `Insumo ${i + 1}: seleccione un insumo`;
+      if (!detalles[i].CantidadUsada || Number(detalles[i].CantidadUsada) <= 0) {
+        errores[`cantidad-${i}`] = `Insumo ${i + 1}: cantidad debe ser > 0`;
+      }
+    }
+    return errores;
+  };
+
   // === Guardar ===
   const handleCreate = async () => {
+    const errores = validarFormulario(formCrear, detallesCrear);
+    if (Object.keys(errores).length > 0) {
+      setErrores(errores);
+      toast.error("Por favor corrige los errores");
+      return;
+    }
+    setErrores({});
     try {
-      if (!formCrear.PedidoClienteId.trim()) {
-        alert("Debe seleccionar un pedido.");
-        return;
-      }
-      if (!formCrear.FechaInicio) {
-        alert("Debe ingresar la fecha de inicio.");
-        return;
-      }
       const detallesLimpios = detallesCrear
         .map(d => ({ InsumoId: d.InsumoId?.trim(), CantidadUsada: Number(d.CantidadUsada) || 1 }))
         .filter(d => d.InsumoId);
-      if (detallesLimpios.length === 0) {
-        alert("Debe agregar al menos un insumo.");
-        return;
-      }
       await axios.post("http://localhost:3000/api/produccion", { ...formCrear, detalle: detallesLimpios });
+      toast.success("Producción creada exitosamente");
       goToBackToList();
-      fetchProducciones();
     } catch (err) {
-      console.error("Error al crear producción:", err);
-      alert("Error: " + (err.response?.data?.error || err.message));
+      toast.error("Error al crear producción: " + (err.response?.data?.message || err.message));
     }
   };
 
   const handleEdit = async () => {
     if (!formEditar) return;
+    const errores = validarFormulario(formEditar, formEditar.detalle);
+    if (Object.keys(errores).length > 0) {
+      setErrores(errores);
+      toast.error("Por favor corrige los errores");
+      return;
+    }
+    setErrores({});
     try {
-      if (!formEditar.PedidoClienteId.trim()) {
-        alert("Debe seleccionar un pedido.");
-        return;
-      }
-      if (!formEditar.FechaInicio) {
-        alert("Debe ingresar la fecha de inicio.");
-        return;
-      }
       await axios.put(`http://localhost:3000/api/produccion/${formEditar.ProduccionId}`, {
         PedidoClienteId: formEditar.PedidoClienteId,
         Estado: formEditar.Estado,
@@ -203,11 +215,10 @@ export const Produccion = () => {
           });
         }
       }
+      toast.success("Producción actualizada exitosamente");
       goToBackToList();
-      fetchProducciones();
     } catch (err) {
-      console.error("Error al editar producción:", err);
-      alert("Error: " + (err.response?.data?.error || err.message));
+      toast.error("Error al editar producción: " + (err.response?.data?.message || err.message));
     }
   };
 
@@ -215,31 +226,42 @@ export const Produccion = () => {
     if (!window.confirm("¿Está seguro de eliminar esta producción?")) return;
     try {
       await axios.delete(`http://localhost:3000/api/produccion/${idProduccion}`);
-      fetchProducciones();
+      setProducciones(prev => prev.filter(p => p.ProduccionId !== idProduccion));
+      toast.success("Producción eliminada");
     } catch (err) {
-      console.error("Error al eliminar:", err);
-      alert("Error: " + (err.response?.data?.error || err.message));
+      toast.error("Error al eliminar producción");
     }
   };
 
+  // ✅ CORRECCIÓN CLAVE: enviar todos los campos al cambiar estado
   const toggleEstado = async (idProduccion, nuevoEstado) => {
+    const produccionActual = producciones.find(p => p.ProduccionId === idProduccion);
+    if (!produccionActual) return;
+
     try {
-      const produccion = producciones.find(p => p.ProduccionId === idProduccion);
-      if (!produccion) return;
-      await axios.put(`http://localhost:3000/api/produccion/${idProduccion}`, { ...produccion, Estado: nuevoEstado });
-      setProducciones(prev => prev.map(p => p.ProduccionId === idProduccion ? { ...p, Estado: nuevoEstado } : p));
+      await axios.put(`http://localhost:3000/api/produccion/${idProduccion}`, {
+        PedidoClienteId: produccionActual.PedidoClienteId,
+        Estado: nuevoEstado,
+        FechaInicio: produccionActual.FechaInicio,
+        FechaFin: produccionActual.FechaFin || null,
+      });
+      setProducciones(prev =>
+        prev.map(p =>
+          p.ProduccionId === idProduccion ? { ...p, Estado: nuevoEstado } : p
+        )
+      );
+      toast.success("Estado actualizado");
     } catch (err) {
-      console.error("Error al actualizar estado:", err);
-      alert("Error al actualizar estado.");
+      toast.error("Error al actualizar estado");
     }
   };
 
   const getEstadoColor = (estado) =>
-    estado === "Finalizado" ? "bg-green-100 text-green-800" : "bg-white text-black";
+    estado === "Finalizado" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800";
 
   // === RENDER ===
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+    <div className="min-h-screen bg-slate-50 p-6"> {/* ✅ Fondo neutro */}
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Producción</h1>
 
@@ -253,7 +275,7 @@ export const Produccion = () => {
               <select
                 value={filtroCampo}
                 onChange={(e) => setFiltroCampo(e.target.value)}
-                className="border rounded-lg px-4 py-3"
+                className="border rounded-lg px-4 py-3 bg-white text-slate-700"
               >
                 <option value="">Filtrar por campo</option>
                 <option value="ProduccionId">Producción ID</option>
@@ -261,6 +283,7 @@ export const Produccion = () => {
                 <option value="Estado">Estado</option>
               </select>
               <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Buscar producción"
@@ -268,7 +291,6 @@ export const Produccion = () => {
                   onChange={(e) => setFiltroText(e.target.value)}
                   className="border rounded-lg pl-10 pr-4 py-3 w-full"
                 />
-                <img src="/multimedia/lupa.png" alt="Buscar" className="absolute left-3 top-1/2 -translate-y-1/2 w-5" />
               </div>
             </div>
             <div className="bg-white rounded-xl shadow-sm border overflow-auto max-h-[600px]">
@@ -286,8 +308,8 @@ export const Produccion = () => {
                 <tbody className="divide-y">
                   {produccionesFiltradas.map((p) => (
                     <tr key={p.ProduccionId} className="hover:bg-slate-50">
-                      <td className="py-4 px-6">{p.ProduccionId}</td>
-                      <td className="py-4 px-6">{p.PedidoClienteId}</td>
+                      <td className="py-4 px-6">{getShortId(p.ProduccionId)}</td>
+                      <td className="py-4 px-6">{getShortId(p.PedidoClienteId)}</td>
                       <td className="py-4 px-6">{p.FechaInicio}</td>
                       <td className="py-4 px-6">{p.FechaFin || "—"}</td>
                       <td className="py-4 px-6 text-center">
@@ -302,9 +324,9 @@ export const Produccion = () => {
                       </td>
                       <td className="py-4 px-6 text-center">
                         <div className="flex justify-center gap-3">
-                          <button onClick={() => goToView(p)}><Eye size={16} className="text-emerald-600" /></button>
-                          <button onClick={() => goToEdit(p)}><Edit size={16} className="text-blue-600" /></button>
-                          <button onClick={() => handleDelete(p.ProduccionId)}><Trash2 size={16} className="text-red-600" /></button>
+                          <button onClick={() => goToView(p)}><Eye size={16} className="text-emerald-600 hover:text-emerald-800" /></button>
+                          <button onClick={() => goToEdit(p)}><Edit size={16} className="text-blue-600 hover:text-blue-800" /></button>
+                          <button onClick={() => handleDelete(p.ProduccionId)}><Trash2 size={16} className="text-red-600 hover:text-red-800" /></button>
                         </div>
                       </td>
                     </tr>
@@ -324,21 +346,26 @@ export const Produccion = () => {
               </button>
               <h3 className="text-lg font-bold">Nueva producción</h3>
             </div>
+            {errores.detalles && <div className="text-red-500 text-sm mb-2">{errores.detalles}</div>}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="flex flex-col gap-2">
-                <label className="font-medium">Pedido Cliente</label>
+                <label className="font-medium">Pedido Cliente *</label>
                 <select
                   value={formCrear.PedidoClienteId}
-                  onChange={(e) => setFormCrear({ ...formCrear, PedidoClienteId: e.target.value })}
-                  className="w-full h-11 px-3 border rounded"
+                  onChange={(e) => {
+                    setFormCrear({ ...formCrear, PedidoClienteId: e.target.value });
+                    if (errores.pedido) setErrores(prev => ({ ...prev, pedido: "" }));
+                  }}
+                  className={`w-full h-11 px-3 border rounded ${errores.pedido ? "border-red-500" : ""}`}
                 >
                   <option value="">Seleccione un pedido</option>
                   {pedidos.map((p) => (
                     <option key={p.PedidoClienteId} value={p.PedidoClienteId}>
-                      {p.PedidoClienteId} - {p.NombreCliente || p.ClienteId}
+                      {getShortId(p.PedidoClienteId)} - {p.NombreCliente || p.ClienteId}
                     </option>
                   ))}
                 </select>
+                {errores.pedido && <span className="text-red-500 text-xs">{errores.pedido}</span>}
               </div>
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Estado</label>
@@ -352,13 +379,17 @@ export const Produccion = () => {
                 </select>
               </div>
               <div className="flex flex-col gap-2">
-                <label className="font-medium">Fecha Inicio</label>
+                <label className="font-medium">Fecha Inicio *</label>
                 <input
                   type="datetime-local"
                   value={formCrear.FechaInicio}
-                  onChange={(e) => setFormCrear({ ...formCrear, FechaInicio: e.target.value })}
-                  className="w-full h-11 px-3 border rounded"
+                  onChange={(e) => {
+                    setFormCrear({ ...formCrear, FechaInicio: e.target.value });
+                    if (errores.fechaInicio) setErrores(prev => ({ ...prev, fechaInicio: "" }));
+                  }}
+                  className={`w-full h-11 px-3 border rounded ${errores.fechaInicio ? "border-red-500" : ""}`}
                 />
+                {errores.fechaInicio && <span className="text-red-500 text-xs">{errores.fechaInicio}</span>}
               </div>
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Fecha Fin</label>
@@ -379,29 +410,41 @@ export const Produccion = () => {
               {detallesCrear.map((d, index) => (
                 <div key={d._tempId} className="grid grid-cols-1 md:grid-cols-2 gap-3 border p-3 rounded bg-gray-50">
                   <div className="flex flex-col gap-2">
-                    <label>Insumo</label>
+                    <label>Insumo *</label>
                     <select
                       value={d.InsumoId || ""}
-                      onChange={(e) => actualizarDetalleCrear(index, "InsumoId", e.target.value)}
-                      className="h-10 px-2 border rounded bg-white"
+                      onChange={(e) => {
+                        actualizarDetalleCrear(index, "InsumoId", e.target.value);
+                        if (errores[`insumo-${index}`]) {
+                          setErrores(prev => ({ ...prev, [`insumo-${index}`]: "" }));
+                        }
+                      }}
+                      className={`h-10 px-2 border rounded bg-white ${errores[`insumo-${index}`] ? "border-red-500" : ""}`}
                     >
                       <option value="">Seleccione</option>
                       {insumos.map((i) => (
                         <option key={i.InsumoId} value={i.InsumoId}>
-                          {i.Nombre} (Stock: {i.CantidadDisponible})
+                          {i.Nombre} (Stock: {i.Stock})
                         </option>
                       ))}
                     </select>
+                    {errores[`insumo-${index}`] && <span className="text-red-500 text-xs">{errores[`insumo-${index}`]}</span>}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label>Cantidad Usada</label>
+                    <label>Cantidad Usada *</label>
                     <input
                       type="number"
                       min="1"
                       value={d.CantidadUsada}
-                      onChange={(e) => actualizarDetalleCrear(index, "CantidadUsada", Number(e.target.value))}
-                      className="h-10 px-2 border rounded"
+                      onChange={(e) => {
+                        actualizarDetalleCrear(index, "CantidadUsada", Number(e.target.value));
+                        if (errores[`cantidad-${index}`]) {
+                          setErrores(prev => ({ ...prev, [`cantidad-${index}`]: "" }));
+                        }
+                      }}
+                      className={`h-10 px-2 border rounded ${errores[`cantidad-${index}`] ? "border-red-500" : ""}`}
                     />
+                    {errores[`cantidad-${index}`] && <span className="text-red-500 text-xs">{errores[`cantidad-${index}`]}</span>}
                   </div>
                   <div className="md:col-span-2 flex justify-end">
                     <Trash2 size={18} className="text-red-600 cursor-pointer" onClick={() => eliminarDetalleCrear(index)} />
@@ -423,13 +466,15 @@ export const Produccion = () => {
               <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
                 <ArrowLeft size={18} />
               </button>
-              <h3 className="text-lg font-bold">Ver producción #{id}</h3>
+              <h3 className="text-lg font-bold">Ver producción #{getShortId(id)}</h3>
             </div>
-            {formEditar ? (
+            {loading ? (
+              <div className="p-6">Cargando...</div>
+            ) : formEditar ? (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div><strong>Producción ID:</strong> {formEditar.ProduccionId}</div>
-                  <div><strong>Pedido ID:</strong> {formEditar.PedidoClienteId}</div>
+                  <div><strong>Producción ID:</strong> {getShortId(formEditar.ProduccionId)}</div>
+                  <div><strong>Pedido ID:</strong> {getShortId(formEditar.PedidoClienteId)}</div>
                   <div><strong>Fecha Inicio:</strong> {formEditar.FechaInicio || "—"}</div>
                   <div><strong>Fecha Fin:</strong> {formEditar.FechaFin || "—"}</div>
                   <div>
@@ -466,112 +511,142 @@ export const Produccion = () => {
                 <button onClick={goToBackToList} className="w-full h-11 bg-gray-200 text-gray-700 rounded">Cerrar</button>
               </div>
             ) : (
-              <p>Cargando...</p>
+              <div className="p-6 text-red-500">No se pudo cargar la producción.</div>
             )}
           </div>
         )}
 
         {/* === EDITAR === */}
-        {mode === "edit" && formEditar && (
+        {mode === "edit" && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
               <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
                 <ArrowLeft size={18} />
               </button>
-              <h3 className="text-lg font-bold">Editar producción #{id}</h3>
+              <h3 className="text-lg font-bold">Editar producción #{getShortId(id)}</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div className="flex flex-col gap-2">
-                <label className="font-medium">Pedido Cliente</label>
-                <select
-                  value={formEditar.PedidoClienteId}
-                  onChange={(e) => setFormEditar({ ...formEditar, PedidoClienteId: e.target.value })}
-                  className="w-full h-11 px-3 border rounded"
-                >
-                  <option value="">Seleccione un pedido</option>
-                  {pedidos.map((p) => (
-                    <option key={p.PedidoClienteId} value={p.PedidoClienteId}>
-                      {p.PedidoClienteId} - {p.NombreCliente || p.ClienteId}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="font-medium">Estado</label>
-                <select
-                  value={formEditar.Estado}
-                  onChange={(e) => setFormEditar({ ...formEditar, Estado: e.target.value })}
-                  className="w-full h-11 px-3 border rounded"
-                >
-                  <option value="En Proceso">En Proceso</option>
-                  <option value="Finalizado">Finalizado</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="font-medium">Fecha Inicio</label>
-                <input
-                  type="datetime-local"
-                  value={formEditar.FechaInicio}
-                  onChange={(e) => setFormEditar({ ...formEditar, FechaInicio: e.target.value })}
-                  className="w-full h-11 px-3 border rounded"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="font-medium">Fecha Fin</label>
-                <input
-                  type="datetime-local"
-                  value={formEditar.FechaFin || ""}
-                  onChange={(e) => setFormEditar({ ...formEditar, FechaFin: e.target.value })}
-                  className="w-full h-11 px-3 border rounded"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end mb-4">
-              <button type="button" onClick={añadirDetalleEditar} className="bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-                <Plus size={15} /> Añadir insumo
-              </button>
-            </div>
-            <div className="grid grid-cols-1 gap-4 mb-6">
-              {formEditar.detalle.map((d, index) => (
-                <div key={d._tempId} className="grid grid-cols-1 md:grid-cols-2 gap-3 border p-3 rounded bg-gray-50">
+            {loading ? (
+              <div className="p-6">Cargando...</div>
+            ) : formEditar ? (
+              <>
+                {errores.detalles && <div className="text-red-500 text-sm mb-2">{errores.detalles}</div>}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div className="flex flex-col gap-2">
-                    <label>Insumo</label>
+                    <label className="font-medium">Pedido Cliente *</label>
                     <select
-                      value={d.InsumoId || ""}
-                      onChange={(e) => actualizarDetalleEditar(index, "InsumoId", e.target.value)}
-                      className="h-10 px-2 border rounded bg-white"
+                      value={formEditar.PedidoClienteId}
+                      onChange={(e) => {
+                        setFormEditar({ ...formEditar, PedidoClienteId: e.target.value });
+                        if (errores.pedido) setErrores(prev => ({ ...prev, pedido: "" }));
+                      }}
+                      className={`w-full h-11 px-3 border rounded ${errores.pedido ? "border-red-500" : ""}`}
                     >
-                      <option value="">Seleccione</option>
-                      {insumos.map((i) => (
-                        <option key={i.InsumoId} value={i.InsumoId}>
-                          {i.Nombre} (Stock: {i.CantidadDisponible})
+                      <option value="">Seleccione un pedido</option>
+                      {pedidos.map((p) => (
+                        <option key={p.PedidoClienteId} value={p.PedidoClienteId}>
+                          {getShortId(p.PedidoClienteId)} - {p.NombreCliente || p.ClienteId}
                         </option>
                       ))}
                     </select>
+                    {errores.pedido && <span className="text-red-500 text-xs">{errores.pedido}</span>}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label>Cantidad Usada</label>
+                    <label className="font-medium">Estado</label>
+                    <select
+                      value={formEditar.Estado}
+                      onChange={(e) => setFormEditar({ ...formEditar, Estado: e.target.value })}
+                      className="w-full h-11 px-3 border rounded"
+                    >
+                      <option value="En Proceso">En Proceso</option>
+                      <option value="Finalizado">Finalizado</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="font-medium">Fecha Inicio *</label>
                     <input
-                      type="number"
-                      min="1"
-                      value={d.CantidadUsada}
-                      onChange={(e) => actualizarDetalleEditar(index, "CantidadUsada", Number(e.target.value))}
-                      className="h-10 px-2 border rounded"
+                      type="datetime-local"
+                      value={formEditar.FechaInicio}
+                      onChange={(e) => {
+                        setFormEditar({ ...formEditar, FechaInicio: e.target.value });
+                        if (errores.fechaInicio) setErrores(prev => ({ ...prev, fechaInicio: "" }));
+                      }}
+                      className={`w-full h-11 px-3 border rounded ${errores.fechaInicio ? "border-red-500" : ""}`}
+                    />
+                    {errores.fechaInicio && <span className="text-red-500 text-xs">{errores.fechaInicio}</span>}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="font-medium">Fecha Fin</label>
+                    <input
+                      type="datetime-local"
+                      value={formEditar.FechaFin || ""}
+                      onChange={(e) => setFormEditar({ ...formEditar, FechaFin: e.target.value })}
+                      className="w-full h-11 px-3 border rounded"
                     />
                   </div>
-                  <div className="md:col-span-2 flex justify-end">
-                    <Trash2 size={18} className="text-red-600 cursor-pointer" onClick={() => eliminarDetalleEditar(index)} />
-                  </div>
                 </div>
-              ))}
-            </div>
-            <div className="flex gap-4">
-              <button type="button" onClick={handleEdit} className="flex-1 bg-blue-500 text-white h-11 rounded">Guardar cambios</button>
-              <button type="button" onClick={goToBackToList} className="flex-1 bg-gray-200 text-gray-700 h-11 rounded">Cancelar</button>
-            </div>
+                <div className="flex justify-end mb-4">
+                  <button type="button" onClick={añadirDetalleEditar} className="bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                    <Plus size={15} /> Añadir insumo
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-4 mb-6">
+                  {formEditar.detalle.map((d, index) => (
+                    <div key={d._tempId} className="grid grid-cols-1 md:grid-cols-2 gap-3 border p-3 rounded bg-gray-50">
+                      <div className="flex flex-col gap-2">
+                        <label>Insumo *</label>
+                        <select
+                          value={d.InsumoId || ""}
+                          onChange={(e) => {
+                            actualizarDetalleEditar(index, "InsumoId", e.target.value);
+                            if (errores[`insumo-${index}`]) {
+                              setErrores(prev => ({ ...prev, [`insumo-${index}`]: "" }));
+                            }
+                          }}
+                          className={`h-10 px-2 border rounded bg-white ${errores[`insumo-${index}`] ? "border-red-500" : ""}`}
+                        >
+                          <option value="">Seleccione</option>
+                          {insumos.map((i) => (
+                            <option key={i.InsumoId} value={i.InsumoId}>
+                              {i.Nombre} (Stock: {i.Stock})
+                            </option>
+                          ))}
+                        </select>
+                        {errores[`insumo-${index}`] && <span className="text-red-500 text-xs">{errores[`insumo-${index}`]}</span>}
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label>Cantidad Usada *</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={d.CantidadUsada}
+                          onChange={(e) => {
+                            actualizarDetalleEditar(index, "CantidadUsada", Number(e.target.value));
+                            if (errores[`cantidad-${index}`]) {
+                              setErrores(prev => ({ ...prev, [`cantidad-${index}`]: "" }));
+                            }
+                          }}
+                          className={`h-10 px-2 border rounded ${errores[`cantidad-${index}`] ? "border-red-500" : ""}`}
+                        />
+                        {errores[`cantidad-${index}`] && <span className="text-red-500 text-xs">{errores[`cantidad-${index}`]}</span>}
+                      </div>
+                      <div className="md:col-span-2 flex justify-end">
+                        <Trash2 size={18} className="text-red-600 cursor-pointer" onClick={() => eliminarDetalleEditar(index)} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-4">
+                  <button type="button" onClick={handleEdit} className="flex-1 bg-blue-500 text-white h-11 rounded">Guardar cambios</button>
+                  <button type="button" onClick={goToBackToList} className="flex-1 bg-gray-200 text-gray-700 h-11 rounded">Cancelar</button>
+                </div>
+              </>
+            ) : (
+              <div className="p-6 text-red-500">No se pudo cargar la producción.</div>
+            )}
           </div>
         )}
       </div>
+      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 };

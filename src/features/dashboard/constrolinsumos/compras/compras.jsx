@@ -1,10 +1,17 @@
-import React, { useEffect, useState, useCallback } from "react";
-import { Plus, Edit, Eye, Trash2, ArrowLeft } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Plus, Edit, Eye, Trash2, ArrowLeft, Search } from "lucide-react";
 import axios from "axios";
 
 const API_URL = `http://localhost:3000/api/compras`;
 const API_DETALLE_URL = `http://localhost:3000/api/detalle-compras`;
 
+// Helper: solo primeras 3 letras o dígitos
+const getShortId = (id) => {
+  const str = String(id || "");
+  return str.length > 3 ? str.substring(0, 3) : str;
+};
+
+// Formateo de fecha
 const formatearFecha = (f) => {
   if (!f) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(f)) return f;
@@ -14,6 +21,48 @@ const formatearFecha = (f) => {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+};
+
+// Validación de formulario
+const validarFormulario = (form, detalles) => {
+  const errores = [];
+
+  if (!form.ProveedorId?.trim()) {
+    errores.push("Proveedor ID es obligatorio.");
+  }
+
+  if (!form.FechaRegistro) {
+    errores.push("La fecha de registro es obligatoria.");
+  }
+
+  if (!detalles || detalles.length === 0) {
+    errores.push("Debe agregar al menos un artículo.");
+  }
+
+  for (let i = 0; i < detalles.length; i++) {
+    const d = detalles[i];
+    if (!d.TipoDetalle) {
+      errores.push(`Artículo ${i + 1}: seleccione tipo (Producto/Insumo).`);
+    } else if (d.TipoDetalle === "Producto" && !d.ProductoServicioId) {
+      errores.push(`Artículo ${i + 1}: seleccione un producto.`);
+    } else if (d.TipoDetalle === "Insumo" && !d.InsumoId) {
+      errores.push(`Artículo ${i + 1}: seleccione un insumo.`);
+    }
+
+    if (!d.Cantidad || Number(d.Cantidad) <= 0) {
+      errores.push(`Artículo ${i + 1}: cantidad debe ser mayor a 0.`);
+    }
+
+    if (!d.PrecioUnitario || Number(d.PrecioUnitario) <= 0) {
+      errores.push(`Artículo ${i + 1}: precio unitario debe ser mayor a 0.`);
+    }
+
+    if (!d.Descripcion?.trim()) {
+      errores.push(`Artículo ${i + 1}: descripción es obligatoria.`);
+    }
+  }
+
+  return errores;
 };
 
 export const Compras = () => {
@@ -34,8 +83,9 @@ export const Compras = () => {
   ]);
   const [productos, setProductos] = useState([]);
   const [insumos, setInsumos] = useState([]);
+  const [errores, setErrores] = useState([]);
 
-  // --- Carga de productos e insumos ---
+  // Cargar productos e insumos
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -46,30 +96,20 @@ export const Compras = () => {
         setProductos(Array.isArray(resProductos.data) ? resProductos.data : []);
         setInsumos(Array.isArray(resInsumos.data) ? resInsumos.data : []);
       } catch (err) {
-        console.error("Error cargando datos:", err);
+        console.error("Error cargando catálogos:", err);
       }
     };
     fetchData();
   }, []);
 
-  // --- Carga de compras ---
+  // Cargar compras (solo cabeceras, sin detalles en lista)
   const fetchCompras = async () => {
     try {
-      const { data } = await axios.get(`http://localhost:3000/api/compras`);
+      const { data } = await axios.get(API_URL);
       const comprasBase = Array.isArray(data) ? data : [];
-      const comprasConDetalles = await Promise.all(
-        comprasBase.map(async (compra) => {
-          try {
-            const { data: detalles } = await axios.get(`${API_DETALLE_URL}/compra/${compra.CompraId}`);
-            return { ...compra, detalle: detalles || [] };
-          } catch {
-            return { ...compra, detalle: [] };
-          }
-        })
-      );
-      setCompras(comprasConDetalles);
+      setCompras(comprasBase);
       const estados = {};
-      comprasConDetalles.forEach((c) => {
+      comprasBase.forEach((c) => {
         estados[c.CompraId] = Number(c.Estado) === 1 ? 1 : 0;
       });
       setEstadoActivo(estados);
@@ -88,26 +128,34 @@ export const Compras = () => {
     return valor.includes(filtroText.toLowerCase());
   });
 
-  // --- Navegación ---
+  // Navegación
   const goToCreate = () => {
     setFormCrear({ ProveedorId: "", Total: 0, FechaRegistro: "", Estado: 1 });
     setDetallesCrear([{ TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }]);
+    setErrores([]);
     setViewMode("create");
   };
   const goToView = (compra) => {
     setSelectedCompra(compra);
     setViewMode("view");
   };
-  const goToEdit = (compra) => {
-    setSelectedCompra(compra);
-    setViewMode("edit");
+  const goToEdit = async (compra) => {
+    try {
+      const { data: detalles } = await axios.get(`${API_DETALLE_URL}/compra/${compra.CompraId}`);
+      setSelectedCompra({ ...compra, detalle: detalles || [] });
+      setErrores([]);
+      setViewMode("edit");
+    } catch (err) {
+      console.error("Error al cargar detalles para edición:", err);
+    }
   };
   const goToBackToList = () => {
     setViewMode("list");
     setSelectedCompra(null);
+    setErrores([]);
   };
 
-  // --- Manejo de detalles en Crear ---
+  // Gestión de detalles (crear)
   const añadirDetalleCrear = () => {
     setDetallesCrear(prev => [
       ...prev,
@@ -131,7 +179,7 @@ export const Compras = () => {
     });
   };
 
-  // --- Manejo de detalles en Editar ---
+  // Gestión de detalles (editar)
   const añadirDetalleEditar = () => {
     setSelectedCompra(prev => ({
       ...prev,
@@ -156,46 +204,56 @@ export const Compras = () => {
         nuevos[index].Subtotal = cantidad * precio;
       }
       const nuevoTotal = nuevos.reduce((sum, item) => sum + (item.Subtotal || 0), 0);
-      return {
-        ...prev,
-        detalle: nuevos,
-        Total: nuevoTotal,
-      };
+      return { ...prev, detalle: nuevos, Total: nuevoTotal };
     });
   };
 
-  // --- Guardado ---
+  // Guardado
   const handleCreate = async () => {
+    const erroresValidacion = validarFormulario(formCrear, detallesCrear);
+    if (erroresValidacion.length > 0) {
+      setErrores(erroresValidacion);
+      return;
+    }
+    setErrores([]);
     try {
-      const detallesLimpios = detallesCrear.map((d) => ({
-        ...d,
-        ProductoServicioId: d.ProductoServicioId?.trim() || null,
-        InsumoId: d.InsumoId?.trim() || null,
-        Subtotal: undefined,
-      }));
-      const total = detallesLimpios.reduce((sum, item) => sum + ((item.Cantidad || 0) * (item.PrecioUnitario || 0)), 0);
-      const { data: compraCreada } = await axios.post(API_URL, {
+      const total = detallesCrear.reduce((sum, item) => sum + (item.Subtotal || 0), 0);
+      const compraData = {
         ...formCrear,
         FechaRegistro: formatearFecha(formCrear.FechaRegistro),
         Total: total,
-      });
+      };
+      const { data: compraCreada } = await axios.post(API_URL, compraData);
+      const detallesLimpios = detallesCrear.map(d => ({
+        ...d,
+        CompraId: compraCreada.CompraId,
+        ProductoServicioId: d.TipoDetalle === "Producto" ? d.ProductoServicioId || null : null,
+        InsumoId: d.TipoDetalle === "Insumo" ? d.InsumoId || null : null,
+        Subtotal: undefined,
+      }));
       for (const d of detallesLimpios) {
-        await axios.post(API_DETALLE_URL, {
-          CompraId: compraCreada.CompraId,
-          ...d,
-        });
+        await axios.post(API_DETALLE_URL, d);
       }
       goToBackToList();
       fetchCompras();
     } catch (err) {
       console.error("Error al crear compra:", err);
-      alert(err.response?.data?.error || err.message);
+      setErrores([err.response?.data?.error || "Error al crear la compra. Intente nuevamente."]);
     }
   };
 
   const handleEdit = async () => {
+    if (!selectedCompra) return;
+    const erroresValidacion = validarFormulario(
+      { ProveedorId: selectedCompra.ProveedorId, FechaRegistro: selectedCompra.FechaRegistro },
+      selectedCompra.detalle
+    );
+    if (erroresValidacion.length > 0) {
+      setErrores(erroresValidacion);
+      return;
+    }
+    setErrores([]);
     try {
-      if (!selectedCompra) return;
       const total = selectedCompra.detalle.reduce((sum, item) => sum + (item.Subtotal || 0), 0);
       await axios.put(`${API_URL}/${selectedCompra.CompraId}`, {
         ProveedorId: selectedCompra.ProveedorId,
@@ -207,35 +265,32 @@ export const Compras = () => {
       for (const d of detallesActuales) {
         await axios.delete(`${API_DETALLE_URL}/${d.DetalleCompraId}`);
       }
-      const detallesLimpios = selectedCompra.detalle.map((d) => ({
+      const detallesLimpios = selectedCompra.detalle.map(d => ({
         ...d,
-        ProductoServicioId: d.ProductoServicioId?.trim() || null,
-        InsumoId: d.InsumoId?.trim() || null,
+        CompraId: selectedCompra.CompraId,
+        ProductoServicioId: d.TipoDetalle === "Producto" ? d.ProductoServicioId || null : null,
+        InsumoId: d.TipoDetalle === "Insumo" ? d.InsumoId || null : null,
         Subtotal: undefined,
       }));
       for (const d of detallesLimpios) {
-        await axios.post(API_DETALLE_URL, {
-          CompraId: selectedCompra.CompraId,
-          ...d,
-        });
+        await axios.post(API_DETALLE_URL, d);
       }
       goToBackToList();
       fetchCompras();
     } catch (err) {
       console.error("Error al editar compra:", err);
-      alert(err.response?.data?.error || err.message);
+      setErrores([err.response?.data?.error || "Error al guardar los cambios."]);
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (compra) => {
+    if (!window.confirm("¿Está seguro de eliminar esta compra?")) return;
     try {
-      if (!selectedCompra) return;
-      await axios.delete(`${API_URL}/${selectedCompra.CompraId}`);
-      goToBackToList();
+      await axios.delete(`${API_URL}/${compra.CompraId}`);
       fetchCompras();
     } catch (err) {
       console.error("Error al eliminar compra:", err);
-      alert(err.response?.data?.error || err.message);
+      alert("No se pudo eliminar la compra.");
     }
   };
 
@@ -258,17 +313,16 @@ export const Compras = () => {
       );
     } catch (err) {
       console.error("Error al actualizar estado", err);
-      alert(err.response?.data?.error || err.message);
     }
   };
 
-  // === RENDER PRINCIPAL ===
+  // === RENDER ===
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+    <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Compras</h1>
 
-        {/* === LISTA === */}
+        {/* LISTA */}
         {viewMode === "list" && (
           <>
             <div className="bg-white rounded-xl shadow-sm border p-6 mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
@@ -289,6 +343,7 @@ export const Compras = () => {
                 <option value="FechaRegistro">Fecha</option>
               </select>
               <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Buscar compra"
@@ -296,16 +351,11 @@ export const Compras = () => {
                   onChange={(e) => setFiltroText(e.target.value)}
                   className="border rounded-lg pl-10 pr-4 py-3 w-full"
                 />
-                <img
-                  src="/multimedia/lupa.png"
-                  alt="Buscar"
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5"
-                />
               </div>
             </div>
             <div className="bg-white rounded-xl shadow-sm border overflow-x-auto max-h-[600px] w-full">
-              <table className="min-w-full table-auto text-sm">
-                <thead className="bg-gradient-to-r from-slate-800 to-slate-700 sticky top-0">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-800 sticky top-0">
                   <tr>
                     <th className="px-4 py-3 text-left text-white">Compra ID</th>
                     <th className="px-4 py-3 text-left text-white">Proveedor ID</th>
@@ -318,10 +368,10 @@ export const Compras = () => {
                 <tbody className="divide-y">
                   {comprasFiltradas.map((compra) => (
                     <tr key={compra.CompraId} className="hover:bg-slate-50">
-                      <td className="py-4 px-6">{compra.CompraId}</td>
-                      <td className="py-4 px-6">{compra.ProveedorId}</td>
+                      <td className="py-4 px-6">{getShortId(compra.CompraId)}</td>
+                      <td className="py-4 px-6">{getShortId(compra.ProveedorId)}</td>
                       <td className="py-4 px-6">{compra.FechaRegistro}</td>
-                      <td className="py-4 px-6 text-center">S/ {(Number(compra.Total) || 0).toFixed(2)}</td>
+                      <td className="py-4 px-6 text-center">$ {(Number(compra.Total) || 0).toFixed(2)}</td>
                       <td className="py-4 px-6 text-center">
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input
@@ -344,10 +394,7 @@ export const Compras = () => {
                           <button onClick={() => goToEdit(compra)}>
                             <Edit size={16} className="text-blue-600 hover:text-blue-800" />
                           </button>
-                          <button onClick={() => {
-                            setSelectedCompra(compra);
-                            handleDelete();
-                          }}>
+                          <button onClick={() => handleDelete(compra)}>
                             <Trash2 size={16} className="text-red-600 hover:text-red-800" />
                           </button>
                         </div>
@@ -367,152 +414,158 @@ export const Compras = () => {
           </>
         )}
 
-        {/* === CREAR === */}
+        {/* CREAR */}
         {viewMode === "create" && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
-              <button
-                onClick={goToBackToList}
-                className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"
-              >
+              <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
                 <ArrowLeft size={18} />
               </button>
               <h3 className="text-lg font-bold">Nueva compra</h3>
             </div>
+
+            {errores.length > 0 && (
+              <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
+                <ul className="list-disc pl-5">
+                  {errores.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               <div className="flex flex-col gap-2">
-                <label className="font-medium">Proveedor ID</label>
+                <label className="font-medium">Proveedor ID *</label>
                 <input
                   type="text"
-                  placeholder="P001"
+                  placeholder="Ej: P01"
                   value={formCrear.ProveedorId}
-                  onChange={(e) =>
-                    setFormCrear({ ...formCrear, ProveedorId: e.target.value })
-                  }
+                  onChange={(e) => setFormCrear({ ...formCrear, ProveedorId: e.target.value })}
                   className="w-full h-11 px-3 border rounded"
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <label className="font-medium">Fecha de registro</label>
+                <label className="font-medium">Fecha de registro *</label>
                 <input
                   type="date"
                   value={formCrear.FechaRegistro}
-                  onChange={(e) =>
-                    setFormCrear({ ...formCrear, FechaRegistro: e.target.value })
-                  }
+                  onChange={(e) => setFormCrear({ ...formCrear, FechaRegistro: e.target.value })}
                   className="w-full h-11 px-3 border rounded"
                 />
               </div>
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Total (Calculado)</label>
                 <input
-                  type="number"
+                  type="text"
                   readOnly
                   value={detallesCrear.reduce((sum, item) => sum + (item.Subtotal || 0), 0).toFixed(2)}
                   className="w-full h-11 px-3 border rounded bg-gray-100"
                 />
               </div>
             </div>
+
             <div className="flex justify-end mb-4">
-              <button
-                type="button"
-                onClick={añadirDetalleCrear}
-                className="inline-flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg"
-              >
+              <button type="button" onClick={añadirDetalleCrear} className="inline-flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg">
                 <Plus size={16} /> Agregar Artículo
               </button>
             </div>
+
             <div className="bg-gray-50 p-4 rounded-lg">
               <h4 className="font-semibold mb-4">Artículos de la Compra</h4>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-200">
                     <tr>
-                      <th className="py-2 px-4">Descripción</th>
-                      <th className="py-2 px-4">Tipo</th>
-                      <th className="py-2 px-4">Cantidad</th>
-                      <th className="py-2 px-4">Precio Unit.</th>
-                      <th className="py-2 px-4">Subtotal</th>
-                      <th className="py-2 px-4">Acciones</th>
+                      <th className="py-2 px-2">Descripción *</th>
+                      <th className="py-2 px-2">Tipo *</th>
+                      <th className="py-2 px-2">Producto/Insumo</th>
+                      <th className="py-2 px-2">Cantidad *</th>
+                      <th className="py-2 px-2">Precio Unit. *</th>
+                      <th className="py-2 px-2">Subtotal</th>
+                      <th className="py-2 px-2">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {detallesCrear.map((d, index) => (
                       <tr key={index} className="border-t">
-                        <td className="py-2 px-4">
+                        <td className="py-2 px-2">
                           <input
                             type="text"
                             value={d.Descripcion}
                             onChange={(e) => actualizarDetalleCrear(index, "Descripcion", e.target.value)}
                             className="w-full px-2 py-1 border rounded"
+                            placeholder="Descripción del artículo"
                           />
                         </td>
-                        <td className="py-2 px-4">
+                        <td className="py-2 px-2">
                           <select
                             value={d.TipoDetalle || ""}
                             onChange={(e) => actualizarDetalleCrear(index, "TipoDetalle", e.target.value)}
                             className="w-full px-2 py-1 border rounded"
                           >
-                            <option value="">Seleccione tipo</option>
+                            <option value="">Seleccione</option>
                             <option value="Producto">Producto</option>
                             <option value="Insumo">Insumo</option>
                           </select>
                         </td>
-                        <td className="py-2 px-4">
-                          <select
-                            disabled={d.TipoDetalle !== "Producto"}
-                            value={d.ProductoServicioId || ""}
-                            onChange={(e) => actualizarDetalleCrear(index, "ProductoServicioId", e.target.value)}
-                            className="w-full px-2 py-1 border rounded"
-                          >
-                            <option value="">Seleccione producto</option>
-                            {productos.map((p) => (
-                              <option key={p.ProductoServicioId} value={p.ProductoServicioId}>
-                                {p.Nombre} {p.Tipo ? `(${p.Tipo})` : ""}
-                              </option>
-                            ))}
-                          </select>
+                        <td className="py-2 px-2">
+                          {d.TipoDetalle === "Producto" ? (
+                            <select
+                              value={d.ProductoServicioId || ""}
+                              onChange={(e) => actualizarDetalleCrear(index, "ProductoServicioId", e.target.value)}
+                              className="w-full px-2 py-1 border rounded"
+                            >
+                              <option value="">Seleccione producto</option>
+                              {productos.map((p) => (
+                                <option key={p.ProductoServicioId} value={p.ProductoServicioId}>
+                                  {p.Nombre}
+                                </option>
+                              ))}
+                            </select>
+                          ) : d.TipoDetalle === "Insumo" ? (
+                            <select
+                              value={d.InsumoId || ""}
+                              onChange={(e) => actualizarDetalleCrear(index, "InsumoId", e.target.value)}
+                              className="w-full px-2 py-1 border rounded"
+                            >
+                              <option value="">Seleccione insumo</option>
+                              {insumos.map((i) => (
+                                <option key={i.InsumoId} value={i.InsumoId}>
+                                  {i.Nombre}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-gray-500">—</span>
+                          )}
                         </td>
-                        <td className="py-2 px-4">
-                          <select
-                            disabled={d.TipoDetalle !== "Insumo"}
-                            value={d.InsumoId || ""}
-                            onChange={(e) => actualizarDetalleCrear(index, "InsumoId", e.target.value)}
-                            className="w-full px-2 py-1 border rounded"
-                          >
-                            <option value="">Seleccione insumo</option>
-                            {insumos.map((i) => (
-                              <option key={i.InsumoId} value={i.InsumoId}>
-                                {i.Nombre}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-2 px-4">
+                        <td className="py-2 px-2">
                           <input
                             type="number"
+                            min="1"
                             value={d.Cantidad ?? ""}
                             onChange={(e) => actualizarDetalleCrear(index, "Cantidad", e.target.value)}
                             className="w-full px-2 py-1 border rounded"
                           />
                         </td>
-                        <td className="py-2 px-4">
+                        <td className="py-2 px-2">
                           <input
                             type="number"
+                            min="0.01"
+                            step="0.01"
                             value={d.PrecioUnitario ?? ""}
                             onChange={(e) => actualizarDetalleCrear(index, "PrecioUnitario", e.target.value)}
                             className="w-full px-2 py-1 border rounded"
                           />
                         </td>
-                        <td className="py-2 px-4">
+                        <td className="py-2 px-2">
                           <input
-                            type="number"
+                            type="text"
                             readOnly
                             value={((d.Subtotal || 0)).toFixed(2)}
                             className="w-full px-2 py-1 border rounded bg-gray-100"
                           />
                         </td>
-                        <td className="py-2 px-4 text-center">
+                        <td className="py-2 px-2 text-center">
                           <Trash2
                             size={18}
                             className="text-red-600 cursor-pointer hover:text-red-800"
@@ -525,16 +578,14 @@ export const Compras = () => {
                 </table>
               </div>
             </div>
+
             <div className="bg-gray-50 p-4 rounded-lg mt-4">
               <div className="flex justify-between text-lg font-bold">
-                <span>Subtotal:</span>
-                <span>{detallesCrear.reduce((sum, item) => sum + (item.Subtotal || 0), 0).toFixed(2)} US$</span>
-              </div>
-              <div className="flex justify-between text-xl font-bold mt-2">
                 <span>Total:</span>
                 <span>{detallesCrear.reduce((sum, item) => sum + (item.Subtotal || 0), 0).toFixed(2)} US$</span>
               </div>
             </div>
+
             <div className="flex flex-col md:flex-row gap-4 mt-6">
               <button
                 type="button"
@@ -545,8 +596,8 @@ export const Compras = () => {
               </button>
               <button
                 type="button"
-                className="flex-1 h-11 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                 onClick={goToBackToList}
+                className="flex-1 h-11 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
               >
                 Cancelar
               </button>
@@ -554,45 +605,49 @@ export const Compras = () => {
           </div>
         )}
 
-        {/* === EDITAR === */}
+        {/* EDITAR */}
         {viewMode === "edit" && selectedCompra && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
-              <button
-                onClick={goToBackToList}
-                className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"
-              >
+              <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
                 <ArrowLeft size={18} />
               </button>
-              <h3 className="text-lg font-bold">Editar compra #{selectedCompra.CompraId}</h3>
+              <h3 className="text-lg font-bold">Editar compra #{getShortId(selectedCompra.CompraId)}</h3>
             </div>
+
+            {errores.length > 0 && (
+              <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
+                <ul className="list-disc pl-5">
+                  {errores.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+              </div>
+            )}
+
             <div className="flex justify-end mb-4">
-              <button
-                type="button"
-                onClick={añadirDetalleEditar}
-                className="inline-flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg"
-              >
+              <button type="button" onClick={añadirDetalleEditar} className="inline-flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg">
                 <Plus size={16} /> Agregar Artículo
               </button>
             </div>
+
             <div className="bg-gray-50 p-4 rounded-lg">
               <h4 className="font-semibold mb-4">Artículos de la Compra</h4>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-200">
                     <tr>
-                      <th className="py-2 px-4">Descripción</th>
-                      <th className="py-2 px-4">Tipo</th>
-                      <th className="py-2 px-4">Cantidad</th>
-                      <th className="py-2 px-4">Precio Unit.</th>
-                      <th className="py-2 px-4">Subtotal</th>
-                      <th className="py-2 px-4">Acciones</th>
+                      <th className="py-2 px-2">Descripción *</th>
+                      <th className="py-2 px-2">Tipo *</th>
+                      <th className="py-2 px-2">Producto/Insumo</th>
+                      <th className="py-2 px-2">Cantidad *</th>
+                      <th className="py-2 px-2">Precio Unit. *</th>
+                      <th className="py-2 px-2">Subtotal</th>
+                      <th className="py-2 px-2">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {selectedCompra.detalle?.map((d, index) => (
                       <tr key={index} className="border-t">
-                        <td className="py-2 px-4">
+                        <td className="py-2 px-2">
                           <input
                             type="text"
                             value={d.Descripcion || ""}
@@ -600,72 +655,76 @@ export const Compras = () => {
                             className="w-full px-2 py-1 border rounded"
                           />
                         </td>
-                        <td className="py-2 px-4">
+                        <td className="py-2 px-2">
                           <select
                             value={d.TipoDetalle || ""}
                             onChange={(e) => actualizarDetalleEditar(index, "TipoDetalle", e.target.value)}
                             className="w-full px-2 py-1 border rounded"
                           >
-                            <option value="">Seleccione tipo</option>
+                            <option value="">Seleccione</option>
                             <option value="Producto">Producto</option>
                             <option value="Insumo">Insumo</option>
                           </select>
                         </td>
-                        <td className="py-2 px-4">
-                          <select
-                            disabled={d.TipoDetalle !== "Producto"}
-                            value={d.ProductoServicioId || ""}
-                            onChange={(e) => actualizarDetalleEditar(index, "ProductoServicioId", e.target.value)}
-                            className="w-full px-2 py-1 border rounded"
-                          >
-                            <option value="">Seleccione producto</option>
-                            {productos.map((p) => (
-                              <option key={p.ProductoServicioId} value={p.ProductoServicioId}>
-                                {p.Nombre} {p.Tipo ? `(${p.Tipo})` : ""}
-                              </option>
-                            ))}
-                          </select>
+                        <td className="py-2 px-2">
+                          {d.TipoDetalle === "Producto" ? (
+                            <select
+                              value={d.ProductoServicioId || ""}
+                              onChange={(e) => actualizarDetalleEditar(index, "ProductoServicioId", e.target.value)}
+                              className="w-full px-2 py-1 border rounded"
+                            >
+                              <option value="">Seleccione producto</option>
+                              {productos.map((p) => (
+                                <option key={p.ProductoServicioId} value={p.ProductoServicioId}>
+                                  {p.Nombre}
+                                </option>
+                              ))}
+                            </select>
+                          ) : d.TipoDetalle === "Insumo" ? (
+                            <select
+                              value={d.InsumoId || ""}
+                              onChange={(e) => actualizarDetalleEditar(index, "InsumoId", e.target.value)}
+                              className="w-full px-2 py-1 border rounded"
+                            >
+                              <option value="">Seleccione insumo</option>
+                              {insumos.map((i) => (
+                                <option key={i.InsumoId} value={i.InsumoId}>
+                                  {i.Nombre}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-gray-500">—</span>
+                          )}
                         </td>
-                        <td className="py-2 px-4">
-                          <select
-                            disabled={d.TipoDetalle !== "Insumo"}
-                            value={d.InsumoId || ""}
-                            onChange={(e) => actualizarDetalleEditar(index, "InsumoId", e.target.value)}
-                            className="w-full px-2 py-1 border rounded"
-                          >
-                            <option value="">Seleccione insumo</option>
-                            {insumos.map((i) => (
-                              <option key={i.InsumoId} value={i.InsumoId}>
-                                {i.Nombre}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-2 px-4">
+                        <td className="py-2 px-2">
                           <input
                             type="number"
+                            min="1"
                             value={d.Cantidad ?? ""}
                             onChange={(e) => actualizarDetalleEditar(index, "Cantidad", e.target.value)}
                             className="w-full px-2 py-1 border rounded"
                           />
                         </td>
-                        <td className="py-2 px-4">
+                        <td className="py-2 px-2">
                           <input
                             type="number"
+                            min="0.01"
+                            step="0.01"
                             value={d.PrecioUnitario ?? ""}
                             onChange={(e) => actualizarDetalleEditar(index, "PrecioUnitario", e.target.value)}
                             className="w-full px-2 py-1 border rounded"
                           />
                         </td>
-                        <td className="py-2 px-4">
+                        <td className="py-2 px-2">
                           <input
-                            type="number"
+                            type="text"
                             readOnly
                             value={((d.Subtotal || 0)).toFixed(2)}
                             className="w-full px-2 py-1 border rounded bg-gray-100"
                           />
                         </td>
-                        <td className="py-2 px-4 text-center">
+                        <td className="py-2 px-2 text-center">
                           <Trash2
                             size={18}
                             className="text-red-600 cursor-pointer hover:text-red-800"
@@ -678,16 +737,14 @@ export const Compras = () => {
                 </table>
               </div>
             </div>
+
             <div className="bg-gray-50 p-4 rounded-lg mt-4">
               <div className="flex justify-between text-lg font-bold">
-                <span>Subtotal:</span>
-                <span>{selectedCompra.detalle?.reduce((sum, item) => sum + (item.Subtotal || 0), 0).toFixed(2)} US$</span>
-              </div>
-              <div className="flex justify-between text-xl font-bold mt-2">
                 <span>Total:</span>
                 <span>{Number(selectedCompra.Total || 0).toFixed(2)} US$</span>
               </div>
             </div>
+
             <div className="flex flex-col md:flex-row gap-4 mt-6">
               <button
                 type="button"
@@ -698,8 +755,8 @@ export const Compras = () => {
               </button>
               <button
                 type="button"
-                className="flex-1 h-11 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                 onClick={goToBackToList}
+                className="flex-1 h-11 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
               >
                 Cancelar
               </button>
@@ -707,17 +764,14 @@ export const Compras = () => {
           </div>
         )}
 
-        {/* === VER === */}
+        {/* VER */}
         {viewMode === "view" && selectedCompra && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
-              <button
-                onClick={goToBackToList}
-                className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"
-              >
+              <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
                 <ArrowLeft size={18} />
               </button>
-              <h3 className="text-lg font-bold">Ver compra #{selectedCompra.CompraId}</h3>
+              <h3 className="text-lg font-bold">Ver compra #{getShortId(selectedCompra.CompraId)}</h3>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg">
               <h4 className="font-semibold mb-4">Artículos de la Compra</h4>
@@ -727,6 +781,7 @@ export const Compras = () => {
                     <tr>
                       <th className="py-2 px-4">Descripción</th>
                       <th className="py-2 px-4">Tipo</th>
+                      <th className="py-2 px-4">Producto/Insumo</th>
                       <th className="py-2 px-4">Cantidad</th>
                       <th className="py-2 px-4">Precio Unit.</th>
                       <th className="py-2 px-4">Subtotal</th>
@@ -736,8 +791,13 @@ export const Compras = () => {
                     {selectedCompra.detalle?.map((d, index) => (
                       <tr key={index} className="border-t">
                         <td className="py-2 px-4">{d.Descripcion || "-"}</td>
+                        <td className="py-2 px-4">{d.TipoDetalle || "-"}</td>
                         <td className="py-2 px-4">
-                          <span className="px-2 py-1 bg-gray-200 rounded text-xs">{d.TipoDetalle || "-"}</span>
+                          {d.TipoDetalle === "Producto" && d.ProductoServicioId
+                            ? productos.find(p => p.ProductoServicioId === d.ProductoServicioId)?.Nombre || d.ProductoServicioId
+                            : d.TipoDetalle === "Insumo" && d.InsumoId
+                            ? insumos.find(i => i.InsumoId === d.InsumoId)?.Nombre || d.InsumoId
+                            : "-"}
                         </td>
                         <td className="py-2 px-4">{d.Cantidad || 0}</td>
                         <td className="py-2 px-4">{((d.PrecioUnitario || 0)).toFixed(2)} US$</td>
@@ -749,11 +809,7 @@ export const Compras = () => {
               </div>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg mt-4">
-              <div className="flex justify-between text-lg font-bold">
-                <span>Subtotal:</span>
-                <span>{selectedCompra.detalle?.reduce((sum, item) => sum + (item.Subtotal || 0), 0).toFixed(2)} US$</span>
-              </div>
-              <div className="flex justify-between text-xl font-bold mt-2">
+              <div className="flex justify-between text-xl font-bold">
                 <span>Total:</span>
                 <span>{Number(selectedCompra.Total || 0).toFixed(2)} US$</span>
               </div>
@@ -761,8 +817,8 @@ export const Compras = () => {
             <div className="mt-6">
               <button
                 type="button"
-                className="w-full h-11 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                 onClick={goToBackToList}
+                className="w-full h-11 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
               >
                 Cerrar
               </button>

@@ -13,8 +13,7 @@ export const Diseño = () => {
   const [campoFiltro, setCampoFiltro] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [errorNombre, setErrorNombre] = useState("");
-  const [errorDescripcion, setErrorDescipcion] = useState("");
-
+  const [errorDescripcion, setErrorDescripcion] = useState(""); // Corregido nombre
 
   const [openCreate, setOpenCreate] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
@@ -41,6 +40,7 @@ export const Diseño = () => {
       setCategorias(data);
     } catch (err) {
       console.error("Error al cargar categorias:", err);
+      toast.error("Error al cargar las categorías");
     }
   };
 
@@ -48,38 +48,39 @@ export const Diseño = () => {
     const errores = {};
 
     if (!form.nombreCategoria.trim()) {
-      errores.nombreCategoria = "El nombre de la categoria es obligatorio";
-    }else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(form.nombreCategoria)) {
+      errores.nombreCategoria = "El nombre de la categoría es obligatorio";
+    } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(form.nombreCategoria)) {
       errores.nombreCategoria = "El nombre solo puede contener letras y espacios";
     }
 
-    if(!form.descripcion.trim()){
-      errores.descripcion = "La descripcion es obligatoria";
-    }else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s.,-]+$/.test(form.Descripcion)) {
-      errores.descripcion =
-      "La descripcion solo puede contener letras y signos basicos";
+    if (!form.descripcion.trim()) {
+      errores.descripcion = "La descripción es obligatoria";
+    } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s.,-]+$/.test(form.descripcion)) {
+      errores.descripcion = "La descripción solo puede contener letras y signos básicos";
     }
 
     return errores;
-  }
+  };
 
   const handleCreate = async () => {
-
-    const validaciones = validarFormularioCategoria(formCrear);
-    if(Object.keys(validaciones).length > 9) {
-      setErrores(validaciones)
+    const errores = validarFormularioCategoria(formCrear);
+    if (Object.keys(errores).length > 0) {
+      if (errores.nombreCategoria) setErrorNombre(errores.nombreCategoria);
+      if (errores.descripcion) setErrorDescripcion(errores.descripcion);
+      toast.error("Por favor corrige los errores del formulario");
       return;
     }
-    
+
     try {
       await axios.post("http://localhost:3000/api/categorias", formCrear);
-
-      toast.success("Categoría creada con éxito ");
+      toast.success("Categoría creada con éxito");
       fetchCategorias();
       setFormCrear({ nombreCategoria: "", descripcion: "" });
       setOpenCreate(false);
+      setErrorNombre("");
+      setErrorDescripcion("");
     } catch (error) {
-      toast.error("Error al crear la categoría ");
+      toast.error("Error al crear la categoría");
     }
   };
 
@@ -89,12 +90,11 @@ export const Diseño = () => {
         `http://localhost:3000/api/categorias/${selectedCategoria.CategoriaId}`,
         formEditar
       );
-
-      toast.success("Categoría actualizada con éxito ");
+      toast.success("Categoría actualizada con éxito");
       fetchCategorias();
       setOpenEditar(false);
     } catch (error) {
-      toast.error("Error al actualizar la categoría ");
+      toast.error("Error al actualizar la categoría");
     }
   };
 
@@ -103,10 +103,11 @@ export const Diseño = () => {
       await axios.delete(
         `http://localhost:3000/api/categorias/${selectedCategoria.CategoriaId}`
       );
+      toast.success("Categoría eliminada con éxito");
       setOpenEliminar(false);
       fetchCategorias();
     } catch (err) {
-      toast.error("Error al eliminar la categoria:", err);
+      toast.error("Error al eliminar la categoría");
     }
   };
 
@@ -119,44 +120,42 @@ export const Diseño = () => {
     setOpenEditar(true);
   };
 
-
-  const categoriasFiltradas = categorias.filter((c) =>  {
+  const categoriasFiltradas = categorias.filter((c) => {
     if (!busqueda) return true;
     if (campoFiltro === "id") {
-      return c.CategoriaId.toString().includes(busqueda); 
+      return c.CategoriaId.toString().includes(busqueda);
     }
-
     if (campoFiltro === "nombre") {
       return c.Nombre.toLowerCase().includes(busqueda.toLowerCase());
     }
-
     return (
       c.CategoriaId.toString().includes(busqueda) ||
-      c.Nombre.toLowerCase().includes(busqueda.toLowerCase))
-  
-  })
+      c.Nombre.toLowerCase().includes(busqueda.toLowerCase())
+    );
+  });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-6">
-            Gestión  diseño
+            Gestión diseño
           </h1>
 
           {/* botón crear */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 ">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <Link
+              <button
                 onClick={() => setOpenCreate(true)}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald"
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all"
               >
                 <Plus size={18} /> Nuevo diseño
-              </Link>
+              </button>
 
-              <select value={campoFiltro}
-              onChange={(e) => setCampoFiltro(e.target.value)}
-              className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-blue-500  focus:border-transparent transition-all duration-200 min-w-[140px]"
+              <select
+                value={campoFiltro}
+                onChange={(e) => setCampoFiltro(e.target.value)}
+                className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 min-w-[140px]"
               >
                 <option value="">Filtrar por campo</option>
                 <option value="id">ID</option>
@@ -170,7 +169,7 @@ export const Diseño = () => {
                   placeholder="Buscar diseño"
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
-                  className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-700"
+                  className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white text-slate-700"
                 />
               </div>
             </div>
@@ -188,7 +187,7 @@ export const Diseño = () => {
                     Nombre diseño
                   </th>
                   <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
-                    Descripcion
+                    Descripción
                   </th>
                   <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
                     Acciones
@@ -199,10 +198,10 @@ export const Diseño = () => {
                 {categoriasFiltradas.map((c) => (
                   <tr
                     key={c.CategoriaId}
-                    className="hover:bg-slate-50 transition-colors duration-150 "
+                    className="hover:bg-slate-50 transition-colors duration-150"
                   >
                     <td className="py-4 px-6 text-sm font-medium text-slate-900">
-                      {c.CategoriaId}
+                      {c.CategoriaId?.toString().substring(0, 3)} {/* 👈 SOLO 3 PRIMEROS CARACTERES */}
                     </td>
                     <td className="py-4 px-6 text-sm font-medium text-slate-900">
                       {c.Nombre}
@@ -212,13 +211,13 @@ export const Diseño = () => {
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex gap-2">
-                        <Link
+                        <button
                           onClick={() => openEditarModal(c)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-150"
                         >
                           <Edit size={16} />
-                        </Link>
-                        <Link
+                        </button>
+                        <button
                           onClick={() => {
                             setSelectedCategoria(c);
                             setOpenVer(true);
@@ -226,8 +225,8 @@ export const Diseño = () => {
                           className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors duration-150"
                         >
                           <Eye size={16} />
-                        </Link>
-                        <Link
+                        </button>
+                        <button
                           onClick={() => {
                             setSelectedCategoria(c);
                             setOpenEliminar(true);
@@ -235,7 +234,7 @@ export const Diseño = () => {
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-150"
                         >
                           <Trash2 size={16} />
-                        </Link>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -250,48 +249,49 @@ export const Diseño = () => {
               <h3 className="text-lg font-black text-gray-800 mb-6">
                 Nuevo diseño
               </h3>
-              <form className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+              <form className="grid grid-cols-1 gap-6 text-left">
                 <div className="flex flex-col">
-                  <label>Nombre diseño</label>
+                  <label className="mb-1 text-sm font-medium text-gray-700">
+                    Nombre diseño
+                  </label>
                   <input
-                    placeholder="Ingrese la categoria"
+                    placeholder="Ingrese el nombre del diseño"
                     value={formCrear.nombreCategoria}
                     className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) => {
                       const valor = e.target.value;
-                      setFormCrear({ ...formCrear, nombreCategoria: e.target.value, });
-                      const regex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]*$/;
-                      if(!regex.test(valor)) {
+                      setFormCrear({ ...formCrear, nombreCategoria: valor });
+                      if (!valor.trim()) {
+                        setErrorNombre("El nombre es obligatorio");
+                      } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]*$/.test(valor)) {
                         setErrorNombre("El nombre solo puede contener letras y espacios");
-                      }else if (valor.trim() === "") {
-                        setErrorNombre("El nombre es obligatorio")
-                      }else {
-                        setErrorNombre("")
+                      } else {
+                        setErrorNombre("");
                       }
                     }}
-                  />  
-                  {errorNombre  && (
+                  />
+                  {errorNombre && (
                     <p className="text-red-500 text-sm mt-1">{errorNombre}</p>
                   )}
                 </div>
                 <div className="flex flex-col">
-                  <label>Descripcion</label>
+                  <label className="mb-1 text-sm font-medium text-gray-700">
+                    Descripción
+                  </label>
                   <input
-                    placeholder="Ingrese descripcion"
+                    placeholder="Ingrese la descripción"
                     value={formCrear.descripcion}
                     className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) => {
                       const valor = e.target.value;
-                      setFormCrear({ ...formCrear, descripcion: e.target.value, });
-                      const regex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]*$/;
-                      if(!regex.test(valor)) {
-                        setErrorDescipcion("la descripcion solo puede contener letras y espacios");
-                      }else if (valor.trim() === "") {
-                        setErrorDescipcion("la descipcion es obligatorio")
-                      }else {
-                        setErrorDescipcion("")
+                      setFormCrear({ ...formCrear, descripcion: valor });
+                      if (!valor.trim()) {
+                        setErrorDescripcion("La descripción es obligatoria");
+                      } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s.,-]*$/.test(valor)) {
+                        setErrorDescripcion("La descripción solo puede contener letras y signos básicos");
+                      } else {
+                        setErrorDescripcion("");
                       }
-
                     }}
                   />
                   {errorDescripcion && (
@@ -324,11 +324,13 @@ export const Diseño = () => {
               <h3 className="text-lg font-black text-gray-800 mb-6">
                 Editar diseño
               </h3>
-              <form className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+              <form className="grid grid-cols-1 gap-6 text-left">
                 <div className="flex flex-col">
-                  <label>Nombre categoria</label>
+                  <label className="mb-1 text-sm font-medium text-gray-700">
+                    Nombre diseño
+                  </label>
                   <input
-                    placeholder="Ingrese la categoria"
+                    placeholder="Ingrese el nombre del diseño"
                     value={formEditar.nombreCategoria}
                     className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) =>
@@ -340,11 +342,13 @@ export const Diseño = () => {
                   />
                 </div>
                 <div className="flex flex-col">
-                  <label>Descripcion</label>
+                  <label className="mb-1 text-sm font-medium text-gray-700">
+                    Descripción
+                  </label>
                   <input
-                    placeholder="Ingrese descripcion"
+                    placeholder="Ingrese la descripción"
                     value={formEditar.descripcion}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg  focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) =>
                       setFormEditar({
                         ...formEditar,
@@ -383,7 +387,7 @@ export const Diseño = () => {
                 <div className="text-left space-y-2">
                   <p>ID: {selectedCategoria.CategoriaId}</p>
                   <p>Nombre: {selectedCategoria.Nombre}</p>
-                  <p>Descripcion: {selectedCategoria.Descripcion}</p>
+                  <p>Descripción: {selectedCategoria.Descripcion}</p>
                 </div>
               )}
               <button
@@ -397,7 +401,7 @@ export const Diseño = () => {
 
           {/* Modal Eliminar */}
           <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
-            <div className="w-[400px] p-6 mx-auto text-center ">
+            <div className="w-[400px] p-6 mx-auto text-center">
               <h3 className="text-lg font-black text-gray-800 mb-4">
                 Eliminar diseño
               </h3>
