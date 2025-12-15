@@ -106,19 +106,27 @@ export const Routers = () => {
           <Route path="roles" element={<Roles />} />
           <Route path="insumos" element={<Insumos />} />
           <Route path="proveedores" element={<Proveedores />} />
+
           <Route path="productoServicio" element={<ProductoServicios />} />
+          <Route path="productoServicio/nuevo" element={<ProductoServicios />} />
+          <Route path="productoServicio/:id" element={<ProductoServicios />} />
+          <Route path="productoServicio/:id/editar" element={<ProductoServicios />} />
+
           <Route path="diseño" element={<Diseño />} />
           <Route path="categoriaDeDiseño" element={<Diseño />} />
           <Route path="agenda" element={<Agenda />} />
           <Route path="ventas" element={<Ventas />} />
+
           <Route path="pedidosClientes" element={<PedidosClientes />} />
           <Route path="pedidosClientes/nuevo" element={<PedidosClientes />} />
           <Route path="pedidosClientes/:id" element={<PedidosClientes />} />
           <Route path="pedidosClientes/:id/editar" element={<PedidosClientes />} />
+
           <Route path="compras" element={<Compras />} />
           <Route path="compras/nueva" element={<Compras />} />
           <Route path="compras/:id" element={<Compras />} />
           <Route path="compras/:id/editar" element={<Compras />} />
+
           <Route path="produccion" element={<Produccion />} />
           <Route path="produccion/nuevo" element={<Produccion />} />
           <Route path="produccion/nuevo/seleccionar-pedido" element={<Produccion />} />
@@ -127,6 +135,7 @@ export const Routers = () => {
           <Route path="produccion/:id/editar" element={<Produccion />} />
           <Route path="produccion/:id/editar/seleccionar-pedido" element={<Produccion />} />
           <Route path="produccion/:id/editar/seleccionar-insumo/:detalleIndex" element={<Produccion />} />
+
           <Route path="ventas/nuevo" element={<Ventas />} />
           <Route path="ventas/:id" element={<Ventas />} />
           <Route path="ventas/:id/editar" element={<Ventas />} />

@@ -1,3 +1,4 @@
+// src/controllers/produccion.controller.js
 import {
   getAllProduccionModel,
   getProduccionByIdModel,
@@ -7,50 +8,47 @@ import {
 } from "../models/produccion.model.js";
 
 import {
-    createDetalleProduccionModel,
-    getDetalleProduccionByProduccionIdModel,
-    deleteDetalleProduccionModel
+  getDetalleProduccionByProduccionIdModel,
+  deleteDetalleProduccionModel as deleteDetalleModel
 } from "../models/detalleProduccion.model.js";
 
+import { v4 as uuidv4 } from "uuid";
+import connectDB from "../lib/db.js";
 
+// Obtener todas las producciones con sus detalles
 export const getProduccion = async (req, res) => {
-    try {
-        const produccion = await getAllProduccionModel();
+  try {
+    const produccion = await getAllProduccionModel();
 
-        for (let p of produccion) {
-            p.detalle = await getDetalleProduccionByProduccionIdModel(p.ProduccionId);
-        }
-
-        res.status(200).json(produccion);
-    } catch (error) {
-        console.error("Error al obtener pedidos:", error);
-        res.status(500).json({ error: "Error al la produccion" });
+    for (let p of produccion) {
+      p.detalle = await getDetalleProduccionByProduccionIdModel(p.ProduccionId);
     }
+
+    res.status(200).json(produccion);
+  } catch (error) {
+    console.error("Error al obtener producciones:", error);
+    res.status(500).json({ error: "Error al obtener producciones" });
+  }
 };
 
-/**
- * Obtener pedido por ID
- */
+// Obtener producción por ID
 export const getProduccionById = async (req, res) => {
-    try {
-        const produccion = await getProduccionByIdModel(req.params.id);
+  try {
+    const produccion = await getProduccionByIdModel(req.params.id);
 
-        if (!produccion) {
-            return res.status(404).json({ error: "Produccion no encontrada" });
-        }
-
-        produccion.detalle = await getDetalleProduccionByProduccionIdModel(req.params.id);
-
-        res.status(200).json(produccion);
-    } catch (error) {
-        console.error("Error al obtener produccion:", error);
-        res.status(500).json({ error: "Error al obtener produccion" });
+    if (!produccion) {
+      return res.status(404).json({ error: "Producción no encontrada" });
     }
+
+    produccion.detalle = await getDetalleProduccionByProduccionIdModel(req.params.id);
+    res.status(200).json(produccion);
+  } catch (error) {
+    console.error("Error al obtener producción:", error);
+    res.status(500).json({ error: "Error al obtener producción" });
+  }
 };
 
-/**
- * Crear pedido + detalles
- */
+// Crear producción + detalles (en una transacción idealmente)
 export const createProduccion = async (req, res) => {
   const { PedidoClienteId, Estado, FechaInicio, FechaFin, detalle } = req.body;
 
@@ -58,14 +56,14 @@ export const createProduccion = async (req, res) => {
     return res.status(400).json({ error: "PedidoClienteId y FechaInicio son requeridos" });
   }
 
-  const ProduccionId = uuidv4();
-
   let connection;
-
   try {
-    connection = await getConnection();
+    connection = await connectDB();
+    await connection.beginTransaction();
 
-    // Insertar master
+    const ProduccionId = uuidv4();
+
+    // Insertar producción
     await connection.execute(
       `INSERT INTO produccion (ProduccionId, PedidoClienteId, Estado, FechaInicio, FechaFin)
        VALUES (?, ?, ?, ?, ?)`,
@@ -75,67 +73,69 @@ export const createProduccion = async (req, res) => {
     // Insertar detalles
     if (Array.isArray(detalle)) {
       for (const d of detalle) {
-        if (!d.InsumoId) continue;
+        if (!d.InsumoId || !d.CantidadUsada) continue;
         await connection.execute(
-          `INSERT INTO detalle_produccion (ProduccionId, InsumoId, CantidadUsada)
-           VALUES (?, ?, ?)`,
-          [ProduccionId, d.InsumoId, Number(d.CantidadUsada) || 1]
+          `INSERT INTO detalleproduccion (DetalleProduccionId, ProduccionId, InsumoId, CantidadUsada)
+           VALUES (?, ?, ?, ?)`,
+          [uuidv4(), ProduccionId, d.InsumoId, Number(d.CantidadUsada)]
         );
       }
     }
 
+    await connection.commit();
     res.status(201).json({ message: "Producción creada correctamente", ProduccionId });
-
   } catch (error) {
+    if (connection) await connection.rollback();
     console.error("Error creando producción:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Error al crear producción" });
   } finally {
     if (connection) connection.release();
   }
 };
 
-/**
- * Actualizar pedido
- */
+// Actualizar producción
 export const updateProduccion = async (req, res) => {
+  try {
+    const result = await updateProduccionModel(req.params.id, req.body);
 
-    try {
-        const result = await updateProduccionModel(req.params.id, req.body);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: "Produccion no encontrada" });
-        }
-
-        const produccionActualizada = await getProduccionByIdModel(req.params.id);
-        produccionActualizada.detalle = await getDetalleProduccionByProduccionIdModel(req.params.id);
-
-        res.status(200).json(produccionActualizada);
-    } catch (error) {
-        console.error("Error al actualizar la produccion:", error);
-        res.status(500).json({ error: "Error al actualizar produccion" });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Producción no encontrada" });
     }
+
+    const produccionActualizada = await getProduccionByIdModel(req.params.id);
+    produccionActualizada.detalle = await getDetalleProduccionByProduccionIdModel(req.params.id);
+    res.status(200).json(produccionActualizada);
+  } catch (error) {
+    console.error("Error al actualizar producción:", error);
+    res.status(500).json({ error: "Error al actualizar producción" });
+  }
 };
 
-/**
- * Eliminar pedido + detalles
- */
+// Eliminar producción + detalles
 export const deleteProduccion = async (req, res) => {
-    try {
-        const detalles = await getDetalleProduccionByProduccionIdModel(req.params.id);
+  let connection;
+  try {
+    connection = await connectDB();
+    await connection.beginTransaction();
 
-        for (let d of detalles) {
-            await deleteDetalleProduccionModel(d.DetalleProduccionId);
-        }
+    // Eliminar detalles primero
+    await connection.execute("DELETE FROM detalleproduccion WHERE ProduccionId = ?", [req.params.id]);
 
-        const result = await deleteProduccionModel(req.params.id);
+    // Eliminar producción
+    const [result] = await connection.execute("DELETE FROM produccion WHERE ProduccionId = ?", [req.params.id]);
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: "Produccion no encontrada" });
-        }
-
-        res.status(204).send();
-    } catch (error) {
-        console.error("Error al eliminar produccion:", error);
-        res.status(500).json({ error: "Error al eliminar produccion" });
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: "Producción no encontrada" });
     }
+
+    await connection.commit();
+    res.status(204).send();
+  } catch (error) {
+    if (connection) await connection.rollback();
+    console.error("Error al eliminar producción:", error);
+    res.status(500).json({ error: "Error al eliminar producción" });
+  } finally {
+    if (connection) connection.release();
+  }
 };

@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import connectDB from '../lib/db.js';
-import { sendResetPasswordEmail  } from '../utils/email.js';
+import { sendResetPasswordEmail } from '../utils/email.js';
 import dayjs from "dayjs"; // para manejar expiraciones
 import crypto from "crypto";
 
@@ -64,7 +64,7 @@ export const createUser = async (req, res) => {
             // Enviar correo con link al frontend   
             await sendResetPasswordEmail(CorreoElectronico, resetToken);
 
-        } 
+        }
 
         res.status(201).json({ message: 'Usuario creado exitosamente' });
 
@@ -131,14 +131,14 @@ export const updateUser = async (req, res) => {
 
         const currentUser = rows[0];
 
-        // Crear objeto con campos actualizados
+        // Crear objeto con campos actualizados - IMPORTANTE: Incluir RoleId del body
         const updatedUser = {
             TipoDocumentoId: req.body.TipoDocumentoId ?? currentUser.TipoDocumentoId,
             NombreCompleto: req.body.NombreCompleto ?? currentUser.NombreCompleto,
             Telefono: req.body.Telefono ?? currentUser.Telefono,
             CorreoElectronico: req.body.CorreoElectronico ?? currentUser.CorreoElectronico,
             Direccion: req.body.Direccion ?? currentUser.Direccion,
-            RoleId: currentUser.RoleId // no se modifica
+            RoleId: req.body.RoleId ?? currentUser.RoleId // ← ESTA ES LA CORRECCIÓN IMPORTANTE
         };
 
         // Ejecutar update
@@ -150,12 +150,26 @@ export const updateUser = async (req, res) => {
                 updatedUser.Telefono,
                 updatedUser.CorreoElectronico,
                 updatedUser.Direccion,
-                updatedUser.RoleId,
+                updatedUser.RoleId, // ← Usar el RoleId actualizado
                 id
             ]
         );
 
-        res.status(200).json({ message: 'Usuario actualizado correctamente' });
+        // Obtener el usuario actualizado con información del rol
+        const [users] = await connection.execute(
+            `SELECT u.*, r.Nombre AS RolNombre 
+       FROM usuarios u 
+       LEFT JOIN roles r ON u.RoleId = r.RoleId 
+       WHERE u.CedulaId = ?`,
+            [id]
+        );
+
+        const userUpdated = users[0];
+
+        res.status(200).json({
+            message: 'Usuario actualizado correctamente',
+            user: userUpdated // ← Devolver el usuario actualizado
+        });
 
     } catch (error) {
         console.error('Error al actualizar usuario:', error);
@@ -163,21 +177,21 @@ export const updateUser = async (req, res) => {
     }
 };
 
-    // Eliminar usuario
+// Eliminar usuario
 export const deleteUser = async (req, res) => {
     const { id } = req.params;
     try {
         const connection = await connectDB();
-        
+
         // Verificar si el usuario tiene pedidos asociados
         const [pedidos] = await connection.execute(
             'SELECT * FROM pedidosclientes WHERE ClienteId = ?',
             [id]
         );
-        
+
         if (pedidos.length > 0) {
-            return res.status(409).json({ 
-                message: 'No se puede eliminar el usuario porque tiene pedidos asociados' 
+            return res.status(409).json({
+                message: 'No se puede eliminar el usuario porque tiene pedidos asociados'
             });
         }
 
@@ -295,56 +309,56 @@ export const buscarUsuarios = async (req, res) => {
 };
 
 export const resetPassword = async (req, res) => {
-  const { token } = req.params;
-  const { nuevaContrasena } = req.body; 
+    const { token } = req.params;
+    const { nuevaContrasena } = req.body;
 
-  if (!nuevaContrasena) {
-    return res.status(400).json({ message: "Debe proporcionar una nueva contraseña" });
-  }
+    if (!nuevaContrasena) {
+        return res.status(400).json({ message: "Debe proporcionar una nueva contraseña" });
+    }
 
-  try {
-    const connection = await connectDB();
-    const [users] = await connection.execute(
-      'SELECT * FROM usuarios WHERE resetToken = ? AND resetTokenExpire > ?',
-      [token, new Date()]
-    );
+    try {
+        const connection = await connectDB();
+        const [users] = await connection.execute(
+            'SELECT * FROM usuarios WHERE resetToken = ? AND resetTokenExpire > ?',
+            [token, new Date()]
+        );
 
-    if (users.length === 0) return res.status(400).json({ message: "Token inválido o expirado" });
+        if (users.length === 0) return res.status(400).json({ message: "Token inválido o expirado" });
 
-    const hash = await bcrypt.hash(nuevaContrasena, 10);
-    await connection.execute(
-      'UPDATE usuarios SET Contrasena = ?, resetToken = NULL, resetTokenExpire = NULL WHERE CedulaId = ?',
-      [hash, users[0].CedulaId]
-    );
+        const hash = await bcrypt.hash(nuevaContrasena, 10);
+        await connection.execute(
+            'UPDATE usuarios SET Contrasena = ?, resetToken = NULL, resetTokenExpire = NULL WHERE CedulaId = ?',
+            [hash, users[0].CedulaId]
+        );
 
-    res.status(200).json({ message: "Contraseña establecida correctamente" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Error interno del servidor" });
-  }
+        res.status(200).json({ message: "Contraseña establecida correctamente" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error interno del servidor" });
+    }
 };
 
 
 export const showResetForm = async (req, res) => {
-  const { token } = req.params;
+    const { token } = req.params;
 
-  try {
-    const connection = await connectDB();
-    const [users] = await connection.execute(
-      'SELECT * FROM usuarios WHERE resetToken = ? AND resetTokenExpire > ?',
-      [token, new Date()]
-    );
+    try {
+        const connection = await connectDB();
+        const [users] = await connection.execute(
+            'SELECT * FROM usuarios WHERE resetToken = ? AND resetTokenExpire > ?',
+            [token, new Date()]
+        );
 
-    if (users.length === 0) {
-      // Token inválido o expirado → puedes redirigir a una página de error en frontend
-      return res.redirect('http://localhost:3000/reset-password-invalid');
+        if (users.length === 0) {
+            // Token inválido o expirado → puedes redirigir a una página de error en frontend
+            return res.redirect('http://localhost:3000/reset-password-invalid');
+        }
+
+        // Redirigir al frontend pasando el token
+        // Por ejemplo, tu frontend React tendría una ruta /reset-password/:token
+        res.redirect(`http://localhost:3000/reset-password/${token}`);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Error interno del servidor');
     }
-
-    // Redirigir al frontend pasando el token
-    // Por ejemplo, tu frontend React tendría una ruta /reset-password/:token
-    res.redirect(`http://localhost:3000/reset-password/${token}`);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Error interno del servidor');
-  }
 };

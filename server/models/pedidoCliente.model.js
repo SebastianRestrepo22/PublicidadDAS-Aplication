@@ -15,7 +15,12 @@ export const getAllPedidosClientesModel = async (clienteId = null) => {
       u.NombreCompleto AS NombreCliente,  
       p.FechaRegistro,
       p.Total,
-      p.Estado
+      p.Estado,
+      p.metodo_pago,
+      p.voucher,
+      p.nombre_recibe,
+      p.telefono_entrega,
+      p.direccion_entrega
     FROM pedidosclientes p
     JOIN usuarios u ON p.ClienteId = u.CedulaId
   `;
@@ -50,7 +55,12 @@ export const getPedidoClienteByIdModel = async (pedidoId) => {
       u.NombreCompleto AS NombreCliente,
       p.FechaRegistro,
       p.Total,
-      p.Estado
+      p.Estado,
+      p.metodo_pago,
+      p.voucher,
+      p.nombre_recibe,
+      p.telefono_entrega,
+      p.direccion_entrega
     FROM pedidosclientes p
     JOIN usuarios u ON p.ClienteId = u.CedulaId
     WHERE p.PedidoClienteId = ?
@@ -64,21 +74,35 @@ export const createPedidoClienteModel = async ({
   ClienteId,
   FechaRegistro,
   Total,
+  metodo_pago = "transferencia",
+  voucher = null,
+  nombre_recibe = null,
+  telefono_entrega = null,
+  direccion_entrega = null,
 }) => {
   const connection = await connectDB();
   const PedidoClienteId = uuidv4();
 
-  // 1. Insertar el pedido
   await connection.execute(
     `
     INSERT INTO pedidosclientes 
-    (PedidoClienteId, ClienteId, FechaRegistro, Total, Estado)
-    VALUES (?, ?, ?, ?, ?)
+    (PedidoClienteId, ClienteId, FechaRegistro, Total, Estado, metodo_pago, voucher, nombre_recibe, telefono_entrega, direccion_entrega)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
-    [PedidoClienteId, ClienteId, FechaRegistro, Total, "pendiente"]
+    [
+      PedidoClienteId,
+      ClienteId,
+      FechaRegistro,
+      Total,
+      "pendiente",
+      metodo_pago,
+      voucher,
+      nombre_recibe,
+      telefono_entrega,
+      direccion_entrega
+    ]
   );
 
-  // 2. Obtener el pedido recién creado CON el nombre del cliente
   const [rows] = await connection.execute(
     `
     SELECT
@@ -87,7 +111,12 @@ export const createPedidoClienteModel = async ({
       u.NombreCompleto AS NombreCliente,
       p.FechaRegistro,
       p.Total,
-      p.Estado
+      p.Estado,
+      p.metodo_pago,
+      p.voucher,
+      p.nombre_recibe,
+      p.telefono_entrega,
+      p.direccion_entrega
     FROM pedidosclientes p
     JOIN usuarios u ON p.ClienteId = u.CedulaId
     WHERE p.PedidoClienteId = ?
@@ -100,19 +129,43 @@ export const createPedidoClienteModel = async ({
 
 export const updatePedidoClienteModel = async (id, data) => {
   const connection = await connectDB();
-  const { ClienteId, FechaRegistro, Total, Estado } = data;
+  const {
+    ClienteId,
+    FechaRegistro,
+    Total,
+    Estado,
+    metodo_pago,
+    voucher,
+    nombre_recibe,
+    telefono_entrega,
+    direccion_entrega
+  } = data;
 
   const [result] = await connection.execute(
     `
     UPDATE pedidosclientes
-    SET ClienteId = ?, FechaRegistro = ?, Total = ?, Estado = ?
-    WHERE PedidoClienteId = ? 
+    SET 
+      ClienteId = ?,
+      FechaRegistro = ?,
+      Total = ?,
+      Estado = ?,
+      metodo_pago = ?,
+      voucher = ?,
+      nombre_recibe = ?,
+      telefono_entrega = ?,
+      direccion_entrega = ?
+    WHERE PedidoClienteId = ?
     `,
     [
       sanitize(ClienteId),
       sanitize(FechaRegistro),
       sanitize(Total),
       sanitize(Estado),
+      sanitize(metodo_pago),
+      sanitize(voucher),
+      sanitize(nombre_recibe),
+      sanitize(telefono_entrega),
+      sanitize(direccion_entrega),
       id,
     ]
   );

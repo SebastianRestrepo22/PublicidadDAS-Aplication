@@ -86,11 +86,22 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Credenciales inválidas' });
         }
 
+        // En la función de login, después de verificar credenciales:
+        const [permisos] = await connection.execute(
+            `SELECT p.Nombre FROM permisos p
+   JOIN rol_permisos rp ON p.PermisoId = rp.PermisoId
+   WHERE rp.RoleId = ?`,
+            [user.RoleId]   
+        );
+
+        const permisosArray = permisos.map(p => p.Nombre);
+
         const token = jwt.sign(
             {
                 CedulaId: user.CedulaId,
                 RoleId: user.RoleId,
-                Role: user.RoleNombre
+                Role: user.RoleNombre,
+                Permisos: permisosArray // Agregar permisos al token
             },
             process.env.JWT_KEY,
             { expiresIn: '1h' }
@@ -206,84 +217,84 @@ import nodemailer from "nodemailer";
 
 // Solicitar recuperación de contraseña
 router.post('/forgot-password', async (req, res) => {
-  const { correo } = req.body;
+    const { correo } = req.body;
 
-  try {
-    const connection = await connectDB();
-    const [usuarios] = await connection.execute(
-      'SELECT * FROM usuarios WHERE CorreoElectronico = ?',
-      [correo]
-    );
+    try {
+        const connection = await connectDB();
+        const [usuarios] = await connection.execute(
+            'SELECT * FROM usuarios WHERE CorreoElectronico = ?',
+            [correo]
+        );
 
-    if (usuarios.length === 0) {
-      return res.status(404).json({ message: 'Correo no registrado' });
+        if (usuarios.length === 0) {
+            return res.status(404).json({ message: 'Correo no registrado' });
+        }
+
+        const user = usuarios[0];
+
+        // Crear token seguro
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const expire = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+
+        // Guardar token en BD
+        await connection.execute(
+            'UPDATE usuarios SET resetToken = ?, resetTokenExpire = ? WHERE CedulaId = ?',
+            [resetToken, expire, user.CedulaId]
+        );
+
+        // Enviar correo con enlace de recuperación
+        const transporter = nodemailer.createTransport({
+            service: 'gmail', // o el que uses
+            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+        });
+
+        const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
+
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: correo,
+            subject: 'Recuperar contraseña',
+            html: `<p>Haz click en este enlace para restablecer tu contraseña: <a href="${resetUrl}">Restablecer contraseña</a></p>`
+        });
+
+        res.status(200).json({ message: 'Correo enviado' });
+    } catch (error) {
+        console.error('Error en forgot-password:', error);
+        res.status(500).json({ message: 'Error interno del servidor' });
     }
-
-    const user = usuarios[0];
-
-    // Crear token seguro
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const expire = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
-
-    // Guardar token en BD
-    await connection.execute(
-      'UPDATE usuarios SET resetToken = ?, resetTokenExpire = ? WHERE CedulaId = ?',
-      [resetToken, expire, user.CedulaId]
-    );
-
-    // Enviar correo con enlace de recuperación
-    const transporter = nodemailer.createTransport({
-      service: 'gmail', // o el que uses
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-    });
-
-    const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: correo,
-      subject: 'Recuperar contraseña',
-      html: `<p>Haz click en este enlace para restablecer tu contraseña: <a href="${resetUrl}">Restablecer contraseña</a></p>`
-    });
-
-    res.status(200).json({ message: 'Correo enviado' });
-  } catch (error) {
-    console.error('Error en forgot-password:', error);
-    res.status(500).json({ message: 'Error interno del servidor' });
-  }
 });
 
 // Restablecer contraseña
 router.post('/reset-password/:token', async (req, res) => {
-  const { token } = req.params;
-  const { nuevaContrasena } = req.body;
+    const { token } = req.params;
+    const { nuevaContrasena } = req.body;
 
-  try {
-    const connection = await connectDB();
-    const [usuarios] = await connection.execute(
-      'SELECT * FROM usuarios WHERE resetToken = ? AND resetTokenExpire > NOW()',
-      [token]
-    );
+    try {
+        const connection = await connectDB();
+        const [usuarios] = await connection.execute(
+            'SELECT * FROM usuarios WHERE resetToken = ? AND resetTokenExpire > NOW()',
+            [token]
+        );
 
-    if (usuarios.length === 0) {
-      return res.status(400).json({ message: 'Token inválido o expirado' });
+        if (usuarios.length === 0) {
+            return res.status(400).json({ message: 'Token inválido o expirado' });
+        }
+
+        const user = usuarios[0];
+
+        const hash = await bcrypt.hash(nuevaContrasena, 10);
+
+        // Actualizar contraseña y eliminar token
+        await connection.execute(
+            'UPDATE usuarios SET Contrasena = ?, resetToken = NULL, resetTokenExpire = NULL WHERE CedulaId = ?',
+            [hash, user.CedulaId]
+        );
+
+        res.status(200).json({ message: 'Contraseña actualizada exitosamente' });
+    } catch (error) {
+        console.error('Error en reset-password:', error);
+        res.status(500).json({ message: 'Error interno del servidor' });
     }
-
-    const user = usuarios[0];
-
-    const hash = await bcrypt.hash(nuevaContrasena, 10);
-
-    // Actualizar contraseña y eliminar token
-    await connection.execute(
-      'UPDATE usuarios SET Contrasena = ?, resetToken = NULL, resetTokenExpire = NULL WHERE CedulaId = ?',
-      [hash, user.CedulaId]
-    );
-
-    res.status(200).json({ message: 'Contraseña actualizada exitosamente' });
-  } catch (error) {
-    console.error('Error en reset-password:', error);
-    res.status(500).json({ message: 'Error interno del servidor' });
-  }
 });
 
 

@@ -15,7 +15,7 @@ export const Login = () => {
 
   const [isLogin, setIsLogin] = useState(true);
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { login } = useAuth(); // CAMBIO: Usar login en lugar de setUser
 
   const [tiposDocumento, setTiposDocumento] = useState([]);
 
@@ -131,12 +131,12 @@ export const Login = () => {
           break;
       }
     }
-    
+
     setFieldErrors(prev => ({
       ...prev,
       [fieldName]: error
     }));
-    
+
     return !error;
   };
 
@@ -148,13 +148,13 @@ export const Login = () => {
     } else if (values.Contrasena !== value) {
       error = 'Las contraseñas no coinciden';
     }
-    
+
     setFieldErrors(prev => ({
       ...prev,
       ConfirmarContrasena: error
     }));
     setContrasenaError(error);
-    
+
     return !error;
   };
 
@@ -181,7 +181,7 @@ export const Login = () => {
   const handleChanges = (e) => {
     const { name, value } = e.target;
     setValues({ ...values, [name]: value });
-    
+
     // Limpiar error cuando el usuario empieza a escribir
     if (fieldErrors[name]) {
       setFieldErrors(prev => ({
@@ -191,70 +191,102 @@ export const Login = () => {
     }
   };
 
+  // En la función handleSubmit (líneas ~163-200):
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitted(true);
 
-    // Validar todos los campos antes de enviar
-    let isValid = true;
-    const newErrors = { ...fieldErrors };
+    // Validación campos obligatorios
+    const camposObligatorios = [
+      "CedulaId",
+      "TipoDocumentoId",
+      "NombreCompleto",
+      "Telefono",
+      "CorreoElectronico",
+      "Direccion",
+      openEditar ? "RoleId" : null
+    ].filter(Boolean);
 
-    // Validar campos del formulario principal
-    Object.keys(values).forEach(key => {
-      if (!validateField(key, values[key])) {
-        isValid = false;
-        newErrors[key] = fieldErrors[key] || 'Este campo es requerido';
-      }
-    });
+    const camposVacios = camposObligatorios.filter(campo => !values[campo] || !values[campo].trim());
 
-    // Validar confirmación de contraseña
-    if (!validateConfirmPassword(confirmarContrasena)) {
-      isValid = false;
-    }
-
-    setFieldErrors(newErrors);
-
-    if (!isValid) {
-      toast.error("Por favor, complete todos los campos correctamente");
+    if (camposVacios.length > 0) {
+      toast.warning(`Los siguientes campos son obligatorios: ${camposVacios.join(", ")}`);
       return;
     }
 
-    if (values.Contrasena !== confirmarContrasena) {
-      setContrasenaError("Las contraseñas no coinciden");
+    // Validaciones existentes de correo, cédula y teléfono
+    if (correoError || cedulaError || telefonoError) {
+      toast.warning("Corrige los errores antes de enviar");
       return;
     }
-
-    setContrasenaError("");
 
     try {
-      const response = await axios.post("http://localhost:3000/auth/register", values);
-      if (response.status === 201) {
-        toast.success("Registro exitoso");
-        setIsLogin(true);
-        setValues({
-          CedulaId: "",
-          NombreCompleto: "",
-          TipoDocumentoId: "",
-          Telefono: "",
-          CorreoElectronico: "",
-          Direccion: "",
-          Contrasena: "",
-        });
-        setConfirmarContrasena("");
-        // Limpiar errores después del registro exitoso
-        setFieldErrors({
-          NombreCompleto: '',
-          CorreoElectronico: '',
-          TipoDocumentoId: '',
-          CedulaId: '',
-          Direccion: '',
-          Telefono: '',
-          Contrasena: '',
-          ConfirmarContrasena: ''
-        });
+      if (editData) {
+        console.log("Datos a enviar para actualizar:", values); // Para debug
+
+        const response = await updateDatauser(editData.CedulaId, values);
+        console.log("Respuesta del servidor:", response.data); // Para debug
+
+        if (response.status === 200) {
+          toast.success("Usuario actualizado correctamente");
+
+          // Si el servidor devuelve el usuario actualizado, actualizarlo
+          if (response.data.user) {
+            // Actualizar editData con la respuesta del servidor
+            setEditData(response.data.user);
+
+            // Actualizar la lista completa de usuarios
+            const updatedList = await GetDataUser();
+
+            // ACTUALIZAR DATOS CON PAGINACIÓN 
+            setAllData(updatedList.data || []);
+            setTotalItems(updatedList.data?.length || 0);
+
+            // Actualizar también el estado user
+            setUser(updatedList.data || []);
+          } else {
+            // Si no viene en la respuesta, recargar toda la lista
+            const updatedList = await GetDataUser();
+            setAllData(updatedList.data || []);
+            setTotalItems(updatedList.data?.length || 0);
+            setUser(updatedList.data || []);
+          }
+
+          setOpenEditar(false);
+        }
+      } else {
+        const response = await postDataUsers(values);
+        if (response.status === 201) {
+          toast.success("Usuario creado correctamente");
+
+          // Refrescar lista completa
+          const updatedList = await GetDataUser();
+
+          // ACTUALIZAR DATOS CON PAGINACIÓN 
+          setAllData(updatedList.data || []);
+          setTotalItems(updatedList.data?.length || 0);
+          setUser(updatedList.data || []);
+
+          setOpenCreate(false);
+        }
       }
+
+      // Solo resetear si no hay errores
+      if (!correoError && !cedulaError && !telefonoError) {
+        resetForm();
+      }
+
     } catch (error) {
-      console.error("Error en registro:", error);
-      toast.error(error.response?.data?.message || "Error al registrar");
+      console.error("Error:", error);
+
+      // Manejo de errores específicos
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else if (error.message) {
+        toast.error(error.message);
+      } else {
+        toast.error("Error al procesar la solicitud");
+      }
     }
   };
 
@@ -273,15 +305,18 @@ export const Login = () => {
     try {
       const response = await axios.post("http://localhost:3000/auth/login", valuesLogin);
       const token = response.data.token;
-      localStorage.setItem("token", token);
+      const userData = response.data.user || {}; // Asegurarnos de obtener userData
 
+      // DEPURACIÓN: Ver qué contiene el token
+      console.log("Token recibido:", token);
       const decoded = jwtDecode(token);
+      console.log("Token decodificado:", decoded);
+      console.log("Permisos en el token:", decoded.Permisos);
 
-      // Guardamos en localStorage los datos base
-      localStorage.setItem("usuario", JSON.stringify(decoded));
+      // Usar la nueva función login del contexto
+      login(token, userData);
 
-      setUser(decoded);
-      
+      // Redirigir según el rol
       if (decoded.Role.toLowerCase() === "administrador") {
         navigate("/dashboard/graficosEstadisticos");
       } else if (decoded.Role.toLowerCase() === "cliente") {
@@ -296,11 +331,11 @@ export const Login = () => {
 
   // Determinar si un campo tiene error
   const hasError = (fieldName) => {
-    return fieldErrors[fieldName] || 
-           (fieldName === 'CorreoElectronico' && correoError) ||
-           (fieldName === 'CedulaId' && cedulaError) ||
-           (fieldName === 'Telefono' && telefonoError) ||
-           (fieldName === 'ConfirmarContrasena' && contrasenaError);
+    return fieldErrors[fieldName] ||
+      (fieldName === 'CorreoElectronico' && correoError) ||
+      (fieldName === 'CedulaId' && cedulaError) ||
+      (fieldName === 'Telefono' && telefonoError) ||
+      (fieldName === 'ConfirmarContrasena' && contrasenaError);
   };
 
   // Obtener mensaje de error combinado
@@ -339,7 +374,7 @@ export const Login = () => {
                     value={valuesLogin.CorreoElectronico}
                     name="CorreoElectronico"
                     onChange={handleChangesLogin}
-                  
+
                   />
                   <div className="relative">
                     <input
@@ -349,7 +384,7 @@ export const Login = () => {
                       value={valuesLogin.Contrasena}
                       name="Contrasena"
                       onChange={handleChangesLogin}
-                    
+
                     />
 
                     <button
@@ -408,7 +443,7 @@ export const Login = () => {
                           name="NombreCompleto"
                           onChange={handleChanges}
                           onBlur={(e) => handleFieldBlur('NombreCompleto', e.target.value)}
-                        
+
                         />
                         <p className="text-red-500 text-xs min-h-[16px] leading-none">
                           {getErrorMessage('NombreCompleto')}
@@ -428,7 +463,7 @@ export const Login = () => {
                             handleFieldBlur('CorreoElectronico', e.target.value);
                             handleCorreoBlur();
                           }}
-                        
+
                         />
                         <p className="text-red-500 text-xs min-h-[16px] leading-none">
                           {getErrorMessage('CorreoElectronico')}
@@ -443,7 +478,7 @@ export const Login = () => {
                           onChange={handleChanges}
                           onBlur={(e) => handleFieldBlur('TipoDocumentoId', e.target.value)}
                           className={`w-full border-2 rounded-xl p-2 bg-transparent focus:outline-none ${hasError('TipoDocumentoId') ? 'border-red-500' : 'border-gray-200 focus:border-violet-500'}`}
-                        
+
                         >
                           <option value="">Tipo de documento</option>
                           {tiposDocumento.map((tipo) => (
@@ -470,7 +505,7 @@ export const Login = () => {
                             handleFieldBlur('CedulaId', e.target.value);
                             handleCedulaBlur();
                           }}
-                        
+
                         />
                         <p className="text-red-500 text-xs min-h-[16px] leading-none">
                           {getErrorMessage('CedulaId')}
@@ -490,7 +525,7 @@ export const Login = () => {
                           name="Direccion"
                           onChange={handleChanges}
                           onBlur={(e) => handleFieldBlur('Direccion', e.target.value)}
-                        
+
                         />
                         <p className="text-red-500 text-xs min-h-[16px] leading-none">
                           {getErrorMessage('Direccion')}
@@ -510,7 +545,7 @@ export const Login = () => {
                             handleFieldBlur('Telefono', e.target.value);
                             handleTelefonoBlur();
                           }}
-                        
+
                         />
                         <p className="text-red-500 text-xs min-h-[16px] leading-none">
                           {getErrorMessage('Telefono')}
@@ -527,7 +562,7 @@ export const Login = () => {
                           name="Contrasena"
                           onChange={handleChanges}
                           onBlur={(e) => handleFieldBlur('Contrasena', e.target.value)}
-                        
+
                         />
                         <button
                           type="button"
@@ -557,7 +592,7 @@ export const Login = () => {
                             }
                           }}
                           onBlur={(e) => handleFieldBlur('ConfirmarContrasena', e.target.value)}
-                        
+
                         />
                         <button
                           type="button"

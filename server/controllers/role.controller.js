@@ -1,217 +1,356 @@
 import connectDB from '../lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
 
-  // Crear rol
-  export const createRole = async (req, res) => {
-    try {
-      const { Nombre, Estado = 'Activo' } = req.body;
+// Crear rol
+export const createRole = async (req, res) => {
+  try {
+    const { Nombre, Estado = 'Activo' } = req.body;
 
-      // Validación de campos vacíos
-      if (!Nombre || Nombre.trim() === '') {
-        return res.status(400).json({ message: 'El nombre del rol es obligatorio' });
-      }
-
-      const RoleId = uuidv4(); // Genera UUID manualmente
-
-      const connection = await connectDB();
-      await connection.execute(
-        'INSERT INTO roles (RoleId, Nombre, Estado) VALUES (?, ?, ?)',
-        [RoleId, Nombre, Estado]
-      );
-
-      res.status(201).json({
-        message: 'Rol creado correctamente',
-        role: { RoleId, Nombre, Estado }
-      });
-    } catch (error) {
-      console.error('Error al crear el rol:', error);
-
-      if (error.code === 'ER_DUP_ENTRY') {
-        return res.status(409).json({ message: 'El nombre del rol ya existe' });
-      }
-
-      res.status(500).json({ message: 'Error al crear el rol', error: error.message });
+    // Validación de campos vacíos
+    if (!Nombre || Nombre.trim() === '') {
+      return res.status(400).json({ message: 'El nombre del rol es obligatorio' });
     }
-  };
 
-  // Listar todos los roles
-  export const getAllRoles = async (req, res) => {
-    try {
-      const connection = await connectDB();
-      const [roles] = await connection.execute('SELECT * FROM roles');
-      res.status(200).json(roles);
-    } catch (error) {
-      res.status(500).json({ message: 'Error al obtener los roles', error: error.message });
+    const RoleId = uuidv4(); // Genera UUID manualmente
+
+    const connection = await connectDB();
+    await connection.execute(
+      'INSERT INTO roles (RoleId, Nombre, Estado) VALUES (?, ?, ?)',
+      [RoleId, Nombre, Estado]
+    );
+
+    res.status(201).json({
+      message: 'Rol creado correctamente',
+      role: { RoleId, Nombre, Estado }
+    });
+  } catch (error) {
+    console.error('Error al crear el rol:', error);
+
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'El nombre del rol ya existe' });
     }
-  };
 
-  // Obtener rol por ID
-  export const getRoleById = async (req, res) => {
-    try {
-      const { id } = req.params;
-      const connection = await connectDB();
-      const [roles] = await connection.execute('SELECT * FROM roles WHERE RoleId = ?', [id]);
+    res.status(500).json({ message: 'Error al crear el rol', error: error.message });
+  }
+};
 
-      if (roles.length === 0) return res.status(404).json({ message: 'Rol no encontrado' });
-      res.status(200).json(roles[0]);
-    } catch (error) {
-      res.status(500).json({ message: 'Error al obtener el rol', error: error.message });
-    }
-  };
+// Listar todos los roles
+export const getAllRoles = async (req, res) => {
+  try {
+    const connection = await connectDB();
+    const [roles] = await connection.execute('SELECT * FROM roles ORDER BY Nombre');
+    res.status(200).json(roles);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener los roles', error: error.message });
+  }
+};
 
-  // Actualizar rol
-  export const updateRole = async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { Nombre, Estado } = req.body;
-
-      if (!Nombre || Nombre.trim() === '') {
-        return res.status(400).json({ message: 'El nombre del rol no puede estar vacío' });
-      }
-
-      const connection = await connectDB();
-      const [result] = await connection.execute(
-        'UPDATE roles SET Nombre = ?, Estado = ? WHERE RoleId = ?',
-        [Nombre, Estado, id]
-      );
-
-      if (result.affectedRows === 0) return res.status(404).json({ message: 'Rol no encontrado' });
-
-      res.status(200).json({
-        message: 'Rol actualizado correctamente',
-        role: { RoleId: id, Nombre, Estado }
-      });
-    } catch (error) {
-      console.error('Error actualizando rol:', error);
-      res.status(500).json({ message: 'Error al actualizar el rol', error: error.message });
-    }
-  };
-
-  // Eliminar rol
-  export const deleteRole = async (req, res) => {
+// Obtener rol por ID
+export const getRoleById = async (req, res) => {
+  try {
     const { id } = req.params;
-    try {
-      const connection = await connectDB();
+    const connection = await connectDB();
+    const [roles] = await connection.execute('SELECT * FROM roles WHERE RoleId = ?', [id]);
 
-      // Verifica si hay usuarios asociados a este rol
-      const [users] = await connection.execute(
-        'SELECT * FROM usuarios WHERE RoleId = ?',
-        [id]
-      );
+    if (roles.length === 0) return res.status(404).json({ message: 'Rol no encontrado' });
+    res.status(200).json(roles[0]);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener el rol', error: error.message });
+  }
+};
 
-      if (users.length > 0) {
-        return res.status(400).json({
-          message: 'No se puede eliminar el rol porque tiene usuarios asociados'
-        });
-      }
-
-      // Si no hay usuarios, elimina el rol
-      await connection.execute('DELETE FROM roles WHERE RoleId = ?', [id]);
-      res.status(200).json({ message: 'Rol eliminado correctamente' });
-
-    } catch (error) {
-      console.error('Error al eliminar rol:', error);
-      res.status(500).json({ message: 'Error al eliminar rol' });
-    }
-  };
-
-
-  // Cambiar estado de un rol
-  export const changeState = async (req, res) => {
-    const { estado } = req.body;
+// Actualizar rol
+export const updateRole = async (req, res) => {
+  try {
     const { id } = req.params;
+    const { Nombre, Estado } = req.body;
 
-    try {
-      const connection = await connectDB();
-
-      // Verifica si hay usuarios asociados a este rol
-      const [users] = await connection.execute(
-        'SELECT * FROM usuarios WHERE RoleId = ?',
-        [id]
-      );
-
-      if (users.length > 0) {
-        return res.status(400).json({
-          message: 'No se puede cambiar el estado del rol porque tiene usuarios asociados'
-        });
-      }
-
-      // Si no hay usuarios, actualiza el estado
-      const [result] = await connection.execute(
-        'UPDATE roles SET Estado = ? WHERE RoleId = ?',
-        [estado, id]
-      );
-
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: 'Rol no encontrado' });
-      }
-
-      res.status(200).json({ message: 'Estado actualizado correctamente' });
-    } catch (error) {
-      console.error('Error al actualizar estado del rol:', error);
-      res.status(500).json({ message: 'Error interno del servidor', error: error.message });
+    if (!Nombre || Nombre.trim() === '') {
+      return res.status(400).json({ message: 'El nombre del rol no puede estar vacío' });
     }
+
+    const connection = await connectDB();
+    const [result] = await connection.execute(
+      'UPDATE roles SET Nombre = ?, Estado = ? WHERE RoleId = ?',
+      [Nombre, Estado, id]
+    );
+
+    if (result.affectedRows === 0) return res.status(404).json({ message: 'Rol no encontrado' });
+
+    res.status(200).json({
+      message: 'Rol actualizado correctamente',
+      role: { RoleId: id, Nombre, Estado }
+    });
+  } catch (error) {
+    console.error('Error actualizando rol:', error);
+    res.status(500).json({ message: 'Error al actualizar el rol', error: error.message });
+  }
+};
+
+// Eliminar rol
+export const deleteRole = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const connection = await connectDB();
+
+    // Verifica si hay usuarios asociados a este rol
+    const [users] = await connection.execute(
+      'SELECT * FROM usuarios WHERE RoleId = ?',
+      [id]
+    );
+
+    if (users.length > 0) {
+      return res.status(400).json({
+        message: 'No se puede eliminar el rol porque tiene usuarios asociados'
+      });
+    }
+
+    // Si no hay usuarios, elimina el rol
+    await connection.execute('DELETE FROM roles WHERE RoleId = ?', [id]);
+    res.status(200).json({ message: 'Rol eliminado correctamente' });
+
+  } catch (error) {
+    console.error('Error al eliminar rol:', error);
+    res.status(500).json({ message: 'Error al eliminar rol' });
+  }
+};
+
+// Cambiar estado de un rol
+export const changeState = async (req, res) => {
+  const { estado } = req.body;
+  const { id } = req.params;
+
+  try {
+    const connection = await connectDB();
+
+    // Verifica si hay usuarios asociados a este rol
+    const [users] = await connection.execute(
+      'SELECT * FROM usuarios WHERE RoleId = ?',
+      [id]
+    );
+
+    if (users.length > 0) {
+      return res.status(400).json({
+        message: 'No se puede cambiar el estado del rol porque tiene usuarios asociados'
+      });
+    }
+
+    // Si no hay usuarios, actualiza el estado
+    const [result] = await connection.execute(
+      'UPDATE roles SET Estado = ? WHERE RoleId = ?',
+      [estado, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Rol no encontrado' });
+    }
+
+    res.status(200).json({ message: 'Estado actualizado correctamente' });
+  } catch (error) {
+    console.error('Error al actualizar estado del rol:', error);
+    res.status(500).json({ message: 'Error interno del servidor', error: error.message });
+  }
+};
+
+// Validar si el rol ya existe
+export const validarRol = async (req, res) => {
+  const { rol } = req.query;
+
+  try {
+    const connection = await connectDB();
+    const [roles] = await connection.execute(
+      'SELECT * FROM roles WHERE Nombre = ?',
+      [rol]
+    );
+
+    res.status(200).json({ exists: roles.length > 0 });
+  } catch (error) {
+    console.error('Error en /validar-rol:', error);
+    res.status(500).json({ message: 'Error al validar rol' });
+  }
+};
+
+// Buscar roles
+export const buscarRoles = async (req, res) => {
+  const { campo, valor } = req.query;
+
+  const columnasPermitidas = {
+    id: 'RoleId',
+    nombre: 'Nombre',
+    estado: 'Estado',
   };
 
+  const columna = columnasPermitidas[campo];
+  if (!columna) {
+    return res.status(400).json({ message: 'Campo de búsqueda inválido' });
+  }
 
-  // Validar si el rol ya existe
-  export const validarRol = async (req, res) => {
-    const { rol } = req.query;
+  try {
+    const connection = await connectDB();
+    let query = "";
+    let params = [];
 
-    try {
-      const connection = await connectDB();
-      const [roles] = await connection.execute(
-        'SELECT * FROM roles WHERE Nombre = ?',
-        [rol]
+    if (columna === "Estado") {
+      // Comparación exacta para ENUM
+      query = `SELECT * FROM roles WHERE ${columna} = ?`;
+      // Normalizamos para mayúscula inicial
+      const valorNormalizado =
+        valor.toLowerCase() === "activo" ? "Activo" :
+        valor.toLowerCase() === "inactivo" ? "Inactivo" :
+        valor;
+      params = [valorNormalizado];
+    } else {
+      // Búsqueda flexible para otros campos
+      query = `SELECT * FROM roles WHERE ${columna} LIKE ?`;
+      params = [`%${valor}%`];
+    }
+
+    const [roles] = await connection.execute(query, params);
+    res.status(200).json(roles);
+  } catch (error) {
+    console.error("Error al buscar roles:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+// ========== NUEVAS FUNCIONES PARA PERMISOS ==========
+
+// Obtener todos los permisos disponibles
+export const getAllPermissions = async (req, res) => {
+  try {
+    const connection = await connectDB();
+    const [permisos] = await connection.execute(
+      'SELECT * FROM permisos ORDER BY Modulo, Nombre'
+    );
+    res.status(200).json(permisos);
+  } catch (error) {
+    console.error('Error al obtener permisos:', error);
+    res.status(500).json({ message: 'Error al obtener permisos', error: error.message });
+  }
+};
+
+// Obtener permisos de un rol específico
+export const getRolePermissions = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const connection = await connectDB();
+    
+    const [permisos] = await connection.execute(
+      `SELECT p.* FROM permisos p
+       JOIN rol_permisos rp ON p.PermisoId = rp.PermisoId
+       WHERE rp.RoleId = ?`,
+      [id]
+    );
+    
+    res.status(200).json(permisos);
+  } catch (error) {
+    console.error('Error al obtener permisos del rol:', error);
+    res.status(500).json({ message: 'Error al obtener permisos del rol', error: error.message });
+  }
+};
+
+// Actualizar permisos de un rol
+export const updateRolePermissions = async (req, res) => {
+  const { id } = req.params;
+  const { permisos } = req.body; // Array de PermisoId
+  
+  if (!Array.isArray(permisos)) {
+    return res.status(400).json({ message: 'Formato de permisos inválido' });
+  }
+
+  let connection;
+  try {
+    connection = await connectDB();
+    
+    // Iniciar transacción
+    await connection.beginTransaction();
+    
+    // Verificar que el rol existe
+    const [roles] = await connection.execute(
+      'SELECT * FROM roles WHERE RoleId = ?',
+      [id]
+    );
+    
+    if (roles.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ message: 'Rol no encontrado' });
+    }
+    
+    // Eliminar permisos actuales
+    await connection.execute('DELETE FROM rol_permisos WHERE RoleId = ?', [id]);
+    
+    // Insertar nuevos permisos si hay alguno
+    if (permisos.length > 0) {
+      // Verificar que los permisos existen
+      const placeholders = permisos.map(() => '?').join(',');
+      const [existentes] = await connection.execute(
+        `SELECT PermisoId FROM permisos WHERE PermisoId IN (${placeholders})`,
+        permisos
       );
-
-      res.status(200).json({ exists: roles.length > 0 });
-    } catch (error) {
-      console.error('Error en /validar-rol:', error);
-      res.status(500).json({ message: 'Error al validar rol' });
-    }
-  };
-
-  //Buscar roles
-
-  export const buscarRoles = async (req, res) => {
-    const { campo, valor } = req.query;
-
-    const columnasPermitidas = {
-      id: 'RoleId',
-      nombre: 'Nombre',
-      estado: 'Estado',
-    };
-
-    const columna = columnasPermitidas[campo];
-    if (!columna) {
-      return res.status(400).json({ message: 'Campo de búsqueda inválido' });
-    }
-
-    try {
-      const connection = await connectDB();
-      let query = "";
-      let params = [];
-
-      if (columna === "Estado") {
-        // Comparación exacta para ENUM
-        query = `SELECT * FROM roles WHERE ${columna} = ?`;
-        // Normalizamos para mayúscula inicial
-        const valorNormalizado =
-          valor.toLowerCase() === "activo" ? "Activo" :
-          valor.toLowerCase() === "inactivo" ? "Inactivo" :
-          valor;
-        params = [valorNormalizado];
-      } else {
-        // Búsqueda flexible para otros campos
-        query = `SELECT * FROM roles WHERE ${columna} LIKE ?`;
-        params = [`%${valor}%`];
+      
+      if (existentes.length !== permisos.length) {
+        await connection.rollback();
+        return res.status(400).json({ message: 'Algunos permisos no existen' });
       }
-
-      const [roles] = await connection.execute(query, params);
-      res.status(200).json(roles);
-    } catch (error) {
-      console.error("Error al buscar roles:", error);
-      res.status(500).json({ message: "Error interno del servidor" });
+      
+      // Insertar permisos
+      const values = permisos.map(permisoId => [id, permisoId]);
+      await connection.query(
+        'INSERT INTO rol_permisos (RoleId, PermisoId) VALUES ?',
+        [values]
+      );
     }
-  };
+    
+    await connection.commit();
+    res.status(200).json({ 
+      message: 'Permisos actualizados correctamente',
+      totalPermisos: permisos.length
+    });
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error('Error al actualizar permisos del rol:', error);
+    
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'Error de duplicación en permisos' });
+    }
+    
+    res.status(500).json({ message: 'Error al actualizar permisos', error: error.message });
+  }
+};
+
+// Obtener permisos por usuario (para login)
+export const getUserPermissions = async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    const connection = await connectDB();
+    
+    // Obtener rol del usuario
+    const [users] = await connection.execute(
+      'SELECT RoleId FROM usuarios WHERE CedulaId = ?',
+      [userId]
+    );
+    
+    if (users.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+    
+    const { RoleId } = users[0];
+    
+    // Obtener permisos del rol
+    const [permisos] = await connection.execute(
+      `SELECT p.PermisoId, p.Nombre, p.Modulo 
+       FROM permisos p
+       JOIN rol_permisos rp ON p.PermisoId = rp.PermisoId
+       WHERE rp.RoleId = ?`,
+      [RoleId]
+    );
+    
+    res.status(200).json(permisos);
+  } catch (error) {
+    console.error('Error al obtener permisos del usuario:', error);
+    res.status(500).json({ message: 'Error al obtener permisos', error: error.message });
+  }
+};

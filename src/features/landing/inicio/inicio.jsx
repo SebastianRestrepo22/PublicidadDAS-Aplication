@@ -31,12 +31,12 @@ export const Inicio = () => {
                     <div className="slide">
 
                         {[
-                            "/multimedia/carru2.jpg",
-                            "/multimedia/carru5-.jpg",
-                            "/multimedia/carru4.jpg",
-                            "/multimedia/carru6.jpeg",
-                            "/multimedia/carru8.png",
-                            "/multimedia/carru7.jpg"
+                            "/multimedia/carrusel1.jpg",
+                            "/multimedia/carrusel2.jpeg",
+                            "/multimedia/carrusel3.jpg",
+                            "/multimedia/carrusel4.jpg",
+                            "/multimedia/carrusel5.png",
+                            "/multimedia/carrusel6.png"
                         ].map((src, i) => (
                             <div
                                 key={i}
@@ -125,7 +125,7 @@ export const Inicio = () => {
 
                 {/* SECCIÓN PRODUCTOS */}
 
-                <section className="py-14 bg-gray-50">
+                {/* <section className="py-14 bg-gray-50">
                     <h2 className="text-3xl font-bold text-center mb-8">Lo más pedido</h2>
                     <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 px-6">
 
@@ -158,8 +158,7 @@ export const Inicio = () => {
 
                     </div>
                 </section>
-
-
+ */}
 
                 {/* SECCIÓN INFORMATIVA */}
                 <div>
@@ -188,7 +187,7 @@ export const Inicio = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 justify-items-center w-full">
 
                             <div className="bg-red-500 w-full h-[350px] sm:h-[400px]">
-                                <img src="/multimedia/espacio_1.jpg" className="w-full h-full object-cover" />
+                                <img src="/multimedia/espacio_1.png" className="w-full h-full object-cover" />
                             </div>
 
                             <div className="bg-[#25395C] flex flex-col justify-center items-center text-center px-6 py-10 h-[350px] sm:h-[400px] w-full">
@@ -260,11 +259,11 @@ export const Inicio = () => {
                             <div className="flex items-center space-x-4 mb-4">
                                 <img
                                     className="w-16 h-16 rounded-full object-cover"
-                                    src="https://media.istockphoto.com/id/1386479313/es/foto/feliz-mujer-de-negocios-afroamericana-millennial-posando-aislada-en-blanco.jpg"
-                                    alt="Andrés Restrepo"
+                                    src="https://www.dzoom.org.es/wp-content/uploads/2020/02/portada-foto-perfil-redes-sociales-consejos.jpg"
+                                    alt="Ana María Perez"
                                 />
                                 <div>
-                                    <h2 className="text-lg font-semibold text-gray-900">Andrés Restrepo</h2>
+                                    <h2 className="text-lg font-semibold text-gray-900">Ana María Perez</h2>
                                     <p className="text-sm text-gray-500">Cliente Satisfecho</p>
                                 </div>
                             </div>

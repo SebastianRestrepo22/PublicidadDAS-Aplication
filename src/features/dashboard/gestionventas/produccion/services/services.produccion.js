@@ -1,7 +1,6 @@
 // src/services/produccionService.js
 import axios from "axios";
 
-const API_BASE = 'http://localhost:3000/api';
 
 // === PRODUCCIÓN ===
 export const getAllProducciones = async () => {
@@ -24,16 +23,35 @@ export const getProduccionById = async (id) => {
   }
 };
 
+// Reemplaza la función createProduccion actual por esta:
 export const createProduccion = async (produccionData) => {
+  const { detalle = [], ...produccionSinDetalles } = produccionData;
+
   try {
-    const response = await axios.post(`${'http://localhost:3000/api'}/produccion`, produccionData);
-    return response.data;
+    // 1. Crear la producción sin detalles
+    const produccionResponse = await axios.post(`${'http://localhost:3000/api'}/produccion`, produccionSinDetalles);
+    const produccionCreada = produccionResponse.data;
+    const produccionId = produccionCreada.ProduccionId;
+
+    // 2. Si hay detalles, crearlos uno por uno
+    if (Array.isArray(detalle) && detalle.length > 0) {
+      const detallesPromises = detalle.map(item =>
+        axios.post(`${'http://localhost:3000/api'}/detalle-produccion`, {
+          ProduccionId: produccionId,
+          InsumoId: item.InsumoId,
+          CantidadUsada: item.CantidadUsada
+        })
+      );
+      await Promise.all(detallesPromises);
+    }
+
+    // 3. Devolver la producción completa (como se espera en el frontend)
+    return await getProduccionCompleta(produccionId);
   } catch (error) {
     console.error("Error creating producción:", error);
     throw error;
   }
 };
-
 export const updateProduccion = async (id, produccionData) => {
   try {
     const response = await axios.put(`${'http://localhost:3000/api'}/produccion/${id}`, produccionData);

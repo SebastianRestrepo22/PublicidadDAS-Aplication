@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Search, Plus, Edit, Eye, Trash2 } from "lucide-react";
+import { Search, Plus, Edit, Eye, Trash2, Shield } from "lucide-react";
 import Modal from "../components/modals/modal.jsx";
-import { buscarRoles, deleteDataRol, GetDataRoles, postDataRoles, updateDataRol } from './services/services.role';
+import { buscarRoles, deleteDataRol, GetDataRoles, postDataRoles, updateDataRol, getPermissions, getRolePermissions, updateRolePermissions } from './services/services.role';
 import axios from "axios";
 
 //importamos toastify
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
+import { Pagination } from "../components/paginacion/pagination.jsx";
 
 function Toggle({ checked = false, onChange }) {
   return (
@@ -25,36 +25,82 @@ function Toggle({ checked = false, onChange }) {
 }
 
 export const Roles = () => {
+  //Paginación
+  const [allData, setAllData] = useState([]);
+  const [paginatedData, setPaginatedData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
   const [roles, setRoles] = useState([]);
   const [formData, setFormData] = useState({ Nombre: "", Estado: true, description: "" });
   const [editData, setEditData] = useState(null);
+
+  // Nuevos estados para permisos
+  const [allPermissions, setAllPermissions] = useState([]);
+  const [selectedPermissions, setSelectedPermissions] = useState([]);
+  const [permissionsByModule, setPermissionsByModule] = useState({});
 
   const [openCreate, setOpenCreate] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
   const [openVer, setOpenVer] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
+  const [openPermissions, setOpenPermissions] = useState(false); // Nuevo modal para permisos
 
   const [filtroCampo, setFiltroCampo] = useState('');
   const [filtroValor, setFiltroValor] = useState('');
 
-  //Manejar los errores debajo del imput
+  // Manejar los errores debajo del imput
   const [submitted, setSubmitted] = useState(false);
+  const [rolError, setRolError] = useState('');
+  const [originalNombre, setOriginalNombre] = useState("");
 
+  // Cargar todos los permisos disponibles
   useEffect(() => {
-    if (filtroCampo && filtroValor) {
-      buscarRoles(filtroCampo, filtroValor).then(setRoles);
-    }
-  }, [filtroCampo, filtroValor]);
-
-  useEffect(() => {
-    const buscar = async () => {
-      if (filtroCampo && filtroValor) {
-        const resultados = await buscarRoles(filtroCampo, filtroValor);
-        setRoles(resultados);
+    const loadPermissions = async () => {
+      try {
+        const permisos = await getPermissions();
+        setAllPermissions(permisos);
+        
+        // Agrupar permisos por módulo
+        const grouped = permisos.reduce((acc, permiso) => {
+          const modulo = permiso.Modulo || 'General';
+          if (!acc[modulo]) acc[modulo] = [];
+          acc[modulo].push(permiso);
+          return acc;
+        }, {});
+        setPermissionsByModule(grouped);
+      } catch (error) {
+        console.error('Error cargando permisos:', error);
       }
     };
-    buscar();
-  }, [filtroCampo, filtroValor]);
+    loadPermissions();
+  }, []);
+
+  // Cargar permisos de un rol cuando se abre el modal de permisos
+  useEffect(() => {
+    const loadRolePermissions = async () => {
+      if (openPermissions && editData?.RoleId) {
+        try {
+          const permisos = await getRolePermissions(editData.RoleId);
+          const permisoIds = permisos.map(p => p.PermisoId);
+          setSelectedPermissions(permisoIds);
+        } catch (error) {
+          console.error('Error cargando permisos del rol:', error);
+          setSelectedPermissions([]);
+        }
+      }
+    };
+    loadRolePermissions();
+  }, [openPermissions, editData]);
+
+  // Función para paginar
+  const paginateData = (data) => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return data.slice(startIndex, endIndex);
+  };
 
   useEffect(() => {
     const cargarRoles = async () => {
@@ -66,7 +112,19 @@ export const Roles = () => {
           const todos = await GetDataRoles();
           resultados = todos?.data || [];
         }
-        setRoles(Array.isArray(resultados) ? resultados : []);
+        
+        setAllData(Array.isArray(resultados) ? resultados : []);
+        setTotalItems(Array.isArray(resultados) ? resultados.length : 0);
+
+        const totalPages = Math.ceil(resultados.length / itemsPerPage);
+        setTotalPages(totalPages > 0 ? totalPages : 1);
+
+        if (currentPage > totalPages && totalPages > 0) {
+          setCurrentPage(totalPages);
+        }
+
+        const paginatedData = paginateData(Array.isArray(resultados) ? resultados : []);
+        setPaginatedData(paginatedData);
       } catch (error) {
         console.error(error);
         setRoles([]);
@@ -75,8 +133,19 @@ export const Roles = () => {
     cargarRoles();
   }, [filtroCampo, filtroValor]);
 
-  const [rolError, setRolError] = useState('');
-  const [originalNombre, setOriginalNombre] = useState("");
+  useEffect(() => {
+    if (allData.length > 0) {
+      const totalPages = Math.ceil(allData.length / itemsPerPage);
+      setTotalPages(totalPages > 0 ? totalPages : 1);
+
+      if (currentPage > totalPages && totalPages > 0) {
+        setCurrentPage(totalPages);
+      }
+
+      const paginatedData = paginateData(allData);
+      setPaginatedData(paginatedData);
+    }
+  }, [itemsPerPage, currentPage, allData]);
 
   const handleRolBlur = async () => {
     if (formData.Nombre === originalNombre) return;
@@ -94,18 +163,6 @@ export const Roles = () => {
     }
   };
 
-  useEffect(() => {
-    const fetchRoles = async () => {
-      const data = await GetDataRoles();
-      if (Array.isArray(data?.data)) {
-        setRoles(data.data);
-      } else {
-        setRoles([]);
-      }
-    };
-    fetchRoles();
-  }, []);
-
   const changeData = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
@@ -118,12 +175,9 @@ export const Roles = () => {
       });
       toast.success(response.data.message);
 
-      // Refrescar los roles para que el estado visual sea consistente
       const updatedList = await GetDataRoles();
       setRoles(updatedList.data);
-
     } catch (error) {
-      // Si falla, volver a cargar la lista para restaurar el estado anterior
       const updatedList = await GetDataRoles();
       setRoles(updatedList.data);
 
@@ -135,59 +189,108 @@ export const Roles = () => {
     }
   };
 
+  const handlePermissionToggle = (permisoId) => {
+    setSelectedPermissions(prev => {
+      if (prev.includes(permisoId)) {
+        return prev.filter(id => id !== permisoId);
+      } else {
+        return [...prev, permisoId];
+      }
+    });
+  };
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
-  setSubmitted(true);
+  const handleSelectAllModule = (module) => {
+    const modulePermisos = permissionsByModule[module];
+    const allModuleIds = modulePermisos.map(p => p.PermisoId);
+    
+    // Verificar si ya están todos seleccionados
+    const allSelected = allModuleIds.every(id => selectedPermissions.includes(id));
+    
+    if (allSelected) {
+      // Deseleccionar todos
+      setSelectedPermissions(prev => prev.filter(id => !allModuleIds.includes(id)));
+    } else {
+      // Seleccionar todos los que no están
+      const newSelected = [...selectedPermissions];
+      allModuleIds.forEach(id => {
+        if (!newSelected.includes(id)) {
+          newSelected.push(id);
+        }
+      });
+      setSelectedPermissions(newSelected);
+    }
+  };
 
-  if (!formData.Nombre || !formData.Nombre.trim()) {
-    setRolError('El nombre no puede ir vacío');
-    return;
-  }
+  const handleSavePermissions = async () => {
+    try {
+      await updateRolePermissions(editData.RoleId, selectedPermissions);
+      toast.success('Permisos actualizados correctamente');
+      setOpenPermissions(false);
+    } catch (error) {
+      toast.error('Error al actualizar permisos');
+      console.error(error);
+    }
+  };
 
-  try {
-    const validarRes = await axios.get(
-      `http://localhost:3000/roles/validar-rol?rol=${encodeURIComponent(formData.Nombre.trim())}`
-    );
-    const exists = validarRes.data?.exists;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitted(true);
 
-    if (exists && (!editData || formData.Nombre.trim() !== (originalNombre || "").trim())) {
-      setRolError('Este rol ya está registrado');
-      toast.warning('Ya existe un rol con ese nombre');
+    if (!formData.Nombre || !formData.Nombre.trim()) {
+      setRolError('El nombre no puede ir vacío');
       return;
     }
 
-    //Convertir el booleano a texto válido para el ENUM
-    const estadoValido = formData.Estado === true ? "Activo" : "Inactivo";
+    try {
+      const validarRes = await axios.get(
+        `http://localhost:3000/roles/validar-rol?rol=${encodeURIComponent(formData.Nombre.trim())}`
+      );
+      const exists = validarRes.data?.exists;
 
-    let response;
-    if (editData && editData.RoleId) {
-      response = await updateDataRol(editData.RoleId, { ...formData, Estado: estadoValido });
-    } else {
-      response = await postDataRoles({ ...formData, Estado: estadoValido });
+      if (exists && (!editData || formData.Nombre.trim() !== (originalNombre || "").trim())) {
+        setRolError('Este rol ya está registrado');
+        toast.warning('Ya existe un rol con ese nombre');
+        return;
+      }
+
+      const estadoValido = formData.Estado === true ? "Activo" : "Inactivo";
+
+      let response;
+      if (editData && editData.RoleId) {
+        response = await updateDataRol(editData.RoleId, { ...formData, Estado: estadoValido });
+      } else {
+        response = await postDataRoles({ ...formData, Estado: estadoValido });
+      }
+
+      if (response && (response.status === 200 || response.status === 201)) {
+        const updatedList = await GetDataRoles();
+        setAllData(updatedList.data || []);
+        setTotalItems(updatedList.data?.length || 0);
+        toast.success(editData ? "Rol actualizado correctamente" : "Rol creado correctamente");
+        handleCloseModal();
+      } else {
+        toast.error("Error al guardar el rol");
+      }
+    } catch (error) {
+      console.error("Error en handleSubmit:", error);
+      const serverMessage = error?.response?.data?.message;
+      if (serverMessage) {
+        setRolError(serverMessage);
+        toast.warning(serverMessage);
+      } else {
+        toast.error("Error al procesar la solicitud");
+      }
     }
+  };
 
-    if (response && (response.status === 200 || response.status === 201)) {
-      const updatedList = await GetDataRoles();
-      setRoles(updatedList.data || []);
-      toast.success(editData ? "Rol actualizado correctamente" : "Rol creado correctamente");
-      handleCloseModal();
-    } else {
-      toast.error("Error al guardar el rol");
-    }
-  } catch (error) {
-    console.error("Error en handleSubmit:", error);
-    const serverMessage = error?.response?.data?.message;
-    if (serverMessage) {
-      setRolError(serverMessage);
-      toast.warning(serverMessage);
-    } else {
-      toast.error("Error al procesar la solicitud");
-    }
-  }
-};
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
 
-
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
 
   const handleEditClick = (rol) => {
     setEditData(rol);
@@ -197,6 +300,10 @@ export const Roles = () => {
     setOpenEditar(true);
   };
 
+  const handlePermissionsClick = (rol) => {
+    setEditData(rol);
+    setOpenPermissions(true);
+  };
 
   const handleViewClick = (rol) => {
     setEditData(rol);
@@ -229,13 +336,14 @@ export const Roles = () => {
     setOpenCreate(false);
     setOpenEditar(false);
     setOpenVer(false);
+    setOpenPermissions(false);
     setFormData({ Nombre: "", description: "", Estado: true });
     setEditData(null);
+    setSelectedPermissions([]);
     setRolError('');
-    setSubmitted(false); //RESETEA el estado de validación
+    setSubmitted(false);
   };
 
-  //También se peude resetear automáticamente cuando el modal se abre
   useEffect(() => {
     if (openCreate || openEditar) {
       setSubmitted(false);
@@ -273,20 +381,78 @@ export const Roles = () => {
           <button
             type="button"
             className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-            onClick={() => {
-              setOpenCreate(false);
-              setOpenEditar(false);
-              setOpenVer(false);
-              setFormData({ Nombre: "", description: "" });
-              setEditData(null);
-              setRolError('');
-              handleCloseModal();
-            }}
+            onClick={handleCloseModal}
           >
             Cancelar
           </button>
         </div>
       </form>
+    );
+  };
+
+  const renderPermissionsModal = () => {
+    if (!editData) return null;
+
+    return (
+      <div className="text-left">
+        <h4 className="font-semibold mb-4">Asignar permisos a: <span className="text-blue-600">{editData.Nombre}</span></h4>
+        
+        <div className="max-h-96 overflow-y-auto pr-2">
+          {Object.keys(permissionsByModule).map((modulo) => (
+            <div key={modulo} className="mb-6">
+              <div className="flex items-center justify-between mb-2 p-2 bg-gray-50 rounded">
+                <h5 className="font-medium text-gray-700">{modulo}</h5>
+                <button
+                  type="button"
+                  onClick={() => handleSelectAllModule(modulo)}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  {permissionsByModule[modulo].every(p => selectedPermissions.includes(p.PermisoId)) 
+                    ? 'Deseleccionar todos' 
+                    : 'Seleccionar todos'}
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
+                {permissionsByModule[modulo].map((permiso) => (
+                  <div key={permiso.PermisoId} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id={`permiso-${permiso.PermisoId}`}
+                      checked={selectedPermissions.includes(permiso.PermisoId)}
+                      onChange={() => handlePermissionToggle(permiso.PermisoId)}
+                      className="h-4 w-4 text-blue-600 rounded"
+                    />
+                    <label htmlFor={`permiso-${permiso.PermisoId}`} className="ml-2 text-sm">
+                      {permiso.Nombre}
+                      {permiso.Descripcion && (
+                        <span className="block text-xs text-gray-500">{permiso.Descripcion}</span>
+                      )}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 pt-4 border-t border-gray-200 flex gap-3">
+          <button
+            type="button"
+            className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={handleSavePermissions}
+          >
+            Guardar Permisos
+          </button>
+          <button
+            type="button"
+            className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+            onClick={() => setOpenPermissions(false)}
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
     );
   };
 
@@ -333,17 +499,6 @@ export const Roles = () => {
                 <Plus size={18} /> Nuevo rol
               </Link>
 
-              <select
-                value={filtroCampo}
-                onChange={(e) => setFiltroCampo(e.target.value)}
-                className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[140px]">
-                <option value="">Filtrar por campo</option>
-                <option value="nombre">Nombre</option>
-                <option value="estado">Estado</option>
-              </select>
-
-
-              {/* Campo de búsqueda o selección de estado */}
               {filtroCampo === "estado" ? (
                 <select
                   value={filtroValor}
@@ -366,6 +521,15 @@ export const Roles = () => {
                   />
                 </div>
               )}
+
+              <select
+                value={filtroCampo}
+                onChange={(e) => setFiltroCampo(e.target.value)}
+                className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[140px]">
+                <option value="">Filtrar por campo</option>
+                <option value="nombre">Nombre</option>
+                <option value="estado">Estado</option>
+              </select>
             </div>
           </div>
 
@@ -391,6 +555,13 @@ export const Roles = () => {
             </div>
           </Modal>
 
+          <Modal open={openPermissions} onClose={() => setOpenPermissions(false)}>
+            <div className="w-[600px] max-h-[80vh] p-6 mx-auto text-center">
+              <h3 className="text-lg font-black text-gray-800 mb-6">Gestión de Permisos</h3>
+              {renderPermissionsModal()}
+            </div>
+          </Modal>
+
           <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
             <div className="w-[400px] p-6 mx-auto text-center">
               <h3 className="text-lg font-black text-gray-800 mb-4">Eliminar rol</h3>
@@ -407,56 +578,70 @@ export const Roles = () => {
           </Modal>
 
           {/* Tabla */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
-                <tr>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">ID</th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Nombre</th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Estado</th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {roles.length > 0 ? (
-                  roles.map((rol) => (
-                    <tr key={rol.RoleId} className="hover:bg-slate-50 transition-colors duration-150">
-                      <td className="py-4 px-6 text-sm text-slate-900">{String(rol.RoleId).slice(0, 8)}</td>
-                      <td className="py-4 px-6 text-sm text-slate-900">{rol.Nombre}</td>
-                      <td className="flex justify-center py-4 px-6 text-sm text-slate-900">
-                        <Toggle
-                          checked={rol.Estado === "Activo"}
-                          onChange={(value) => handleToggleEstado(rol.RoleId, value ? "Activo" : "Inactivo")}
-                        />
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex justify-center gap-2">
-                          <Link onClick={() => handleEditClick(rol)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
-                            <Edit size={16} />
-                          </Link>
-                          <Link onClick={() => handleViewClick(rol)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg">
-                            <Eye size={16} />
-                          </Link>
-                          <Link onClick={() => handleDeleteClick(rol)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
-                            <Trash2 size={16} />
-                          </Link>
-                        </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
+                  <tr>
+                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">ID</th>
+                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Nombre</th>
+                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Estado</th>
+                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginatedData.length > 0 ? (
+                    paginatedData.map((rol) => (
+                      <tr key={rol.RoleId} className="hover:bg-slate-50 transition-colors duration-150">
+                        <td className="py-4 px-6 text-sm text-slate-900">{String(rol.RoleId).slice(0, 3)}...</td>
+                        <td className="py-4 px-6 text-sm text-slate-900">{rol.Nombre}</td>
+                        <td className="flex justify-center py-4 px-6 text-sm text-slate-900">
+                          <Toggle
+                            checked={rol.Estado === "Activo"}
+                            onChange={(value) => handleToggleEstado(rol.RoleId, value ? "Activo" : "Inactivo")}
+                          />
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex justify-center gap-2">
+                            <Link onClick={() => handleEditClick(rol)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Editar">
+                              <Edit size={16} />
+                            </Link>
+                            <Link onClick={() => handlePermissionsClick(rol)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Permisos">
+                              <Shield size={16} />
+                            </Link>
+                            <Link onClick={() => handleViewClick(rol)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Ver">
+                              <Eye size={16} />
+                            </Link>
+                            <Link onClick={() => handleDeleteClick(rol)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="Eliminar">
+                              <Trash2 size={16} />
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="5" className="text-center py-4">
+                        No se encontraron roles
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="5" className="text-center py-4">
-                      No se encontraron roles
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {paginatedData.length > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                itemsPerPage={itemsPerPage}
+                totalItems={totalItems}
+                onItemsPerPageChange={handleItemsPerPageChange}
+              />
+            )}
           </div>
         </div>
 
-        {/* El contenedor de notificaciones (una sola vez) */}
         <ToastContainer
           position="top-right"
           autoClose={3000}
@@ -469,7 +654,6 @@ export const Roles = () => {
           pauseOnHover
           theme="colored"
         />
-
       </div>
     </div>
   );
