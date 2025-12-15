@@ -1,31 +1,44 @@
 import React, { useEffect, useState, useMemo } from "react";
-import axios from "axios";
-import { Plus, Edit, Eye, Trash2, ArrowLeft } from "lucide-react";
+import {
+  Plus, Eye, Trash2, ArrowLeft, Search, X,
+} from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+
+// Servicios
+import {
+  getAllPedidosClientes,
+  getPedidoById,
+  createPedidoCliente,
+  updatePedidoCliente,
+  deletePedidoCliente,
+  getDetallesByPedidoId,
+  getAllProductos,
+} from "./services/services.pedidosClientes";
 
 export const PedidosClientes = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
 
-  //  Estabilizamos 'mode' con useMemo
   const mode = useMemo(() => {
     if (location.pathname === "/dashboard/pedidosClientes/nuevo") return "create";
-    if (id && location.pathname === `/dashboard/pedidosClientes/${id}/editar`) return "edit";
     if (id && location.pathname === `/dashboard/pedidosClientes/${id}`) return "view";
+    if (location.pathname === `/dashboard/pedidosClientes/nuevo/seleccionar-producto`) return "select-product";
     return "list";
   }, [location.pathname, id]);
 
   const [pedidos, setPedidos] = useState([]);
   const [filtroCampo, setFiltroCampo] = useState("");
   const [filtroText, setFiltroText] = useState("");
-  const [formEdit, setFormEdit] = useState(null);
-
+  const [productoSearch, setProductoSearch] = useState("");
+  const [productoFilter, setProductoFilter] = useState("todos");
   const [formCrear, setFormCrear] = useState({
     ClienteId: "",
     FechaRegistro: "",
     Total: 0,
     Estado: "pendiente",
+    VoucherBase64: "",
+    VoucherFile: null,
   });
 
   const [detallesCrear, setDetallesCrear] = useState([
@@ -33,13 +46,14 @@ export const PedidosClientes = () => {
   ]);
 
   const [productos, setProductos] = useState([]);
+  const [selectedProductIndex, setSelectedProductIndex] = useState(null);
 
   // Cargar productos
   useEffect(() => {
     const fetchProductos = async () => {
       try {
-        const res = await axios.get("http://localhost:3000/service/");
-        setProductos(Array.isArray(res.data) ? res.data : res.data?.data || []);
+        const data = await getAllProductos();
+        setProductos(data);
       } catch (err) {
         console.error("Error cargando productos/servicios:", err);
       }
@@ -47,17 +61,14 @@ export const PedidosClientes = () => {
     fetchProductos();
   }, []);
 
-  // Cargar pedidos (solo en modo lista)
+  // Cargar pedidos
   const fetchPedidos = async () => {
     try {
-      const { data } = await axios.get(`http://localhost:3000/api/pedidos-clientes`);
-      const pedidosBase = Array.isArray(data) ? data : [];
-
+      const pedidosBase = await getAllPedidosClientes();
       const pedidosConDetalles = await Promise.all(
         pedidosBase.map(async (p) => {
           try {
-            const res = await axios.get(`http://localhost:3000/api/detalle-pedido/${p.PedidoClienteId}`);
-            const detalle = Array.isArray(res.data) ? res.data : [];
+            const detalle = await getDetallesByPedidoId(p.PedidoClienteId);
             return {
               ...p,
               detalle: detalle.map(item => ({
@@ -80,16 +91,13 @@ export const PedidosClientes = () => {
     if (mode === "list") fetchPedidos();
   }, [mode]);
 
-  // Cargar pedido para ver/editar
+  // Cargar pedido para ver
   useEffect(() => {
-    if (mode === "view" || mode === "edit") {
+    if (mode === "view") {
       const cargarPedido = async () => {
         try {
-          const pedidoRes = await axios.get(`http://localhost:3000/api/pedidos-clientes/${id}`);
-          const detalleRes = await axios.get(`http://localhost:3000/api/detalle-pedido/${id}`);
-
-          const pedido = pedidoRes.data;
-          const detalle = detalleRes.data;
+          const pedido = await getPedidoById(id);
+          const detalle = await getDetallesByPedidoId(id);
 
           const pedidoCompleto = {
             ...pedido,
@@ -99,7 +107,7 @@ export const PedidosClientes = () => {
             }))
           };
 
-          if (mode === "edit") setFormEdit(pedidoCompleto);
+          setPedidos(prev => prev.map(p => p.PedidoClienteId === id ? pedidoCompleto : p));
         } catch {
           navigate("/dashboard/pedidosClientes");
         }
@@ -108,23 +116,50 @@ export const PedidosClientes = () => {
     }
   }, [mode, id, navigate]);
 
-  // Filtro de pedidos
+  // Filtro para pedidos
   const pedidosFiltrados = pedidos.filter((p) => {
     if (!filtroCampo || !filtroText.trim()) return true;
     const valor = String(p[filtroCampo] || "").toLowerCase();
     return valor.includes(filtroText.toLowerCase());
   });
 
+  // Filtro para productos en modal
+  const productosFiltrados = useMemo(() => {
+    return productos.filter(p => {
+      const matchesSearch = p.Nombre.toLowerCase().includes(productoSearch.toLowerCase());
+      const matchesType = productoFilter === "todos" || 
+        (productoFilter === "producto" && p.Tipo?.toLowerCase() === "producto") ||
+        (productoFilter === "insumo" && p.Tipo?.toLowerCase() === "insumo");
+      return matchesSearch && matchesType;
+    });
+  }, [productos, productoSearch, productoFilter]);
+
+  // Garantizar 4 filas visibles
+  const productosConPadding = useMemo(() => {
+    const results = [...productosFiltrados];
+    while (results.length < 4) {
+      results.push({ ProductoServicioId: `placeholder-${results.length}`, Nombre: "", SKU: "", Precio: 0, Stock: 0, placeholder: true });
+    }
+    return results;
+  }, [productosFiltrados]);
+
   // Navegación
-  const goToBackToList = () => {
-    setFormEdit(null);
-    navigate("/dashboard/pedidosClientes");
-  };
+  const goToBackToList = () => navigate("/dashboard/pedidosClientes");
   const goToCreate = () => navigate("/dashboard/pedidosClientes/nuevo");
   const goToView = (pedido) => navigate(`/dashboard/pedidosClientes/${pedido.PedidoClienteId}`);
-  const goToEdit = (pedido) => navigate(`/dashboard/pedidosClientes/${pedido.PedidoClienteId}/editar`);
+  const goToSelectProduct = (index) => {
+    setSelectedProductIndex(index);
+    navigate("/dashboard/pedidosClientes/nuevo/seleccionar-producto");
+  };
 
-  // Manejo de detalles (crear)
+  // Función para reducir el ID (últimos 6 dígitos)
+  const shortenId = (id) => {
+    if (!id) return "—";
+    const strId = String(id);
+    return strId.length > 6 ? strId.slice(-6) : strId;
+  };
+
+  // Detalles
   const añadirDetalleCrear = () => {
     setDetallesCrear(prev => [...prev, {
       _tempId: crypto.randomUUID(),
@@ -151,36 +186,23 @@ export const PedidosClientes = () => {
     });
   };
 
-  // Manejo de detalles (editar)
-  const actualizarDetalleEditar = (index, campo, valor) => {
-    setFormEdit(prev => {
-      if (!prev) return prev;
-      const nuevos = [...prev.detalle];
-      nuevos[index] = { ...nuevos[index], [campo]: valor };
-      return { ...prev, detalle: nuevos };
-    });
+  // Manejar adjunto de voucher
+  const handleVoucherFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setFormCrear(prev => ({
+          ...prev,
+          VoucherFile: file,
+          VoucherBase64: event.target.result
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const añadirDetalleEditar = () => {
-    if (!formEdit) return;
-    setFormEdit(prev => ({
-      ...prev,
-      detalle: [
-        ...prev.detalle,
-        { _tempId: crypto.randomUUID(), ProductoServicioId: "", Cantidad: 1, Alto: "", Ancho: "", Descripcion: "", UrlImagen: "" }
-      ]
-    }));
-  };
-
-  const eliminarDetalleEditar = (index) => {
-    if (!formEdit || formEdit.detalle.length <= 1) return;
-    setFormEdit(prev => ({
-      ...prev,
-      detalle: prev.detalle.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Guardar
+  // Guardar pedido
   const handleCreate = async () => {
     try {
       const detallesLimpios = detallesCrear.map(d => ({
@@ -192,11 +214,12 @@ export const PedidosClientes = () => {
         UrlImagen: d.UrlImagen || "",
       }));
 
-      await axios.post(`http://localhost:3000/api/pedidos-clientes`, {
+      await createPedidoCliente({
         ClienteId: formCrear.ClienteId.trim(),
         FechaRegistro: formCrear.FechaRegistro,
         Total: Number(formCrear.Total) || 0,
         Estado: formCrear.Estado,
+        Voucher: formCrear.VoucherBase64 || "",
         detalle: detallesLimpios,
       });
 
@@ -207,50 +230,18 @@ export const PedidosClientes = () => {
     }
   };
 
-  const handleEdit = async () => {
-    if (!formEdit) return;
-    try {
-      await axios.put(`http://localhost:3000/api/pedidos-clientes/${formEdit.PedidoClienteId}`, {
-        ClienteId: formEdit.ClienteId,
-        FechaRegistro: formEdit.FechaRegistro,
-        Total: formEdit.Total,
-        Estado: formEdit.Estado,
-      });
-
-      const res = await axios.get(`http://localhost:3000/api/detalle-pedido/${formEdit.PedidoClienteId}`);
-      for (const d of res.data) {
-        await axios.delete(`http://localhost:3000/api/detalle-pedido/${d.DetallePedidoClienteId}`);
-      }
-
-      for (const d of formEdit.detalle) {
-        await axios.post(`http://localhost:3000/api/detalle-pedido`, {
-          PedidoClienteId: formEdit.PedidoClienteId,
-          ...d,
-        });
-      }
-
-      goToBackToList();
-      fetchPedidos();
-    } catch (err) {
-      console.error("Error al editar pedido:", err);
-    }
-  };
-
-  const handleDelete = async (pedidoId) => {
-    await axios.delete(`http://localhost:3000/api/pedidos-clientes/${pedidoId}`);
-    fetchPedidos();
-  };
-
+  // Actualizar estado
   const actualizarEstadoPedido = async (pedidoId, nuevoEstado) => {
     try {
       const pedidoActual = pedidos.find(p => p.PedidoClienteId === pedidoId);
       if (!pedidoActual) return;
 
-      await axios.put(`http://localhost:3000/api/pedidos-clientes/${pedidoId}`, {
+      await updatePedidoCliente(pedidoId, {
         ClienteId: pedidoActual.ClienteId,
         FechaRegistro: pedidoActual.FechaRegistro,
         Total: pedidoActual.Total,
         Estado: nuevoEstado,
+        Voucher: pedidoActual.Voucher,
       });
 
       setPedidos(prev =>
@@ -263,46 +254,67 @@ export const PedidosClientes = () => {
     }
   };
 
-  // ===== RENDER PRINCIPAL =====
+  // Eliminar pedido
+  const handleDelete = async (pedidoId) => {
+    if (window.confirm("¿Está seguro de eliminar este pedido?")) {
+      try {
+        await deletePedidoCliente(pedidoId);
+        fetchPedidos();
+      } catch (err) {
+        console.error("Error al eliminar pedido:", err);
+      }
+    }
+  };
+
+  // ===== RENDER =====
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Pedidos</h1>
 
-        {/* === LISTA === */}
+        {/* LISTA */}
         {mode === "list" && (
           <>
-            <div className="bg-white rounded-xl shadow-sm border p-6 mb-6 flex flex-col sm:flex-row gap-4">
-              <button onClick={goToCreate} className="bg-green-800 text-white px-6 py-3 rounded-lg flex items-center gap-2">
+            <div className="bg-white rounded-xl shadow-sm border p-6 mb-6 flex flex-col sm:flex-row gap-4 items-center">
+              <button
+                onClick={goToCreate}
+                className="bg-green-800 text-white px-6 py-3 rounded-lg flex items-center gap-2 whitespace-wrap"
+              >
                 <Plus size={18} /> Nuevo pedido
               </button>
-              <select
-                value={filtroCampo}
-                onChange={(e) => setFiltroCampo(e.target.value)}
-                className="border rounded-lg px-4 py-3 bg-white text-slate-700"
-              >
-                <option value="">Filtrar por Campo</option>
-                <option value="PedidoClienteId">Pedido ID</option>
-                <option value="NombreCliente">Cliente</option>
-                <option value="FechaRegistro">Fecha</option>
-              </select>
-              <div className="relative flex-1 max-w-md">
-                <input
-                  type="text"
-                  placeholder="Buscar pedido"
-                  value={filtroText}
-                  onChange={(e) => setFiltroText(e.target.value)}
-                  className="border rounded-lg pl-10 pr-4 py-3 w-full"
-                />
-                <img
-                  src="/multimedia/lupa.png"
-                  alt="Buscar"
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-5"
-                />
+
+              <div className="flex-1 max-w-md">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Buscar pedido"
+                    value={filtroText}
+                    onChange={(e) => setFiltroText(e.target.value)}
+                    className="w-full border rounded-lg pl-10 pr-4 py-3"
+                  />
+                  <img
+                    src="/multimedia/lupa.png"
+                    alt="Buscar"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-5"
+                  />
+                </div>
+              </div>
+
+              <div className="w-full sm:w-auto">
+                <select
+                  value={filtroCampo}
+                  onChange={(e) => setFiltroCampo(e.target.value)}
+                  className="border rounded-lg px-4 py-3 bg-white text-slate-700 w-full sm:w-auto"
+                >
+                  <option value="">Filtrar por Campo</option>
+                  <option value="PedidoClienteId">Pedido ID</option>
+                  <option value="NombreCliente">Cliente</option>
+                  <option value="FechaRegistro">Fecha</option>
+                </select>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border overflow-auto max-h-[600px]">
+            <div className="bg-white rounded-xl shadow-sm border overflow-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-800 sticky top-0">
                   <tr>
@@ -317,32 +329,28 @@ export const PedidosClientes = () => {
                 <tbody className="divide-y">
                   {pedidosFiltrados.map((pedido) => (
                     <tr key={pedido.PedidoClienteId} className="hover:bg-slate-50">
-                      <td className="py-4 px-6">{pedido.PedidoClienteId}</td>
-                      <td className="py-4 px-6">{pedido.NombreCliente || "—"} </td>
+                      <td className="py-4 px-6">{shortenId(pedido.PedidoClienteId)}</td>
+                      <td className="py-4 px-6">{pedido.NombreCliente || "—"}</td>
                       <td className="py-4 px-6">{pedido.FechaRegistro}</td>
                       <td className="py-4 px-6">$ {Number(pedido.Total || 0).toFixed(2)}</td>
                       <td className="py-4 px-6">
-                        <select
-                          value={pedido.Estado}
-                          onChange={(e) => actualizarEstadoPedido(pedido.PedidoClienteId, e.target.value)}
-                          className="px-2 py-1 border rounded bg-white text-slate-700 text-sm"
-                        >
-                          <option value="pendiente">Pendiente</option>
-                          <option value="aprobado">Aprobado</option>
-                          <option value="en_produccion">En Producción</option>
-                          <option value="terminado">Terminado</option>
-                          <option value="entregado">Entregado</option>
-                          <option value="cancelado">Cancelado</option>
-
-                        </select>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          pedido.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                          pedido.Estado === 'en_produccion' ? 'bg-blue-100 text-blue-800' :
+                          pedido.Estado === 'terminado' ? 'bg-green-100 text-green-800' :
+                          pedido.Estado === 'entregado' ? 'bg-purple-100 text-purple-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {pedido.Estado === 'pendiente' ? 'Pendiente' :
+                           pedido.Estado === 'en_produccion' ? 'En Producción' :
+                           pedido.Estado === 'terminado' ? 'Terminado' :
+                           pedido.Estado === 'entregado' ? 'Entregado' : 'Cancelado'}
+                        </span>
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex gap-3">
                           <button onClick={() => goToView(pedido)}>
                             <Eye size={16} className="text-emerald-600" />
-                          </button>
-                          <button onClick={() => goToEdit(pedido)}>
-                            <Edit size={16} className="text-blue-600" />
                           </button>
                           <button onClick={() => handleDelete(pedido.PedidoClienteId)}>
                             <Trash2 size={16} className="text-red-600" />
@@ -357,7 +365,7 @@ export const PedidosClientes = () => {
           </>
         )}
 
-        {/* === CREAR === */}
+        {/* CREAR */}
         {mode === "create" && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
@@ -396,19 +404,39 @@ export const PedidosClientes = () => {
                   />
                 </div>
               </div>
-              <div className="flex flex-col gap-2">
-                <label className="font-medium">Estado</label>
-                <select
-                  value={formCrear.Estado}
-                  onChange={(e) => setFormCrear({ ...formCrear, Estado: e.target.value })}
-                  className="w-full h-11 px-3 border rounded"
-                >
-                  <option value="pendiente">Pendiente</option>
-                  <option value="aprobado">Aprobado</option>
-                  <option value="en_produccion">En Producción</option>
-                  <option value="terminado">Terminado</option>
-                  <option value="entregado">Entregado</option>
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex flex-col gap-2">
+                  <label className="font-medium">Adjuntar Voucher</label>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={handleVoucherFileChange}
+                    className="w-full h-11 px-3 border rounded"
+                  />
+                  {formCrear.VoucherBase64 && (
+                    <div className="mt-2">
+                      {formCrear.VoucherBase64.startsWith("data:image") ? (
+                        <img src={formCrear.VoucherBase64} alt="Voucher preview" className="max-w-32 max-h-32 rounded" />
+                      ) : (
+                        <p className="text-sm text-green-600">Archivo PDF adjuntado</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="font-medium">Estado</label>
+                  <select
+                    value={formCrear.Estado}
+                    onChange={(e) => setFormCrear({ ...formCrear, Estado: e.target.value })}
+                    className="w-full h-11 px-3 border rounded"
+                  >
+                    <option value="pendiente">Pendiente</option>
+                    <option value="en_produccion">En Producción</option>
+                    <option value="terminado">Terminado</option>
+                    <option value="entregado">Entregado</option>
+                    <option value="cancelado">Cancelado</option>
+                  </select>
+                </div>
               </div>
               <div className="flex justify-end">
                 <button type="button" onClick={añadirDetalleCrear} className="bg-blue-500 text-white px-6 py-2 rounded-lg flex items-center gap-2">
@@ -420,12 +448,27 @@ export const PedidosClientes = () => {
                   <div key={d._tempId} className="grid grid-cols-1 md:grid-cols-7 gap-3 border p-3 rounded">
                     <div className="flex flex-col gap-2">
                       <label>Producto / Servicio</label>
+                      {/* SELECT TRADICIONAL QUE ABRE EL MODAL */}
                       <select
                         value={d.ProductoServicioId || ""}
-                        onChange={(e) => actualizarDetalleCrear(index, "ProductoServicioId", e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === "open-modal") {
+                            goToSelectProduct(index);
+                          } else {
+                            actualizarDetalleCrear(index, "ProductoServicioId", value);
+                            // Actualizar descripción e imagen basado en el producto seleccionado
+                            const producto = productos.find(p => p.ProductoServicioId === value);
+                            if (producto) {
+                              actualizarDetalleCrear(index, "Descripcion", producto.Nombre || "");
+                              actualizarDetalleCrear(index, "UrlImagen", producto.UrlImagen || "");
+                            }
+                          }
+                        }}
                         className="h-10 px-2 border rounded bg-white"
                       >
                         <option value="">Seleccione</option>
+                        <option value="open-modal">Seleccionar desde lista...</option>
                         {productos.map((p) => (
                           <option key={p.ProductoServicioId} value={p.ProductoServicioId}>
                             {p.Nombre}
@@ -495,7 +538,7 @@ export const PedidosClientes = () => {
           </div>
         )}
 
-        {/* === VER === */}
+        {/* VER */}
         {mode === "view" && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
@@ -503,11 +546,94 @@ export const PedidosClientes = () => {
                 <ArrowLeft size={18} />
               </button>
               <h3 className="text-lg font-bold">
-                Ver pedido #{pedidos.find(p => p.PedidoClienteId === id)?.PedidoClienteId || id}
+                Pedido #{shortenId(pedidos.find(p => p.PedidoClienteId === id)?.PedidoClienteId || id)}
               </h3>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-semibold mb-4">Detalles del Pedido</h4>
+
+            <div className="bg-gray-50 p-6 rounded-xl mb-6">
+              <h4 className="font-semibold mb-4">Información del Pedido</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-4 rounded-lg">
+                  <div className="text-sm text-gray-500">Pedido ID</div>
+                  <div className="font-bold">{shortenId(pedidos.find(p => p.PedidoClienteId === id)?.PedidoClienteId || "—")}</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg">
+                  <div className="text-sm text-gray-500">Cliente</div>
+                  <div className="font-bold">{pedidos.find(p => p.PedidoClienteId === id)?.NombreCliente || "—"}</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg">
+                  <div className="text-sm text-gray-500">Fecha Registro</div>
+                  <div className="font-bold">{pedidos.find(p => p.PedidoClienteId === id)?.FechaRegistro || "—"}</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg">
+                  <div className="text-sm text-gray-500">Total</div>
+                  <div className="font-bold">$ {Number(pedidos.find(p => p.PedidoClienteId === id)?.Total || 0).toFixed(2)}</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg">
+                  <div className="text-sm text-gray-500">Voucher</div>
+                  <div className="font-bold">
+                    {pedidos.find(p => p.PedidoClienteId === id)?.Voucher ? (
+                      pedidos.find(p => p.PedidoClienteId === id).Voucher.startsWith("data:image") ? (
+                        <img
+                          src={pedidos.find(p => p.PedidoClienteId === id).Voucher}
+                          alt="Voucher"
+                          className="w-24 h-24 object-contain"
+                        />
+                      ) : (
+                        <a
+                          href={pedidos.find(p => p.PedidoClienteId === id).Voucher}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 underline"
+                        >
+                          Ver archivo adjunto
+                        </a>
+                      )
+                    ) : "—"}
+                  </div>
+                </div>
+                <div className="bg-white p-4 rounded-lg">
+                  <div className="text-sm text-gray-500">Estado Actual</div>
+                  <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                    pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'en_produccion' ? 'bg-blue-100 text-blue-800' :
+                    pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'terminado' ? 'bg-green-100 text-green-800' :
+                    pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'entregado' ? 'bg-purple-100 text-purple-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'pendiente' ? 'Pendiente' :
+                     pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'en_produccion' ? 'En Producción' :
+                     pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'terminado' ? 'Terminado' :
+                     pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'entregado' ? 'Entregado' : 'Cancelado'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-6 rounded-xl mb-6">
+              <h4 className="font-semibold mb-4">Resumen de Productos</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-4 rounded-lg text-center">
+                  <div className="text-sm text-gray-500">Productos Únicos</div>
+                  <div className="text-2xl font-bold">{pedidos.find(p => p.PedidoClienteId === id)?.detalle?.length || 0}</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg text-center">
+                  <div className="text-sm text-gray-500">Total Unidades</div>
+                  <div className="text-2xl font-bold">
+                    {pedidos.find(p => p.PedidoClienteId === id)?.detalle?.reduce((sum, d) => sum + (Number(d.Cantidad) || 0), 0) || 0}
+                  </div>
+                </div>
+                <div className="bg-white p-4 rounded-lg text-center">
+                  <div className="text-sm text-gray-500">Total Productos</div>
+                  <div className="text-2xl font-bold">
+                    {pedidos.find(p => p.PedidoClienteId === id)?.detalle?.reduce((sum, d) => sum + (Number(d.Cantidad) || 0), 0) || 0}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-6 rounded-xl mb-6">
+              <h4 className="font-semibold mb-4">Productos Solicitados</h4>
               <div className="overflow-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-200">
@@ -542,122 +668,155 @@ export const PedidosClientes = () => {
                 </table>
               </div>
             </div>
+
+            <div className="bg-yellow-50 p-6 rounded-xl border border-yellow-200">
+              <h4 className="font-semibold mb-2">Cambiar Estado del Pedido</h4>
+              <p className="text-sm text-gray-600 mb-4">
+                Seleccione el nuevo estado del pedido. Esta acción no se puede deshacer.
+              </p>
+              <div className="flex gap-3">
+                <select
+                  id="estado-select"
+                  className="flex-1 px-4 py-2 border rounded"
+                  defaultValue={pedidos.find(p => p.PedidoClienteId === id)?.Estado || "pendiente"}
+                >
+                  <option value="pendiente">Pendiente</option>
+                  <option value="en_produccion">En Producción</option>
+                  <option value="terminado">Terminado</option>
+                  <option value="entregado">Entregado</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+                <button
+                  onClick={() => {
+                    const nuevoEstado = document.getElementById('estado-select').value;
+                    actualizarEstadoPedido(id, nuevoEstado);
+                  }}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+                >
+                  Guardar cambios
+                </button>
+                <button
+                  onClick={goToBackToList}
+                  className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-300 transition"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+
             <div className="mt-6">
               <button onClick={goToBackToList} className="w-full h-11 bg-gray-200 text-gray-700 rounded">Cerrar</button>
             </div>
           </div>
         )}
 
-        {/* === EDITAR === */}
-        {mode === "edit" && (
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
-                <ArrowLeft size={18} />
-              </button>
-              <h3 className="text-lg font-bold">
-                Editar pedido #{formEdit?.PedidoClienteId || id}
-              </h3>
-            </div>
-            {formEdit ? (
-              <>
-                <div className="flex justify-end mb-4">
-                  <button type="button" onClick={añadirDetalleEditar} className="bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-                    <Plus size={15} /> Añadir detalle
+        {/* SELECCIONAR PRODUCTO (MODAL FUNCIONAL) */}
+        {mode === "select-product" && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-bold">Seleccionar Producto</h3>
+                  <button
+                    onClick={goToCreate}
+                    className="p-2 hover:bg-gray-100 rounded-full"
+                  >
+                    <X size={20} />
                   </button>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold mb-4">Detalles del Pedido</h4>
-                  <div className="overflow-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-gray-200">
-                        <tr>
-                          <th className="py-2 px-4">Producto/Servicio</th>
-                          <th className="py-2 px-4">Cantidad</th>
-                          <th className="py-2 px-4">Alto</th>
-                          <th className="py-2 px-4">Ancho</th>
-                          <th className="py-2 px-4">Descripción</th>
-                          <th className="py-2 px-4">Imagen</th>
-                          <th className="py-2 px-4">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {formEdit.detalle.map((d, idx) => (
-                          <tr key={d._tempId} className="border-t">
-                            <td className="py-2 px-4">
-                              <select
-                                value={d.ProductoServicioId || ""}
-                                onChange={(e) => actualizarDetalleEditar(idx, "ProductoServicioId", e.target.value)}
-                                className="w-full px-2 py-1 border rounded"
-                              >
-                                <option value="">Seleccione</option>
-                                {productos.map((p) => (
-                                  <option key={p.ProductoServicioId} value={p.ProductoServicioId}>
-                                    {p.Nombre}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="py-2 px-4">
-                              <input
-                                type="number"
-                                value={d.Cantidad ?? ""}
-                                onChange={(e) => actualizarDetalleEditar(idx, "Cantidad", Number(e.target.value))}
-                                className="w-full px-2 py-1 border rounded"
-                              />
-                            </td>
-                            <td className="py-2 px-4">
-                              <input
-                                type="text"
-                                value={d.Alto || ""}
-                                onChange={(e) => actualizarDetalleEditar(idx, "Alto", e.target.value)}
-                                className="w-full px-2 py-1 border rounded"
-                              />
-                            </td>
-                            <td className="py-2 px-4">
-                              <input
-                                type="text"
-                                value={d.Ancho || ""}
-                                onChange={(e) => actualizarDetalleEditar(idx, "Ancho", e.target.value)}
-                                className="w-full px-2 py-1 border rounded"
-                              />
-                            </td>
-                            <td className="py-2 px-4">
-                              <input
-                                type="text"
-                                value={d.Descripcion || ""}
-                                onChange={(e) => actualizarDetalleEditar(idx, "Descripcion", e.target.value)}
-                                className="w-full px-2 py-1 border rounded"
-                              />
-                            </td>
-                            <td className="py-2 px-4">
-                              <input
-                                type="text"
-                                value={d.UrlImagen || ""}
-                                onChange={(e) => actualizarDetalleEditar(idx, "UrlImagen", e.target.value)}
-                                className="w-full px-2 py-1 border rounded"
-                              />
-                              {d.UrlImagen && <img src={d.UrlImagen} className="w-14 h-14 object-cover rounded mt-1" />}
-                            </td>
-                            <td className="py-2 px-4 text-center">
-                              <Trash2 size={18} className="text-red-600 cursor-pointer" onClick={() => eliminarDetalleEditar(idx)} />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <p className="text-gray-600 mt-1">Busca y selecciona el producto que deseas agregar.</p>
+              </div>
+
+              {/* Buscador y filtros */}
+              <div className="p-6 border-b">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input
+                      type="text"
+                      placeholder="Buscar por nombre..."
+                      value={productoSearch}
+                      onChange={(e) => setProductoSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    {["todos", "producto", "insumo"].map((tipo) => (
+                      <button
+                        key={tipo}
+                        onClick={() => setProductoFilter(tipo)}
+                        className={`px-4 py-2 rounded-lg font-medium ${
+                          productoFilter === tipo
+                            ? 'bg-black text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {tipo === 'todos' ? 'Todos' : tipo.charAt(0).toUpperCase() + tipo.slice(1)}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <div className="flex gap-4 mt-6">
-                  <button type="button" onClick={handleEdit} className="flex-1 bg-blue-500 text-white h-11 rounded">Guardar cambios</button>
-                  <button type="button" onClick={goToBackToList} className="flex-1 bg-gray-200 text-gray-700 h-11 rounded">Cancelar</button>
-                </div>
-              </>
-            ) : (
-              <div className="p-6">Cargando...</div>
-            )}
+              </div>
+
+              {/* Tabla de resultados */}
+              <div className="overflow-auto flex-1">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-100 sticky top-0">
+                    <tr>
+                      <th className="p-3 text-left">Nombre</th>
+                      <th className="p-3 text-left">SKU</th>
+                      <th className="p-3 text-left">Precio</th>
+                      <th className="p-3 text-left">Stock</th>
+                      <th className="p-3 text-left">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productosConPadding.map((producto) => (
+                      <tr key={producto.ProductoServicioId} className={producto.placeholder ? "opacity-0" : "hover:bg-gray-50"}>
+                        <td className="p-3">{producto.Nombre || "—"}</td>
+                        <td className="p-3">{producto.SKU || "—"}</td>
+                        <td className="p-3">$ {Number(producto.Precio || 0).toFixed(2)}</td>
+                        <td className="p-3">{producto.Stock || "0"}</td>
+                        <td className="p-3">
+                          {!producto.placeholder && (
+                            <button
+                              onClick={() => {
+                                if (selectedProductIndex !== null) {
+                                  actualizarDetalleCrear(selectedProductIndex, "ProductoServicioId", producto.ProductoServicioId);
+                                  actualizarDetalleCrear(selectedProductIndex, "Descripcion", producto.Nombre || "");
+                                  actualizarDetalleCrear(selectedProductIndex, "UrlImagen", producto.UrlImagen || "");
+                                }
+                                goToCreate();
+                              }}
+                              className="bg-blue-500 text-white px-4 py-1.5 rounded hover:bg-blue-600"
+                            >
+                              Seleccionar
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {productosFiltrados.length === 0 && (
+                  <div className="text-center py-10 text-gray-500">
+                    No se encontraron productos.
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 border-t flex justify-end">
+                <button
+                  onClick={goToCreate}
+                  className="bg-gray-200 text-gray-700 px-6 py-2.5 rounded-lg font-medium hover:bg-gray-300"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
           </div>
         )}
+
       </div>
     </div>
   );

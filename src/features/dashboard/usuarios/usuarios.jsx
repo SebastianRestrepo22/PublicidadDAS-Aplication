@@ -9,6 +9,7 @@ import { GetDataRoles } from "../roles/services/services.role.js";
 //importamos toastify
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { Pagination } from "../components/paginacion/pagination.jsx";
 
 export const Usuarios = () => {
   const [user, setUser] = useState([]);
@@ -25,6 +26,13 @@ export const Usuarios = () => {
 
   const [submitted, setSubmitted] = useState(false);
 
+  //Paginación
+  const [allData, setAllData] = useState([]); // TODOS LOS DATOS
+  const [paginatedData, setPaginatedData] = useState([]); // DATOS PAGINADOS (USAR ESTE PARA RENDER)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5); // POR DEFECTO 5 REGISTROS
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [editData, setEditData] = useState(null);
 
@@ -32,6 +40,13 @@ export const Usuarios = () => {
   const [openEditar, setOpenEditar] = useState(false);
   const [openVer, setOpenVer] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
+
+  // FUNCIÓN PARA PAGINAR 
+  const paginateData = (data) => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return data.slice(startIndex, endIndex);
+  };
 
   //Traer los tipos de documentos
 
@@ -98,7 +113,22 @@ export const Usuarios = () => {
           const todos = await GetDataUser();
           resultados = todos?.data || [];
         }
-        setUser(Array.isArray(resultados) ? resultados : []);
+        // 1. Guardar todos los datos
+        setAllData(Array.isArray(resultados) ? resultados : []);
+        setTotalItems(Array.isArray(resultados) ? resultados.length : 0);
+
+        // 2. Calcular total de páginas
+        const totalPages = Math.ceil(resultados.length / itemsPerPage);
+        setTotalPages(totalPages > 0 ? totalPages : 1);
+
+        // 3. Ajustar página actual si es necesario
+        if (currentPage > totalPages && totalPages > 0) {
+          setCurrentPage(totalPages);
+        }
+
+        // 4. Paginar los datos
+        const paginatedData = paginateData(Array.isArray(resultados) ? resultados : []);
+        setPaginatedData(paginatedData);
       } catch (error) {
         console.error(error);
         setUser([]);
@@ -106,6 +136,21 @@ export const Usuarios = () => {
     };
     cargarUsuarios();
   }, [filtroCampo, filtroValor]);
+
+  // EFECTO PARA RECALCULAR PAGINACIÓN 
+  useEffect(() => {
+    if (allData.length > 0) {
+      const totalPages = Math.ceil(allData.length / itemsPerPage);
+      setTotalPages(totalPages > 0 ? totalPages : 1);
+
+      if (currentPage > totalPages && totalPages > 0) {
+        setCurrentPage(totalPages);
+      }
+
+      const paginatedData = paginateData(allData);
+      setPaginatedData(paginatedData);
+    }
+  }, [itemsPerPage, currentPage, allData]);
 
   const [correoError, setCorreoError] = useState("");
   const [cedulaError, setCedulaError] = useState("");
@@ -196,7 +241,11 @@ export const Usuarios = () => {
         const response = await updateDatauser(editData.CedulaId, values);
         if (response.status === 200) {
           const updatedList = await GetDataUser();
-          setUser(updatedList.data);
+
+          // ACTUALIZAR DATOS CON PAGINACIÓN 
+          setAllData(updatedList.data || []);
+          setTotalItems(updatedList.data?.length || 0);
+
           setOpenEditar(false);
           toast.success("Usuario actualizado correctamente");
         }
@@ -205,6 +254,9 @@ export const Usuarios = () => {
         if (response.status === 201) {
           const updatedList = await GetDataUser();
           setUser(updatedList.data);
+          // ACTUALIZAR DATOS CON PAGINACIÓN 
+          setAllData(updatedList.data || []);
+          setTotalItems(updatedList.data?.length || 0);
           setOpenCreate(false);
           toast.success("Usuario creado correctamente");
         }
@@ -240,20 +292,45 @@ export const Usuarios = () => {
   const handleDelete = async (id) => {
     try {
       const response = await deleteDataUser(id); // Usamos la función del servicio
+
+      // Si la respuesta es exitosa (200 o 201)
       if (response.status === 200 || response.status === 201) {
         toast.success(response.data.message); // Mensaje del backend
 
         // Actualiza la lista de usuarios después de eliminar
         const updatedList = await GetDataUser();
-        if (updatedList?.data) setUser(updatedList.data);
+        if (updatedList?.data) {
+          // ACTUALIZAR DATOS CON PAGINACIÓN 
+          setAllData(updatedList.data);
+          setTotalItems(updatedList.data.length);
+        }
 
         setOpenEliminar(false); // Cerramos el modal
-      } else {
-        toast.error(response.message || "No se pudo eliminar el usuario");
       }
     } catch (error) {
-      toast.error(error.message || "Error al  el usuario");
+      // Manejar específicamente el error 409 (Conflict)
+      if (error.response && error.response.status === 409) {
+        // Mostrar el mensaje específico del backend
+        toast.warning(error.response.data.message || "No se puede eliminar el usuario porque tiene pedidos asociados");
+      } else {
+        // Otros errores
+        toast.error(error.message || "Error al eliminar el usuario");
+      }
+      // No cerrar el modal si hay error 409
+      if (!error.response || error.response.status !== 409) {
+        setOpenEliminar(false);
+      }
     }
+  };
+
+  // FUNCIONES DE PAGINACIÓN 
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
   };
 
   // Abrir modal para editar, ver o eliminar
@@ -498,7 +575,7 @@ export const Usuarios = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue p-6">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl mx-auto"> {/* Cambiado de max-w-5xl a max-w-7xl para más espacio */}
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de usuarios</h1>
 
         {/* Filtros */}
@@ -513,6 +590,15 @@ export const Usuarios = () => {
               <Plus size={18} /> Nuevo usuario
             </Link>
 
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input value={filtroValor}
+                onChange={(e) => setFiltroValor(e.target.value)}
+                type="text"
+                placeholder="Buscar usuarios"
+                className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-700" />
+            </div>
+
             <select
               value={filtroCampo}
               onChange={(e) => setFiltroCampo(e.target.value)}
@@ -526,15 +612,6 @@ export const Usuarios = () => {
               <option value="telefono">Telefono</option>
               <option value="rol">Rol</option>
             </select>
-
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <input value={filtroValor}
-                onChange={(e) => setFiltroValor(e.target.value)}
-                type="text"
-                placeholder="Buscar usuarios"
-                className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-700" />
-            </div>
           </div>
         </div>
 
@@ -587,58 +664,70 @@ export const Usuarios = () => {
           </div>
         </Modal>
 
-        {/* Tabla */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
-              <tr>
-                <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Tipo documento</th>
-                <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Cédula</th>
-                <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Nombre</th>
-                <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Dirección</th>
-                <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Correo</th>
-                <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Teléfono</th>
-                <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Rol</th>
-                <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {user.length > 0 ? (
-                user.map((u) => (
-                  <tr key={u.CedulaId} className="hover:bg-slate-50 transition-colors duration-150">
-                    <td className="py-4 px-6 text-sm text-slate-900">
-                      {tiposDocumento.find(tipo => tipo.TipoDocumentoId === u.TipoDocumentoId)?.Nombre || u.TipoDocumentoId}
-                    </td>
-                    <td className="py-4 px-6 text-sm text-slate-900">{u.CedulaId}</td>
-                    <td className="py-4 px-6 text-sm text-slate-900">{u.NombreCompleto}</td>
-                    <td className="py-4 px-6 text-sm text-slate-900">{u.Direccion}</td>
-                    <td className="py-4 px-6 text-sm text-slate-900">{u.CorreoElectronico}</td>
-                    <td className="py-4 px-6 text-sm text-slate-900">{u.Telefono}</td>
-                    <td className="py-4 px-6 text-sm text-slate-900">{u.RolNombre}</td>
-                    <td className="py-4 px-6">
-                      <div className="flex gap-2">
-                        <Link onClick={() => handleEditClick(u)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
-                          <Edit size={16} />
-                        </Link>
-                        <Link onClick={() => handleViewClick(u)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg">
-                          <Eye size={16} />
-                        </Link>
-                        <Link onClick={() => handleDeleteClick(u)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
-                          <Trash2 size={16} />
-                        </Link>
-                      </div>
+        {/* Tabla - Cambios realizados aquí */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="overflow-x-visible"> {/* Cambiado de overflow-x-auto a overflow-x-visible */}
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
+                <tr>
+                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Tipo documento</th>
+                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Cédula</th>
+                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Nombre</th>
+                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Dirección</th>
+                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Correo</th>
+                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Teléfono</th>
+                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Rol</th>
+                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedData.length > 0 ? (
+                  paginatedData.map((u) => (
+                    <tr key={u.CedulaId} className="hover:bg-slate-50 transition-colors duration-150">
+                      <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[120px]">
+                        {tiposDocumento.find(tipo => tipo.TipoDocumentoId === u.TipoDocumentoId)?.Nombre || u.TipoDocumentoId}
+                      </td>
+                      <td className="py-4 px-4 text-sm text-slate-900">{u.CedulaId}</td>
+                      <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[150px]">{u.NombreCompleto}</td>
+                      <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[150px]">{u.Direccion}</td>
+                      <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[180px]">{u.CorreoElectronico}</td>
+                      <td className="py-4 px-4 text-sm text-slate-900">{u.Telefono}</td>
+                      <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[120px]">{u.RolNombre}</td>
+                      <td className="py-4 px-4">
+                        <div className="flex gap-2">
+                          <Link onClick={() => handleEditClick(u)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
+                            <Edit size={16} />
+                          </Link>
+                          <Link onClick={() => handleViewClick(u)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg">
+                            <Eye size={16} />
+                          </Link>
+                          <Link onClick={() => handleDeleteClick(u)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
+                            <Trash2 size={16} />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="8" className="text-center py-4">
+                      No se econtraron usuarios
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" className="text-center py-4">
-                    No se econtraron usuarios
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {paginatedData.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              itemsPerPage={itemsPerPage}
+              totalItems={totalItems}
+              onItemsPerPageChange={handleItemsPerPageChange}
+            />
+          )}
         </div>
 
         {/* El contenedor de notificaciones (una sola vez) */}

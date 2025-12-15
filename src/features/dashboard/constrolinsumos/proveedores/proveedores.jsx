@@ -2,9 +2,14 @@ import { Link } from "react-router-dom";
 import { Search, Plus, Edit, Eye, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Modal from "../../components/modals/modal";
-import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import {
+  getAllProveedores,
+  createProveedor,
+  updateProveedor,
+  deleteProveedor,
+} from "./services/services.proveedores";
 
 // Función auxiliar para obtener las primeras 3 letras o dígitos
 const getShortId = (id) => {
@@ -74,7 +79,7 @@ export const Proveedores = () => {
 
   const fetchProveedores = async () => {
     try {
-      const { data } = await axios.get("http://localhost:3000/api/proveedores");
+      const data = await getAllProveedores();
       setProveedores(data);
 
       const estados = {};
@@ -103,7 +108,7 @@ export const Proveedores = () => {
     }
     setErrorsCrear({});
     try {
-      await axios.post("http://localhost:3000/api/proveedores", formCrear);
+      await createProveedor(formCrear); // 👈
       setOpenCreate(false);
       setFormCrear({
         nombreProveedor: "",
@@ -128,10 +133,7 @@ export const Proveedores = () => {
     }
     setErrorsEditar({});
     try {
-      await axios.put(
-        `http://localhost:3000/api/proveedores/${selectedProveedor.ProveedorId}`,
-        formEditar
-      );
+      await updateProveedor(selectedProveedor.ProveedorId, formEditar); // 
       setOpenEditar(false);
       fetchProveedores();
       toast.success("Proveedor actualizado exitosamente");
@@ -142,10 +144,9 @@ export const Proveedores = () => {
 
   const handleDelete = async () => {
     try {
-      await axios.delete(
-        `http://localhost:3000/api/proveedores/${selectedProveedor.ProveedorId}`
-      );
+      await deleteProveedor(selectedProveedor.ProveedorId); // 
       setOpenEliminar(false);
+      setSelectedProveedor(null);
       fetchProveedores();
       toast.success("Proveedor eliminado correctamente");
     } catch (err) {
@@ -175,7 +176,7 @@ export const Proveedores = () => {
     }
 
     try {
-      await axios.put(`http://localhost:3000/api/proveedores/${idProveedor}`, {
+      await updateProveedor(idProveedor, {
         nombreProveedor: provActual.NombreProveedor,
         telefono: provActual.Telefono,
         correo: provActual.Correo,
@@ -194,9 +195,8 @@ export const Proveedores = () => {
       toast.error("Error al actualizar estado: " + (error.message || error));
     }
   };
-
   return (
-    <div className="min-h-screen bg-slate-50 p-6"> {/* ✅ Fondo neutro */}
+    <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-6">
@@ -212,17 +212,6 @@ export const Proveedores = () => {
                 <Plus size={18} /> Nuevo proveedor
               </button>
 
-              <select
-                value={filtroCampo}
-                onChange={(e) => setFiltroCampo(e.target.value)}
-                className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700"
-              >
-                <option value="">Filtrar por campo</option>
-                <option value="ProveedorId">ID</option>
-                <option value="NombreProveedor">Nombre</option>
-                <option value="Correo">Correo</option>
-              </select>
-
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
@@ -230,8 +219,21 @@ export const Proveedores = () => {
                   value={filtroText}
                   onChange={(e) => setFiltroText(e.target.value)}
                   placeholder="Buscar proveedor"
-                  className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full"
+                  className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-700"
                 />
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <select
+                  value={filtroCampo}
+                  onChange={(e) => setFiltroCampo(e.target.value)}
+                  className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700"
+                >
+                  <option value="">Filtrar por campo</option>
+                  <option value="ProveedorId">ID</option>
+                  <option value="NombreProveedor">Nombre</option>
+                  <option value="Correo">Correo</option>
+                </select>
               </div>
             </div>
           </div>
@@ -239,7 +241,7 @@ export const Proveedores = () => {
           {/* Tabla */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
             <table className="min-w-full">
-              <thead className="bg-slate-800"> {/* ✅ Sin gradiente */}
+              <thead className="bg-slate-800">
                 <tr>
                   <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">ID</th>
                   <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Nombre Empresa</th>
@@ -254,7 +256,7 @@ export const Proveedores = () => {
                 {proveedoresFiltrados.map((p) => (
                   <tr key={p.ProveedorId} className="hover:bg-slate-50 transition-colors duration-150">
                     <td className="py-4 px-6 text-sm font-medium text-slate-900">
-                      {getShortId(p.ProveedorId)} {/* ✅ Solo primeras 3 letras/dígitos */}
+                      {getShortId(p.ProveedorId)}
                     </td>
                     <td className="py-4 px-6 text-sm font-medium text-slate-900">{p.NombreProveedor}</td>
                     <td className="py-4 px-6 text-sm font-medium text-slate-900">{p.Telefono}</td>
@@ -274,7 +276,7 @@ export const Proveedores = () => {
                           <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform transform peer-checked:translate-x-5"></div>
                         </div>
                         <span className="ml-3 text-sm text-slate-700">
-                          {estadoActivos[p.ProveedorId] === 1 ? "Activo" : "Inactivo"}
+                          {estadoActivos[p.ProveedorId] === 1}
                         </span>
                       </label>
                     </td>
@@ -322,9 +324,8 @@ export const Proveedores = () => {
                   <input
                     placeholder="Nombre del proveedor"
                     value={formCrear.nombreProveedor}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                      errorsCrear.nombreProveedor ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
-                    }`}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsCrear.nombreProveedor ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                      }`}
                     onChange={(e) => setFormCrear({ ...formCrear, nombreProveedor: e.target.value })}
                   />
                   {errorsCrear.nombreProveedor && <span className="text-red-500 text-xs mt-1">{errorsCrear.nombreProveedor}</span>}
@@ -334,9 +335,8 @@ export const Proveedores = () => {
                   <input
                     placeholder="Ej: 3001234567"
                     value={formCrear.telefono}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                      errorsCrear.telefono ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
-                    }`}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsCrear.telefono ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                      }`}
                     onChange={(e) => setFormCrear({ ...formCrear, telefono: e.target.value.replace(/\D/g, "") })}
                   />
                   {errorsCrear.telefono && <span className="text-red-500 text-xs mt-1">{errorsCrear.telefono}</span>}
@@ -347,9 +347,8 @@ export const Proveedores = () => {
                     type="email"
                     placeholder="proveedor@ejemplo.com"
                     value={formCrear.correo}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                      errorsCrear.correo ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
-                    }`}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsCrear.correo ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                      }`}
                     onChange={(e) => setFormCrear({ ...formCrear, correo: e.target.value })}
                   />
                   {errorsCrear.correo && <span className="text-red-500 text-xs mt-1">{errorsCrear.correo}</span>}
@@ -359,9 +358,8 @@ export const Proveedores = () => {
                   <input
                     placeholder="Dirección completa"
                     value={formCrear.direccion}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                      errorsCrear.direccion ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
-                    }`}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsCrear.direccion ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                      }`}
                     onChange={(e) => setFormCrear({ ...formCrear, direccion: e.target.value })}
                   />
                   {errorsCrear.direccion && <span className="text-red-500 text-xs mt-1">{errorsCrear.direccion}</span>}
@@ -395,9 +393,8 @@ export const Proveedores = () => {
                   <label className="text-sm font-medium text-gray-700">Nombre *</label>
                   <input
                     value={formEditar.nombreProveedor}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                      errorsEditar.nombreProveedor ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
-                    }`}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsEditar.nombreProveedor ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                      }`}
                     onChange={(e) => setFormEditar({ ...formEditar, nombreProveedor: e.target.value })}
                   />
                   {errorsEditar.nombreProveedor && <span className="text-red-500 text-xs mt-1">{errorsEditar.nombreProveedor}</span>}
@@ -406,9 +403,8 @@ export const Proveedores = () => {
                   <label className="text-sm font-medium text-gray-700">Teléfono *</label>
                   <input
                     value={formEditar.telefono}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                      errorsEditar.telefono ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
-                    }`}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsEditar.telefono ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                      }`}
                     onChange={(e) => setFormEditar({ ...formEditar, telefono: e.target.value.replace(/\D/g, "") })}
                   />
                   {errorsEditar.telefono && <span className="text-red-500 text-xs mt-1">{errorsEditar.telefono}</span>}
@@ -418,9 +414,8 @@ export const Proveedores = () => {
                   <input
                     type="email"
                     value={formEditar.correo}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                      errorsEditar.correo ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
-                    }`}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsEditar.correo ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                      }`}
                     onChange={(e) => setFormEditar({ ...formEditar, correo: e.target.value })}
                   />
                   {errorsEditar.correo && <span className="text-red-500 text-xs mt-1">{errorsEditar.correo}</span>}
@@ -429,9 +424,8 @@ export const Proveedores = () => {
                   <label className="text-sm font-medium text-gray-700">Dirección *</label>
                   <input
                     value={formEditar.direccion}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                      errorsEditar.direccion ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
-                    }`}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsEditar.direccion ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                      }`}
                     onChange={(e) => setFormEditar({ ...formEditar, direccion: e.target.value })}
                   />
                   {errorsEditar.direccion && <span className="text-red-500 text-xs mt-1">{errorsEditar.direccion}</span>}

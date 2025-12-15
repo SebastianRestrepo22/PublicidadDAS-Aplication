@@ -1,11 +1,21 @@
 import { Search, Plus, Edit, Eye, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Modal from "../../components/modals/modal";
-import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { 
+  getAllInsumos, 
+  createInsumo, 
+  updateInsumo, 
+  deleteInsumo 
+} from "./services/services.insumos";
 
-const API_URL = "http://localhost:3000/api/insumos";
+// Función para reducir el ID a 4 caracteres con puntos suspensivos
+const getShortId = (id) => {
+  const str = String(id || "");
+  if (str.length <= 4) return str;
+  return str.substring(0, 4) + "...";
+};
 
 export const Insumos = () => {
   const [insumos, setInsumos] = useState([]);
@@ -26,17 +36,17 @@ export const Insumos = () => {
   });
 
   const [formEditar, setFormEditar] = useState({
-    Nombre: "", // ✅ Nombres que espera el backend
-    Stock: "",
+    nombreInsumo: "",
+    stock: "",
   });
 
   // Obtener insumos
   const fetchInsumos = async () => {
     try {
-      const response = await fetch(API_URL);
-      const data = await response.json();
-      setInsumos(data);
+      const data = await getAllInsumos();
+      setInsumos(Array.isArray(data) ? data : []);
     } catch (error) {
+      console.error("Error al obtener insumos:", error);
       toast.error("Error al obtener insumos");
     }
   };
@@ -45,256 +55,389 @@ export const Insumos = () => {
     fetchInsumos();
   }, []);
 
-  // Crear insumo
-  const handleCreate = async () => {
-    if (!formCrear.nombreInsumo.trim()) {
-      setErrorNombre("El nombre es obligatorio");
-      toast.error("El nombre es obligatorio");
-      return;
-    }
-    if (!formCrear.stock || isNaN(Number(formCrear.stock)) || Number(formCrear.stock) < 0) {
-      setErrorStock("El stock debe ser un número válido >= 0");
-      toast.error("El stock debe ser un número válido");
-      return;
-    }
+  // Resetear formulario de creación
+  const resetCreateForm = () => {
+    setFormCrear({ nombreInsumo: "", stock: "" });
     setErrorNombre("");
     setErrorStock("");
+  };
+
+  // Validar nombre
+  const validarNombre = (nombre) => {
+    if (!nombre || !nombre.trim()) {
+      return "El nombre es obligatorio";
+    }
+    const nombreRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/;
+    if (!nombreRegex.test(nombre.trim())) {
+      return "Solo letras y espacios permitidos";
+    }
+    if (nombre.trim().length < 2) {
+      return "El nombre debe tener al menos 2 caracteres";
+    }
+    if (nombre.trim().length > 100) {
+      return "El nombre no puede exceder 100 caracteres";
+    }
+    return "";
+  };
+
+  // Validar stock
+  const validarStock = (stock) => {
+    if (stock === "" || stock === null || stock === undefined) {
+      return "El stock es obligatorio";
+    }
+    
+    // Convertir a número
+    const numStock = parseInt(stock, 10);
+    if (isNaN(numStock)) {
+      return "El stock debe ser un número válido";
+    }
+    if (numStock < 0) {
+      return "El stock debe ser mayor o igual a 0";
+    }
+    if (!Number.isInteger(numStock)) {
+      return "El stock debe ser un número entero";
+    }
+    if (numStock > 999999) {
+      return "El stock no puede exceder 999,999";
+    }
+    return "";
+  };
+
+  // Crear insumo
+  const handleCreate = async () => {
+    // Validaciones
+    const nombreError = validarNombre(formCrear.nombreInsumo);
+    const stockError = validarStock(formCrear.stock);
+
+    if (nombreError) {
+      setErrorNombre(nombreError);
+      toast.error(nombreError);
+      return;
+    }
+
+    if (stockError) {
+      setErrorStock(stockError);
+      toast.error(stockError);
+      return;
+    }
 
     try {
-      await axios.post(API_URL, {
-        Nombre: formCrear.nombreInsumo, // ✅ Envía Nombre, no nombreInsumo
-        Stock: Number(formCrear.stock),
-      });
+      // Asegurarnos de que los datos estén en el formato correcto que espera el backend
+      const insumoData = {
+        nombreInsumo: formCrear.nombreInsumo.trim(),
+        stock: parseInt(formCrear.stock, 10)
+      };
+
+      console.log("Enviando datos para crear insumo:", insumoData);
+      
+      const result = await createInsumo(insumoData);
+      console.log("Respuesta del servidor:", result);
+      
       toast.success("Insumo creado exitosamente");
       setOpenCreate(false);
-      setFormCrear({ nombreInsumo: "", stock: "" });
+      resetCreateForm();
       fetchInsumos();
     } catch (err) {
-      toast.error("Error al crear insumo");
+      console.error("Error al crear insumo:", err);
+      if (err.response) {
+        console.error("Response data:", err.response.data);
+        console.error("Response status:", err.response.status);
+        toast.error(err.response?.data?.error || err.response?.data?.message || "Error al crear insumo");
+      } else if (err.request) {
+        toast.error("No se pudo conectar con el servidor");
+      } else {
+        toast.error("Error inesperado al crear insumo");
+      }
     }
   };
 
   // Editar insumo
   const handleUpdate = async () => {
-    if (!formEditar.Nombre?.trim()) {
-      toast.error("El nombre es obligatorio");
+    if (!selectedInsumo) {
+      toast.error("No se seleccionó ningún insumo para editar");
       return;
     }
-    if (!formEditar.Stock || isNaN(Number(formEditar.Stock)) || Number(formEditar.Stock) < 0) {
-      toast.error("El stock debe ser un número válido >= 0");
+
+    const nombreError = validarNombre(formEditar.nombreInsumo);
+    const stockError = validarStock(formEditar.stock);
+
+    if (nombreError) {
+      toast.error(nombreError);
+      return;
+    }
+
+    if (stockError) {
+      toast.error(stockError);
       return;
     }
 
     try {
-      await axios.put(`${API_URL}/${selectedInsumo.InsumoId}`, {
-        Nombre: formEditar.Nombre,
-        Stock: Number(formEditar.Stock),
-      });
+      const insumoData = {
+        nombreInsumo: formEditar.nombreInsumo.trim(),
+        stock: parseInt(formEditar.stock, 10)
+      };
+
+      console.log("Enviando datos para actualizar insumo:", insumoData);
+      
+      await updateInsumo(selectedInsumo.InsumoId, insumoData);
       toast.success("Insumo actualizado correctamente");
       fetchInsumos();
       setOpenEditar(false);
+      setSelectedInsumo(null);
     } catch (error) {
-      toast.error("Error al actualizar el insumo");
+      console.error("Error al actualizar insumo:", error);
+      toast.error(error.response?.data?.error || error.response?.data?.message || "Error al actualizar el insumo");
     }
   };
 
   // Eliminar insumo
   const handleDelete = async () => {
+    if (!selectedInsumo) {
+      toast.error("No se seleccionó ningún insumo para eliminar");
+      return;
+    }
+
     try {
-      await axios.delete(`${API_URL}/${selectedInsumo.InsumoId}`);
+      await deleteInsumo(selectedInsumo.InsumoId);
       toast.success("Insumo eliminado correctamente");
       setOpenEliminar(false);
+      setSelectedInsumo(null);
       fetchInsumos();
     } catch (err) {
-      toast.error("Error al eliminar el insumo");
+      console.error("Error al eliminar insumo:", err);
+      toast.error(err.response?.data?.error || err.response?.data?.message || "Error al eliminar el insumo");
     }
   };
 
   const openEditarModal = (item) => {
     setSelectedInsumo(item);
     setFormEditar({
-      Nombre: item.Nombre, // ✅ Usa los mismos nombres que la API
-      Stock: item.Stock,
+      nombreInsumo: item.Nombre || item.nombreInsumo || "",
+      stock: item.Stock || item.stock || "",
     });
     setOpenEditar(true);
   };
 
   // Filtro
   const insumosFiltrados = insumos.filter((i) => {
-    if (!busqueda.trim()) return true;
-    const search = busqueda.toLowerCase();
+    if (!busqueda) return true;
+    const id = i.InsumoId || i.id || "";
+    const nombre = i.Nombre || i.nombreInsumo || "";
+    const stock = i.Stock || i.stock || "";
+    
     if (campoFiltro === "id") {
-      return i.InsumoId.toString().includes(busqueda);
+      return id.toString().includes(busqueda);
     }
     if (campoFiltro === "nombre") {
-      return i.Nombre.toLowerCase().includes(search);
+      return nombre.toLowerCase().includes(busqueda.toLowerCase());
     }
     if (campoFiltro === "stock") {
-      return i.Stock.toString().includes(busqueda);
+      return stock.toString().includes(busqueda);
     }
     return (
-      i.InsumoId.toString().includes(busqueda) ||
-      i.Nombre.toLowerCase().includes(search) ||
-      i.Stock.toString().includes(busqueda)
+      id.toString().includes(busqueda) ||
+      nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+      stock.toString().includes(busqueda)
     );
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6"> {/* ✅ Fondo neutro */}
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-800 mb-6">
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-4 sm:mb-6">
             Gestión de insumos
           </h1>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-4 sm:mb-6">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center">
               <button
-                onClick={() => setOpenCreate(true)}
-                className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-all"
+                onClick={() => {
+                  resetCreateForm();
+                  setOpenCreate(true);
+                }}
+                className="inline-flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 sm:px-6 sm:py-3 rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap text-sm sm:text-base"
               >
                 <Plus size={18} /> Nuevo insumo
               </button>
 
-              <select
-                value={campoFiltro}
-                onChange={(e) => setCampoFiltro(e.target.value)}
-                className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
-              >
-                <option value="">Filtrar por campo</option>
-                <option value="id">ID</option>
-                <option value="nombre">Nombre</option>
-                <option value="stock">Stock</option>
-              </select>
-
               <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Buscar insumos"
+                  placeholder="Buscar insumos..."
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
-                  className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700"
+                  className="border border-slate-300 rounded-lg pl-9 sm:pl-10 pr-4 py-2.5 sm:py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700 text-sm sm:text-base"
                 />
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <select
+                  value={campoFiltro}
+                  onChange={(e) => setCampoFiltro(e.target.value)}
+                  className="border border-slate-300 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px] text-sm sm:text-base"
+                >
+                  <option value="">Filtrar por campo</option>
+                  <option value="id">ID</option>
+                  <option value="nombre">Nombre</option>
+                  <option value="stock">Stock</option>
+                </select>
               </div>
             </div>
           </div>
 
-          {/* Tabla */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-slate-800"> {/* ✅ Sin gradiente */}
-                <tr>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">ID</th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Nombre del insumo</th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Stock</th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {insumosFiltrados.map((i) => (
-                  <tr key={i.InsumoId} className="hover:bg-slate-50 transition-colors duration-150">
-                    <td className="py-4 px-6 text-sm font-medium text-slate-900">
-                      {i.InsumoId?.toString().substring(0, 3)}
-                    </td>
-                    <td className="py-4 px-6 text-sm font-medium text-slate-900">{i.Nombre}</td>
-                    <td className="py-4 px-6 text-sm font-medium text-slate-900">{i.Stock}</td>
-                    <td className="py-4 px-6">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => openEditarModal(i)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-150"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedInsumo(i);
-                            setOpenVer(true);
-                          }}
-                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors duration-150"
-                        >
-                          <Eye size={16} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedInsumo(i);
-                            setOpenEliminar(true);
-                          }}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-150"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-800">
+                  <tr>
+                    <th className="py-2.5 px-3 sm:py-3 sm:px-6 text-xs sm:text-sm font-semibold text-white uppercase tracking-wider text-center">
+                      ID
+                    </th>
+                    <th className="py-2.5 px-3 sm:py-3 sm:px-7 text-xs sm:text-sm font-semibold text-white uppercase tracking-wider text-left">
+                      Nombre del insumo
+                    </th>
+                    <th className="py-2.5 px-3 sm:py-3 sm:px-6 text-xs sm:text-sm font-semibold text-white uppercase tracking-wider text-center">
+                      Stock
+                    </th>
+                    <th className="py-2.5 px-3 sm:py-3 sm:px-6 text-xs sm:text-sm font-semibold text-white uppercase tracking-wider text-center">
+                      Acciones
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {insumosFiltrados.length > 0 ? (
+                    insumosFiltrados.map((i) => (
+                      <tr key={i.InsumoId || i.id} className="hover:bg-slate-50 transition-colors duration-150">
+                        <td className="py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-slate-900 text-center align-middle font-mono">
+                          {getShortId(i.InsumoId || i.id)}
+                        </td>
+                        <td className="py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-slate-900 align-middle">
+                          {i.Nombre || i.nombreInsumo}
+                        </td>
+                        <td className="py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-slate-900 text-center align-middle">
+                          {i.Stock || i.stock}
+                        </td>
+                        <td className="py-2.5 px-3 sm:py-3 sm:px-4 text-center align-middle">
+                          <div className="flex justify-center gap-1 sm:gap-2">
+                            <button
+                              onClick={() => openEditarModal(i)}
+                              className="p-1.5 sm:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-150"
+                              title="Editar"
+                            >
+                              <Edit size={14} className="sm:w-4 sm:h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedInsumo(i);
+                                setOpenVer(true);
+                              }}
+                              className="p-1.5 sm:p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors duration-150"
+                              title="Ver"
+                            >
+                              <Eye size={14} className="sm:w-4 sm:h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedInsumo(i);
+                                setOpenEliminar(true);
+                              }}
+                              className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-150"
+                              title="Eliminar"
+                            >
+                              <Trash2 size={14} className="sm:w-4 sm:h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="py-4 sm:py-6 text-center text-gray-500 text-sm sm:text-base">
+                        {insumos.length === 0 ? "No hay insumos registrados" : "No se encontraron resultados"}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          {/* MODAL CREAR */}
-          <Modal open={openCreate} onClose={() => setOpenCreate(false)}>
-            <div className="w-[450px] p-6 mx-auto text-center">
-              <h3 className="text-lg font-black text-gray-800 mb-4">Nuevo insumo</h3>
-              <form className="grid grid-cols-1 gap-4 text-left">
+          {/* MODALES */}
+          {/* Crear */}
+          <Modal open={openCreate} onClose={() => {
+            setOpenCreate(false);
+            resetCreateForm();
+          }}>
+            <div className="w-[90vw] max-w-[450px] p-4 sm:p-6 mx-auto text-center">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Nuevo insumo</h3>
+              <form className="grid grid-cols-1 gap-4 text-left" onSubmit={(e) => {
+                e.preventDefault();
+                handleCreate();
+              }}>
                 <div className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700">Nombre *</label>
+                  <label className="mb-1 text-sm font-medium text-gray-700">Nombre del insumo *</label>
                   <input
-                    placeholder="Nombre del insumo"
+                    placeholder="Ingrese nombre del insumo"
                     value={formCrear.nombreInsumo}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                      errorNombre ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
-                    }`}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorNombre ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                      }`}
                     onChange={(e) => {
                       const valor = e.target.value;
                       setFormCrear({ ...formCrear, nombreInsumo: valor });
-                      const regex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]*$/;
-                      if (!regex.test(valor)) {
-                        setErrorNombre("Solo letras y espacios");
-                      } else if (valor.trim() === "") {
-                        setErrorNombre("El nombre es obligatorio");
-                      } else {
-                        setErrorNombre("");
-                      }
+                      setErrorNombre(validarNombre(valor));
+                    }}
+                    onBlur={(e) => {
+                      setErrorNombre(validarNombre(e.target.value));
                     }}
                   />
-                  {errorNombre && <span className="text-red-500 text-xs mt-1">{errorNombre}</span>}
+                  {errorNombre && (
+                    <span className="text-red-500 text-xs mt-1">{errorNombre}</span>
+                  )}
                 </div>
                 <div className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700">Stock *</label>
+                  <label className="mb-1 text-sm font-medium text-gray-700">Stock *</label>
                   <input
                     type="number"
                     min="0"
-                    placeholder="Cantidad en stock"
+                    step="1"
+                    placeholder="Ingrese stock"
                     value={formCrear.stock}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                      errorStock ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
-                    }`}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorStock ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                      }`}
                     onChange={(e) => {
                       const valor = e.target.value;
                       setFormCrear({ ...formCrear, stock: valor });
-                      if (valor === "" || (Number(valor) >= 0 && !isNaN(Number(valor)))) {
-                        setErrorStock("");
-                      } else {
-                        setErrorStock("Ingrese un número válido >= 0");
+                      setErrorStock(validarStock(valor));
+                    }}
+                    onBlur={(e) => {
+                      setErrorStock(validarStock(e.target.value));
+                    }}
+                    onKeyDown={(e) => {
+                      if (!/[0-9]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) {
+                        e.preventDefault();
                       }
                     }}
                   />
-                  {errorStock && <span className="text-red-500 text-xs mt-1">{errorStock}</span>}
+                  {errorStock && (
+                    <span className="text-red-500 text-xs mt-1">{errorStock}</span>
+                  )}
                 </div>
-                <div className="flex gap-4 mt-6">
+                <div className="flex gap-3 mt-4">
                   <button
-                    type="button"
-                    onClick={handleCreate}
-                    className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700"
+                    type="submit"
+                    className="flex-1 bg-emerald-600 text-white py-2.5 rounded-lg hover:bg-emerald-700 transition-colors"
                   >
-                    Crear
+                    Crear insumo
                   </button>
                   <button
                     type="button"
-                    onClick={() => setOpenCreate(false)}
-                    className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                    onClick={() => {
+                      setOpenCreate(false);
+                      resetCreateForm();
+                    }}
+                    className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors"
                   >
                     Cancelar
                   </button>
@@ -303,43 +446,57 @@ export const Insumos = () => {
             </div>
           </Modal>
 
-          {/* MODAL EDITAR */}
-          <Modal open={openEditar} onClose={() => setOpenEditar(false)}>
-            <div className="w-[450px] p-6 mx-auto text-center">
-              <h3 className="text-lg font-black text-gray-800 mb-4">Editar insumo</h3>
-              <form className="grid grid-cols-1 gap-4 text-left">
+          {/* Editar */}
+          <Modal open={openEditar} onClose={() => {
+            setOpenEditar(false);
+            setSelectedInsumo(null);
+          }}>
+            <div className="w-[90vw] max-w-[450px] p-4 sm:p-6 mx-auto text-center">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Editar insumo</h3>
+              <form className="grid grid-cols-1 gap-4 text-left" onSubmit={(e) => {
+                e.preventDefault();
+                handleUpdate();
+              }}>
                 <div className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700">Nombre *</label>
+                  <label className="mb-1 text-sm font-medium text-gray-700">Nombre del insumo *</label>
                   <input
                     placeholder="Nombre del insumo"
-                    value={formEditar.Nombre}
+                    value={formEditar.nombreInsumo}
                     className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) => setFormEditar({ ...formEditar, Nombre: e.target.value })}
+                    onChange={(e) => setFormEditar({ ...formEditar, nombreInsumo: e.target.value })}
                   />
                 </div>
                 <div className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700">Stock *</label>
+                  <label className="mb-1 text-sm font-medium text-gray-700">Stock *</label>
                   <input
                     type="number"
                     min="0"
+                    step="1"
                     placeholder="Cantidad en stock"
-                    value={formEditar.Stock}
+                    value={formEditar.stock}
                     className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) => setFormEditar({ ...formEditar, Stock: e.target.value })}
+                    onChange={(e) => setFormEditar({ ...formEditar, stock: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (!/[0-9]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
                   />
                 </div>
-                <div className="flex gap-4 mt-6">
+                <div className="flex gap-3 mt-4">
                   <button
-                    type="button"
-                    onClick={handleUpdate}
-                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                    type="submit"
+                    className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors"
                   >
                     Guardar cambios
                   </button>
                   <button
                     type="button"
-                    onClick={() => setOpenEditar(false)}
-                    className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                    onClick={() => {
+                      setOpenEditar(false);
+                      setSelectedInsumo(null);
+                    }}
+                    className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors"
                   >
                     Cancelar
                   </button>
@@ -348,45 +505,67 @@ export const Insumos = () => {
             </div>
           </Modal>
 
-          {/* MODAL VER */}
-          <Modal open={openVer} onClose={() => setOpenVer(false)}>
-            <div className="w-[450px] p-6 mx-auto text-center">
-              <h3 className="text-lg font-black text-gray-800 mb-4">Ver insumo</h3>
+          {/* Ver */}
+          <Modal open={openVer} onClose={() => {
+            setOpenVer(false);
+            setSelectedInsumo(null);
+          }}>
+            <div className="w-[90vw] max-w-[450px] p-4 sm:p-6 mx-auto text-center">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Ver insumo</h3>
               {selectedInsumo && (
                 <div className="text-left space-y-3 text-gray-700">
-                  <p><strong>ID:</strong> {selectedInsumo.InsumoId?.toString().substring(0, 3)}</p>
-                  <p><strong>Nombre:</strong> {selectedInsumo.Nombre}</p>
-                  <p><strong>Stock:</strong> {selectedInsumo.Stock}</p>
+                  <p>
+                    <strong>ID:</strong> {getShortId(selectedInsumo.InsumoId || selectedInsumo.id)}
+                    <span className="text-gray-500 text-sm ml-2">(completo: {selectedInsumo.InsumoId || selectedInsumo.id})</span>
+                  </p>
+                  <p>
+                    <strong>Nombre:</strong> {selectedInsumo.Nombre || selectedInsumo.nombreInsumo}
+                  </p>
+                  <p>
+                    <strong>Stock:</strong> {selectedInsumo.Stock || selectedInsumo.stock}
+                  </p>
                 </div>
               )}
               <button
-                onClick={() => setOpenVer(false)}
-                className="mt-6 bg-gray-200 px-6 py-2 rounded-lg text-gray-700 hover:bg-gray-300"
+                onClick={() => {
+                  setOpenVer(false);
+                  setSelectedInsumo(null);
+                }}
+                className="mt-6 bg-gray-200 px-6 py-2 rounded-lg text-gray-700 hover:bg-gray-300 transition-colors"
               >
                 Cerrar
               </button>
             </div>
           </Modal>
 
-          {/* MODAL ELIMINAR */}
-          <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
-            <div className="w-[400px] p-6 mx-auto text-center">
-              <h3 className="text-lg font-black text-gray-800 mb-3">Eliminar insumo</h3>
+          {/* Eliminar */}
+          <Modal open={openEliminar} onClose={() => {
+            setOpenEliminar(false);
+            setSelectedInsumo(null);
+          }}>
+            <div className="w-[90vw] max-w-[400px] p-4 sm:p-6 mx-auto text-center">
+              <h3 className="text-lg font-bold text-gray-800 mb-3">Eliminar insumo</h3>
               {selectedInsumo && (
-                <p className="mb-5 text-gray-600">
-                  ¿Estás seguro de eliminar <strong>"{selectedInsumo.Nombre}"</strong>?
-                </p>
+                <div className="mb-5 text-gray-600">
+                  <p>¿Estás seguro de eliminar el insumo?</p>
+                  <p className="mt-2 font-medium">
+                    <strong>{selectedInsumo.Nombre || selectedInsumo.nombreInsumo}</strong> (ID: {getShortId(selectedInsumo.InsumoId || selectedInsumo.id)})
+                  </p>
+                </div>
               )}
-              <div className="flex gap-4">
+              <div className="flex gap-3">
                 <button
                   onClick={handleDelete}
-                  className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700"
+                  className="flex-1 bg-red-600 text-white py-2.5 rounded-lg hover:bg-red-700 transition-colors"
                 >
                   Eliminar
                 </button>
                 <button
-                  onClick={() => setOpenEliminar(false)}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                  onClick={() => {
+                    setOpenEliminar(false);
+                    setSelectedInsumo(null);
+                  }}
+                  className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors"
                 >
                   Cancelar
                 </button>

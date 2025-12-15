@@ -15,8 +15,8 @@ import detallePedidoClienteRoutes from "./routes/detallePedidoCliente.routes.js"
 import detalleProduccionRoutes from "./routes/detalleProduccion.routes.js";
 import produccionRoutes from "./routes/produccion.routes.js";
 import citaRoutes from "./routes/cita.routes.js";
-import comprobanteRoutes from "./routes/comprobante.routes.js";
-
+import ventasRoutes from "./routes/venta.routes.js";
+import detalleVentasRoutes from "./routes/detalleVentas.routes.js"
 // Rutas de autenticación y usuarios
 import authRouter from './routes/authRoutes.js';
 import roleRouter from './routes/role.routes.js';
@@ -60,7 +60,8 @@ app.use("/api/detalle-pedido", detallePedidoClienteRoutes);
 app.use("/api/detalle-produccion", detalleProduccionRoutes);
 app.use("/api/produccion", produccionRoutes);
 app.use("/api/cita", citaRoutes);
-app.use("/api/comprobantes", comprobanteRoutes); 
+app.use("/api/ventas", ventasRoutes);
+app.use("/api/detalle-ventas", detalleVentasRoutes);
 app.use(express.static("public")); 
 
 // Iniciar servidor

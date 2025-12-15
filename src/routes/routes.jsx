@@ -23,14 +23,13 @@ import { ProtectedRouteAdmin } from "./ProtectedRouteAdmin";
 import { Perfil } from "../features/landing/carritoCompras/perfil/perfil";
 import MisPedidos from "../features/landing/historial/MisPedidos";
 import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidosClientes";
-import { Compras } from "../features/dashboard/constrolinsumos/compras/compras";
 import { Ventas } from "../features/dashboard/gestionventas/venta/ventas";
 import { Produccion } from "../features/dashboard/gestionventas/produccion/produccion";
 import { Checkout } from "../features/landing/carritoCompras/checkout/checkout";
 import { PedidoExitoso } from "../features/dashboard/gestionventas/pedidos/pedidoExitoso/pedidoExitoso";
 import { ScrollToTop } from "../features/landing/components/ScrollToTop";
-import Comprobante from "../features/dashboard/comprobantes/comprobante";
 import { Inicio } from "../features/landing/inicio/inicio";
+import { Compras } from "../features/dashboard/constrolinsumos/compras/compras";
 
 export const Routers = () => {
   return (
@@ -122,10 +121,12 @@ export const Routers = () => {
           <Route path="compras/:id/editar" element={<Compras />} />
           <Route path="produccion" element={<Produccion />} />
           <Route path="produccion/nuevo" element={<Produccion />} />
+          <Route path="produccion/nuevo/seleccionar-pedido" element={<Produccion />} />
+          <Route path="produccion/nuevo/seleccionar-insumo/:detalleIndex" element={<Produccion />} />
           <Route path="produccion/:id" element={<Produccion />} />
           <Route path="produccion/:id/editar" element={<Produccion />} />
-          <Route path="comprobante" element={<Comprobante />} />
-          <Route path="comprobante" element={<Comprobante />} />
+          <Route path="produccion/:id/editar/seleccionar-pedido" element={<Produccion />} />
+          <Route path="produccion/:id/editar/seleccionar-insumo/:detalleIndex" element={<Produccion />} />
           <Route path="ventas/nuevo" element={<Ventas />} />
           <Route path="ventas/:id" element={<Ventas />} />
           <Route path="ventas/:id/editar" element={<Ventas />} />

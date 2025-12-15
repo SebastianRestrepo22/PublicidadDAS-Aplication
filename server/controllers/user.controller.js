@@ -1,10 +1,10 @@
 import bcrypt from 'bcrypt';
+import connectDB from '../lib/db.js';
 import { sendResetPasswordEmail  } from '../utils/email.js';
 import dayjs from "dayjs"; // para manejar expiraciones
 import crypto from "crypto";
-import connectDB from '../lib/db.js';
 
-// Crear usuario
+// Crear usuari
 export const createUser = async (req, res) => {
     const {
         CedulaId,
@@ -163,12 +163,24 @@ export const updateUser = async (req, res) => {
     }
 };
 
-
-// Eliminar usuario
+    // Eliminar usuario
 export const deleteUser = async (req, res) => {
     const { id } = req.params;
     try {
         const connection = await connectDB();
+        
+        // Verificar si el usuario tiene pedidos asociados
+        const [pedidos] = await connection.execute(
+            'SELECT * FROM pedidosclientes WHERE ClienteId = ?',
+            [id]
+        );
+        
+        if (pedidos.length > 0) {
+            return res.status(409).json({ 
+                message: 'No se puede eliminar el usuario porque tiene pedidos asociados' 
+            });
+        }
+
         const [result] = await connection.execute(
             'DELETE FROM usuarios WHERE CedulaId = ?',
             [id]

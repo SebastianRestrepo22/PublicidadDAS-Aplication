@@ -38,18 +38,18 @@ export const deleteDataUser = async (id) => {
         const response = await axios.delete(url + `user/${id}`);
         return response; // Devuelve la respuesta de la API
     } catch (error) {
-        return { status: false, message: "No se puede eliminar el usuario : ", error }; // Manejo de errores
+        throw error; // Manejo de errores
     }
 }
 
 //Buscar usuarios
 
 export const buscarUsuarios = async (campo, valor) => {
-  try {
-    const response = await axios.get(`${url}user/buscar?campo=${campo}&valor=${valor}`);
-    return response.data;
-  } catch (error) {
-    console.error("Error al buscar usuarios:", error);
-    return [];
-  }
+    try {
+        const response = await axios.get(`${url}user/buscar?campo=${campo}&valor=${valor}`);
+        return response.data;
+    } catch (error) {
+        console.error("Error al buscar usuarios:", error);
+        return [];
+    }
 };

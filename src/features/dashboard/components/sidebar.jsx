@@ -24,6 +24,7 @@ const menuItems = [
   { icon: BarChart3, label: "Gráficos Estadísticos", to: "/dashboard/graficosEstadisticos" },
   { icon: UserCheck, label: "Roles", to: "/dashboard/roles" },
   { icon: Users, label: "Usuarios", to: "/dashboard/usuarios" },
+  { icon: Palette, label: "Diseño", to: "/dashboard/Diseño" },
   { icon: Wrench, label: "Servicios", to: "/dashboard/productoServicio" },
   {
     icon: Package,
@@ -36,7 +37,6 @@ const menuItems = [
       { label: "Insumos", to: "/dashboard/insumos" },
     ],
   },
-  { icon: Palette, label: "Diseño", to: "/dashboard/Diseño" },
   {
     icon: ShoppingCart,
     label: "Gestión de Ventas",
@@ -48,7 +48,6 @@ const menuItems = [
       { label: "Venta", to: "/dashboard/ventas" }
     ]
   },
-  { icon: MonitorCheck, label: "Comprobantes", to: "/dashboard/comprobante"},
   { icon: CalendarDays, label: "Agenda", to: "/dashboard/agenda" }
 ];
 
