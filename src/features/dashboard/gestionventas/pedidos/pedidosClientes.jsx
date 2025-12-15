@@ -37,8 +37,11 @@ export const PedidosClientes = () => {
     FechaRegistro: "",
     Total: 0,
     Estado: "pendiente",
-    VoucherBase64: "",
-    VoucherFile: null,
+    metodo_pago: "transferencia",
+    nombre_recibe: "",
+    telefono_entrega: "",
+    direccion_entrega: "",
+    voucher: "",
   });
 
   const [detallesCrear, setDetallesCrear] = useState([
@@ -186,22 +189,6 @@ export const PedidosClientes = () => {
     });
   };
 
-  // Manejar adjunto de voucher
-  const handleVoucherFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setFormCrear(prev => ({
-          ...prev,
-          VoucherFile: file,
-          VoucherBase64: event.target.result
-        }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   // Guardar pedido
   const handleCreate = async () => {
     try {
@@ -219,7 +206,11 @@ export const PedidosClientes = () => {
         FechaRegistro: formCrear.FechaRegistro,
         Total: Number(formCrear.Total) || 0,
         Estado: formCrear.Estado,
-        Voucher: formCrear.VoucherBase64 || "",
+        metodo_pago: formCrear.metodo_pago,
+        nombre_recibe: formCrear.metodo_pago === "contra_entrega" ? formCrear.nombre_recibe : null,
+        telefono_entrega: formCrear.metodo_pago === "contra_entrega" ? formCrear.telefono_entrega : null,
+        direccion_entrega: formCrear.metodo_pago === "contra_entrega" ? formCrear.direccion_entrega : null,
+        voucher: formCrear.metodo_pago === "transferencia" ? formCrear.voucher : null,
         detalle: detallesLimpios,
       });
 
@@ -241,7 +232,11 @@ export const PedidosClientes = () => {
         FechaRegistro: pedidoActual.FechaRegistro,
         Total: pedidoActual.Total,
         Estado: nuevoEstado,
-        Voucher: pedidoActual.Voucher,
+        metodo_pago: pedidoActual.metodo_pago,
+        nombre_recibe: pedidoActual.nombre_recibe,
+        telefono_entrega: pedidoActual.telefono_entrega,
+        direccion_entrega: pedidoActual.direccion_entrega,
+        voucher: pedidoActual.voucher,
       });
 
       setPedidos(prev =>
@@ -310,6 +305,8 @@ export const PedidosClientes = () => {
                   <option value="PedidoClienteId">Pedido ID</option>
                   <option value="NombreCliente">Cliente</option>
                   <option value="FechaRegistro">Fecha</option>
+                  <option value="metodo_pago">Método Pago</option>
+                  <option value="Estado">Estado</option>
                 </select>
               </div>
             </div>
@@ -322,6 +319,7 @@ export const PedidosClientes = () => {
                     <th className="px-4 py-3 text-white text-left">Cliente</th>
                     <th className="px-4 py-3 text-white text-left">Fecha Registro</th>
                     <th className="px-4 py-3 text-white text-left">Total</th>
+                    <th className="px-4 py-3 text-white text-left">Método</th>
                     <th className="px-4 py-3 text-white text-left">Estado</th>
                     <th className="px-4 py-3 text-white text-left">Acciones</th>
                   </tr>
@@ -333,6 +331,11 @@ export const PedidosClientes = () => {
                       <td className="py-4 px-6">{pedido.NombreCliente || "—"}</td>
                       <td className="py-4 px-6">{pedido.FechaRegistro}</td>
                       <td className="py-4 px-6">$ {Number(pedido.Total || 0).toFixed(2)}</td>
+                      <td className="py-4 px-6">
+                        <span className="text-sm font-medium">
+                          {pedido.metodo_pago === 'contra_entrega' ? 'Contra Entrega' : 'Transferencia'}
+                        </span>
+                      </td>
                       <td className="py-4 px-6">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                           pedido.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
@@ -404,40 +407,92 @@ export const PedidosClientes = () => {
                   />
                 </div>
               </div>
+
+              {/* Método de pago */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-2">
-                  <label className="font-medium">Adjuntar Voucher</label>
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={handleVoucherFileChange}
-                    className="w-full h-11 px-3 border rounded"
-                  />
-                  {formCrear.VoucherBase64 && (
-                    <div className="mt-2">
-                      {formCrear.VoucherBase64.startsWith("data:image") ? (
-                        <img src={formCrear.VoucherBase64} alt="Voucher preview" className="max-w-32 max-h-32 rounded" />
-                      ) : (
-                        <p className="text-sm text-green-600">Archivo PDF adjuntado</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="font-medium">Estado</label>
+                  <label className="font-medium">Método de Pago</label>
                   <select
-                    value={formCrear.Estado}
-                    onChange={(e) => setFormCrear({ ...formCrear, Estado: e.target.value })}
+                    value={formCrear.metodo_pago}
+                    onChange={(e) => setFormCrear({ ...formCrear, metodo_pago: e.target.value })}
                     className="w-full h-11 px-3 border rounded"
                   >
-                    <option value="pendiente">Pendiente</option>
-                    <option value="en_produccion">En Producción</option>
-                    <option value="terminado">Terminado</option>
-                    <option value="entregado">Entregado</option>
-                    <option value="cancelado">Cancelado</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="contra_entrega">Contra Entrega</option>
                   </select>
                 </div>
+
+                {/* Comprobante solo si es transferencia */}
+                {formCrear.metodo_pago === "transferencia" && (
+                  <div className="flex flex-col gap-2">
+                    <label className="font-medium">Comprobante de pago (imagen o PDF)</label>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) {
+                          setFormCrear(prev => ({ ...prev, voucher: "" }));
+                          return;
+                        }
+                        if (file.size > 10 * 1024 * 1024) {
+                          alert("El archivo debe ser menor a 10MB");
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          setFormCrear(prev => ({ ...prev, voucher: reader.result }));
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                      className="w-full h-11 px-3 border rounded"
+                    />
+                    {formCrear.voucher && (
+                      <div className="mt-2">
+                        {formCrear.voucher.startsWith("image") ? (
+                          <img src={formCrear.voucher} alt="Voucher preview" className="max-w-32 max-h-32 rounded" />
+                        ) : (
+                          <p className="text-sm text-green-600">Archivo PDF adjuntado</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {/* Campos de entrega (solo contra entrega) */}
+              {formCrear.metodo_pago === "contra_entrega" && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="font-medium">Nombre quien recibe</label>
+                    <input
+                      type="text"
+                      value={formCrear.nombre_recibe}
+                      onChange={(e) => setFormCrear({ ...formCrear, nombre_recibe: e.target.value })}
+                      className="w-full h-11 px-3 border rounded"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="font-medium">Teléfono de entrega</label>
+                    <input
+                      type="text"
+                      value={formCrear.telefono_entrega}
+                      onChange={(e) => setFormCrear({ ...formCrear, telefono_entrega: e.target.value })}
+                      className="w-full h-11 px-3 border rounded"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="font-medium">Dirección de entrega</label>
+                    <textarea
+                      value={formCrear.direccion_entrega}
+                      onChange={(e) => setFormCrear({ ...formCrear, direccion_entrega: e.target.value })}
+                      className="w-full h-11 px-3 border rounded"
+                      rows="2"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-end">
                 <button type="button" onClick={añadirDetalleCrear} className="bg-blue-500 text-white px-6 py-2 rounded-lg flex items-center gap-2">
                   <Plus size={15} /> Añadir detalle
@@ -448,7 +503,6 @@ export const PedidosClientes = () => {
                   <div key={d._tempId} className="grid grid-cols-1 md:grid-cols-7 gap-3 border p-3 rounded">
                     <div className="flex flex-col gap-2">
                       <label>Producto / Servicio</label>
-                      {/* SELECT TRADICIONAL QUE ABRE EL MODAL */}
                       <select
                         value={d.ProductoServicioId || ""}
                         onChange={(e) => {
@@ -457,7 +511,6 @@ export const PedidosClientes = () => {
                             goToSelectProduct(index);
                           } else {
                             actualizarDetalleCrear(index, "ProductoServicioId", value);
-                            // Actualizar descripción e imagen basado en el producto seleccionado
                             const producto = productos.find(p => p.ProductoServicioId === value);
                             if (producto) {
                               actualizarDetalleCrear(index, "Descripcion", producto.Nombre || "");
@@ -569,29 +622,57 @@ export const PedidosClientes = () => {
                   <div className="text-sm text-gray-500">Total</div>
                   <div className="font-bold">$ {Number(pedidos.find(p => p.PedidoClienteId === id)?.Total || 0).toFixed(2)}</div>
                 </div>
-                <div className="bg-white p-4 rounded-lg">
-                  <div className="text-sm text-gray-500">Voucher</div>
-                  <div className="font-bold">
-                    {pedidos.find(p => p.PedidoClienteId === id)?.Voucher ? (
-                      pedidos.find(p => p.PedidoClienteId === id).Voucher.startsWith("data:image") ? (
-                        <img
-                          src={pedidos.find(p => p.PedidoClienteId === id).Voucher}
-                          alt="Voucher"
-                          className="w-24 h-24 object-contain"
-                        />
-                      ) : (
-                        <a
-                          href={pedidos.find(p => p.PedidoClienteId === id).Voucher}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 underline"
-                        >
-                          Ver archivo adjunto
-                        </a>
-                      )
-                    ) : "—"}
-                  </div>
-                </div>
+
+                {/* Mostrar voucher o datos de entrega */}
+                {(() => {
+                  const pedido = pedidos.find(p => p.PedidoClienteId === id);
+                  if (!pedido) return null;
+
+                  if (pedido.metodo_pago === "contra_entrega") {
+                    return (
+                      <>
+                        <div className="bg-white p-4 rounded-lg">
+                          <div className="text-sm text-gray-500">Nombre Recibe</div>
+                          <div className="font-bold">{pedido.nombre_recibe || "—"}</div>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                          <div className="text-sm text-gray-500">Teléfono Entrega</div>
+                          <div className="font-bold">{pedido.telefono_entrega || "—"}</div>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                          <div className="text-sm text-gray-500">Dirección Entrega</div>
+                          <div className="font-bold">{pedido.direccion_entrega || "—"}</div>
+                        </div>
+                      </>
+                    );
+                  } else if (pedido.voucher) {
+                    return (
+                      <div className="bg-white p-4 rounded-lg">
+                        <div className="text-sm text-gray-500">Comprobante de pago</div>
+                        {pedido.voucher.startsWith("image") ? (
+                          <img src={pedido.voucher} alt="Comprobante" className="w-24 h-24 object-contain mt-1" />
+                        ) : (
+                          <a
+                            href={pedido.voucher}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 underline"
+                          >
+                            Ver archivo adjunto
+                          </a>
+                        )}
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="bg-white p-4 rounded-lg">
+                        <div className="text-sm text-gray-500">Comprobante de pago</div>
+                        <div className="font-bold text-gray-500">— No adjuntado</div>
+                      </div>
+                    );
+                  }
+                })()}
+
                 <div className="bg-white p-4 rounded-lg">
                   <div className="text-sm text-gray-500">Estado Actual</div>
                   <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

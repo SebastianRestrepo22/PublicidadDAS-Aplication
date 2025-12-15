@@ -22,7 +22,6 @@ import { PrivateRoute } from "./PrivateRoute";
 import { ProtectedRouteAdmin } from "./ProtectedRouteAdmin";
 import { Perfil } from "../features/landing/carritoCompras/perfil/perfil";
 import MisPedidos from "../features/landing/historial/MisPedidos";
-import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidosClientes";
 import { Ventas } from "../features/dashboard/gestionventas/venta/ventas";
 import { Produccion } from "../features/dashboard/gestionventas/produccion/produccion";
 import { Checkout } from "../features/landing/carritoCompras/checkout/checkout";
@@ -30,6 +29,7 @@ import { PedidoExitoso } from "../features/dashboard/gestionventas/pedidos/pedid
 import { ScrollToTop } from "../features/landing/components/ScrollToTop";
 import { Inicio } from "../features/landing/inicio/inicio";
 import { Compras } from "../features/dashboard/constrolinsumos/compras/compras";
+import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidosClientes";
 
 export const Routers = () => {
   return (

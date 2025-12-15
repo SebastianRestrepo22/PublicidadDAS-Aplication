@@ -1,4 +1,4 @@
-// src/features/dashboard/gestionventas/produccion/produccion.jsx
+// src/features/dashboard/gestionventas/produccion/Produccion.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { Plus, Edit, Eye, Trash2, ArrowLeft, Search, CheckCircle, Filter } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -82,7 +82,7 @@ export const Produccion = () => {
   const [errores, setErrores] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // Estados para selección (reseteables)
+  // Estados para selección
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 4;
@@ -95,12 +95,10 @@ export const Produccion = () => {
           produccionService.getAllPedidos(),
           produccionService.getAllInsumos(),
         ]);
-
-        // ✅ Filtrar solo pedidos que puedan entrar en producción
+        // ✅ CORREGIDO: Incluye "en_produccion" para que los pedidos automáticos aparezcan
         const pedidosValidos = pedidosData.filter(p =>
-          ["Confirmado", "Aprobado", "Pagado"].includes(p.Estado)
+          ["Confirmado", "Aprobado", "Pagado", "en_produccion"].includes(p.Estado)
         );
-
         setPedidos(pedidosValidos);
         setInsumos(insumosData);
       } catch (err) {
@@ -108,7 +106,6 @@ export const Produccion = () => {
         toast.error("Error al cargar pedidos o insumos");
       }
     };
-
     fetchRelacionados();
   }, []);
 
@@ -145,6 +142,8 @@ export const Produccion = () => {
             detalle: (produccionCompleta.detalle || []).map(item => ({
               ...item,
               _tempId: item.DetalleProduccionId || crypto.randomUUID(),
+              // ✅ Enriquecer con datos del insumo
+              InsumoData: insumos.find(i => i.InsumoId === item.InsumoId) || null,
             })),
           };
           setFormEditar(produccionFormateada);
@@ -156,9 +155,12 @@ export const Produccion = () => {
           setLoading(false);
         }
       };
-      cargarProduccion();
+      // Solo cargar si ya se tienen los insumos (evita render vacío)
+      if (insumos.length > 0) {
+        cargarProduccion();
+      }
     }
-  }, [mode, id, navigate]);
+  }, [mode, id, navigate, insumos]);
 
   // ─── RESETEAR PAGINACIÓN Y BÚSQUEDA AL ENTRAR A SELECCIÓN ───
   useEffect(() => {
@@ -183,7 +185,6 @@ export const Produccion = () => {
   const goToCreate = () => navigate("/dashboard/produccion/nuevo");
   const goToView = (p) => navigate(`/dashboard/produccion/${p.ProduccionId}`);
   const goToEdit = (p) => navigate(`/dashboard/produccion/${p.ProduccionId}/editar`);
-
   const goToSelectPedido = () => {
     if (isCreateMode) {
       navigate("/dashboard/produccion/nuevo/seleccionar-pedido");
@@ -191,7 +192,6 @@ export const Produccion = () => {
       navigate(`/dashboard/produccion/${id}/editar/seleccionar-pedido`);
     }
   };
-
   const goToSelectInsumo = (index) => {
     if (isCreateMode) {
       navigate(`/dashboard/produccion/nuevo/seleccionar-insumo/${index}`);
@@ -199,7 +199,6 @@ export const Produccion = () => {
       navigate(`/dashboard/produccion/${id}/editar/seleccionar-insumo/${index}`);
     }
   };
-
   const goBackToForm = () => {
     if (isCreateMode) {
       navigate("/dashboard/produccion/nuevo");
@@ -223,7 +222,6 @@ export const Produccion = () => {
   const handleSelectInsumo = (insumoId) => {
     const idx = parseInt(detalleIndex, 10);
     if (isNaN(idx)) return;
-
     if (isCreateMode) {
       setDetallesCrear((prev) => {
         const copy = [...prev];
@@ -316,7 +314,6 @@ export const Produccion = () => {
       toast.error("Por favor corrige los errores");
       return;
     }
-
     try {
       const detallesLimpios = detallesCrear
         .map((d) => ({
@@ -324,12 +321,10 @@ export const Produccion = () => {
           CantidadUsada: Number(d.CantidadUsada),
         }))
         .filter((d) => d.InsumoId);
-
       await produccionService.createProduccion({
         ...formCrear,
         detalle: detallesLimpios,
       });
-
       toast.success("Producción creada exitosamente");
       goToBackToList();
     } catch (err) {
@@ -339,14 +334,12 @@ export const Produccion = () => {
 
   const handleEdit = async () => {
     if (!formEditar) return;
-
     const errores = validarFormulario(formEditar, formEditar.detalle);
     if (Object.keys(errores).length) {
       setErrores(errores);
       toast.error("Por favor corrige los errores");
       return;
     }
-
     try {
       const produccionData = {
         PedidoClienteId: formEditar.PedidoClienteId,
@@ -354,14 +347,12 @@ export const Produccion = () => {
         FechaInicio: formEditar.FechaInicio,
         FechaFin: formEditar.FechaFin || null,
       };
-
       const detallesLimpios = formEditar.detalle
         .map((d) => ({
           InsumoId: d.InsumoId.trim(),
           CantidadUsada: Number(d.CantidadUsada),
         }))
         .filter((d) => d.InsumoId);
-
       await produccionService.updateProduccionConDetalles(formEditar.ProduccionId, produccionData, detallesLimpios);
       toast.success("Producción actualizada exitosamente");
       goToBackToList();
@@ -410,7 +401,6 @@ export const Produccion = () => {
   if (mode === "select-pedido") {
     const { filtered: pedidosFiltrados, paginated: pedidosPaginados, total } = getFilteredAndPaginatedData(pedidos, searchTerm);
     const totalPages = Math.ceil(total / itemsPerPage);
-
     return (
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-4xl mx-auto">
@@ -486,7 +476,6 @@ export const Produccion = () => {
   if (mode === "select-insumo") {
     const { filtered: insumosFiltrados, paginated: insumosPaginados, total } = getFilteredAndPaginatedData(insumos, searchTerm);
     const totalPages = Math.ceil(total / itemsPerPage);
-
     return (
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-4xl mx-auto">
@@ -602,7 +591,6 @@ export const Produccion = () => {
                 </div>
               </div>
             </div>
-
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
               {loading ? (
                 <div className="p-8 text-center">
@@ -749,7 +737,6 @@ export const Produccion = () => {
                 />
               </div>
             </div>
-
             <div className="mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h4 className="font-medium text-slate-700">
@@ -808,7 +795,6 @@ export const Produccion = () => {
                 ))}
               </div>
             </div>
-
             <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
               <button onClick={handleCreate} className="flex-1 bg-green-600 hover:bg-green-700 text-white h-11 rounded-lg font-medium">
                 Crear producción
@@ -868,6 +854,7 @@ export const Produccion = () => {
                   </div>
                 </div>
 
+                {/* ✅ DETALLE DE INSUMOS - SOLO EN MODO VER */}
                 {formEditar.detalle?.length > 0 && (
                   <div>
                     <h4 className="font-bold text-slate-800 mb-3">Insumos utilizados</h4>
@@ -880,22 +867,30 @@ export const Produccion = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {formEditar.detalle.map((d, idx) => {
-                            const insumo = insumos.find((i) => i.InsumoId === d.InsumoId);
-                            return (
-                              <tr key={d._tempId || idx} className="border-t hover:bg-gray-50">
-                                <td className="py-3 px-4">
-                                  <div className="font-medium">{insumo?.Nombre || d.InsumoId}</div>
-                                  {insumo?.Categoria && <div className="text-xs text-gray-500">{insumo.Categoria}</div>}
-                                </td>
-                                <td className="py-3 px-4">
-                                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium">
-                                    {d.CantidadUsada} unidades
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
+                          {formEditar.detalle.map((d, idx) => (
+                            <tr key={d._tempId || idx} className="border-t hover:bg-gray-50">
+                              <td className="py-3 px-4">
+                                {d.InsumoData ? (
+                                  <>
+                                    <div className="font-medium">{d.InsumoData.Nombre}</div>
+                                    {d.InsumoData.Categoria && (
+                                      <div className="text-xs text-gray-500">{d.InsumoData.Categoria}</div>
+                                    )}
+                                    {d.InsumoData.Descripcion && (
+                                      <div className="text-xs text-gray-500 italic">{d.InsumoData.Descripcion}</div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <div className="font-medium text-red-500">Insumo no encontrado (ID: {d.InsumoId})</div>
+                                )}
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium">
+                                  {d.CantidadUsada} unidades
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
@@ -990,7 +985,6 @@ export const Produccion = () => {
                     />
                   </div>
                 </div>
-
                 <div className="mb-6">
                   <div className="flex justify-between items-center mb-4">
                     <h4 className="font-medium text-slate-700">
@@ -1049,7 +1043,6 @@ export const Produccion = () => {
                     ))}
                   </div>
                 </div>
-
                 <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
                   <button onClick={handleEdit} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-11 rounded-lg font-medium">
                     Guardar cambios
