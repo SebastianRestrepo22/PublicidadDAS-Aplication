@@ -1,4 +1,3 @@
-// src/controllers/produccion.controller.js
 import {
   getAllProduccionModel,
   getProduccionByIdModel,
@@ -11,6 +10,8 @@ import {
   getDetalleProduccionByProduccionIdModel,
   deleteDetalleProduccionModel as deleteDetalleModel
 } from "../models/detalleProduccion.model.js";
+
+import { updatePedidoClienteModel } from "../models/pedidoCliente.model.js";
 
 import { v4 as uuidv4 } from "uuid";
 import connectDB from "../lib/db.js";
@@ -48,7 +49,7 @@ export const getProduccionById = async (req, res) => {
   }
 };
 
-// Crear producción + detalles (en una transacción idealmente)
+// Crear producción + detalles
 export const createProduccion = async (req, res) => {
   const { PedidoClienteId, Estado, FechaInicio, FechaFin, detalle } = req.body;
 
@@ -58,7 +59,10 @@ export const createProduccion = async (req, res) => {
 
   let connection;
   try {
-    connection = await connectDB();
+    // Obtener una conexión del pool
+    const pool = await connectDB();
+    connection = await pool.getConnection();
+    
     await connection.beginTransaction();
 
     const ProduccionId = uuidv4();
@@ -93,21 +97,85 @@ export const createProduccion = async (req, res) => {
   }
 };
 
-// Actualizar producción
-export const updateProduccion = async (req, res) => {
-  try {
-    const result = await updateProduccionModel(req.params.id, req.body);
+// Función auxiliar para actualizar estado del pedido
+const updatePedidoClienteEstado = async (connection, pedidoId, estado) => {
+  await connection.execute(
+    `UPDATE pedidocliente SET Estado = ? WHERE PedidoClienteId = ?`,
+    [estado, pedidoId]
+  );
+};
 
-    if (result.affectedRows === 0) {
+// Actualizar producción + sincronizar con pedido si se finaliza
+export const updateProduccion = async (req, res) => {
+  const { id } = req.params;
+  const { Estado, PedidoClienteId, FechaInicio, FechaFin } = req.body;
+
+  let connection;
+  try {
+    // 1. Obtener producción actual para comparar estado
+    const produccionActual = await getProduccionByIdModel(id);
+    if (!produccionActual) {
       return res.status(404).json({ error: "Producción no encontrada" });
     }
 
-    const produccionActualizada = await getProduccionByIdModel(req.params.id);
-    produccionActualizada.detalle = await getDetalleProduccionByProduccionIdModel(req.params.id);
+    const eraFinalizada = produccionActual.Estado === "Finalizado";
+    const seraFinalizada = Estado === "Finalizado";
+
+    // 2. Obtener conexión del pool
+    const pool = await connectDB();
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // 3. Actualizar producción
+    const [result] = await connection.execute(
+      `UPDATE produccion 
+       SET Estado = ?, FechaInicio = ?, FechaFin = ? 
+       WHERE ProduccionId = ?`,
+      [
+        Estado || produccionActual.Estado, 
+        FechaInicio || produccionActual.FechaInicio, 
+        FechaFin || produccionActual.FechaFin, 
+        id
+      ]
+    );
+
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      connection.release();
+      return res.status(404).json({ error: "Producción no encontrada" });
+    }
+
+    // 4. Si pasa a "Finalizado" y no lo estaba antes, actualizar el pedido
+    if (seraFinalizada && !eraFinalizada) {
+      const pedidoId = PedidoClienteId || produccionActual.PedidoClienteId;
+      
+      if (!pedidoId) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({ error: "No se puede finalizar: pedido no asociado" });
+      }
+
+      // Actualizar estado del pedido a "terminado"
+      await updatePedidoClienteEstado(connection, pedidoId, "terminado");
+    }
+
+    await connection.commit();
+
+    // 5. Responder con producción actualizada
+    const produccionActualizada = await getProduccionByIdModel(id);
+    produccionActualizada.detalle = await getDetalleProduccionByProduccionIdModel(id);
+    
     res.status(200).json(produccionActualizada);
   } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
     console.error("Error al actualizar producción:", error);
     res.status(500).json({ error: "Error al actualizar producción" });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 };
 
@@ -115,27 +183,40 @@ export const updateProduccion = async (req, res) => {
 export const deleteProduccion = async (req, res) => {
   let connection;
   try {
-    connection = await connectDB();
+    // Obtener conexión del pool
+    const pool = await connectDB();
+    connection = await pool.getConnection();
     await connection.beginTransaction();
 
     // Eliminar detalles primero
-    await connection.execute("DELETE FROM detalleproduccion WHERE ProduccionId = ?", [req.params.id]);
+    await connection.execute(
+      "DELETE FROM detalleproduccion WHERE ProduccionId = ?", 
+      [req.params.id]
+    );
 
     // Eliminar producción
-    const [result] = await connection.execute("DELETE FROM produccion WHERE ProduccionId = ?", [req.params.id]);
+    const [result] = await connection.execute(
+      "DELETE FROM produccion WHERE ProduccionId = ?", 
+      [req.params.id]
+    );
 
     if (result.affectedRows === 0) {
       await connection.rollback();
+      connection.release();
       return res.status(404).json({ error: "Producción no encontrada" });
     }
 
     await connection.commit();
     res.status(204).send();
   } catch (error) {
-    if (connection) await connection.rollback();
+    if (connection) {
+      await connection.rollback();
+    }
     console.error("Error al eliminar producción:", error);
     res.status(500).json({ error: "Error al eliminar producción" });
   } finally {
-    if (connection) connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 };

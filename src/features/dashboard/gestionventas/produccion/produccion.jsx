@@ -1,19 +1,22 @@
 // src/features/dashboard/gestionventas/produccion/Produccion.jsx
 import React, { useEffect, useState, useMemo } from "react";
-import { Plus, Edit, Eye, Trash2, ArrowLeft, Search, CheckCircle, Filter } from "lucide-react";
+import { Plus, Edit, Eye, Trash2, ArrowLeft, Search, CheckCircle, Save, X } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import * as produccionService from "./services/services.produccion";
+// 👇 Importar servicios necesarios
+import { getAllPedidosClientes } from "../pedidos/services/services.pedidosClientes";
+import { getAllInsumos as getAllInsumosService } from "../produccion/services/services.produccion";
+import { updatePedidoCliente } from "../pedidos/services/services.pedidosClientes";
 
-// ─── UTILIDADES ───────────────────────────────────────────────
 const formatDate = (dateString) => {
   if (!dateString) return "—";
   try {
     const date = new Date(dateString);
     return date.toLocaleDateString("es-CO", {
       year: "numeric",
-      month: "short",
+      month: "long",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
@@ -36,8 +39,9 @@ const formatDateForInput = (dateString) => {
 };
 
 const getShortId = (id) => {
-  const str = String(id || "");
-  return str.length > 6 ? `...${str.slice(-6)}` : str;
+  if (!id) return "—";
+  const str = String(id);
+  return str.length > 6 ? str.slice(-6) : str;
 };
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────
@@ -49,24 +53,43 @@ export const Produccion = () => {
   // ─── DETECCIÓN DE MODO ───────────────────────────────────────
   const mode = useMemo(() => {
     const path = location.pathname;
-    if (path === "/dashboard/produccion") return "list";
-    if (path === "/dashboard/produccion/nuevo") return "create";
-    if (path === "/dashboard/produccion/nuevo/seleccionar-pedido") return "select-pedido";
-    if (path.match(/^\/dashboard\/produccion\/nuevo\/seleccionar-insumo\/\d+$/)) return "select-insumo";
-    if (path.match(/^\/dashboard\/produccion\/\d+$/) && !path.includes("/editar")) return "view";
-    if (path.match(/^\/dashboard\/produccion\/\d+\/editar$/)) return "edit";
-    if (path.match(/^\/dashboard\/produccion\/\d+\/editar\/seleccionar-pedido$/)) return "select-pedido";
-    if (path.match(/^\/dashboard\/produccion\/\d+\/editar\/seleccionar-insumo\/\d+$/)) return "select-insumo";
-    return "list";
+
+    // Patrones específicos primero (más específicos arriba)
+    if (path.includes('/seleccionar-insumo/')) {
+      return path.includes('/editar/') ? 'select-insumo-edit' : 'select-insumo';
+    }
+
+    if (path.includes('/seleccionar-pedido')) {
+      return path.includes('/editar/') ? 'select-pedido-edit' : 'select-pedido';
+    }
+
+    // Modos principales
+    if (path === "/dashboard/produccion/nuevo") return 'create';
+    if (path.match(/\/dashboard\/produccion\/[^/]+\/editar$/)) return 'edit';
+    if (path.match(/\/dashboard\/produccion\/[^/]+$/)) {
+      const lastSegment = path.split('/').pop();
+      if (lastSegment !== 'produccion' && lastSegment !== 'nuevo' && !lastSegment.includes('editar') && !lastSegment.includes('seleccionar')) {
+        return 'view';
+      }
+    }
+
+    return 'list';
   }, [location.pathname]);
 
-  const isEditMode = mode.includes("edit");
-  const isCreateMode = mode.includes("create");
+  console.log("📍 Modo detectado:", mode, "ID:", id);
+
+  const isEditMode = mode === "edit";
+  const isCreateMode = mode === "create";
+  const isViewMode = mode === "view";
+  const isSelectPedidoMode = mode === "select-pedido" || mode === "select-pedido-edit";
+  const isSelectInsumoMode = mode === "select-insumo" || mode === "select-insumo-edit";
 
   // ─── ESTADOS ─────────────────────────────────────────────────
   const [producciones, setProducciones] = useState([]);
   const [filtroCampo, setFiltroCampo] = useState("");
   const [filtroText, setFiltroText] = useState("");
+
+  // Estados para CREAR
   const [formCrear, setFormCrear] = useState({
     PedidoClienteId: "",
     Estado: "En Proceso",
@@ -76,9 +99,16 @@ export const Produccion = () => {
   const [detallesCrear, setDetallesCrear] = useState([
     { _tempId: crypto.randomUUID(), InsumoId: "", CantidadUsada: 1 },
   ]);
+
+  // Estados para EDITAR/VER
+  const [produccionDetalle, setProduccionDetalle] = useState(null);
   const [formEditar, setFormEditar] = useState(null);
+
+  // Datos maestros
   const [pedidos, setPedidos] = useState([]);
   const [insumos, setInsumos] = useState([]);
+
+  // Estados de UI
   const [errores, setErrores] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -87,26 +117,29 @@ export const Produccion = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 4;
 
-  // ─── CARGA INICIAL DE PEDIDOS E INSUMOS ──────────────────────
+  // ─── CARGAR DATOS INICIALES ─────────────────────────────────
   useEffect(() => {
-    const fetchRelacionados = async () => {
+    const cargarDatosIniciales = async () => {
       try {
         const [pedidosData, insumosData] = await Promise.all([
-          produccionService.getAllPedidos(),
-          produccionService.getAllInsumos(),
+          getAllPedidosClientes(),
+          getAllInsumosService()
         ]);
-        // ✅ CORREGIDO: Incluye "en_produccion" para que los pedidos automáticos aparezcan
-        const pedidosValidos = pedidosData.filter(p =>
-          ["Confirmado", "Aprobado", "Pagado", "en_produccion"].includes(p.Estado)
-        );
-        setPedidos(pedidosValidos);
+
+        console.log("📦 Pedidos cargados:", pedidosData.length);
+        console.log("📦 Insumos cargados:", insumosData.length);
+
+        // Filtrar solo pedidos confirmados para producción
+        const pedidosConfirmados = pedidosData.filter(p => p.Estado === "confirmado");
+        setPedidos(pedidosConfirmados);
         setInsumos(insumosData);
-      } catch (err) {
-        console.error("Error cargando datos relacionados:", err);
-        toast.error("Error al cargar pedidos o insumos");
+      } catch (error) {
+        console.error("Error cargando datos iniciales:", error);
+        toast.error("Error al cargar datos iniciales");
       }
     };
-    fetchRelacionados();
+
+    cargarDatosIniciales();
   }, []);
 
   // ─── CARGAR LISTA DE PRODUCCIONES ────────────────────────────
@@ -116,6 +149,7 @@ export const Produccion = () => {
       const data = await produccionService.getAllProducciones();
       setProducciones(data);
     } catch (err) {
+      console.error("Error cargando producciones:", err);
       toast.error("Error al cargar producciones");
     } finally {
       setLoading(false);
@@ -128,47 +162,73 @@ export const Produccion = () => {
     }
   }, [mode]);
 
-  // ─── CARGAR PRODUCCIÓN (VER/EDITAR) ──────────────────────────
+  // ─── CARGAR DETALLE DE PRODUCCIÓN ────────────────────────────
   useEffect(() => {
-    if ((mode === "view" || mode === "edit") && id) {
-      const cargarProduccion = async () => {
-        setLoading(true);
-        try {
-          const produccionCompleta = await produccionService.getProduccionCompleta(id);
-          const produccionFormateada = {
-            ...produccionCompleta,
+  if ((isViewMode || isEditMode) && id) {
+    // Solo cargar si NO hay un formEditar existente en modo edición
+    // (para evitar sobrescribir cambios locales al volver de selección)
+    if (isEditMode && formEditar) {
+      console.log("⚠️ Formulario ya existe en modo edición. No se recarga.");
+      return;
+    }
+
+    const cargarProduccionDetalle = async () => {
+      setLoading(true);
+      try {
+        console.log("🔍 Cargando producción con ID:", id);
+        const produccionCompleta = await produccionService.getProduccionCompleta(id);
+        if (!produccionCompleta) {
+          throw new Error("Producción no encontrada");
+        }
+        const detalleConInfo = produccionCompleta.detalle?.map(item => ({
+          ...item,
+          InsumoInfo: insumos.find(i => i.InsumoId === item.InsumoId) || null
+        })) || [];
+        const datosProduccion = {
+          ...produccionCompleta,
+          detalle: detalleConInfo
+        };
+        setProduccionDetalle(datosProduccion);
+        if (isEditMode) {
+          setFormEditar({
+            ProduccionId: produccionCompleta.ProduccionId,
+            PedidoClienteId: produccionCompleta.PedidoClienteId,
+            Estado: produccionCompleta.Estado,
             FechaInicio: formatDateForInput(produccionCompleta.FechaInicio),
             FechaFin: formatDateForInput(produccionCompleta.FechaFin),
-            detalle: (produccionCompleta.detalle || []).map(item => ({
-              ...item,
+            detalle: detalleConInfo.map(item => ({
+              DetalleProduccionId: item.DetalleProduccionId,
+              InsumoId: item.InsumoId,
+              CantidadUsada: item.CantidadUsada,
               _tempId: item.DetalleProduccionId || crypto.randomUUID(),
-              // ✅ Enriquecer con datos del insumo
-              InsumoData: insumos.find(i => i.InsumoId === item.InsumoId) || null,
-            })),
-          };
-          setFormEditar(produccionFormateada);
-        } catch (err) {
-          console.error("Error cargando producción:", err);
-          toast.error("Error al cargar producción");
-          navigate("/dashboard/produccion");
-        } finally {
-          setLoading(false);
+            }))
+          });
         }
-      };
-      // Solo cargar si ya se tienen los insumos (evita render vacío)
-      if (insumos.length > 0) {
-        cargarProduccion();
+      } catch (err) {
+        console.error("❌ Error cargando producción:", err);
+        toast.error("Error al cargar producción");
+        navigate("/dashboard/produccion");
+      } finally {
+        setLoading(false);
       }
-    }
-  }, [mode, id, navigate, insumos]);
+    };
 
-  // ─── RESETEAR PAGINACIÓN Y BÚSQUEDA AL ENTRAR A SELECCIÓN ───
+    if (insumos.length > 0) {
+      cargarProduccionDetalle();
+    } else {
+      // Si no hay insumos, cargar igual (se actualiza después si es necesario)
+      cargarProduccionDetalle();
+    }
+  }
+}, [mode, id, navigate, insumos, isViewMode, isEditMode, formEditar]); // 👈 Añadido formEditar como dependencia
+
+  // ─── RESETEAR PAGINACIÓN ─────────────────────────────────────
   useEffect(() => {
-    if (mode === "select-pedido" || mode === "select-insumo") {
+    if (isSelectPedidoMode || isSelectInsumoMode) {
       setSearchTerm("");
       setCurrentPage(1);
     }
-  }, [mode]);
+  }, [isSelectPedidoMode, isSelectInsumoMode]);
 
   // ─── FILTROS ─────────────────────────────────────────────────
   const produccionesFiltradas = producciones.filter((p) => {
@@ -182,27 +242,48 @@ export const Produccion = () => {
     setErrores({});
     navigate("/dashboard/produccion");
   };
+
   const goToCreate = () => navigate("/dashboard/produccion/nuevo");
-  const goToView = (p) => navigate(`/dashboard/produccion/${p.ProduccionId}`);
-  const goToEdit = (p) => navigate(`/dashboard/produccion/${p.ProduccionId}/editar`);
+
+  const goToView = (produccionId) => {
+    if (!produccionId) {
+      toast.error("ID de producción inválido");
+      return;
+    }
+    navigate(`/dashboard/produccion/${produccionId}`);
+  };
+
+  const goToEdit = (produccionId) => {
+    if (!produccionId) {
+      toast.error("ID de producción inválido");
+      return;
+    }
+    navigate(`/dashboard/produccion/${produccionId}/editar`);
+  };
+
   const goToSelectPedido = () => {
-    if (isCreateMode) {
+    const path = location.pathname;
+    if (path.includes("/nuevo") && !path.includes("/editar")) {
       navigate("/dashboard/produccion/nuevo/seleccionar-pedido");
-    } else if (isEditMode) {
+    } else if (path.includes("/editar")) {
       navigate(`/dashboard/produccion/${id}/editar/seleccionar-pedido`);
     }
   };
+
   const goToSelectInsumo = (index) => {
-    if (isCreateMode) {
+    const path = location.pathname;
+    if (path.includes("/nuevo") && !path.includes("/editar")) {
       navigate(`/dashboard/produccion/nuevo/seleccionar-insumo/${index}`);
-    } else if (isEditMode) {
+    } else if (path.includes("/editar")) {
       navigate(`/dashboard/produccion/${id}/editar/seleccionar-insumo/${index}`);
     }
   };
+
   const goBackToForm = () => {
-    if (isCreateMode) {
+    const path = location.pathname;
+    if (path.includes("/nuevo") && !path.includes("/editar")) {
       navigate("/dashboard/produccion/nuevo");
-    } else if (isEditMode) {
+    } else if (path.includes("/editar")) {
       navigate(`/dashboard/produccion/${id}/editar`);
     } else {
       navigate("/dashboard/produccion");
@@ -211,9 +292,10 @@ export const Produccion = () => {
 
   // ─── MANEJO DE SELECCIONES ───────────────────────────────────
   const handleSelectPedido = (pedidoId) => {
-    if (isCreateMode) {
+    console.log("✅ Pedido seleccionado:", pedidoId);
+    if (mode === "select-pedido") {
       setFormCrear((prev) => ({ ...prev, PedidoClienteId: pedidoId }));
-    } else if (isEditMode) {
+    } else if (mode === "select-pedido-edit") {
       setFormEditar((prev) => ({ ...prev, PedidoClienteId: pedidoId }));
     }
     goBackToForm();
@@ -221,17 +303,27 @@ export const Produccion = () => {
 
   const handleSelectInsumo = (insumoId) => {
     const idx = parseInt(detalleIndex, 10);
-    if (isNaN(idx)) return;
-    if (isCreateMode) {
+    console.log("✅ Insumo seleccionado:", insumoId, "para índice:", idx);
+
+    if (isNaN(idx)) {
+      toast.error("Índice de detalle inválido");
+      return;
+    }
+
+    if (mode === "select-insumo") {
       setDetallesCrear((prev) => {
         const copy = [...prev];
         copy[idx] = { ...copy[idx], InsumoId: insumoId };
         return copy;
       });
-    } else if (isEditMode && formEditar) {
+    } else if (mode === "select-insumo-edit" && formEditar) {
       setFormEditar((prev) => {
+        if (!prev) return prev;
         const copyDetalle = [...prev.detalle];
-        copyDetalle[idx] = { ...copyDetalle[idx], InsumoId: insumoId };
+        copyDetalle[idx] = {
+          ...copyDetalle[idx],
+          InsumoId: insumoId
+        };
         return { ...prev, detalle: copyDetalle };
       });
     }
@@ -306,14 +398,68 @@ export const Produccion = () => {
     return errores;
   };
 
-  // ─── CRUD ────────────────────────────────────────────────────
+  // ─── ACTUALIZAR PEDIDO A "TERMINADO" ─────────────────────────
+  const actualizarPedidoATerminado = async (pedidoId) => {
+    try {
+      console.log("🔄 Actualizando pedido:", pedidoId, "a terminado");
+      await updatePedidoCliente(pedidoId, { Estado: "terminado" });
+      toast.success(`✅ Pedido #${getShortId(pedidoId)} actualizado a "terminado"`);
+    } catch (err) {
+      console.error("Error al actualizar pedido a terminado:", err);
+      toast.warn("Producción finalizada, pero no se pudo actualizar el pedido.");
+    }
+  };
+
+  // ─── ALERTAS CONFIRMACIÓN ────────────────────────────────────
+  const confirmDelete = async (idProduccion) => {
+    if (!window.confirm("¿Está seguro de eliminar esta producción? Esta acción no se puede deshacer.")) return;
+
+    try {
+      await produccionService.deleteProduccion(idProduccion);
+      setProducciones((prev) => prev.filter((p) => p.ProduccionId !== idProduccion));
+      toast.success("Producción eliminada exitosamente");
+    } catch (err) {
+      toast.error("Error al eliminar producción: " + err.message);
+    }
+  };
+
+  const confirmToggleEstado = async (idProduccion, nuevoEstado) => {
+    if (!window.confirm(`¿Está seguro de cambiar el estado a "${nuevoEstado}"?`)) return;
+
+    try {
+      const produccionActual = producciones.find(p => p.ProduccionId === idProduccion);
+      const eraFinalizado = produccionActual?.Estado === "Finalizado";
+      const seraFinalizado = nuevoEstado === "Finalizado";
+
+      await produccionService.updateProduccion(idProduccion, { Estado: nuevoEstado });
+      setProducciones((prev) =>
+        prev.map((p) => (p.ProduccionId === idProduccion ? { ...p, Estado: nuevoEstado } : p))
+      );
+
+      if (seraFinalizado && !eraFinalizado && produccionActual?.PedidoClienteId) {
+        await actualizarPedidoATerminado(produccionActual.PedidoClienteId);
+      }
+
+      toast.success(`Estado actualizado a "${nuevoEstado}"`);
+    } catch (err) {
+      toast.error("Error al actualizar estado: " + err.message);
+    }
+  };
+
+  // ─── CRUD - CREAR ────────────────────────────────────────────
   const handleCreate = async () => {
+    console.log("📝 Iniciando creación de producción...");
+
     const errores = validarFormulario(formCrear, detallesCrear);
     if (Object.keys(errores).length) {
       setErrores(errores);
-      toast.error("Por favor corrige los errores");
+      toast.error("Por favor corrige los errores antes de continuar");
       return;
     }
+
+    if (!window.confirm("¿Está seguro de crear esta producción?")) return;
+
+    setLoading(true);
     try {
       const detallesLimpios = detallesCrear
         .map((d) => ({
@@ -321,66 +467,119 @@ export const Produccion = () => {
           CantidadUsada: Number(d.CantidadUsada),
         }))
         .filter((d) => d.InsumoId);
-      await produccionService.createProduccion({
+
+      console.log("📤 Datos a enviar para CREAR:", {
         ...formCrear,
         detalle: detallesLimpios,
       });
+
+      // Tu servicio createProduccion espera { detalle: [], ...otrosCampos }
+      const resultado = await produccionService.createProduccion({
+        ...formCrear,
+        detalle: detallesLimpios,
+      });
+
+      console.log("✅ Producción creada:", resultado);
+
       toast.success("Producción creada exitosamente");
-      goToBackToList();
+
+      // Resetear formulario
+      setFormCrear({
+        PedidoClienteId: "",
+        Estado: "En Proceso",
+        FechaInicio: formatDateForInput(new Date()),
+        FechaFin: "",
+      });
+      setDetallesCrear([{ _tempId: crypto.randomUUID(), InsumoId: "", CantidadUsada: 1 }]);
+      setErrores({});
+
+      // Ir a la vista de la producción creada
+      if (resultado && resultado.ProduccionId) {
+        navigate(`/dashboard/produccion/${resultado.ProduccionId}`);
+      } else {
+        goToBackToList();
+      }
     } catch (err) {
+      console.error("❌ Error al crear producción:", err);
       toast.error("Error al crear producción: " + (err.response?.data?.message || err.message || "Error desconocido"));
+    } finally {
+      setLoading(false);
     }
   };
 
+  // ─── CRUD - EDITAR ───────────────────────────────────────────
   const handleEdit = async () => {
-    if (!formEditar) return;
+    console.log("📝 Iniciando edición de producción...");
+
+    if (!formEditar) {
+      toast.error("No hay datos para editar");
+      return;
+    }
+
     const errores = validarFormulario(formEditar, formEditar.detalle);
     if (Object.keys(errores).length) {
       setErrores(errores);
-      toast.error("Por favor corrige los errores");
+      toast.error("Por favor corrige los errores antes de continuar");
       return;
     }
+
+    if (!window.confirm("¿Está seguro de guardar los cambios?")) return;
+
+    setLoading(true);
     try {
+      // Obtener estado anterior para verificar si se finalizó
+      const produccionAnterior = producciones.find(p => p.ProduccionId === id);
+      const eraFinalizada = produccionAnterior?.Estado === "Finalizado";
+      const seraFinalizada = formEditar.Estado === "Finalizado";
+
+      // Datos para actualizar la producción principal
       const produccionData = {
         PedidoClienteId: formEditar.PedidoClienteId,
         Estado: formEditar.Estado,
         FechaInicio: formEditar.FechaInicio,
         FechaFin: formEditar.FechaFin || null,
       };
+
+      // Preparar detalles (sin los campos temporales)
       const detallesLimpios = formEditar.detalle
         .map((d) => ({
+          // DetalleProduccionId puede ser undefined para nuevos detalles
+          DetalleProduccionId: d.DetalleProduccionId,
           InsumoId: d.InsumoId.trim(),
           CantidadUsada: Number(d.CantidadUsada),
         }))
         .filter((d) => d.InsumoId);
-      await produccionService.updateProduccionConDetalles(formEditar.ProduccionId, produccionData, detallesLimpios);
-      toast.success("Producción actualizada exitosamente");
-      goToBackToList();
-    } catch (err) {
-      toast.error("Error al editar producción: " + (err.response?.data?.message || err.message || "Error desconocido"));
-    }
-  };
 
-  const handleDelete = async (idProduccion) => {
-    if (!window.confirm("¿Está seguro de eliminar esta producción?")) return;
-    try {
-      await produccionService.deleteProduccion(idProduccion);
-      setProducciones((prev) => prev.filter((p) => p.ProduccionId !== idProduccion));
-      toast.success("Producción eliminada");
-    } catch (err) {
-      toast.error("Error al eliminar producción");
-    }
-  };
+      console.log("📤 Datos a enviar para EDITAR:", {
+        produccionId: formEditar.ProduccionId,
+        produccionData,
+        detallesLimpios,
+      });
 
-  const toggleEstado = async (idProduccion, nuevoEstado) => {
-    try {
-      await produccionService.updateProduccion(idProduccion, { Estado: nuevoEstado });
-      setProducciones((prev) =>
-        prev.map((p) => (p.ProduccionId === idProduccion ? { ...p, Estado: nuevoEstado } : p))
+      // Usar updateProduccionConDetalles que maneja producción + detalles
+      await produccionService.updateProduccionConDetalles(
+        formEditar.ProduccionId,
+        produccionData,
+        detallesLimpios
       );
-      toast.success("Estado actualizado");
+
+      // Si se finaliza la producción y no estaba finalizada antes
+      if (seraFinalizada && !eraFinalizada) {
+        await actualizarPedidoATerminado(formEditar.PedidoClienteId);
+      }
+
+      toast.success("Producción actualizada exitosamente");
+
+      // Actualizar la lista de producciones
+      await fetchProducciones();
+
+      // Ir a la vista de la producción editada
+      navigate(`/dashboard/produccion/${id}`);
     } catch (err) {
-      toast.error("Error al actualizar estado");
+      console.error("❌ Error al editar producción:", err);
+      toast.error("Error al editar producción: " + (err.response?.data?.message || err.message || "Error desconocido"));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -390,19 +589,28 @@ export const Produccion = () => {
 
   const getFilteredAndPaginatedData = (data, term) => {
     const filtered = data.filter((item) =>
-      Object.values(item).some((val) => String(val).toLowerCase().includes(term.toLowerCase()))
+      Object.values(item).some((val) =>
+        String(val).toLowerCase().includes(term.toLowerCase())
+      )
     );
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginated = filtered.slice(startIndex, startIndex + itemsPerPage);
     return { filtered, paginated, total: filtered.length };
   };
 
+  // ─── OBTENER NOMBRE DE INSUMO ────────────────────────────────
+  const getNombreInsumo = (insumoId) => {
+    const insumo = insumos.find(i => i.InsumoId === insumoId);
+    return insumo ? insumo.Nombre : `Insumo #${getShortId(insumoId)}`;
+  };
+
   // ─── RENDER: SELECCIÓN DE PEDIDO ─────────────────────────────
-  if (mode === "select-pedido") {
+  if (isSelectPedidoMode) {
     const { filtered: pedidosFiltrados, paginated: pedidosPaginados, total } = getFilteredAndPaginatedData(pedidos, searchTerm);
     const totalPages = Math.ceil(total / itemsPerPage);
+
     return (
-      <div className="min-h-screen bg-slate-50 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-3 mb-6">
             <button onClick={goBackToForm} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
@@ -410,6 +618,7 @@ export const Produccion = () => {
             </button>
             <h2 className="text-2xl font-bold text-slate-800">Seleccionar Pedido</h2>
           </div>
+
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
@@ -423,6 +632,7 @@ export const Produccion = () => {
               className="w-full pl-10 pr-4 py-3 border rounded-lg"
             />
           </div>
+
           <div className="bg-white rounded-xl shadow-sm border divide-y max-h-[500px] overflow-auto">
             {pedidosPaginados.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
@@ -430,10 +640,10 @@ export const Produccion = () => {
               </div>
             ) : (
               pedidosPaginados.map((p) => (
-                <div
+                <button
                   key={p.PedidoClienteId}
                   onClick={() => handleSelectPedido(p.PedidoClienteId)}
-                  className="p-4 hover:bg-slate-50 cursor-pointer flex justify-between items-center"
+                  className="w-full p-4 hover:bg-slate-50 cursor-pointer flex justify-between items-center text-left"
                 >
                   <div>
                     <div className="font-medium">Pedido #{getShortId(p.PedidoClienteId)}</div>
@@ -443,10 +653,11 @@ export const Produccion = () => {
                     <div className="text-xs text-gray-500 mt-1">{formatDate(p.FechaRegistro)}</div>
                   </div>
                   <CheckCircle className="text-green-500 w-5 h-5" />
-                </div>
+                </button>
               ))
             )}
           </div>
+
           {totalPages > 1 && (
             <div className="flex justify-center mt-4 gap-2">
               <button
@@ -473,11 +684,12 @@ export const Produccion = () => {
   }
 
   // ─── RENDER: SELECCIÓN DE INSUMO ─────────────────────────────
-  if (mode === "select-insumo") {
+  if (isSelectInsumoMode) {
     const { filtered: insumosFiltrados, paginated: insumosPaginados, total } = getFilteredAndPaginatedData(insumos, searchTerm);
     const totalPages = Math.ceil(total / itemsPerPage);
+
     return (
-      <div className="min-h-screen bg-slate-50 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-3 mb-6">
             <button onClick={goBackToForm} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
@@ -485,6 +697,7 @@ export const Produccion = () => {
             </button>
             <h2 className="text-2xl font-bold text-slate-800">Seleccionar Insumo</h2>
           </div>
+
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
@@ -498,6 +711,7 @@ export const Produccion = () => {
               className="w-full pl-10 pr-4 py-3 border rounded-lg"
             />
           </div>
+
           <div className="bg-white rounded-xl shadow-sm border divide-y max-h-[500px] overflow-auto">
             {insumosPaginados.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
@@ -505,10 +719,10 @@ export const Produccion = () => {
               </div>
             ) : (
               insumosPaginados.map((i) => (
-                <div
+                <button
                   key={i.InsumoId}
                   onClick={() => handleSelectInsumo(i.InsumoId)}
-                  className="p-4 hover:bg-slate-50 cursor-pointer flex justify-between items-center"
+                  className="w-full p-4 hover:bg-slate-50 cursor-pointer flex justify-between items-center text-left"
                 >
                   <div>
                     <div className="font-medium">{i.Nombre}</div>
@@ -518,10 +732,11 @@ export const Produccion = () => {
                     <div className="text-xs text-gray-500 mt-1">{i.Descripcion || "Sin descripción"}</div>
                   </div>
                   <CheckCircle className="text-green-500 w-5 h-5" />
-                </div>
+                </button>
               ))
             )}
           </div>
+
           {totalPages > 1 && (
             <div className="flex justify-center mt-4 gap-2">
               <button
@@ -547,247 +762,249 @@ export const Produccion = () => {
     );
   }
 
-  // ─── RENDER: LISTA / CREAR / VER / EDITAR ────────────────────
-  return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-800 mb-6">Gestión de Producción</h1>
+  // ─── RENDER: LISTA ───────────────────────────────────────────
+  if (mode === "list") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Producción</h1>
 
-        {/* LISTA */}
-        {mode === "list" && (
-          <>
-            <div className="bg-white rounded-xl shadow-sm border p-4 md:p-6 mb-6">
-              <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-                <button
-                  onClick={goToCreate}
-                  className="bg-green-800 hover:bg-green-900 text-white px-5 py-3 rounded-lg flex items-center gap-2 w-full lg:w-auto justify-center transition-colors"
-                >
-                  <Plus size={18} /> Nueva producción
-                </button>
-                <div className="relative w-full lg:w-1/2">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Buscar producción por cualquier campo..."
-                    value={filtroText}
-                    onChange={(e) => setFiltroText(e.target.value)}
-                    className="border rounded-lg pl-10 pr-4 py-3 w-full focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex items-center gap-3 w-full lg:w-auto">
-                  <Filter className="text-slate-500" size={18} />
-                  <select
-                    value={filtroCampo}
-                    onChange={(e) => setFiltroCampo(e.target.value)}
-                    className="border rounded-lg px-4 py-3 bg-white text-slate-700 w-full lg:w-48 focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Filtrar por campo</option>
-                    <option value="ProduccionId">Producción ID</option>
-                    <option value="PedidoClienteId">Pedido ID</option>
-                    <option value="Estado">Estado</option>
-                    <option value="FechaInicio">Fecha Inicio</option>
-                    <option value="FechaFin">Fecha Fin</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-              {loading ? (
-                <div className="p-8 text-center">
-                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-slate-800">
-                      <tr>
-                        <th className="px-4 py-3 text-white text-left font-medium">ID</th>
-                        <th className="px-4 py-3 text-white text-left font-medium">Pedido</th>
-                        <th className="px-4 py-3 text-white text-left font-medium">Fecha Inicio</th>
-                        <th className="px-4 py-3 text-white text-left font-medium">Fecha Fin</th>
-                        <th className="px-4 py-3 text-white text-center font-medium">Estado</th>
-                        <th className="px-4 py-3 text-white text-center font-medium">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {produccionesFiltradas.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-8 text-center text-gray-500">
-                            {producciones.length === 0
-                              ? "No hay producciones registradas."
-                              : filtroText
-                              ? `No se encontraron producciones con "${filtroText}"`
-                              : "No hay resultados"}
-                          </td>
-                        </tr>
-                      ) : (
-                        produccionesFiltradas.map((p) => (
-                          <tr key={p.ProduccionId} className="hover:bg-slate-50">
-                            <td className="py-4 px-4 font-medium">
-                              <span className="font-mono bg-gray-100 px-2 py-1 rounded text-xs">
-                                #{getShortId(p.ProduccionId)}
-                              </span>
-                            </td>
-                            <td className="py-4 px-4">
-                              <span className="font-mono bg-blue-50 px-2 py-1 rounded text-xs">
-                                #{getShortId(p.PedidoClienteId)}
-                              </span>
-                            </td>
-                            <td className="py-4 px-4 whitespace-nowrap">{formatDate(p.FechaInicio)}</td>
-                            <td className="py-4 px-4 whitespace-nowrap">{formatDate(p.FechaFin)}</td>
-                            <td className="py-4 px-4">
-                              <div className="flex justify-center">
-                                <select
-                                  value={p.Estado}
-                                  onChange={(e) => toggleEstado(p.ProduccionId, e.target.value)}
-                                  className={`px-3 py-2 text-sm font-medium border rounded focus:ring-2 focus:ring-blue-300 ${getEstadoColor(p.Estado)}`}
-                                >
-                                  <option value="En Proceso">En Proceso</option>
-                                  <option value="Finalizado">Finalizado</option>
-                                </select>
-                              </div>
-                            </td>
-                            <td className="py-4 px-4">
-                              <div className="flex justify-center gap-2">
-                                <button onClick={() => goToView(p)} className="p-2 bg-emerald-50 rounded-lg hover:bg-emerald-100">
-                                  <Eye size={16} className="text-emerald-600" />
-                                </button>
-                                <button onClick={() => goToEdit(p)} className="p-2 bg-blue-50 rounded-lg hover:bg-blue-100">
-                                  <Edit size={16} className="text-blue-600" />
-                                </button>
-                                <button onClick={() => handleDelete(p.ProduccionId)} className="p-2 bg-red-50 rounded-lg hover:bg-red-100">
-                                  <Trash2 size={16} className="text-red-600" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </>
-        )}
+          <div className="bg-white rounded-xl shadow-sm border p-6 mb-6 flex flex-col sm:flex-row gap-4 items-center">
+            <button
+              onClick={goToCreate}
+              className="bg-green-800 text-white px-6 py-3 rounded-lg flex items-center gap-2 whitespace-wrap hover:bg-green-900 transition-colors"
+            >
+              <Plus size={18} /> Nueva producción
+            </button>
 
-        {/* CREAR */}
-        {mode === "create" && (
-          <div className="bg-white rounded-xl shadow-sm border p-4 md:p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
-                <ArrowLeft size={18} />
-              </button>
-              <div>
-                <h3 className="text-lg font-bold text-slate-800">Nueva producción</h3>
-                <p className="text-sm text-gray-600">Complete todos los campos obligatorios (*)</p>
-              </div>
-            </div>
-            {errores.detalles && (
-              <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-4">{errores.detalles}</div>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div className="flex flex-col gap-2">
-                <label className="font-medium text-slate-700">
-                  Pedido Cliente <span className="text-red-500">*</span>
-                </label>
+            <div className="flex-1 max-w-md">
+              <div className="relative">
                 <input
                   type="text"
-                  readOnly
-                  value={formCrear.PedidoClienteId ? `Pedido #${getShortId(formCrear.PedidoClienteId)}` : ""}
-                  placeholder="Haz clic para seleccionar un pedido"
-                  className={`w-full h-11 px-3 border rounded-lg ${errores.pedido ? "border-red-500" : "border-gray-300"} bg-white cursor-pointer hover:bg-gray-50`}
-                  onClick={goToSelectPedido}
+                  placeholder="Buscar producción..."
+                  value={filtroText}
+                  onChange={(e) => setFiltroText(e.target.value)}
+                  className="w-full border rounded-lg pl-10 pr-4 py-3"
                 />
-                {errores.pedido && <span className="text-red-500 text-xs mt-1 block">{errores.pedido}</span>}
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               </div>
+            </div>
+
+            <div className="w-full sm:w-auto">
+              <select
+                value={filtroCampo}
+                onChange={(e) => setFiltroCampo(e.target.value)}
+                className="border rounded-lg px-4 py-3 bg-white text-slate-700 w-full sm:w-auto"
+              >
+                <option value="">Filtrar por Campo</option>
+                <option value="ProduccionId">Producción ID</option>
+                <option value="PedidoClienteId">Pedido ID</option>
+                <option value="Estado">Estado</option>
+                <option value="FechaInicio">Fecha Inicio</option>
+                <option value="FechaFin">Fecha Fin</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border overflow-auto">
+            {loading ? (
+              <div className="p-8 text-center">
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-800 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-3 text-white text-left">ID Producción</th>
+                    <th className="px-4 py-3 text-white text-left">Pedido ID</th>
+                    <th className="px-4 py-3 text-white text-left">Fecha Inicio</th>
+                    <th className="px-4 py-3 text-white text-left">Fecha Fin</th>
+                    <th className="px-4 py-3 text-white text-left">Estado</th>
+                    <th className="px-4 py-3 text-white text-left">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {produccionesFiltradas.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-gray-500">
+                        {producciones.length === 0
+                          ? "No hay producciones registradas."
+                          : filtroText
+                            ? `No se encontraron producciones con "${filtroText}"`
+                            : "No hay resultados"}
+                      </td>
+                    </tr>
+                  ) : (
+                    produccionesFiltradas.map((p) => (
+                      <tr key={p.ProduccionId} className="hover:bg-slate-50">
+                        <td className="py-4 px-4">#{getShortId(p.ProduccionId)}</td>
+                        <td className="py-4 px-4">#{getShortId(p.PedidoClienteId)}</td>
+                        <td className="py-4 px-4">{formatDate(p.FechaInicio)}</td>
+                        <td className="py-4 px-4">{formatDate(p.FechaFin)}</td>
+                        <td className="py-4 px-4">
+                          <button
+                            onClick={() => confirmToggleEstado(
+                              p.ProduccionId,
+                              p.Estado === "En Proceso" ? "Finalizado" : "En Proceso"
+                            )}
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${getEstadoColor(p.Estado)} hover:opacity-80 transition-opacity`}
+                          >
+                            {p.Estado}
+                          </button>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => goToView(p.ProduccionId)}
+                              className="p-1 hover:bg-emerald-50 rounded"
+                              title="Ver detalles"
+                            >
+                              <Eye size={16} className="text-emerald-600" />
+                            </button>
+                            <button
+                              onClick={() => goToEdit(p.ProduccionId)}
+                              className="p-1 hover:bg-blue-50 rounded"
+                              title="Editar"
+                            >
+                              <Edit size={16} className="text-blue-600" />
+                            </button>
+                            <button
+                              onClick={() => confirmDelete(p.ProduccionId)}
+                              className="p-1 hover:bg-red-50 rounded"
+                              title="Eliminar"
+                            >
+                              <Trash2 size={16} className="text-red-600" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+        <ToastContainer />
+      </div>
+    );
+  }
+
+  // ─── RENDER: CREAR ───────────────────────────────────────────
+  if (mode === "create") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-3 mb-6">
+            <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
+              <ArrowLeft size={18} />
+            </button>
+            <h3 className="text-lg font-bold">Nueva producción</h3>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            {errores.detalles && (
+              <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-4">
+                {errores.detalles}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="flex flex-col gap-2">
-                <label className="font-medium text-slate-700">Estado</label>
+                <label className="font-medium">Pedido Cliente *</label>
+                <button
+                  type="button"
+                  className={`w-full h-11 px-3 border rounded-lg text-left ${errores.pedido ? "border-red-500" : "border-gray-300"} bg-white hover:bg-gray-50 flex justify-between items-center`}
+                  onClick={goToSelectPedido}
+                >
+                  <span className={formCrear.PedidoClienteId ? "text-gray-800" : "text-gray-500"}>
+                    {formCrear.PedidoClienteId ? `#${getShortId(formCrear.PedidoClienteId)}` : "Seleccionar pedido"}
+                  </span>
+                  <Search size={16} />
+                </button>
+                {errores.pedido && <span className="text-red-500 text-xs">{errores.pedido}</span>}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="font-medium">Estado</label>
                 <select
                   value={formCrear.Estado}
                   onChange={(e) => setFormCrear({ ...formCrear, Estado: e.target.value })}
-                  className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full h-11 px-3 border rounded"
                 >
                   <option value="En Proceso">En Proceso</option>
                   <option value="Finalizado">Finalizado</option>
                 </select>
               </div>
+
               <div className="flex flex-col gap-2">
-                <label className="font-medium text-slate-700">
-                  Fecha Inicio <span className="text-red-500">*</span>
-                </label>
+                <label className="font-medium">Fecha Inicio *</label>
                 <input
                   type="datetime-local"
                   value={formCrear.FechaInicio}
-                  onChange={(e) => {
-                    setFormCrear({ ...formCrear, FechaInicio: e.target.value });
-                    if (errores.fechaInicio) setErrores((prev) => ({ ...prev, fechaInicio: "" }));
-                  }}
-                  className={`w-full h-11 px-3 border rounded-lg ${errores.fechaInicio ? "border-red-500" : "border-gray-300"} focus:ring-2 focus:ring-blue-500`}
+                  onChange={(e) => setFormCrear({ ...formCrear, FechaInicio: e.target.value })}
+                  className={`w-full h-11 px-3 border rounded ${errores.fechaInicio ? "border-red-500" : "border-gray-300"}`}
                 />
                 {errores.fechaInicio && <span className="text-red-500 text-xs">{errores.fechaInicio}</span>}
               </div>
+
               <div className="flex flex-col gap-2">
-                <label className="font-medium text-slate-700">Fecha Fin (opcional)</label>
+                <label className="font-medium">Fecha Fin (opcional)</label>
                 <input
                   type="datetime-local"
                   value={formCrear.FechaFin}
                   onChange={(e) => setFormCrear({ ...formCrear, FechaFin: e.target.value })}
-                  className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full h-11 px-3 border rounded"
                 />
               </div>
             </div>
+
             <div className="mb-6">
               <div className="flex justify-between items-center mb-4">
-                <h4 className="font-medium text-slate-700">
-                  Insumos utilizados <span className="text-red-500">*</span>
-                </h4>
-                <button onClick={añadirDetalleCrear} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                <h4 className="font-semibold">Insumos utilizados *</h4>
+                <button onClick={añadirDetalleCrear} className="bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-600">
                   <Plus size={15} /> Añadir insumo
                 </button>
               </div>
+
               <div className="grid grid-cols-1 gap-4">
                 {detallesCrear.map((d, index) => (
-                  <div key={d._tempId} className="border border-gray-200 p-4 rounded-lg bg-gray-50">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium text-slate-700">
-                          Insumo <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          readOnly
-                          value={d.InsumoId ? insumos.find((i) => i.InsumoId === d.InsumoId)?.Nombre || d.InsumoId : ""}
-                          placeholder="Haz clic para seleccionar un insumo"
-                          className={`h-10 px-3 border rounded bg-white cursor-pointer w-full ${errores[`insumo-${index}`] ? "border-red-500" : "border-gray-300"} hover:bg-gray-50`}
-                          onClick={() => goToSelectInsumo(index)}
-                        />
-                        {errores[`insumo-${index}`] && <span className="text-red-500 text-xs mt-1 block">{errores[`insumo-${index}`]}</span>}
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium text-slate-700">
-                          Cantidad <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={d.CantidadUsada}
-                          onChange={(e) => {
-                            actualizarDetalleCrear(index, "CantidadUsada", Number(e.target.value));
-                            if (errores[`cantidad-${index}`]) setErrores((prev) => ({ ...prev, [`cantidad-${index}`]: "" }));
-                          }}
-                          className={`h-10 px-3 border rounded w-full ${errores[`cantidad-${index}`] ? "border-red-500" : "border-gray-300"} focus:ring-2 focus:ring-blue-500`}
-                        />
-                        {errores[`cantidad-${index}`] && <span className="text-red-500 text-xs mt-1">{errores[`cantidad-${index}`]}</span>}
-                      </div>
+                  <div key={d._tempId} className="grid grid-cols-1 md:grid-cols-3 gap-3 border p-3 rounded">
+                    <div className="flex flex-col gap-2">
+                      <label>Insumo *</label>
+                      <button
+                        type="button"
+                        className={`h-10 px-2 border rounded text-left ${errores[`insumo-${index}`] ? "border-red-500" : "border-gray-300"} bg-white hover:bg-gray-50 flex justify-between items-center`}
+                        onClick={() => goToSelectInsumo(index)}
+                      >
+                        <span className={d.InsumoId ? "text-gray-800" : "text-gray-500"}>
+                          {d.InsumoId ? getNombreInsumo(d.InsumoId) : "Seleccionar insumo"}
+                        </span>
+                        <Search size={16} />
+                      </button>
+                      {errores[`insumo-${index}`] && <span className="text-red-500 text-xs">{errores[`insumo-${index}`]}</span>}
                     </div>
-                    <div className="flex justify-end mt-3">
+
+                    <div className="flex flex-col gap-2">
+                      <label>Cantidad *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="0.01"
+                        value={d.CantidadUsada}
+                        onChange={(e) => actualizarDetalleCrear(index, "CantidadUsada", Number(e.target.value))}
+                        className={`h-10 px-2 border rounded ${errores[`cantidad-${index}`] ? "border-red-500" : "border-gray-300"}`}
+                      />
+                      {errores[`cantidad-${index}`] && <span className="text-red-500 text-xs">{errores[`cantidad-${index}`]}</span>}
+                    </div>
+
+                    <div className="flex items-end">
                       {detallesCrear.length > 1 && (
                         <button
                           onClick={() => eliminarDetalleCrear(index)}
-                          className="text-red-600 hover:text-red-800 flex items-center gap-1 text-sm"
+                          className="h-10 px-4 bg-red-100 text-red-700 rounded hover:bg-red-200 flex items-center gap-2"
                         >
-                          <Trash2 size={16} /> <span>Eliminar</span>
+                          <Trash2 size={14} /> Eliminar
                         </button>
                       )}
                     </div>
@@ -795,99 +1012,126 @@ export const Produccion = () => {
                 ))}
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
-              <button onClick={handleCreate} className="flex-1 bg-green-600 hover:bg-green-700 text-white h-11 rounded-lg font-medium">
-                Crear producción
+
+            <div className="flex gap-4 mt-6">
+              <button
+                onClick={handleCreate}
+                disabled={loading}
+                className={`flex-1 h-11 rounded flex items-center justify-center gap-2 ${loading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white`}
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Creando...
+                  </>
+                ) : (
+                  <>
+                    <Save size={18} /> Crear Producción
+                  </>
+                )}
               </button>
-              <button onClick={goToBackToList} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 h-11 rounded-lg font-medium">
-                Cancelar
+
+              <button
+                onClick={goToBackToList}
+                disabled={loading}
+                className="flex-1 bg-gray-200 text-gray-700 h-11 rounded hover:bg-gray-300 flex items-center justify-center gap-2"
+              >
+                <X size={18} /> Cancelar
               </button>
             </div>
           </div>
-        )}
+        </div>
+        <ToastContainer />
+      </div>
+    );
+  }
 
-        {/* VER */}
-        {mode === "view" && (
-          <div className="bg-white rounded-xl shadow-sm border p-4 md:p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
-                <ArrowLeft size={18} />
-              </button>
-              <div>
-                <h3 className="text-lg font-bold text-slate-800">Producción #{getShortId(id)}</h3>
-                <p className="text-sm text-gray-600">Detalles de la producción</p>
-              </div>
-            </div>
+  // ─── RENDER: VER (SOLO LECTURA) ──────────────────────────────
+  if (mode === "view") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-3 mb-6">
+            <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
+              <ArrowLeft size={18} />
+            </button>
+            <h3 className="text-lg font-bold">Producción #{getShortId(id)}</h3>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border p-6">
             {loading ? (
               <div className="p-8 text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <p className="mt-2 text-gray-600">Cargando producción...</p>
               </div>
-            ) : formEditar ? (
+            ) : produccionDetalle ? (
               <div className="space-y-6">
+                {/* Información principal */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="text-sm text-gray-500 mb-1">Producción ID</div>
-                    <div className="font-bold text-lg text-slate-800">#{getShortId(formEditar.ProduccionId)}</div>
+                    <div className="text-sm text-gray-500">Producción ID</div>
+                    <div className="font-bold">#{getShortId(produccionDetalle.ProduccionId)}</div>
                   </div>
+
                   <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="text-sm text-gray-500 mb-1">Pedido ID</div>
-                    <div className="font-bold text-lg text-blue-600">#{getShortId(formEditar.PedidoClienteId)}</div>
+                    <div className="text-sm text-gray-500">Pedido ID</div>
+                    <div className="font-bold">#{getShortId(produccionDetalle.PedidoClienteId)}</div>
                   </div>
+
                   <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="text-sm text-gray-500 mb-1">Estado</div>
-                    <div className={`inline-block px-3 py-1 rounded-full font-medium ${getEstadoColor(formEditar.Estado)}`}>
-                      {formEditar.Estado}
+                    <div className="text-sm text-gray-500">Estado</div>
+                    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEstadoColor(produccionDetalle.Estado)}`}>
+                      {produccionDetalle.Estado}
                     </div>
                   </div>
+
                   <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="text-sm text-gray-500 mb-1">Fecha Inicio</div>
-                    <div className="font-bold text-slate-800">{formatDate(formEditar.FechaInicio)}</div>
+                    <div className="text-sm text-gray-500">Fecha Inicio</div>
+                    <div className="font-bold">{formatDate(produccionDetalle.FechaInicio)}</div>
                   </div>
+
                   <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="text-sm text-gray-500 mb-1">Fecha Fin</div>
-                    <div className="font-bold text-slate-800">{formatDate(formEditar.FechaFin)}</div>
+                    <div className="text-sm text-gray-500">Fecha Fin</div>
+                    <div className="font-bold">{formatDate(produccionDetalle.FechaFin)}</div>
                   </div>
+
                   <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="text-sm text-gray-500 mb-1">Total Insumos</div>
-                    <div className="font-bold text-lg text-slate-800">{formEditar.detalle?.length || 0}</div>
+                    <div className="text-sm text-gray-500">Total Insumos</div>
+                    <div className="font-bold">{produccionDetalle.detalle?.length || 0}</div>
                   </div>
                 </div>
 
-                {/* ✅ DETALLE DE INSUMOS - SOLO EN MODO VER */}
-                {formEditar.detalle?.length > 0 && (
+                {/* Insumos utilizados */}
+                {produccionDetalle.detalle?.length > 0 ? (
                   <div>
-                    <h4 className="font-bold text-slate-800 mb-3">Insumos utilizados</h4>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm border rounded-lg">
+                    <h4 className="font-semibold mb-4">Insumos utilizados</h4>
+                    <div className="overflow-auto border rounded-lg">
+                      <table className="min-w-full text-sm">
                         <thead className="bg-gray-100">
                           <tr>
-                            <th className="py-3 px-4 text-left font-medium text-slate-700">Insumo</th>
-                            <th className="py-3 px-4 text-left font-medium text-slate-700">Cantidad</th>
+                            <th className="py-3 px-4 text-left">Insumo</th>
+                            <th className="py-3 px-4 text-left">Cantidad</th>
+                            <th className="py-3 px-4 text-left">Categoría</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {formEditar.detalle.map((d, idx) => (
-                            <tr key={d._tempId || idx} className="border-t hover:bg-gray-50">
+                          {produccionDetalle.detalle.map((d, idx) => (
+                            <tr key={idx} className="border-t hover:bg-gray-50">
                               <td className="py-3 px-4">
-                                {d.InsumoData ? (
-                                  <>
-                                    <div className="font-medium">{d.InsumoData.Nombre}</div>
-                                    {d.InsumoData.Categoria && (
-                                      <div className="text-xs text-gray-500">{d.InsumoData.Categoria}</div>
-                                    )}
-                                    {d.InsumoData.Descripcion && (
-                                      <div className="text-xs text-gray-500 italic">{d.InsumoData.Descripcion}</div>
-                                    )}
-                                  </>
-                                ) : (
-                                  <div className="font-medium text-red-500">Insumo no encontrado (ID: {d.InsumoId})</div>
+                                <div className="font-medium">
+                                  {d.InsumoInfo?.Nombre || `Insumo #${getShortId(d.InsumoId)}`}
+                                </div>
+                                {d.InsumoInfo?.Descripcion && (
+                                  <div className="text-xs text-gray-500 mt-1">{d.InsumoInfo.Descripcion}</div>
                                 )}
                               </td>
+
                               <td className="py-3 px-4">
-                                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium">
-                                  {d.CantidadUsada} unidades
-                                </span>
+                                <span className="font-semibold">{d.CantidadUsada}</span> unidades
+                              </td>
+
+                              <td className="py-3 px-4">
+                                {d.InsumoInfo?.Categoria || "Sin categoría"}
                               </td>
                             </tr>
                           ))}
@@ -895,36 +1139,54 @@ export const Produccion = () => {
                       </table>
                     </div>
                   </div>
+                ) : (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-yellow-700">No hay insumos registrados para esta producción.</p>
+                  </div>
                 )}
 
+                {/* Solo botón para volver a la lista */}
                 <div className="pt-4 border-t">
-                  <button onClick={goToBackToList} className="w-full h-11 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium">
+                  <button
+                    onClick={goToBackToList}
+                    className="w-full h-11 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                  >
                     Volver a la lista
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="p-6 text-center">
-                <div className="text-red-500 mb-2">No se pudo cargar la producción.</div>
-                <button onClick={goToBackToList} className="text-blue-600 hover:text-blue-800">Volver a la lista</button>
+              <div className="p-6 text-center text-red-500">
+                <p>No se pudo cargar la producción.</p>
+                <button
+                  onClick={goToBackToList}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Volver a la lista
+                </button>
               </div>
             )}
           </div>
-        )}
+        </div>
+        <ToastContainer />
+      </div>
+    );
+  }
 
-        {/* EDITAR */}
-        {mode === "edit" && (
-          <div className="bg-white rounded-xl shadow-sm border p-4 md:p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
-                <ArrowLeft size={18} />
-              </button>
-              <div>
-                <h3 className="text-lg font-bold text-slate-800">Editar producción #{getShortId(id)}</h3>
-                <p className="text-sm text-gray-600">Modifique los campos necesarios</p>
-              </div>
-            </div>
-            {loading ? (
+  // ─── RENDER: EDITAR ──────────────────────────────────────────
+  if (mode === "edit") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-3 mb-6">
+            <button onClick={() => navigate(`/dashboard/produccion/${id}`)} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
+              <ArrowLeft size={18} />
+            </button>
+            <h3 className="text-lg font-bold">Editar producción #{getShortId(id)}</h3>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            {loading && !formEditar ? (
               <div className="p-8 text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <p className="mt-2 text-gray-600">Cargando datos...</p>
@@ -932,110 +1194,111 @@ export const Produccion = () => {
             ) : formEditar ? (
               <>
                 {errores.detalles && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-4">{errores.detalles}</div>
+                  <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-4">
+                    {errores.detalles}
+                  </div>
                 )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div className="flex flex-col gap-2">
-                    <label className="font-medium text-slate-700">
-                      Pedido Cliente <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={formEditar.PedidoClienteId ? `Pedido #${getShortId(formEditar.PedidoClienteId)}` : ""}
-                      placeholder="Haz clic para seleccionar un pedido"
-                      className={`w-full h-11 px-3 border rounded-lg ${errores.pedido ? "border-red-500" : "border-gray-300"} bg-white cursor-pointer hover:bg-gray-50`}
+                    <label className="font-medium">Pedido Cliente *</label>
+                    <button
+                      type="button"
+                      className={`w-full h-11 px-3 border rounded-lg text-left ${errores.pedido ? "border-red-500" : "border-gray-300"} bg-white hover:bg-gray-50 flex justify-between items-center`}
                       onClick={goToSelectPedido}
-                    />
-                    {errores.pedido && <span className="text-red-500 text-xs mt-1 block">{errores.pedido}</span>}
+                    >
+                      <span className={formEditar.PedidoClienteId ? "text-gray-800" : "text-gray-500"}>
+                        {formEditar.PedidoClienteId ? `#${getShortId(formEditar.PedidoClienteId)}` : "Seleccionar pedido"}
+                      </span>
+                      <Search size={16} />
+                    </button>
+                    {errores.pedido && <span className="text-red-500 text-xs">{errores.pedido}</span>}
                   </div>
+
                   <div className="flex flex-col gap-2">
-                    <label className="font-medium text-slate-700">Estado</label>
+                    <label className="font-medium">Estado</label>
                     <select
                       value={formEditar.Estado}
                       onChange={(e) => setFormEditar({ ...formEditar, Estado: e.target.value })}
-                      className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="w-full h-11 px-3 border rounded"
                     >
                       <option value="En Proceso">En Proceso</option>
                       <option value="Finalizado">Finalizado</option>
                     </select>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {formEditar.Estado === "Finalizado" &&
+                        "Al marcar como Finalizado, el pedido asociado se actualizará a 'terminado'"}
+                    </div>
                   </div>
+
                   <div className="flex flex-col gap-2">
-                    <label className="font-medium text-slate-700">
-                      Fecha Inicio <span className="text-red-500">*</span>
-                    </label>
+                    <label className="font-medium">Fecha Inicio *</label>
                     <input
                       type="datetime-local"
                       value={formEditar.FechaInicio}
-                      onChange={(e) => {
-                        setFormEditar({ ...formEditar, FechaInicio: e.target.value });
-                        if (errores.fechaInicio) setErrores((prev) => ({ ...prev, fechaInicio: "" }));
-                      }}
-                      className={`w-full h-11 px-3 border rounded-lg ${errores.fechaInicio ? "border-red-500" : "border-gray-300"} focus:ring-2 focus:ring-blue-500`}
+                      onChange={(e) => setFormEditar({ ...formEditar, FechaInicio: e.target.value })}
+                      className={`w-full h-11 px-3 border rounded ${errores.fechaInicio ? "border-red-500" : "border-gray-300"}`}
                     />
                     {errores.fechaInicio && <span className="text-red-500 text-xs">{errores.fechaInicio}</span>}
                   </div>
+
                   <div className="flex flex-col gap-2">
-                    <label className="font-medium text-slate-700">Fecha Fin (opcional)</label>
+                    <label className="font-medium">Fecha Fin (opcional)</label>
                     <input
                       type="datetime-local"
                       value={formEditar.FechaFin || ""}
-                      onChange={(e) => setFormEditar({ ...formEditar, FechaFin: e.target.value })}
-                      className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => setFormEditar({ ...formEditar, FechaFin: e.target.value || null })}
+                      className="w-full h-11 px-3 border rounded"
                     />
                   </div>
                 </div>
+
                 <div className="mb-6">
                   <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-medium text-slate-700">
-                      Insumos utilizados <span className="text-red-500">*</span>
-                    </h4>
-                    <button onClick={añadirDetalleEditar} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                    <h4 className="font-semibold">Insumos utilizados *</h4>
+                    <button onClick={añadirDetalleEditar} className="bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-600">
                       <Plus size={15} /> Añadir insumo
                     </button>
                   </div>
+
                   <div className="grid grid-cols-1 gap-4">
                     {formEditar.detalle.map((d, index) => (
-                      <div key={d._tempId} className="border border-gray-200 p-4 rounded-lg bg-gray-50">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium text-slate-700">
-                              Insumo <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              readOnly
-                              value={d.InsumoId ? insumos.find((i) => i.InsumoId === d.InsumoId)?.Nombre || d.InsumoId : ""}
-                              placeholder="Haz clic para seleccionar un insumo"
-                              className={`h-10 px-3 border rounded bg-white cursor-pointer w-full ${errores[`insumo-${index}`] ? "border-red-500" : "border-gray-300"} hover:bg-gray-50`}
-                              onClick={() => goToSelectInsumo(index)}
-                            />
-                            {errores[`insumo-${index}`] && <span className="text-red-500 text-xs mt-1 block">{errores[`insumo-${index}`]}</span>}
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium text-slate-700">
-                              Cantidad <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={d.CantidadUsada}
-                              onChange={(e) => {
-                                actualizarDetalleEditar(index, "CantidadUsada", Number(e.target.value));
-                                if (errores[`cantidad-${index}`]) setErrores((prev) => ({ ...prev, [`cantidad-${index}`]: "" }));
-                              }}
-                              className={`h-10 px-3 border rounded w-full ${errores[`cantidad-${index}`] ? "border-red-500" : "border-gray-300"} focus:ring-2 focus:ring-blue-500`}
-                            />
-                            {errores[`cantidad-${index}`] && <span className="text-red-500 text-xs mt-1">{errores[`cantidad-${index}`]}</span>}
-                          </div>
+                      <div key={d._tempId} className="grid grid-cols-1 md:grid-cols-3 gap-3 border p-3 rounded">
+                        <div className="flex flex-col gap-2">
+                          <label>Insumo *</label>
+                          <button
+                            type="button"
+                            className={`h-10 px-2 border rounded text-left ${errores[`insumo-${index}`] ? "border-red-500" : "border-gray-300"} bg-white hover:bg-gray-50 flex justify-between items-center`}
+                            onClick={() => goToSelectInsumo(index)}
+                          >
+                            <span className={d.InsumoId ? "text-gray-800" : "text-gray-500"}>
+                              {d.InsumoId ? getNombreInsumo(d.InsumoId) : "Seleccionar insumo"}
+                            </span>
+                            <Search size={16} />
+                          </button>
+                          {errores[`insumo-${index}`] && <span className="text-red-500 text-xs">{errores[`insumo-${index}`]}</span>}
                         </div>
-                        <div className="flex justify-end mt-3">
+
+                        <div className="flex flex-col gap-2">
+                          <label>Cantidad *</label>
+                          <input
+                            type="number"
+                            min="1"
+                            step="0.01"
+                            value={d.CantidadUsada}
+                            onChange={(e) => actualizarDetalleEditar(index, "CantidadUsada", Number(e.target.value))}
+                            className={`h-10 px-2 border rounded ${errores[`cantidad-${index}`] ? "border-red-500" : "border-gray-300"}`}
+                          />
+                          {errores[`cantidad-${index}`] && <span className="text-red-500 text-xs">{errores[`cantidad-${index}`]}</span>}
+                        </div>
+
+                        <div className="flex items-end">
                           {formEditar.detalle.length > 1 && (
                             <button
                               onClick={() => eliminarDetalleEditar(index)}
-                              className="text-red-600 hover:text-red-800 flex items-center gap-1 text-sm"
+                              className="h-10 px-4 bg-red-100 text-red-700 rounded hover:bg-red-200 flex items-center gap-2"
                             >
-                              <Trash2 size={16} /> <span>Eliminar</span>
+                              <Trash2 size={14} /> Eliminar
                             </button>
                           )}
                         </div>
@@ -1043,22 +1306,68 @@ export const Produccion = () => {
                     ))}
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
-                  <button onClick={handleEdit} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-11 rounded-lg font-medium">
-                    Guardar cambios
+
+                <div className="flex gap-4 mt-6">
+                  <button
+                    onClick={handleEdit}
+                    disabled={loading}
+                    className={`flex-1 h-11 rounded flex items-center justify-center gap-2 ${loading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
+                  >
+                    {loading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={18} /> Guardar Cambios
+                      </>
+                    )}
                   </button>
-                  <button onClick={goToBackToList} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 h-11 rounded-lg font-medium">
-                    Cancelar
+
+                  <button
+                    onClick={() => navigate(`/dashboard/produccion/${id}`)}
+                    disabled={loading}
+                    className="flex-1 bg-gray-200 text-gray-700 h-11 rounded hover:bg-gray-300 flex items-center justify-center gap-2"
+                  >
+                    <X size={18} /> Cancelar
                   </button>
                 </div>
               </>
             ) : (
-              <div className="p-6 text-center text-red-500">No se pudo cargar la producción para editar.</div>
+              <div className="p-6 text-center text-red-500">
+                <p>No se pudo cargar la producción para editar.</p>
+                <button
+                  onClick={() => navigate(`/dashboard/produccion/${id}`)}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Volver a la vista
+                </button>
+              </div>
             )}
           </div>
-        )}
+        </div>
+        <ToastContainer />
       </div>
-      <ToastContainer position="top-right" autoClose={3000} pauseOnHover />
+    );
+  }
+
+  // ─── DEFAULT RENDER ──────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Producción</h1>
+        <div className="bg-white rounded-xl shadow-sm border p-6 text-center">
+          <p className="text-gray-600">Modo no reconocido. Redirigiendo...</p>
+          <button
+            onClick={goToBackToList}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Volver a la lista
+          </button>
+        </div>
+      </div>
+      <ToastContainer />
     </div>
   );
 };

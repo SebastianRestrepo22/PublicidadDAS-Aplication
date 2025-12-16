@@ -76,7 +76,9 @@ export const Checkout = () => {
 
     if (metodoPago === "entrega") {
       payload.metodoPago = "contra_entrega";
-      payload.datosEntrega = datosEntrega;
+      payload.nombre_recibe = datosEntrega.nombreRecibe;
+      payload.telefono_entrega = datosEntrega.telefono;
+      payload.direccion_entrega = datosEntrega.direccion;
     } else {
       payload.metodoPago = metodoPago;
     }
@@ -131,8 +133,8 @@ export const Checkout = () => {
     }
   };
 
-  // ====== COMPONENTE: Subir comprobante (SIN banco ni número de transacción) ======
-  const SubirComprobanteBanco = ({ pedidoId }) => {
+  // ====== COMPONENTE: Subir comprobante ======
+  const SubirComprobanteBanco = ({ pedidoId, metodo }) => {
     const [file, setFile] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -150,7 +152,8 @@ export const Checkout = () => {
 
       setUploading(true);
       try {
-        const res = await fetch("http://localhost:3000/api/comprobantes", {
+        // ⬇️ NUEVA RUTA: /api/voucher
+        const res = await fetch("http://localhost:3000/api/voucher", {
           method: "POST",
           body: formData
         });
@@ -160,9 +163,9 @@ export const Checkout = () => {
           setTimeout(() => {
             navigate("/pedido-exitoso", { 
               state: { 
-                metodo: voucher.metodo, 
+                metodo,
                 id: pedidoId,
-                referencia: voucher.referencia
+                referencia: `PED${pedidoId.toString().padStart(6, '0')}`
               } 
             });
           }, 2000);
@@ -332,7 +335,7 @@ export const Checkout = () => {
               </div>
               
               <div className="p-6">
-                <SubirComprobanteBanco pedidoId={voucher.id} />
+                <SubirComprobanteBanco pedidoId={voucher.id} metodo={voucher.metodo} />
               </div>
             </div>
           </div>
@@ -536,9 +539,6 @@ export const Checkout = () => {
                       src={DATOS_BANCARIOS_REALES.qrCode}
                       alt="QR Bancolombia"
                       className="w-36 h-36 object-contain"
-                      onError={(e) => {
-                        e.target.src = "/placeholder-qr.png";
-                      }}
                     />
                   </div>
                   <div className="text-xs text-gray-600 mt-3 text-center">

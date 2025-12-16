@@ -3,7 +3,6 @@ import {
   Plus, Eye, Trash2, ArrowLeft, Search, X,
 } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-
 // Servicios
 import {
   getAllPedidosClientes,
@@ -14,6 +13,9 @@ import {
   getDetallesByPedidoId,
   getAllProductos,
 } from "./services/services.pedidosClientes";
+
+// ⚙️ CONFIGURACIÓN
+const BACKEND_URL = "http://localhost:3000"; // ← AJUSTA SI TU BACKEND USA OTRO PUERTO
 
 export const PedidosClientes = () => {
   const navigate = useNavigate();
@@ -43,13 +45,29 @@ export const PedidosClientes = () => {
     direccion_entrega: "",
     voucher: "",
   });
-
   const [detallesCrear, setDetallesCrear] = useState([
     { _tempId: crypto.randomUUID(), ProductoServicioId: "", Cantidad: 1, Alto: "", Ancho: "", Descripcion: "", UrlImagen: "" },
   ]);
-
   const [productos, setProductos] = useState([]);
   const [selectedProductIndex, setSelectedProductIndex] = useState(null);
+  const [alert, setAlert] = useState({ show: false, message: "", type: "info" });
+
+  // === Formatear fecha en español ===
+  const formatDate = (dateString) => {
+    if (!dateString) return "—";
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('es-ES', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    }).format(date);
+  };
+
+  // === Alertas ===
+  const showAlert = (message, type = "info") => {
+    setAlert({ show: true, message, type });
+    setTimeout(() => setAlert({ show: false, message: "", type: "info" }), 3000);
+  };
 
   // Cargar productos
   useEffect(() => {
@@ -101,7 +119,6 @@ export const PedidosClientes = () => {
         try {
           const pedido = await getPedidoById(id);
           const detalle = await getDetallesByPedidoId(id);
-
           const pedidoCompleto = {
             ...pedido,
             detalle: (Array.isArray(detalle) ? detalle : []).map(item => ({
@@ -109,7 +126,6 @@ export const PedidosClientes = () => {
               _tempId: item.DetallePedidoClienteId || crypto.randomUUID()
             }))
           };
-
           setPedidos(prev => prev.map(p => p.PedidoClienteId === id ? pedidoCompleto : p));
         } catch {
           navigate("/dashboard/pedidosClientes");
@@ -195,12 +211,11 @@ export const PedidosClientes = () => {
       const detallesLimpios = detallesCrear.map(d => ({
         ProductoServicioId: String(d.ProductoServicioId).trim(),
         Cantidad: Number(d.Cantidad) || 1,
-        Alto: d.Alto || "",
-        Ancho: d.Ancho || "",
-        Descripcion: d.Descripcion || "",
-        UrlImagen: d.UrlImagen || "",
+        Alto: d.Alto || (productos.find(p => p.ProductoServicioId === d.ProductoServicioId)?.Alto || ""),
+        Ancho: d.Ancho || (productos.find(p => p.ProductoServicioId === d.ProductoServicioId)?.Ancho || ""),
+        Descripcion: d.Descripcion || (productos.find(p => p.ProductoServicioId === d.ProductoServicioId)?.Descripcion || productos.find(p => p.ProductoServicioId === d.ProductoServicioId)?.Nombre || ""),
+        UrlImagen: d.UrlImagen || (productos.find(p => p.ProductoServicioId === d.ProductoServicioId)?.UrlImagen || ""),
       }));
-
       await createPedidoCliente({
         ClienteId: formCrear.ClienteId.trim(),
         FechaRegistro: formCrear.FechaRegistro,
@@ -213,11 +228,12 @@ export const PedidosClientes = () => {
         voucher: formCrear.metodo_pago === "transferencia" ? formCrear.voucher : null,
         detalle: detallesLimpios,
       });
-
+      showAlert("Pedido creado exitosamente", "success");
       goToBackToList();
       fetchPedidos();
     } catch (err) {
       console.error("Error al crear pedido:", err);
+      showAlert("Error al crear el pedido", "error");
     }
   };
 
@@ -226,7 +242,6 @@ export const PedidosClientes = () => {
     try {
       const pedidoActual = pedidos.find(p => p.PedidoClienteId === pedidoId);
       if (!pedidoActual) return;
-
       await updatePedidoCliente(pedidoId, {
         ClienteId: pedidoActual.ClienteId,
         FechaRegistro: pedidoActual.FechaRegistro,
@@ -238,14 +253,16 @@ export const PedidosClientes = () => {
         direccion_entrega: pedidoActual.direccion_entrega,
         voucher: pedidoActual.voucher,
       });
-
       setPedidos(prev =>
         prev.map(p =>
           p.PedidoClienteId === pedidoId ? { ...p, Estado: nuevoEstado } : p
         )
       );
+      showAlert("Estado actualizado correctamente", "success");
+      goToBackToList();
     } catch (err) {
       console.error("Error al actualizar estado:", err);
+      showAlert("Error al actualizar el estado", "error");
     }
   };
 
@@ -255,15 +272,94 @@ export const PedidosClientes = () => {
       try {
         await deletePedidoCliente(pedidoId);
         fetchPedidos();
+        showAlert("Pedido eliminado correctamente", "success");
       } catch (err) {
         console.error("Error al eliminar pedido:", err);
+        showAlert("Error al eliminar el pedido", "error");
       }
     }
+  };
+
+  // Abrir voucher con botón "Cerrar"
+  const openVoucherWithClose = (fullUrl) => {
+    const voucherWindow = window.open();
+    voucherWindow.document.write(`
+      <html>
+        <head>
+          <title>Voucher</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 20px;
+              background: #f9fafb;
+              font-family: system-ui, sans-serif;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+            }
+            .content {
+              max-width: 90vw;
+              max-height: 90vh;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+            }
+            img, embed {
+              max-width: 100%;
+              max-height: 80vh;
+              object-fit: contain;
+              border: 1px solid #e5e7eb;
+              border-radius: 8px;
+            }
+            .close-btn {
+              margin-top: 20px;
+              padding: 8px 16px;
+              background: #3b82f6;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: 500;
+            }
+            .close-btn:hover {
+              background: #2563eb;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="content">
+            <div>
+              ${fullUrl.endsWith('.pdf') 
+                ? `<embed src="${fullUrl}" type="application/pdf" width="100%" height="80vh" />`
+                : `<img src="${fullUrl}" alt="Voucher" />`
+              }
+            </div>
+            <button class="close-btn" onclick="window.close()">Cerrar</button>
+          </div>
+        </body>
+      </html>
+    `);
+    voucherWindow.document.close();
   };
 
   // ===== RENDER =====
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+      {/* Alertas */}
+      {alert.show && (
+        <div
+          className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 ${
+            alert.type === "success" ? "bg-green-600" :
+            alert.type === "error" ? "bg-red-600" :
+            "bg-blue-600"
+          }`}
+        >
+          {alert.message}
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Pedidos</h1>
 
@@ -277,7 +373,6 @@ export const PedidosClientes = () => {
               >
                 <Plus size={18} /> Nuevo pedido
               </button>
-
               <div className="flex-1 max-w-md">
                 <div className="relative">
                   <input
@@ -294,7 +389,6 @@ export const PedidosClientes = () => {
                   />
                 </div>
               </div>
-
               <div className="w-full sm:w-auto">
                 <select
                   value={filtroCampo}
@@ -310,7 +404,6 @@ export const PedidosClientes = () => {
                 </select>
               </div>
             </div>
-
             <div className="bg-white rounded-xl shadow-sm border overflow-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-800 sticky top-0">
@@ -329,7 +422,7 @@ export const PedidosClientes = () => {
                     <tr key={pedido.PedidoClienteId} className="hover:bg-slate-50">
                       <td className="py-4 px-6">{shortenId(pedido.PedidoClienteId)}</td>
                       <td className="py-4 px-6">{pedido.NombreCliente || "—"}</td>
-                      <td className="py-4 px-6">{pedido.FechaRegistro}</td>
+                      <td className="py-4 px-6">{formatDate(pedido.FechaRegistro)}</td>
                       <td className="py-4 px-6">$ {Number(pedido.Total || 0).toFixed(2)}</td>
                       <td className="py-4 px-6">
                         <span className="text-sm font-medium">
@@ -341,13 +434,11 @@ export const PedidosClientes = () => {
                           pedido.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
                           pedido.Estado === 'en_produccion' ? 'bg-blue-100 text-blue-800' :
                           pedido.Estado === 'terminado' ? 'bg-green-100 text-green-800' :
-                          pedido.Estado === 'entregado' ? 'bg-purple-100 text-purple-800' :
                           'bg-red-100 text-red-800'
                         }`}>
                           {pedido.Estado === 'pendiente' ? 'Pendiente' :
                            pedido.Estado === 'en_produccion' ? 'En Producción' :
-                           pedido.Estado === 'terminado' ? 'Terminado' :
-                           pedido.Estado === 'entregado' ? 'Entregado' : 'Cancelado'}
+                           pedido.Estado === 'terminado' ? 'Terminado' : 'Cancelado'}
                         </span>
                       </td>
                       <td className="py-4 px-6">
@@ -407,7 +498,6 @@ export const PedidosClientes = () => {
                   />
                 </div>
               </div>
-
               {/* Método de pago */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-2">
@@ -421,7 +511,6 @@ export const PedidosClientes = () => {
                     <option value="contra_entrega">Contra Entrega</option>
                   </select>
                 </div>
-
                 {/* Comprobante solo si es transferencia */}
                 {formCrear.metodo_pago === "transferencia" && (
                   <div className="flex flex-col gap-2">
@@ -459,7 +548,6 @@ export const PedidosClientes = () => {
                   </div>
                 )}
               </div>
-
               {/* Campos de entrega (solo contra entrega) */}
               {formCrear.metodo_pago === "contra_entrega" && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
@@ -492,7 +580,6 @@ export const PedidosClientes = () => {
                   </div>
                 </div>
               )}
-
               <div className="flex justify-end">
                 <button type="button" onClick={añadirDetalleCrear} className="bg-blue-500 text-white px-6 py-2 rounded-lg flex items-center gap-2">
                   <Plus size={15} /> Añadir detalle
@@ -513,7 +600,9 @@ export const PedidosClientes = () => {
                             actualizarDetalleCrear(index, "ProductoServicioId", value);
                             const producto = productos.find(p => p.ProductoServicioId === value);
                             if (producto) {
-                              actualizarDetalleCrear(index, "Descripcion", producto.Nombre || "");
+                              actualizarDetalleCrear(index, "Descripcion", producto.Descripcion || producto.Nombre || "");
+                              actualizarDetalleCrear(index, "Alto", producto.Alto || "");
+                              actualizarDetalleCrear(index, "Ancho", producto.Ancho || "");
                               actualizarDetalleCrear(index, "UrlImagen", producto.UrlImagen || "");
                             }
                           }
@@ -602,7 +691,6 @@ export const PedidosClientes = () => {
                 Pedido #{shortenId(pedidos.find(p => p.PedidoClienteId === id)?.PedidoClienteId || id)}
               </h3>
             </div>
-
             <div className="bg-gray-50 p-6 rounded-xl mb-6">
               <h4 className="font-semibold mb-4">Información del Pedido</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -616,18 +704,16 @@ export const PedidosClientes = () => {
                 </div>
                 <div className="bg-white p-4 rounded-lg">
                   <div className="text-sm text-gray-500">Fecha Registro</div>
-                  <div className="font-bold">{pedidos.find(p => p.PedidoClienteId === id)?.FechaRegistro || "—"}</div>
+                  <div className="font-bold">{formatDate(pedidos.find(p => p.PedidoClienteId === id)?.FechaRegistro || "—")}</div>
                 </div>
                 <div className="bg-white p-4 rounded-lg">
                   <div className="text-sm text-gray-500">Total</div>
                   <div className="font-bold">$ {Number(pedidos.find(p => p.PedidoClienteId === id)?.Total || 0).toFixed(2)}</div>
                 </div>
-
                 {/* Mostrar voucher o datos de entrega */}
                 {(() => {
                   const pedido = pedidos.find(p => p.PedidoClienteId === id);
                   if (!pedido) return null;
-
                   if (pedido.metodo_pago === "contra_entrega") {
                     return (
                       <>
@@ -646,21 +732,19 @@ export const PedidosClientes = () => {
                       </>
                     );
                   } else if (pedido.voucher) {
+                    const fullVoucherUrl = pedido.voucher.startsWith("http")
+                      ? pedido.voucher
+                      : `${BACKEND_URL}${pedido.voucher}`;
+
                     return (
                       <div className="bg-white p-4 rounded-lg">
                         <div className="text-sm text-gray-500">Comprobante de pago</div>
-                        {pedido.voucher.startsWith("image") ? (
-                          <img src={pedido.voucher} alt="Comprobante" className="w-24 h-24 object-contain mt-1" />
-                        ) : (
-                          <a
-                            href={pedido.voucher}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 underline"
-                          >
-                            Ver archivo adjunto
-                          </a>
-                        )}
+                        <button
+                          onClick={() => openVoucherWithClose(fullVoucherUrl)}
+                          className="text-blue-600 underline"
+                        >
+                          Ver archivo adjunto
+                        </button>
                       </div>
                     );
                   } else {
@@ -672,25 +756,21 @@ export const PedidosClientes = () => {
                     );
                   }
                 })()}
-
                 <div className="bg-white p-4 rounded-lg">
                   <div className="text-sm text-gray-500">Estado Actual</div>
                   <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
                     pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'en_produccion' ? 'bg-blue-100 text-blue-800' :
                     pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'terminado' ? 'bg-green-100 text-green-800' :
-                    pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'entregado' ? 'bg-purple-100 text-purple-800' :
                     'bg-red-100 text-red-800'
                   }`}>
                     {pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'pendiente' ? 'Pendiente' :
                      pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'en_produccion' ? 'En Producción' :
-                     pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'terminado' ? 'Terminado' :
-                     pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'entregado' ? 'Entregado' : 'Cancelado'}
+                     pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'terminado' ? 'Terminado' : 'Cancelado'}
                   </div>
                 </div>
               </div>
             </div>
-
             <div className="bg-gray-50 p-6 rounded-xl mb-6">
               <h4 className="font-semibold mb-4">Resumen de Productos</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -712,7 +792,6 @@ export const PedidosClientes = () => {
                 </div>
               </div>
             </div>
-
             <div className="bg-gray-50 p-6 rounded-xl mb-6">
               <h4 className="font-semibold mb-4">Productos Solicitados</h4>
               <div className="overflow-auto">
@@ -749,7 +828,6 @@ export const PedidosClientes = () => {
                 </table>
               </div>
             </div>
-
             <div className="bg-yellow-50 p-6 rounded-xl border border-yellow-200">
               <h4 className="font-semibold mb-2">Cambiar Estado del Pedido</h4>
               <p className="text-sm text-gray-600 mb-4">
@@ -764,7 +842,7 @@ export const PedidosClientes = () => {
                   <option value="pendiente">Pendiente</option>
                   <option value="en_produccion">En Producción</option>
                   <option value="terminado">Terminado</option>
-                  <option value="entregado">Entregado</option>
+                  {/* ❌ Estado "entregado" eliminado */}
                   <option value="cancelado">Cancelado</option>
                 </select>
                 <button
@@ -784,14 +862,13 @@ export const PedidosClientes = () => {
                 </button>
               </div>
             </div>
-
             <div className="mt-6">
               <button onClick={goToBackToList} className="w-full h-11 bg-gray-200 text-gray-700 rounded">Cerrar</button>
             </div>
           </div>
         )}
 
-        {/* SELECCIONAR PRODUCTO (MODAL FUNCIONAL) */}
+        {/* SELECCIONAR PRODUCTO */}
         {mode === "select-product" && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-xl shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -807,8 +884,6 @@ export const PedidosClientes = () => {
                 </div>
                 <p className="text-gray-600 mt-1">Busca y selecciona el producto que deseas agregar.</p>
               </div>
-
-              {/* Buscador y filtros */}
               <div className="p-6 border-b">
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="relative flex-1">
@@ -838,8 +913,6 @@ export const PedidosClientes = () => {
                   </div>
                 </div>
               </div>
-
-              {/* Tabla de resultados */}
               <div className="overflow-auto flex-1">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-100 sticky top-0">
@@ -864,7 +937,9 @@ export const PedidosClientes = () => {
                               onClick={() => {
                                 if (selectedProductIndex !== null) {
                                   actualizarDetalleCrear(selectedProductIndex, "ProductoServicioId", producto.ProductoServicioId);
-                                  actualizarDetalleCrear(selectedProductIndex, "Descripcion", producto.Nombre || "");
+                                  actualizarDetalleCrear(selectedProductIndex, "Descripcion", producto.Descripcion || producto.Nombre || "");
+                                  actualizarDetalleCrear(selectedProductIndex, "Alto", producto.Alto || "");
+                                  actualizarDetalleCrear(selectedProductIndex, "Ancho", producto.Ancho || "");
                                   actualizarDetalleCrear(selectedProductIndex, "UrlImagen", producto.UrlImagen || "");
                                 }
                                 goToCreate();
@@ -885,7 +960,6 @@ export const PedidosClientes = () => {
                   </div>
                 )}
               </div>
-
               <div className="p-6 border-t flex justify-end">
                 <button
                   onClick={goToCreate}
@@ -897,7 +971,6 @@ export const PedidosClientes = () => {
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

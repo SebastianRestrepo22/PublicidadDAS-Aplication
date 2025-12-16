@@ -1,9 +1,9 @@
+// src/models/pedidoCliente.model.js
 import { v4 as uuidv4 } from "uuid";
 import connectDB from "../lib/db.js";
 
 const sanitize = (v) => (v === undefined ? null : v);
 
-// ✔ TABLA REAL: pedidosclientes
 
 export const getAllPedidosClientesModel = async (clienteId = null) => {
   const connection = await connectDB();
@@ -70,6 +70,7 @@ export const getPedidoClienteByIdModel = async (pedidoId) => {
   return rows[0];
 };
 
+
 export const createPedidoClienteModel = async ({
   ClienteId,
   FechaRegistro,
@@ -127,51 +128,55 @@ export const createPedidoClienteModel = async ({
   return rows[0]; 
 };
 
+
+
+// src/models/pedidoCliente.model.js
+
 export const updatePedidoClienteModel = async (id, data) => {
   const connection = await connectDB();
-  const {
-    ClienteId,
-    FechaRegistro,
-    Total,
-    Estado,
-    metodo_pago,
-    voucher,
-    nombre_recibe,
-    telefono_entrega,
-    direccion_entrega
-  } = data;
 
-  const [result] = await connection.execute(
-    `
+  // Solo actualizar campos que están definidos y no son undefined
+  const allowedFields = [
+    'ClienteId',
+    'FechaRegistro',
+    'Total',
+    'Estado',
+    'metodo_pago',
+    'voucher',
+    'nombre_recibe',
+    'telefono_entrega',
+    'direccion_entrega'
+  ];
+
+  const fields = [];
+  const values = [];
+
+  for (const field of allowedFields) {
+    if (data[field] !== undefined) {
+      fields.push(`${field} = ?`);
+      values.push(data[field]); // 👈 NO uses sanitize() aquí
+    }
+  }
+
+  if (fields.length === 0) {
+    return { affectedRows: 0 };
+  }
+
+  const query = `
     UPDATE pedidosclientes
-    SET 
-      ClienteId = ?,
-      FechaRegistro = ?,
-      Total = ?,
-      Estado = ?,
-      metodo_pago = ?,
-      voucher = ?,
-      nombre_recibe = ?,
-      telefono_entrega = ?,
-      direccion_entrega = ?
+    SET ${fields.join(', ')}
     WHERE PedidoClienteId = ?
-    `,
-    [
-      sanitize(ClienteId),
-      sanitize(FechaRegistro),
-      sanitize(Total),
-      sanitize(Estado),
-      sanitize(metodo_pago),
-      sanitize(voucher),
-      sanitize(nombre_recibe),
-      sanitize(telefono_entrega),
-      sanitize(direccion_entrega),
-      id,
-    ]
-  );
+  `;
 
+  values.push(id);
+
+  const [result] = await connection.execute(query, values);
   return result;
 };
+
+// ███████████████████████████████████████████
+// ELIMINAR (sin cambios)
+// ███████████████████████████████████████████
 
 export const deletePedidoClienteModel = async (id) => {
   const connection = await connectDB();

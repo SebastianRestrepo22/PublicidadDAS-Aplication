@@ -17,6 +17,7 @@ import produccionRoutes from "./routes/produccion.routes.js";
 import citaRoutes from "./routes/cita.routes.js";
 import ventasRoutes from "./routes/venta.routes.js";
 import detalleVentasRoutes from "./routes/detalleVentas.routes.js"
+import voucherRoutes from './routes/voucher.routes.js';
 // Rutas de autenticación y usuarios
 import authRouter from './routes/authRoutes.js';
 import roleRouter from './routes/role.routes.js';
@@ -62,7 +63,9 @@ app.use("/api/produccion", produccionRoutes);
 app.use("/api/cita", citaRoutes);
 app.use("/api/ventas", ventasRoutes);
 app.use("/api/detalle-ventas", detalleVentasRoutes);
+app.use('/api/voucher', voucherRoutes);
 app.use(express.static("public")); 
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // Iniciar servidor
 const startServer = async () => {

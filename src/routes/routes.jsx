@@ -131,10 +131,14 @@ export const Routers = () => {
           <Route path="produccion/nuevo" element={<Produccion />} />
           <Route path="produccion/nuevo/seleccionar-pedido" element={<Produccion />} />
           <Route path="produccion/nuevo/seleccionar-insumo/:detalleIndex" element={<Produccion />} />
-          <Route path="produccion/:id" element={<Produccion />} />
-          <Route path="produccion/:id/editar" element={<Produccion />} />
+
+          {/* Rutas de edición → deben ir ANTES de la ruta general de "ver" */}
           <Route path="produccion/:id/editar/seleccionar-pedido" element={<Produccion />} />
           <Route path="produccion/:id/editar/seleccionar-insumo/:detalleIndex" element={<Produccion />} />
+          <Route path="produccion/:id/editar" element={<Produccion />} />
+
+          {/* Ruta de "ver" → debe ir al FINAL */}
+          <Route path="produccion/:id" element={<Produccion />} />
 
           <Route path="ventas/nuevo" element={<Ventas />} />
           <Route path="ventas/:id" element={<Ventas />} />
