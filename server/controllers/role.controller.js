@@ -196,8 +196,8 @@ export const buscarRoles = async (req, res) => {
       // Normalizamos para mayúscula inicial
       const valorNormalizado =
         valor.toLowerCase() === "activo" ? "Activo" :
-        valor.toLowerCase() === "inactivo" ? "Inactivo" :
-        valor;
+          valor.toLowerCase() === "inactivo" ? "Inactivo" :
+            valor;
       params = [valorNormalizado];
     } else {
       // Búsqueda flexible para otros campos
@@ -234,14 +234,14 @@ export const getRolePermissions = async (req, res) => {
   try {
     const { id } = req.params;
     const connection = await connectDB();
-    
+
     const [permisos] = await connection.execute(
       `SELECT p.* FROM permisos p
        JOIN rol_permisos rp ON p.PermisoId = rp.PermisoId
        WHERE rp.RoleId = ?`,
       [id]
     );
-    
+
     res.status(200).json(permisos);
   } catch (error) {
     console.error('Error al obtener permisos del rol:', error);
@@ -249,96 +249,144 @@ export const getRolePermissions = async (req, res) => {
   }
 };
 
-// Actualizar permisos de un rol
+// Actualizar permisos de un rol 
 export const updateRolePermissions = async (req, res) => {
   const { id } = req.params;
-  const { permisos } = req.body; // Array de PermisoId
+  const { permisos } = req.body;
+  
+  console.log('Actualizando permisos para rol:', { 
+    roleId: id, 
+    permisosCount: permisos?.length || 0,
+    permisos: permisos 
+  });
   
   if (!Array.isArray(permisos)) {
-    return res.status(400).json({ message: 'Formato de permisos inválido' });
+    return res.status(400).json({ message: 'Formato de permisos inválido. Se esperaba un array.' });
   }
 
-  let connection;
   try {
-    connection = await connectDB();
+    const pool = await connectDB();
     
-    // Iniciar transacción
-    await connection.beginTransaction();
-    
-    // Verificar que el rol existe
-    const [roles] = await connection.execute(
+    // 1. Verificar que el rol existe
+    const [roles] = await pool.execute(
       'SELECT * FROM roles WHERE RoleId = ?',
       [id]
     );
     
     if (roles.length === 0) {
-      await connection.rollback();
       return res.status(404).json({ message: 'Rol no encontrado' });
     }
     
-    // Eliminar permisos actuales
-    await connection.execute('DELETE FROM rol_permisos WHERE RoleId = ?', [id]);
+    // 2. Eliminar permisos actuales
+    console.log('Eliminando permisos antiguos para rol:', id);
+    await pool.execute('DELETE FROM rol_permisos WHERE RoleId = ?', [id]);
     
-    // Insertar nuevos permisos si hay alguno
-    if (permisos.length > 0) {
-      // Verificar que los permisos existen
-      const placeholders = permisos.map(() => '?').join(',');
-      const [existentes] = await connection.execute(
-        `SELECT PermisoId FROM permisos WHERE PermisoId IN (${placeholders})`,
-        permisos
-      );
-      
-      if (existentes.length !== permisos.length) {
-        await connection.rollback();
-        return res.status(400).json({ message: 'Algunos permisos no existen' });
-      }
-      
-      // Insertar permisos
-      const values = permisos.map(permisoId => [id, permisoId]);
-      await connection.query(
-        'INSERT INTO rol_permisos (RoleId, PermisoId) VALUES ?',
-        [values]
-      );
+    // 3. Si no hay nuevos permisos, terminar aquí
+    if (permisos.length === 0) {
+      return res.status(200).json({ 
+        message: 'Permisos actualizados correctamente (sin permisos)',
+        totalPermisos: 0
+      });
     }
     
-    await connection.commit();
+    // 4. Verificar que los permisos existen
+    console.log('Verificando que los permisos existen...');
+    const placeholders = permisos.map(() => '?').join(',');
+    const [existentes] = await pool.execute(
+      `SELECT PermisoId FROM permisos WHERE PermisoId IN (${placeholders})`,
+      permisos
+    );
+    
+    const permisosExistentes = existentes.map(p => p.PermisoId);
+    const permisosInexistentes = permisos.filter(p => !permisosExistentes.includes(p));
+    
+    if (permisosInexistentes.length > 0) {
+      console.log('Permisos no encontrados:', permisosInexistentes);
+      return res.status(400).json({ 
+        message: 'Algunos permisos no existen en la base de datos',
+        permisosInexistentes: permisosInexistentes
+      });
+    }
+    
+    // 5. Insertar nuevos permisos (uno por uno para mejor control)
+    console.log(`Insertando ${permisos.length} permisos...`);
+    for (let i = 0; i < permisos.length; i++) {
+      const permisoId = permisos[i];
+      try {
+        await pool.execute(
+          'INSERT INTO rol_permisos (RoleId, PermisoId) VALUES (?, ?)',
+          [id, permisoId]
+        );
+        console.log(`Permiso ${i+1}/${permisos.length} insertado:`, permisoId);
+      } catch (insertError) {
+        // Si hay error de duplicado (no debería pasar porque borramos primero), continuar
+        if (insertError.code === 'ER_DUP_ENTRY') {
+          console.warn(`Permiso duplicado (ignorado): ${permisoId}`);
+          continue;
+        }
+        throw insertError;
+      }
+    }
+    
+    console.log('Permisos actualizados exitosamente');
     res.status(200).json({ 
       message: 'Permisos actualizados correctamente',
-      totalPermisos: permisos.length
+      totalPermisos: permisos.length,
+      roleId: id,
+      roleName: roles[0].Nombre
     });
   } catch (error) {
-    if (connection) {
-      await connection.rollback();
-    }
-    console.error('Error al actualizar permisos del rol:', error);
+    console.error('Error CRÍTICO al actualizar permisos:', {
+      error: error.message,
+      code: error.code,
+      sqlState: error.sqlState,
+      sqlMessage: error.sqlMessage
+    });
     
+    // Errores específicos
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ message: 'Error de duplicación en permisos' });
+      return res.status(409).json({ 
+        message: 'Error de duplicación. Algunos permisos ya estaban asignados.',
+        error: error.sqlMessage
+      });
     }
     
-    res.status(500).json({ message: 'Error al actualizar permisos', error: error.message });
+    if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+      return res.status(400).json({ 
+        message: 'Error de integridad referencial. El rol o algunos permisos no existen.',
+        error: error.sqlMessage
+      });
+    }
+    
+    // Error genérico
+    res.status(500).json({ 
+      message: 'Error interno del servidor al actualizar permisos',
+      error: error.message,
+      code: error.code,
+      suggestion: 'Verifique que el rol exista y que los IDs de permisos sean válidos'
+    });
   }
 };
 
 // Obtener permisos por usuario (para login)
 export const getUserPermissions = async (req, res) => {
   const { userId } = req.params;
-  
+
   try {
     const connection = await connectDB();
-    
+
     // Obtener rol del usuario
     const [users] = await connection.execute(
       'SELECT RoleId FROM usuarios WHERE CedulaId = ?',
       [userId]
     );
-    
+
     if (users.length === 0) {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
-    
+
     const { RoleId } = users[0];
-    
+
     // Obtener permisos del rol
     const [permisos] = await connection.execute(
       `SELECT p.PermisoId, p.Nombre, p.Modulo 
@@ -347,7 +395,7 @@ export const getUserPermissions = async (req, res) => {
        WHERE rp.RoleId = ?`,
       [RoleId]
     );
-    
+
     res.status(200).json(permisos);
   } catch (error) {
     console.error('Error al obtener permisos del usuario:', error);

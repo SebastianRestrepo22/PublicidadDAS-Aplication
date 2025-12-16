@@ -11,7 +11,8 @@ import {
   deleteDetalleProduccionModel as deleteDetalleModel
 } from "../models/detalleProduccion.model.js";
 
-import { updatePedidoClienteModel } from "../models/pedidoCliente.model.js";
+// REMOVER esta importación si no existe el modelo
+// import { updatePedidoClienteModel } from "../models/pedidoCliente.model.js";
 
 import { v4 as uuidv4 } from "uuid";
 import connectDB from "../lib/db.js";
@@ -99,10 +100,79 @@ export const createProduccion = async (req, res) => {
 
 // Función auxiliar para actualizar estado del pedido
 const updatePedidoClienteEstado = async (connection, pedidoId, estado) => {
-  await connection.execute(
-    `UPDATE pedidocliente SET Estado = ? WHERE PedidoClienteId = ?`,
-    [estado, pedidoId]
-  );
+  try {
+    // PRIMERO: Verificar si la tabla existe
+    const [tables] = await connection.execute("SHOW TABLES");
+    const tableNames = tables.map(table => Object.values(table)[0]);
+    
+    console.log("📊 Tablas disponibles:", tableNames);
+    
+    // Buscar el nombre correcto de la tabla
+    let tablaPedido = null;
+    const posiblesNombres = [
+      'pedidocliente',
+      'PedidoCliente', 
+      'pedidos_cliente',
+      'pedidosclientes',
+      'pedidos',
+      'pedidos_clientes'
+    ];
+    
+    for (const nombre of posiblesNombres) {
+      if (tableNames.includes(nombre)) {
+        tablaPedido = nombre;
+        console.log(`✅ Tabla encontrada: ${tablaPedido}`);
+        break;
+      }
+    }
+    
+    if (!tablaPedido) {
+      console.error("❌ No se encontró la tabla de pedidos");
+      return;
+    }
+    
+    // Verificar las columnas de la tabla
+    const [columns] = await connection.execute(`DESCRIBE ${tablaPedido}`);
+    console.log(`📋 Columnas de ${tablaPedido}:`, columns.map(col => col.Field));
+    
+    // Buscar el nombre correcto de la columna ID
+    let columnaId = 'PedidoClienteId';
+    const posiblesColumnasId = ['PedidoClienteId', 'pedidoclienteid', 'id', 'ID', 'pedido_id'];
+    
+    for (const columna of posiblesColumnasId) {
+      if (columns.some(col => col.Field === columna)) {
+        columnaId = columna;
+        console.log(`✅ Columna ID encontrada: ${columnaId}`);
+        break;
+      }
+    }
+    
+    // Buscar el nombre correcto de la columna Estado
+    let columnaEstado = 'Estado';
+    const posiblesColumnasEstado = ['Estado', 'estado', 'status', 'EstadoPedido'];
+    
+    for (const columna of posiblesColumnasEstado) {
+      if (columns.some(col => col.Field === columna)) {
+        columnaEstado = columna;
+        console.log(`✅ Columna Estado encontrada: ${columnaEstado}`);
+        break;
+      }
+    }
+    
+    // Actualizar el pedido
+    console.log(`🔄 Actualizando pedido ${pedidoId} a estado "${estado}" en tabla ${tablaPedido}`);
+    
+    const [result] = await connection.execute(
+      `UPDATE ${tablaPedido} SET ${columnaEstado} = ? WHERE ${columnaId} = ?`,
+      [estado, pedidoId]
+    );
+    
+    console.log(`✅ Pedido actualizado. Filas afectadas: ${result.affectedRows}`);
+    
+  } catch (error) {
+    console.error("❌ Error en updatePedidoClienteEstado:", error);
+    // No lanzamos el error, solo lo registramos para no romper el flujo principal
+  }
 };
 
 // Actualizar producción + sincronizar con pedido si se finaliza
@@ -150,13 +220,11 @@ export const updateProduccion = async (req, res) => {
       const pedidoId = PedidoClienteId || produccionActual.PedidoClienteId;
       
       if (!pedidoId) {
-        await connection.rollback();
-        connection.release();
-        return res.status(400).json({ error: "No se puede finalizar: pedido no asociado" });
+        console.warn("⚠️ No se puede actualizar pedido: ID no disponible");
+      } else {
+        // Intentar actualizar el pedido (esta función ya maneja errores internamente)
+        await updatePedidoClienteEstado(connection, pedidoId, "terminado");
       }
-
-      // Actualizar estado del pedido a "terminado"
-      await updatePedidoClienteEstado(connection, pedidoId, "terminado");
     }
 
     await connection.commit();

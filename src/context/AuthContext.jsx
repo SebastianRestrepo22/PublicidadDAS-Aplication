@@ -1,11 +1,14 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { jwtDecode } from "jwt-decode";
+import axios from "axios";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const token = localStorage.getItem("token");
+    const userData = localStorage.getItem("userData");
+    
     if (!token) return null;
 
     try {
@@ -14,12 +17,18 @@ export const AuthProvider = ({ children }) => {
       // Verificar expiración
       if (decoded.exp * 1000 < Date.now()) {
         localStorage.removeItem("token");
+        localStorage.removeItem("userData");
         return null;
       }
 
-      return decoded;
+      // COMBINAR DATOS DEL TOKEN CON DATOS DEL LOCALSTORAGE
+      return {
+        ...decoded,
+        ...(userData ? JSON.parse(userData) : {})
+      };
     } catch (error) {
       localStorage.removeItem("token");
+      localStorage.removeItem("userData");
       return null;
     }
   });
@@ -34,43 +43,57 @@ export const AuthProvider = ({ children }) => {
       // Verificar expiración
       if (decoded.exp * 1000 < Date.now()) {
         localStorage.removeItem("token");
+        localStorage.removeItem("userData");
         return [];
       }
+
+      // Asegurarse de obtener permisos de múltiples fuentes
+      const userData = localStorage.getItem("userData");
+      const storedUser = userData ? JSON.parse(userData) : null;
       
-      // Extraer permisos del token si existen
-      return decoded.Permisos || [];
+      // Priorizar permisos del token, luego del userData almacenado
+      return decoded.Permisos || (storedUser?.Permisos || []);
     } catch (error) {
       return [];
     }
   });
 
-  // Estado para verificar si está cargando
+  // AÑADIR ESTADO LOADING
   const [loading, setLoading] = useState(true);
 
   // Función para actualizar el estado después del login
   const login = (token, userData) => {
+    console.log("AuthContext: login() ejecutado con userData:", userData);
+
+    // Guardar en localStorage
     localStorage.setItem("token", token);
-    
+    if (userData) {
+      localStorage.setItem("userData", JSON.stringify(userData));
+    }
+
     try {
       const decoded = jwtDecode(token);
-      
-      // Verificar expiración
-      if (decoded.exp * 1000 < Date.now()) {
-        localStorage.removeItem("token");
-        setUser(null);
-        setPermissions([]);
-        return;
-      }
+      console.log("Token decodificado:", decoded);
 
-      setUser(decoded);
-      setPermissions(decoded.Permisos || []);
+      // Combinar datos del token con datos adicionales
+      const combinedUser = {
+        ...decoded,
+        ...(userData || {})
+      };
+
+      setUser(combinedUser);
       
-      // Guardar datos adicionales del usuario si se proporcionan
-      if (userData) {
-        localStorage.setItem("userData", JSON.stringify(userData));
-      }
+      // Asegurar que los permisos se establezcan correctamente
+      const perms = decoded.Permisos || (userData?.Permisos || []);
+      console.log("Permisos establecidos:", perms);
+      setPermissions(perms);
+      setLoading(false); // AÑADIR: establecer loading como false
+
+      // Configurar axios para futuras peticiones
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
     } catch (error) {
-      console.error("Error al decodificar token:", error);
+      console.error("Error decodificando token:", error);
       logout();
     }
   };
@@ -85,17 +108,18 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("userData");
     setUser(null);
     setPermissions([]);
+    setLoading(false); // AÑADIR: establecer loading como false
   };
 
   // Función para verificar si el usuario tiene un permiso específico
   const hasPermission = (permissionName) => {
     if (!user) return false;
-    
+
     // Si es administrador, tiene todos los permisos
     if (user.Role?.toLowerCase() === "administrador") {
       return true;
     }
-    
+
     if (!permissions || permissions.length === 0) return false;
     return permissions.includes(permissionName);
   };
@@ -103,11 +127,11 @@ export const AuthProvider = ({ children }) => {
   // Función para verificar múltiples permisos (al menos uno)
   const hasAnyPermission = (permissionNames) => {
     if (!user) return false;
-    
+
     if (user.Role?.toLowerCase() === "administrador") {
       return true;
     }
-    
+
     if (!permissions || permissions.length === 0 || !permissionNames) return false;
     return permissionNames.some(perm => permissions.includes(perm));
   };
@@ -115,25 +139,35 @@ export const AuthProvider = ({ children }) => {
   // Función para verificar todos los permisos
   const hasAllPermissions = (permissionNames) => {
     if (!user) return false;
-    
+
     if (user.Role?.toLowerCase() === "administrador") {
       return true;
     }
-    
+
     if (!permissions || permissions.length === 0 || !permissionNames) return false;
     return permissionNames.every(perm => permissions.includes(perm));
   };
 
   // Efecto para establecer loading como false después de la inicialización
   useEffect(() => {
-    setLoading(false);
-  }, []);
+    // Si ya tenemos usuario y permisos, no estamos cargando
+    if (user !== null && permissions !== null) {
+      setLoading(false);
+    } else {
+      // Pequeño timeout para evitar flash de carga si es rápido
+      const timer = setTimeout(() => {
+        setLoading(false);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user, permissions]);
 
   // Valor del contexto
   const value = {
     user,
     permissions,
-    loading,
+    loading, // AHORA ESTÁ DEFINIDO
     login,
     logout,
     updatePermissions,

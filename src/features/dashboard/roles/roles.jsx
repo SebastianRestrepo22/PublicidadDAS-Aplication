@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Search, Plus, Edit, Eye, Trash2, Shield } from "lucide-react";
+import { Search, Plus, Edit, Eye, Trash2, Shield, Check, X, ChevronDown, ChevronUp } from "lucide-react";
 import Modal from "../components/modals/modal.jsx";
 import { buscarRoles, deleteDataRol, GetDataRoles, postDataRoles, updateDataRol, getPermissions, getRolePermissions, updateRolePermissions } from './services/services.role';
 import axios from "axios";
@@ -41,6 +41,7 @@ export const Roles = () => {
   const [allPermissions, setAllPermissions] = useState([]);
   const [selectedPermissions, setSelectedPermissions] = useState([]);
   const [permissionsByModule, setPermissionsByModule] = useState({});
+  const [expandedModules, setExpandedModules] = useState([]); // Para expandir/contraer módulos
 
   const [openCreate, setOpenCreate] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
@@ -62,7 +63,7 @@ export const Roles = () => {
       try {
         const permisos = await getPermissions();
         setAllPermissions(permisos);
-        
+
         // Agrupar permisos por módulo
         const grouped = permisos.reduce((acc, permiso) => {
           const modulo = permiso.Modulo || 'General';
@@ -71,6 +72,9 @@ export const Roles = () => {
           return acc;
         }, {});
         setPermissionsByModule(grouped);
+
+        // Expandir todos los módulos por defecto
+        setExpandedModules(Object.keys(grouped));
       } catch (error) {
         console.error('Error cargando permisos:', error);
       }
@@ -102,34 +106,36 @@ export const Roles = () => {
     return data.slice(startIndex, endIndex);
   };
 
-  useEffect(() => {
-    const cargarRoles = async () => {
-      try {
-        let resultados;
-        if (filtroCampo && filtroValor) {
-          resultados = await buscarRoles(filtroCampo, filtroValor);
-        } else {
-          const todos = await GetDataRoles();
-          resultados = todos?.data || [];
-        }
-        
-        setAllData(Array.isArray(resultados) ? resultados : []);
-        setTotalItems(Array.isArray(resultados) ? resultados.length : 0);
-
-        const totalPages = Math.ceil(resultados.length / itemsPerPage);
-        setTotalPages(totalPages > 0 ? totalPages : 1);
-
-        if (currentPage > totalPages && totalPages > 0) {
-          setCurrentPage(totalPages);
-        }
-
-        const paginatedData = paginateData(Array.isArray(resultados) ? resultados : []);
-        setPaginatedData(paginatedData);
-      } catch (error) {
-        console.error(error);
-        setRoles([]);
+  // Función para cargar roles
+  const cargarRoles = async () => {
+    try {
+      let resultados;
+      if (filtroCampo && filtroValor) {
+        resultados = await buscarRoles(filtroCampo, filtroValor);
+      } else {
+        const todos = await GetDataRoles();
+        resultados = todos?.data || [];
       }
-    };
+
+      setAllData(Array.isArray(resultados) ? resultados : []);
+      setTotalItems(Array.isArray(resultados) ? resultados.length : 0);
+
+      const totalPages = Math.ceil(resultados.length / itemsPerPage);
+      setTotalPages(totalPages > 0 ? totalPages : 1);
+
+      if (currentPage > totalPages && totalPages > 0) {
+        setCurrentPage(totalPages);
+      }
+
+      const paginatedData = paginateData(Array.isArray(resultados) ? resultados : []);
+      setPaginatedData(paginatedData);
+    } catch (error) {
+      console.error(error);
+      setRoles([]);
+    }
+  };
+
+  useEffect(() => {
     cargarRoles();
   }, [filtroCampo, filtroValor]);
 
@@ -175,12 +181,9 @@ export const Roles = () => {
       });
       toast.success(response.data.message);
 
-      const updatedList = await GetDataRoles();
-      setRoles(updatedList.data);
+      // Actualizar la lista después de cambiar estado
+      await cargarRoles();
     } catch (error) {
-      const updatedList = await GetDataRoles();
-      setRoles(updatedList.data);
-
       if (error.response?.data?.message) {
         toast.warning(error.response.data.message);
       } else {
@@ -199,13 +202,21 @@ export const Roles = () => {
     });
   };
 
+  const toggleModule = (module) => {
+    setExpandedModules(prev =>
+      prev.includes(module)
+        ? prev.filter(m => m !== module)
+        : [...prev, module]
+    );
+  };
+
   const handleSelectAllModule = (module) => {
     const modulePermisos = permissionsByModule[module];
     const allModuleIds = modulePermisos.map(p => p.PermisoId);
-    
+
     // Verificar si ya están todos seleccionados
     const allSelected = allModuleIds.every(id => selectedPermissions.includes(id));
-    
+
     if (allSelected) {
       // Deseleccionar todos
       setSelectedPermissions(prev => prev.filter(id => !allModuleIds.includes(id)));
@@ -218,6 +229,21 @@ export const Roles = () => {
         }
       });
       setSelectedPermissions(newSelected);
+    }
+  };
+
+  const handleSelectAllPermissions = () => {
+    const allPermisoIds = allPermissions.map(p => p.PermisoId);
+
+    // Verificar si ya están todos seleccionados
+    const allSelected = allPermisoIds.every(id => selectedPermissions.includes(id));
+
+    if (allSelected) {
+      // Deseleccionar todos
+      setSelectedPermissions([]);
+    } else {
+      // Seleccionar todos
+      setSelectedPermissions(allPermisoIds);
     }
   };
 
@@ -263,9 +289,8 @@ export const Roles = () => {
       }
 
       if (response && (response.status === 200 || response.status === 201)) {
-        const updatedList = await GetDataRoles();
-        setAllData(updatedList.data || []);
-        setTotalItems(updatedList.data?.length || 0);
+        // Actualizar la lista después de crear/editar
+        await cargarRoles();
         toast.success(editData ? "Rol actualizado correctamente" : "Rol creado correctamente");
         handleCloseModal();
       } else {
@@ -320,8 +345,10 @@ export const Roles = () => {
     try {
       const response = await axios.delete(`http://localhost:3000/roles/${id}`);
       toast.success(response.data.message);
-      const updatedList = await GetDataRoles();
-      if (updatedList?.data) setRoles(updatedList.data);
+
+      // ACTUALIZAR LA LISTA INMEDIATAMENTE después de eliminar
+      await cargarRoles();
+
       setOpenEliminar(false);
     } catch (error) {
       if (error.response?.data?.message) {
@@ -393,64 +420,145 @@ export const Roles = () => {
   const renderPermissionsModal = () => {
     if (!editData) return null;
 
+    const totalSelected = selectedPermissions.length;
+    const totalPermissions = allPermissions.length;
+
     return (
-      <div className="text-left">
-        <h4 className="font-semibold mb-4">Asignar permisos a: <span className="text-blue-600">{editData.Nombre}</span></h4>
-        
-        <div className="max-h-96 overflow-y-auto pr-2">
-          {Object.keys(permissionsByModule).map((modulo) => (
-            <div key={modulo} className="mb-6">
-              <div className="flex items-center justify-between mb-2 p-2 bg-gray-50 rounded">
-                <h5 className="font-medium text-gray-700">{modulo}</h5>
-                <button
-                  type="button"
-                  onClick={() => handleSelectAllModule(modulo)}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  {permissionsByModule[modulo].every(p => selectedPermissions.includes(p.PermisoId)) 
-                    ? 'Deseleccionar todos' 
-                    : 'Seleccionar todos'}
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
-                {permissionsByModule[modulo].map((permiso) => (
-                  <div key={permiso.PermisoId} className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id={`permiso-${permiso.PermisoId}`}
-                      checked={selectedPermissions.includes(permiso.PermisoId)}
-                      onChange={() => handlePermissionToggle(permiso.PermisoId)}
-                      className="h-4 w-4 text-blue-600 rounded"
-                    />
-                    <label htmlFor={`permiso-${permiso.PermisoId}`} className="ml-2 text-sm">
-                      {permiso.Nombre}
-                      {permiso.Descripcion && (
-                        <span className="block text-xs text-gray-500">{permiso.Descripcion}</span>
-                      )}
-                    </label>
-                  </div>
-                ))}
-              </div>
+      <div className="text-left flex flex-col h-full">
+        {/* Encabezado - fijo */}
+        <div className="mb-4">
+          <h4 className="text-lg font-semibold text-gray-800">Asignar permisos a:</h4>
+          <div className="flex items-center gap-2 mt-1">
+            <div className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+              {editData.Nombre}
             </div>
-          ))}
+            <span className="text-sm text-gray-600">
+              ({totalSelected} de {totalPermissions} permisos seleccionados)
+            </span>
+          </div>
         </div>
 
-        <div className="mt-6 pt-4 border-t border-gray-200 flex gap-3">
-          <button
-            type="button"
-            className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            onClick={handleSavePermissions}
-          >
-            Guardar Permisos
-          </button>
-          <button
-            type="button"
-            className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-            onClick={() => setOpenPermissions(false)}
-          >
-            Cancelar
-          </button>
+        {/* Controles globales - fijo */}
+        <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={handleSelectAllPermissions}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors"
+            >
+              <Check size={16} />
+              {totalSelected === totalPermissions ? 'Deseleccionar todos' : 'Seleccionar todos'}
+            </button>
+            <div className="text-sm text-gray-500">
+              {Math.round((totalSelected / totalPermissions) * 100)}% seleccionado
+            </div>
+          </div>
+        </div>
+
+        {/* CONTENEDOR DE PERMISOS CON SCROLL - CORRECCIÓN COMPLETA */}
+        <div className="flex-1 overflow-hidden relative">
+          <div className="absolute inset-0 overflow-y-auto pr-2">
+            {Object.keys(permissionsByModule).map((modulo) => {
+              const modulePermisos = permissionsByModule[modulo];
+              const moduleSelectedCount = modulePermisos.filter(p => selectedPermissions.includes(p.PermisoId)).length;
+              const isModuleExpanded = expandedModules.includes(modulo);
+              const isModuleAllSelected = modulePermisos.every(p => selectedPermissions.includes(p.PermisoId));
+
+              return (
+                <div key={modulo} className="border border-gray-200 rounded-lg overflow-hidden mb-3">
+                  {/* Cabecera del módulo */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                    onClick={() => toggleModule(modulo)}>
+                    <div className="flex items-center gap-2">
+                      <div className={`p-1 rounded ${isModuleExpanded ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                        {isModuleExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </div>
+                      <div>
+                        <h5 className="font-medium text-gray-800 text-sm">{modulo}</h5>
+                        <p className="text-xs text-gray-500">
+                          {moduleSelectedCount} de {modulePermisos.length} permisos
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectAllModule(modulo);
+                      }}
+                      className="text-xs font-medium text-blue-600 hover:text-blue-800 px-2 py-1 hover:bg-blue-50 rounded transition-colors"
+                    >
+                      {isModuleAllSelected ? 'Deseleccionar' : 'Seleccionar'} todos
+                    </button>
+                  </div>
+
+                  {/* Permisos del módulo (expandido) */}
+                  {isModuleExpanded && (
+                    <div className="p-3 bg-white border-t border-gray-100">
+                      <div className="grid grid-cols-1 gap-2">
+                        {modulePermisos.map((permiso) => {
+                          const isSelected = selectedPermissions.includes(permiso.PermisoId);
+                          return (
+                            <div key={permiso.PermisoId}
+                              className={`flex items-center p-2 rounded-md transition-colors ${isSelected ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 hover:bg-gray-100'}`}>
+                              <button
+                                type="button"
+                                onClick={() => handlePermissionToggle(permiso.PermisoId)}
+                                className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'}`}
+                              >
+                                {isSelected && <Check size={10} className="text-white" />}
+                              </button>
+                              <label className="ml-2 cursor-pointer flex-1" onClick={() => handlePermissionToggle(permiso.PermisoId)}>
+                                <div className="font-medium text-sm text-gray-800">{permiso.Nombre}</div>
+                                {permiso.Descripcion && (
+                                  <div className="text-xs text-gray-500 mt-0.5">{permiso.Descripcion}</div>
+                                )}
+                              </label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Botones - fijos en la parte inferior */}
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm">
+              <span className="font-medium text-gray-700">Permisos seleccionados: </span>
+              <span className="font-semibold text-blue-700">{totalSelected}</span>
+              <span className="text-gray-500"> / {totalPermissions}</span>
+            </div>
+            <div className="text-xs text-gray-500">
+              {totalSelected === 0 ? 'Sin permisos seleccionados' :
+                totalSelected === totalPermissions ? 'Todos seleccionados' :
+                  `${totalSelected} permisos`}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
+              onClick={handleSavePermissions}
+            >
+              <Check size={16} />
+              Guardar Permisos
+            </button>
+            <button
+              type="button"
+              className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
+              onClick={() => setOpenPermissions(false)}
+            >
+              <X size={16} />
+              Cancelar
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -494,7 +602,7 @@ export const Roles = () => {
                   setSubmitted(false);
                   setOpenCreate(true);
                 }}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald"
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow"
               >
                 <Plus size={18} /> Nuevo rol
               </Link>
@@ -535,49 +643,60 @@ export const Roles = () => {
 
           {/* Modales */}
           <Modal open={openCreate} onClose={() => setOpenCreate(false)}>
-            <div className="w-[450px] p-6 mx-auto text-center">
+            <div className="w-[450px] p-6 mx-auto text-center bg-white rounded-xl shadow-lg">
               <h3 className="text-lg font-black text-gray-800 mb-6">Nuevo rol</h3>
               {renderForm("create")}
             </div>
           </Modal>
 
           <Modal open={openEditar} onClose={() => setOpenEditar(false)}>
-            <div className="w-[450px] p-6 mx-auto text-center">
+            <div className="w-[450px] p-6 mx-auto text-center bg-white rounded-xl shadow-lg">
               <h3 className="text-lg font-black text-gray-800 mb-6">Editar rol</h3>
               {renderForm("editar")}
             </div>
           </Modal>
 
           <Modal open={openVer} onClose={() => setOpenVer(false)}>
-            <div className="w-[450px] p-6 mx-auto text-center">
+            <div className="w-[450px] p-6 mx-auto text-center bg-white rounded-xl shadow-lg">
               <h3 className="text-lg font-black text-gray-800 mb-6">Ver rol</h3>
               {renderView()}
             </div>
           </Modal>
 
+          {/* MODAL DE PERMISOS CORREGIDO */}
           <Modal open={openPermissions} onClose={() => setOpenPermissions(false)}>
-            <div className="w-[600px] max-h-[80vh] p-6 mx-auto text-center">
-              <h3 className="text-lg font-black text-gray-800 mb-6">Gestión de Permisos</h3>
+            <div className="w-[700px] h-[85vh] p-6 mx-auto bg-white rounded-xl shadow-lg flex flex-col">
+              <h3 className="text-lg font-black text-gray-800 mb-4 text-center">
+                Gestión de Permisos
+              </h3>
               {renderPermissionsModal()}
             </div>
           </Modal>
 
           <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
-            <div className="w-[400px] p-6 mx-auto text-center">
+            <div className="w-[400px] p-6 mx-auto text-center bg-white rounded-xl shadow-lg">
               <h3 className="text-lg font-black text-gray-800 mb-4">Eliminar rol</h3>
-              <p className="mb-6">¿Estás seguro de eliminar este rol?</p>
+              <p className="mb-6 text-gray-600">¿Estás seguro de eliminar este rol?</p>
               <div className="flex gap-4">
-                <button className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors" onClick={() => handleDelete(editData.RoleId)}>
+                <button
+                  className="flex-1 bg-red-500 text-white py-2.5 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2 font-medium"
+                  onClick={() => handleDelete(editData.RoleId)}
+                >
+                  <Trash2 size={16} />
                   Eliminar
                 </button>
-                <button className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors" onClick={() => setOpenEliminar(false)}>
+                <button
+                  className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors flex items-center justify-center gap-2 font-medium"
+                  onClick={() => setOpenEliminar(false)}
+                >
+                  <X size={16} />
                   Cancelar
                 </button>
               </div>
             </div>
           </Modal>
 
-          {/* Tabla */}
+          {/* Tabla - CORREGIDO: Solo mostrar el toggle, sin texto */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full">
@@ -586,43 +705,64 @@ export const Roles = () => {
                     <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">ID</th>
                     <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Nombre</th>
                     <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Estado</th>
-                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Acciones</th>
+                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginatedData.length > 0 ? (
                     paginatedData.map((rol) => (
                       <tr key={rol.RoleId} className="hover:bg-slate-50 transition-colors duration-150">
-                        <td className="py-4 px-6 text-sm text-slate-900">{String(rol.RoleId).slice(0, 3)}...</td>
-                        <td className="py-4 px-6 text-sm text-slate-900">{rol.Nombre}</td>
-                        <td className="flex justify-center py-4 px-6 text-sm text-slate-900">
-                          <Toggle
-                            checked={rol.Estado === "Activo"}
-                            onChange={(value) => handleToggleEstado(rol.RoleId, value ? "Activo" : "Inactivo")}
-                          />
+                        <td className="py-4 px-6 text-sm text-slate-900 font-mono">{String(rol.RoleId).slice(0, 8)}...</td>
+                        <td className="py-4 px-6 text-sm text-slate-900 font-medium">{rol.Nombre}</td>
+                        <td className="py-4 px-6">
+                          <div className="flex justify-center">
+                            <Toggle
+                              checked={rol.Estado === "Activo"}
+                              onChange={(value) => handleToggleEstado(rol.RoleId, value ? "Activo" : "Inactivo")}
+                            />
+                          </div>
                         </td>
                         <td className="py-4 px-6">
-                          <div className="flex justify-center gap-2">
-                            <Link onClick={() => handleEditClick(rol)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Editar">
+                          <div className="flex justify-center gap-1">
+                            <button
+                              onClick={() => handleEditClick(rol)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Editar"
+                            >
                               <Edit size={16} />
-                            </Link>
-                            <Link onClick={() => handlePermissionsClick(rol)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Permisos">
+                            </button>
+                            <button
+                              onClick={() => handlePermissionsClick(rol)}
+                              className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                              title="Permisos"
+                            >
                               <Shield size={16} />
-                            </Link>
-                            <Link onClick={() => handleViewClick(rol)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Ver">
+                            </button>
+                            <button
+                              onClick={() => handleViewClick(rol)}
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Ver"
+                            >
                               <Eye size={16} />
-                            </Link>
-                            <Link onClick={() => handleDeleteClick(rol)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="Eliminar">
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClick(rol)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Eliminar"
+                            >
                               <Trash2 size={16} />
-                            </Link>
+                            </button>
                           </div>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="5" className="text-center py-4">
-                        No se encontraron roles
+                      <td colSpan="4" className="text-center py-8">
+                        <div className="text-gray-500">
+                          <p className="text-lg font-medium">No se encontraron roles</p>
+                          <p className="text-sm mt-1">Intenta con otros filtros o crea un nuevo rol</p>
+                        </div>
                       </td>
                     </tr>
                   )}

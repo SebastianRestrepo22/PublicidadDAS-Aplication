@@ -13,7 +13,7 @@ import {
   getDetallesByPedidoId,
   getAllProductos,
 } from "./services/services.pedidosClientes";
-
+import { Pagination } from "../../components/paginacion/pagination"; // 👈 Importado
 // ⚙️ CONFIGURACIÓN
 const BACKEND_URL = "http://localhost:3000"; // ← AJUSTA SI TU BACKEND USA OTRO PUERTO
 
@@ -21,7 +21,6 @@ export const PedidosClientes = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-
   const mode = useMemo(() => {
     if (location.pathname === "/dashboard/pedidosClientes/nuevo") return "create";
     if (id && location.pathname === `/dashboard/pedidosClientes/${id}`) return "view";
@@ -34,6 +33,15 @@ export const PedidosClientes = () => {
   const [filtroText, setFiltroText] = useState("");
   const [productoSearch, setProductoSearch] = useState("");
   const [productoFilter, setProductoFilter] = useState("todos");
+
+  // 👇 Estados para PAGINACIÓN PRINCIPAL
+  const [allData, setAllData] = useState([]);
+  const [paginatedData, setPaginatedData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5); // Puedes ajustar a 4 si prefieres
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
   const [formCrear, setFormCrear] = useState({
     ClienteId: "",
     FechaRegistro: "",
@@ -135,12 +143,36 @@ export const PedidosClientes = () => {
     }
   }, [mode, id, navigate]);
 
-  // Filtro para pedidos
-  const pedidosFiltrados = pedidos.filter((p) => {
-    if (!filtroCampo || !filtroText.trim()) return true;
-    const valor = String(p[filtroCampo] || "").toLowerCase();
-    return valor.includes(filtroText.toLowerCase());
-  });
+  // 👇 Reemplazar pedidosFiltrados por lógica de paginación
+  useEffect(() => {
+    let filtered = pedidos;
+    if (filtroCampo && filtroText.trim()) {
+      filtered = pedidos.filter((p) => {
+        const valor = String(p[filtroCampo] || "").toLowerCase();
+        return valor.includes(filtroText.toLowerCase());
+      });
+    }
+    setAllData(filtered);
+    setTotalItems(filtered.length);
+    setCurrentPage(1);
+  }, [filtroText, filtroCampo, pedidos]);
+
+  // 👇 Efecto para paginar
+  useEffect(() => {
+    if (allData.length > 0) {
+      const totalPagesCalc = Math.ceil(allData.length / itemsPerPage);
+      setTotalPages(totalPagesCalc > 0 ? totalPagesCalc : 1);
+      if (currentPage > totalPagesCalc && totalPagesCalc > 0) {
+        setCurrentPage(totalPagesCalc);
+      }
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      setPaginatedData(allData.slice(startIndex, endIndex));
+    } else {
+      setPaginatedData([]);
+      setTotalPages(1);
+    }
+  }, [itemsPerPage, currentPage, allData]);
 
   // Filtro para productos en modal
   const productosFiltrados = useMemo(() => {
@@ -344,6 +376,16 @@ export const PedidosClientes = () => {
     voucherWindow.document.close();
   };
 
+  // 👇 FUNCIONES DE PAGINACIÓN
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
+
   // ===== RENDER =====
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
@@ -359,10 +401,8 @@ export const PedidosClientes = () => {
           {alert.message}
         </div>
       )}
-
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Pedidos</h1>
-
         {/* LISTA */}
         {mode === "list" && (
           <>
@@ -418,7 +458,7 @@ export const PedidosClientes = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {pedidosFiltrados.map((pedido) => (
+                  {paginatedData.map((pedido) => (
                     <tr key={pedido.PedidoClienteId} className="hover:bg-slate-50">
                       <td className="py-4 px-6">{shortenId(pedido.PedidoClienteId)}</td>
                       <td className="py-4 px-6">{pedido.NombreCliente || "—"}</td>
@@ -455,10 +495,25 @@ export const PedidosClientes = () => {
                   ))}
                 </tbody>
               </table>
+
+              {/* 👇 PAGINACIÓN */}
+              {paginatedData.length > 0 && (
+                <div className="px-6 py-4 border-t border-slate-200">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={totalItems}
+                    onItemsPerPageChange={handleItemsPerPageChange}
+                  />
+                </div>
+              )}
             </div>
           </>
         )}
 
+        {/* === Resto de vistas sin cambios (crear, ver, select-product) === */}
         {/* CREAR */}
         {mode === "create" && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -735,7 +790,6 @@ export const PedidosClientes = () => {
                     const fullVoucherUrl = pedido.voucher.startsWith("http")
                       ? pedido.voucher
                       : `${BACKEND_URL}${pedido.voucher}`;
-
                     return (
                       <div className="bg-white p-4 rounded-lg">
                         <div className="text-sm text-gray-500">Comprobante de pago</div>

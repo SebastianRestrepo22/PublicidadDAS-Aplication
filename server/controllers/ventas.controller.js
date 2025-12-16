@@ -1,3 +1,4 @@
+// controllers/ventas.controller.js
 import connectDB from "../lib/db.js";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -5,13 +6,12 @@ import {
   getVentaByIdModel,
   createVentaModel,
   updateVentaModel,
-  deleteVentaModel
+  deleteVentaModel,
+  existeVentaParaPedidoModel
 } from "../models/venta.models.js";
 import {
   getDetalleVentaByVentaIdModel,
-  createDetalleVentaModel,
-  updateDetalleVentaModel,
-  deleteDetalleVentaModel
+  createDetalleVentaModel
 } from "../models/detalleVentas.models.js";
 
 /**
@@ -49,100 +49,79 @@ export const getVentaById = async (req, res) => {
 };
 
 /**
- * Crear venta automáticamente desde producción
+ * Crear venta automáticamente desde pedido
  */
-export const createVentaDesdeProduccion = async (req, res) => {
-  const connection = await connectDB();
-  const { ProduccionId } = req.body;
+export const crearVentaDesdePedidoId = async (PedidoClienteId) => {
+  if (!PedidoClienteId) throw new Error("PedidoClienteId es obligatorio");
 
-  if (!ProduccionId) {
-    return res.status(400).json({ error: "ProduccionId es obligatorio" });
-  }
+  const pool = await connectDB();
+  const connection = await pool.getConnection();
 
   try {
-    // Verificar que la producción existe y está finalizada
-    const [produccionRows] = await connection.execute(
-      `SELECT * FROM produccion WHERE ProduccionId = ? AND Estado = 'Finalizado'`,
-      [ProduccionId]
+    const [pedidoRows] = await connection.execute(
+      `SELECT * FROM pedidosclientes WHERE PedidoClienteId = ?`,
+      [PedidoClienteId]
     );
-
-    if (produccionRows.length === 0) {
-      return res.status(400).json({ 
-        error: "Producción no encontrada o no está finalizada" 
-      });
+    if (pedidoRows.length === 0) {
+      throw new Error("Pedido no encontrado");
     }
 
-    const produccion = produccionRows[0];
-
-    // Verificar si ya existe una venta para esta producción
-    const [ventaExistente] = await connection.execute(
-      `SELECT * FROM ventas WHERE ProduccionId = ?`,
-      [ProduccionId]
+    const [ventaCheck] = await connection.execute(
+      "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
+      [PedidoClienteId]
     );
-
-    if (ventaExistente.length > 0) {
-      return res.status(400).json({ 
-        error: "Ya existe una venta para esta producción" 
-      });
+    if (ventaCheck.length > 0) {
+      throw new Error("Ya existe una venta para este pedido");
     }
 
     await connection.beginTransaction();
 
-    // 1. Obtener detalles del pedido original
     const [detallesPedido] = await connection.execute(
-      `SELECT 
-        dpc.ProductoServicioId,
-        dpc.Cantidad,
-        ps.PrecioVenta
+      `SELECT dpc.ProductoServicioId, dpc.Cantidad, ps.Precio, ps.Nombre
        FROM detallepedidosclientes dpc
        JOIN productoservicios ps ON dpc.ProductoServicioId = ps.ProductoServicioId
        WHERE dpc.PedidoClienteId = ?`,
-      [produccion.PedidoClienteId]
+      [PedidoClienteId]
     );
 
     if (detallesPedido.length === 0) {
       await connection.rollback();
-      return res.status(400).json({ 
-        error: "El pedido no tiene detalles" 
-      });
+      throw new Error("El pedido no tiene detalles");
     }
 
-    // 2. Calcular totales
     let total = 0;
     const detallesConSubtotal = detallesPedido.map(detalle => {
-      const subtotal = detalle.Cantidad * detalle.PrecioVenta;
+      const subtotal = detalle.Cantidad * detalle.Precio;
       total += subtotal;
-      
       return {
         ProductoServicioId: detalle.ProductoServicioId,
+        Nombre: detalle.Nombre,
         Cantidad: detalle.Cantidad,
-        PrecioUnitario: detalle.PrecioVenta,
+        PrecioUnitario: detalle.Precio,
         Descuento: 0,
         Subtotal: subtotal
       };
     });
+    const iva = total * 0.19;
 
-    const iva = total * 0.19; // Ejemplo: 19% IVA
-
-    // 3. Crear la venta
     const VentaId = uuidv4();
     await connection.execute(
-      `INSERT INTO ventas (VentaId, ProduccionId, FechaVenta, Total, IVA, Estado)
+      `INSERT INTO ventas (VentaId, PedidoClienteId, FechaVenta, Total, IVA, Estado)
        VALUES (?, ?, NOW(), ?, ?, 'Pendiente')`,
-      [VentaId, ProduccionId, total, iva]
+      [VentaId, PedidoClienteId, total, iva]
     );
 
-    // 4. Crear detalles de venta
+    // CORRECTO: incluye Nombre en el INSERT
     for (const detalle of detallesConSubtotal) {
-      const DetalleVentaId = uuidv4();
       await connection.execute(
         `INSERT INTO detalleventas 
-         (DetalleVentaId, VentaId, ProductoServicioId, Cantidad, PrecioUnitario, Descuento, Subtotal)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (DetalleVentaId, VentaId, ProductoServicioId, Nombre, Cantidad, PrecioUnitario, Descuento, Subtotal)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          DetalleVentaId,
+          uuidv4(),
           VentaId,
           detalle.ProductoServicioId,
+          detalle.Nombre,
           detalle.Cantidad,
           detalle.PrecioUnitario,
           detalle.Descuento,
@@ -153,16 +132,29 @@ export const createVentaDesdeProduccion = async (req, res) => {
 
     await connection.commit();
 
-    // 5. Retornar venta creada
     const ventaCreada = await getVentaByIdModel(VentaId);
     ventaCreada.detalle = detallesConSubtotal;
-    
-    res.status(201).json(ventaCreada);
-    
+    return ventaCreada;
   } catch (error) {
     await connection.rollback();
-    console.error("Error al crear venta desde producción:", error);
-    res.status(500).json({ error: "Error al crear venta" });
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
+export const createVentaDesdePedido = async (req, res) => {
+  const { PedidoClienteId } = req.body;
+  if (!PedidoClienteId) {
+    return res.status(400).json({ error: "PedidoClienteId es obligatorio" });
+  }
+
+  try {
+    const venta = await crearVentaDesdePedidoId(PedidoClienteId);
+    res.status(201).json(venta);
+  } catch (error) {
+    console.error("Error al crear venta desde pedido:", error.message);
+    res.status(400).json({ error: error.message || "Error al crear venta" });
   }
 };
 
@@ -170,20 +162,18 @@ export const createVentaDesdeProduccion = async (req, res) => {
  * Actualizar venta (solo estado y datos de pago)
  */
 export const updateVenta = async (req, res) => {
-  const connection = await connectDB();
   const { id } = req.params;
-  const { Estado, Total, IVA } = req.body; // Solo estos campos se pueden actualizar
+  const { Estado, Total, IVA } = req.body;
 
   try {
     const ventaActual = await getVentaByIdModel(id);
     if (!ventaActual) return res.status(404).json({ error: "Venta no encontrada" });
 
-    // Solo permitir actualizar estado, total e IVA
     await updateVentaModel(id, { Estado, Total, IVA });
 
     const ventaActualizada = await getVentaByIdModel(id);
     ventaActualizada.detalle = await getDetalleVentaByVentaIdModel(id);
-    
+
     res.status(200).json(ventaActualizada);
   } catch (error) {
     console.error("Error al actualizar venta:", error);
@@ -192,20 +182,19 @@ export const updateVenta = async (req, res) => {
 };
 
 /**
- * Eliminar venta y sus detalles
+ * Eliminar venta y sus detalles (CORREGIDO)
  */
 export const deleteVenta = async (req, res) => {
-  const connection = await connectDB();
+  const pool = await connectDB();
+  const connection = await pool.getConnection();
   const { id } = req.params;
 
   try {
     await connection.beginTransaction();
 
-    // Eliminar detalles
     await connection.execute("DELETE FROM detalleventas WHERE VentaId = ?", [id]);
-
-    // Eliminar venta
     const [result] = await connection.execute("DELETE FROM ventas WHERE VentaId = ?", [id]);
+
     if (result.affectedRows === 0) {
       await connection.rollback();
       return res.status(404).json({ error: "Venta no encontrada" });
@@ -217,5 +206,7 @@ export const deleteVenta = async (req, res) => {
     await connection.rollback();
     console.error("Error al eliminar venta:", error);
     res.status(500).json({ error: "Error al eliminar venta" });
+  } finally {
+    connection.release();
   }
 };

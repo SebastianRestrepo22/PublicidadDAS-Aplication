@@ -5,7 +5,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import * as produccionService from "./services/services.produccion";
-// 👇 Importar servicios necesarios
+//  Importar servicios necesarios
 import { getAllPedidosClientes } from "../pedidos/services/services.pedidosClientes";
 import { getAllInsumos as getAllInsumosService } from "../produccion/services/services.produccion";
 import { updatePedidoCliente } from "../pedidos/services/services.pedidosClientes";
@@ -126,8 +126,8 @@ export const Produccion = () => {
           getAllInsumosService()
         ]);
 
-        console.log("📦 Pedidos cargados:", pedidosData.length);
-        console.log("📦 Insumos cargados:", insumosData.length);
+        console.log(" Pedidos cargados:", pedidosData.length);
+        console.log(" Insumos cargados:", insumosData.length);
 
         // Filtrar solo pedidos confirmados para producción
         const pedidosConfirmados = pedidosData.filter(p => p.Estado === "confirmado");
@@ -168,7 +168,7 @@ export const Produccion = () => {
     // Solo cargar si NO hay un formEditar existente en modo edición
     // (para evitar sobrescribir cambios locales al volver de selección)
     if (isEditMode && formEditar) {
-      console.log("⚠️ Formulario ya existe en modo edición. No se recarga.");
+      console.log(" Formulario ya existe en modo edición. No se recarga.");
       return;
     }
 
@@ -205,7 +205,7 @@ export const Produccion = () => {
           });
         }
       } catch (err) {
-        console.error("❌ Error cargando producción:", err);
+        console.error(" Error cargando producción:", err);
         toast.error("Error al cargar producción");
         navigate("/dashboard/produccion");
       } finally {
@@ -220,7 +220,7 @@ export const Produccion = () => {
       cargarProduccionDetalle();
     }
   }
-}, [mode, id, navigate, insumos, isViewMode, isEditMode, formEditar]); // 👈 Añadido formEditar como dependencia
+}, [mode, id, navigate, insumos, isViewMode, isEditMode, formEditar]); //  Añadido formEditar como dependencia
 
   // ─── RESETEAR PAGINACIÓN ─────────────────────────────────────
   useEffect(() => {
@@ -292,7 +292,7 @@ export const Produccion = () => {
 
   // ─── MANEJO DE SELECCIONES ───────────────────────────────────
   const handleSelectPedido = (pedidoId) => {
-    console.log("✅ Pedido seleccionado:", pedidoId);
+    console.log(" Pedido seleccionado:", pedidoId);
     if (mode === "select-pedido") {
       setFormCrear((prev) => ({ ...prev, PedidoClienteId: pedidoId }));
     } else if (mode === "select-pedido-edit") {
@@ -303,7 +303,7 @@ export const Produccion = () => {
 
   const handleSelectInsumo = (insumoId) => {
     const idx = parseInt(detalleIndex, 10);
-    console.log("✅ Insumo seleccionado:", insumoId, "para índice:", idx);
+    console.log(" Insumo seleccionado:", insumoId, "para índice:", idx);
 
     if (isNaN(idx)) {
       toast.error("Índice de detalle inválido");
@@ -448,7 +448,7 @@ export const Produccion = () => {
 
   // ─── CRUD - CREAR ────────────────────────────────────────────
   const handleCreate = async () => {
-    console.log("📝 Iniciando creación de producción...");
+    console.log(" Iniciando creación de producción...");
 
     const errores = validarFormulario(formCrear, detallesCrear);
     if (Object.keys(errores).length) {
@@ -500,7 +500,7 @@ export const Produccion = () => {
         goToBackToList();
       }
     } catch (err) {
-      console.error("❌ Error al crear producción:", err);
+      console.error(" Error al crear producción:", err);
       toast.error("Error al crear producción: " + (err.response?.data?.message || err.message || "Error desconocido"));
     } finally {
       setLoading(false);
@@ -509,7 +509,7 @@ export const Produccion = () => {
 
   // ─── CRUD - EDITAR ───────────────────────────────────────────
   const handleEdit = async () => {
-    console.log("📝 Iniciando edición de producción...");
+    console.log(" Iniciando edición de producción...");
 
     if (!formEditar) {
       toast.error("No hay datos para editar");
@@ -784,7 +784,7 @@ export const Produccion = () => {
                   placeholder="Buscar producción..."
                   value={filtroText}
                   onChange={(e) => setFiltroText(e.target.value)}
-                  className="w-full border rounded-lg pl-10 pr-4 py-3"
+                  className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-700"
                 />
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               </div>

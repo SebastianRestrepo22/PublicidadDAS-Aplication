@@ -1,121 +1,9 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Eye, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { getVentas, getVentaById, updateVenta } from "./ventas.service.js";
+import { getVentas, getVentaById, updateVenta } from "../venta/ventas.service.js";
 import { toast } from "react-toastify";
 import { Pagination } from "../../components/paginacion/pagination.jsx";
-
-// Datos mock con muchos productos para probar
-const ventasMockDesdeProduccion = [
-  {
-    VentaId: "1",
-    ProduccionId: "PROD-001",
-    PedidoClienteId: "PED-001",
-    NombreCliente: "Juan Pérez",
-    FechaVenta: "2025-12-10",
-    Total: 2150.0,
-    IVA: 408.5,
-    Estado: "Pendiente",
-    detalle: [
-      { DetalleVentaId: "DV-1-1", ProductoServicioId: "PS-001", Nombre: "Tarjetas de presentación", Cantidad: 100, PrecioUnitario: 1.20, Descuento: 0, Subtotal: 120.00 },
-      { DetalleVentaId: "DV-1-2", ProductoServicioId: "PS-002", Nombre: "Volantes publicitarios", Cantidad: 500, PrecioUnitario: 0.06, Descuento: 5, Subtotal: 28.50 },
-      { DetalleVentaId: "DV-1-3", ProductoServicioId: "PS-003", Nombre: "Afiches A3", Cantidad: 50, PrecioUnitario: 3.50, Descuento: 0, Subtotal: 175.00 },
-      { DetalleVentaId: "DV-1-4", ProductoServicioId: "PS-004", Nombre: "Folleto díptico", Cantidad: 300, PrecioUnitario: 2.00, Descuento: 10, Subtotal: 540.00 },
-      { DetalleVentaId: "DV-1-5", ProductoServicioId: "PS-005", Nombre: "Calendario de pared", Cantidad: 100, PrecioUnitario: 8.50, Descuento: 5, Subtotal: 807.50 },
-      { DetalleVentaId: "DV-1-6", ProductoServicioId: "PS-006", Nombre: "Stickers redondos", Cantidad: 1000, PrecioUnitario: 0.25, Descuento: 0, Subtotal: 250.00 },
-      { DetalleVentaId: "DV-1-7", ProductoServicioId: "PS-007", Nombre: "Invitaciones de boda", Cantidad: 150, PrecioUnitario: 4.50, Descuento: 15, Subtotal: 573.75 },
-      { DetalleVentaId: "DV-1-8", ProductoServicioId: "PS-008", Nombre: "Tarjetas de visita premium", Cantidad: 500, PrecioUnitario: 0.80, Descuento: 0, Subtotal: 400.00 },
-      { DetalleVentaId: "DV-1-9", ProductoServicioId: "PS-009", Nombre: "Postales 10x15", Cantidad: 200, PrecioUnitario: 1.50, Descuento: 5, Subtotal: 285.00 },
-      { DetalleVentaId: "DV-1-10", ProductoServicioId: "PS-010", Nombre: "Etiquetas adhesivas", Cantidad: 800, PrecioUnitario: 0.30, Descuento: 0, Subtotal: 240.00 },
-      { DetalleVentaId: "DV-1-11", ProductoServicioId: "PS-011", Nombre: "Carpetas corporativas", Cantidad: 50, PrecioUnitario: 12.00, Descuento: 10, Subtotal: 540.00 },
-      { DetalleVentaId: "DV-1-12", ProductoServicioId: "PS-012", Nombre: "Sobres personalizados", Cantidad: 400, PrecioUnitario: 0.40, Descuento: 0, Subtotal: 160.00 },
-    ]
-  },
-  {
-    VentaId: "2",
-    ProduccionId: "PROD-002",
-    PedidoClienteId: "PED-002",
-    NombreCliente: "María López",
-    FechaVenta: "2025-12-09",
-    Total: 200.0,
-    IVA: 38.0,
-    Estado: "Pagada",
-    detalle: [
-      { 
-        DetalleVentaId: "DV-2-1", 
-        ProductoServicioId: "PS-003", 
-        Nombre: "Afiches promocionales", 
-        Cantidad: 50, 
-        PrecioUnitario: 4.00, 
-        Descuento: 10, 
-        Subtotal: 180.00 
-      }
-    ]
-  },
-  {
-    VentaId: "3",
-    ProduccionId: "PROD-003",
-    PedidoClienteId: "PED-003",
-    NombreCliente: "Empresa XYZ",
-    FechaVenta: "2025-12-11",
-    Total: 350.0,
-    IVA: 66.5,
-    Estado: "Pendiente",
-    detalle: [
-      { 
-        DetalleVentaId: "DV-3-1", 
-        ProductoServicioId: "PS-004", 
-        Nombre: "Catálogo empresarial", 
-        Cantidad: 200, 
-        PrecioUnitario: 1.75, 
-        Descuento: 0, 
-        Subtotal: 350.00 
-      }
-    ]
-  },
-  {
-    VentaId: "4",
-    ProduccionId: "PROD-004",
-    PedidoClienteId: "PED-004",
-    NombreCliente: "Carlos Rodríguez",
-    FechaVenta: "2025-12-12",
-    Total: 500.0,
-    IVA: 95.0,
-    Estado: "Cancelada",
-    detalle: [
-      { DetalleVentaId: "DV-4-1", ProductoServicioId: "PS-013", Nombre: "Banners", Cantidad: 10, PrecioUnitario: 50.00, Descuento: 0, Subtotal: 500.00 }
-    ]
-  },
-  {
-    VentaId: "5",
-    ProduccionId: "PROD-005",
-    PedidoClienteId: "PED-005",
-    NombreCliente: "Ana García",
-    FechaVenta: "2025-12-13",
-    Total: 750.0,
-    IVA: 142.5,
-    Estado: "Pagada",
-    detalle: [
-      { DetalleVentaId: "DV-5-1", ProductoServicioId: "PS-014", Nombre: "Tazas personalizadas", Cantidad: 50, PrecioUnitario: 15.00, Descuento: 10, Subtotal: 675.00 },
-      { DetalleVentaId: "DV-5-2", ProductoServicioId: "PS-015", Nombre: "Llaveros", Cantidad: 100, PrecioUnitario: 2.50, Descuento: 5, Subtotal: 237.50 }
-    ]
-  },
-  {
-    VentaId: "6",
-    ProduccionId: "PROD-006",
-    PedidoClienteId: "PED-006",
-    NombreCliente: "Luis Martínez",
-    FechaVenta: "2025-12-14",
-    Total: 1200.0,
-    IVA: 228.0,
-    Estado: "Pendiente",
-    detalle: [
-      { DetalleVentaId: "DV-6-1", ProductoServicioId: "PS-016", Nombre: "Camisetas", Cantidad: 30, PrecioUnitario: 20.00, Descuento: 15, Subtotal: 510.00 },
-      { DetalleVentaId: "DV-6-2", ProductoServicioId: "PS-017", Nombre: "Gorras", Cantidad: 20, PrecioUnitario: 15.00, Descuento: 10, Subtotal: 270.00 },
-      { DetalleVentaId: "DV-6-3", ProductoServicioId: "PS-018", Nombre: "Mouse pads", Cantidad: 50, PrecioUnitario: 8.40, Descuento: 0, Subtotal: 420.00 }
-    ]
-  }
-];
 
 // Componente para mostrar detalles de productos con acordeón
 const DetallesProductosAcordeon = ({ detalles }) => {
@@ -127,12 +15,10 @@ const DetallesProductosAcordeon = ({ detalles }) => {
     return <p className="text-gray-500">No hay productos en esta venta</p>;
   }
 
-  // Calcular resumen
   const totalProductos = detalles.length;
   const totalCantidad = detalles.reduce((sum, d) => sum + d.Cantidad, 0);
   const productosUnicos = [...new Set(detalles.map(d => d.ProductoServicioId))].length;
 
-  // Paginación
   const totalPaginas = Math.ceil(totalProductos / productosPorPagina);
   const indiceInicial = (paginaActual - 1) * productosPorPagina;
   const productosPagina = detalles.slice(indiceInicial, indiceInicial + productosPorPagina);
@@ -195,13 +81,17 @@ const DetallesProductosAcordeon = ({ detalles }) => {
           {/* LISTA DE PRODUCTOS */}
           <div className="max-h-96 overflow-y-auto">
             {productosPagina.map((producto, index) => (
-              <div 
-                key={producto.DetalleVentaId} 
+              <div
+                key={producto.DetalleVentaId}
                 className={`p-3 border-b hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
               >
                 <div className="grid grid-cols-12 items-center text-sm">
                   <div className="col-span-5">
-                    <div className="font-medium">{producto.Nombre}</div>
+                    <div className="font-medium">
+                      {producto.Nombre && producto.Nombre.trim() !== "" 
+                        ? producto.Nombre 
+                        : `Producto ${producto.ProductoServicioId}`}
+                    </div>
                     <div className="text-xs text-gray-500">ID: {producto.ProductoServicioId}</div>
                     {producto.Descuento > 0 && (
                       <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">
@@ -210,8 +100,8 @@ const DetallesProductosAcordeon = ({ detalles }) => {
                     )}
                   </div>
                   <div className="col-span-2 text-center">{producto.Cantidad}</div>
-                  <div className="col-span-2 text-center">$ {producto.PrecioUnitario.toFixed(2)}</div>
-                  <div className="col-span-2 text-center font-medium">$ {producto.Subtotal.toFixed(2)}</div>
+                  <div className="col-span-2 text-center">$ {producto.PrecioUnitario?.toFixed(2) || '0.00'}</div>
+                  <div className="col-span-2 text-center font-medium">$ {producto.Subtotal?.toFixed(2) || '0.00'}</div>
                   <div className="col-span-1 text-center">
                     <span className="text-xs text-gray-400">#{indiceInicial + index + 1}</span>
                   </div>
@@ -246,7 +136,6 @@ const DetallesProductosAcordeon = ({ detalles }) => {
                     } else {
                       pagina = paginaActual - 2 + i;
                     }
-                    
                     return (
                       <button
                         key={pagina}
@@ -299,7 +188,7 @@ const DetallesProductosAcordeon = ({ detalles }) => {
               </div>
               <div>
                 <div className="text-gray-300">Subtotal</div>
-                <div className="font-bold text-lg">$ {detalles.reduce((sum, d) => sum + d.Subtotal, 0).toFixed(2)}</div>
+                <div className="font-bold text-lg">$ {detalles.reduce((sum, d) => sum + (d.Subtotal || 0), 0).toFixed(2)}</div>
               </div>
               <div>
                 <div className="text-gray-300">Total productos</div>
@@ -318,7 +207,6 @@ export const Ventas = () => {
   const { id } = useParams();
   const location = useLocation();
 
-  // SOLO 2 modos: list (ver lista) y edit (cambiar estado)
   const mode = useMemo(() => {
     if (id && location.pathname === `/dashboard/ventas/${id}/editar`) return "edit";
     return "list";
@@ -329,32 +217,23 @@ export const Ventas = () => {
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
   const [cargando, setCargando] = useState(true);
 
-  // ESTADOS PARA FILTROS (como en el componente Roles)
   const [filtroCampo, setFiltroCampo] = useState('');
   const [filtroValor, setFiltroValor] = useState('');
 
-  // ======================================================
-  // ESTADOS DE PAGINACIÓN - COPIADOS TAL CUAL DE PRODUCTOSERVICIO
-  // ======================================================
-  const [allData, setAllData] = useState([]); // TODOS LOS DATOS
-  const [paginatedData, setPaginatedData] = useState([]); // DATOS PAGINADOS (USAR ESTE PARA RENDER)
+  // Estados de paginación
+  const [allData, setAllData] = useState([]);
+  const [paginatedData, setPaginatedData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5); // POR DEFECTO 5 REGISTROS
+  const [itemsPerPage, setItemsPerPage] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  // ======================================================
-  // FUNCIÓN PARA PAGINAR - COPIADA TAL CUAL
-  // ======================================================
   const paginateData = (data) => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return data.slice(startIndex, endIndex);
   };
 
-  // ======================================================
-  // FUNCIONES DE PAGINACIÓN - COPIADAS TAL CUAL
-  // ======================================================
   const handlePageChange = (page) => {
     setCurrentPage(page);
   };
@@ -369,44 +248,38 @@ export const Ventas = () => {
     setCargando(true);
     try {
       const res = await getVentas();
-      
-      if (res.status !== false && Array.isArray(res)) {
+      if (Array.isArray(res)) {
         const ventasMapeadas = res.map(v => ({
           VentaId: v.VentaId,
-          ProduccionId: v.ProduccionId,
           PedidoClienteId: v.PedidoClienteId || "N/A",
           NombreCliente: v.NombreCliente || "Cliente no especificado",
-          FechaVenta: v.FechaVenta || new Date().toISOString().split('T')[0],
+          FechaVenta: v.FechaVenta ? v.FechaVenta.split('T')[0] : "-",
           Total: parseFloat(v.Total) || 0,
           IVA: parseFloat(v.IVA) || 0,
           Estado: v.Estado || "Pendiente",
-          detalle: v.detalle?.map(d => ({
+          detalle: (v.detalle || []).map(d => ({
             DetalleVentaId: d.DetalleVentaId,
             ProductoServicioId: d.ProductoServicioId,
-            Nombre: d.Nombre || `Producto ${d.ProductoServicioId}`,
+            Nombre: d.Nombre || "",
             Cantidad: parseFloat(d.Cantidad) || 0,
             PrecioUnitario: parseFloat(d.PrecioUnitario) || 0,
             Descuento: parseFloat(d.Descuento) || 0,
             Subtotal: parseFloat(d.Subtotal) || 0
-          })) || []
+          }))
         }));
         setVentas(ventasMapeadas);
         setVentasFiltradas(ventasMapeadas);
-        setAllData(ventasMapeadas); // GUARDAR TODOS LOS DATOS PARA PAGINACIÓN
+        setAllData(ventasMapeadas);
         setTotalItems(ventasMapeadas.length);
       } else {
-        console.log("Usando datos mock para ventas");
-        setVentas(ventasMockDesdeProduccion);
-        setVentasFiltradas(ventasMockDesdeProduccion);
-        setAllData(ventasMockDesdeProduccion); // GUARDAR TODOS LOS DATOS PARA PAGINACIÓN
-        setTotalItems(ventasMockDesdeProduccion.length);
+        throw new Error("Respuesta inválida del servidor");
       }
     } catch (error) {
-      console.error("Error cargando ventas, usando datos mock:", error);
-      setVentas(ventasMockDesdeProduccion);
-      setVentasFiltradas(ventasMockDesdeProduccion);
-      setAllData(ventasMockDesdeProduccion); // GUARDAR TODOS LOS DATOS PARA PAGINACIÓN
-      setTotalItems(ventasMockDesdeProduccion.length);
+      console.error("Error al cargar ventas:", error);
+      toast.error("No se pudieron cargar las ventas");
+      setVentas([]);
+      setAllData([]);
+      setTotalItems(0);
     } finally {
       setCargando(false);
     }
@@ -423,18 +296,15 @@ export const Ventas = () => {
       setVentasFiltradas(filteredData);
       setAllData(filteredData);
       setTotalItems(filteredData.length);
-      setCurrentPage(1); // Resetear a página 1 al cambiar filtros
+      setCurrentPage(1);
       return;
     }
 
     const valorBusqueda = filtroValor.toLowerCase().trim();
-    
     const ventasFiltradas = ventas.filter(venta => {
-      switch(filtroCampo) {
+      switch (filtroCampo) {
         case 'ventaId':
           return venta.VentaId.toLowerCase().includes(valorBusqueda);
-        case 'produccionId':
-          return venta.ProduccionId.toLowerCase().includes(valorBusqueda);
         case 'pedidoClienteId':
           return venta.PedidoClienteId.toLowerCase().includes(valorBusqueda);
         case 'nombreCliente':
@@ -447,25 +317,21 @@ export const Ventas = () => {
           return true;
       }
     });
-    
+
     setVentasFiltradas(ventasFiltradas);
-    setAllData(ventasFiltradas); // Actualizar datos para paginación
+    setAllData(ventasFiltradas);
     setTotalItems(ventasFiltradas.length);
-    setCurrentPage(1); // Resetear a página 1 al aplicar filtros
+    setCurrentPage(1);
   }, [filtroCampo, filtroValor, ventas]);
 
-  // ======================================================
-  // EFECTO PARA PAGINAR DATOS - COPIADO TAL CUAL
-  // ======================================================
+  // ======== PAGINACIÓN ========
   useEffect(() => {
     if (allData.length > 0 && mode === "list") {
       const totalPages = Math.ceil(allData.length / itemsPerPage);
       setTotalPages(totalPages > 0 ? totalPages : 1);
-      
       if (currentPage > totalPages && totalPages > 0) {
         setCurrentPage(totalPages);
       }
-      
       const paginatedData = paginateData(allData);
       setPaginatedData(paginatedData);
     } else {
@@ -474,115 +340,77 @@ export const Ventas = () => {
     }
   }, [itemsPerPage, currentPage, allData, mode]);
 
-  // ======== EFECTO PARA CARGAR VENTA ESPECÍFICA ========
+  // ======== CARGAR VENTA ESPECÍFICA ========
   useEffect(() => {
     if (mode === "edit" && id) {
       const cargarVentaEspecifica = async () => {
         try {
           const res = await getVentaById(id);
-          if (res.status !== false && res.VentaId) {
+          if (res && res.VentaId) {
             setVentaSeleccionada({
               VentaId: res.VentaId,
-              ProduccionId: res.ProduccionId,
               PedidoClienteId: res.PedidoClienteId,
               NombreCliente: res.NombreCliente || "Cliente no especificado",
               FechaVenta: res.FechaVenta,
               Total: parseFloat(res.Total) || 0,
               IVA: parseFloat(res.IVA) || 0,
               Estado: res.Estado || "Pendiente",
-              detalle: res.detalle?.map(d => ({
+              detalle: (res.detalle || []).map(d => ({
                 DetalleVentaId: d.DetalleVentaId,
                 ProductoServicioId: d.ProductoServicioId,
-                Nombre: d.Nombre || `Producto ${d.ProductoServicioId}`,
+                Nombre: d.Nombre || "",
                 Cantidad: parseFloat(d.Cantidad) || 0,
                 PrecioUnitario: parseFloat(d.PrecioUnitario) || 0,
                 Descuento: parseFloat(d.Descuento) || 0,
                 Subtotal: parseFloat(d.Subtotal) || 0
-              })) || []
+              }))
             });
-          } else {
-            const ventaMock = ventasMockDesdeProduccion.find(v => v.VentaId === id);
-            if (ventaMock) {
-              setVentaSeleccionada(ventaMock);
-            } else {
-              toast.error("Venta no encontrada");
-              navigate("/dashboard/ventas");
-            }
-          }
-        } catch (error) {
-          console.error("Error cargando venta, usando datos mock:", error);
-          const ventaMock = ventasMockDesdeProduccion.find(v => v.VentaId === id);
-          if (ventaMock) {
-            setVentaSeleccionada(ventaMock);
           } else {
             toast.error("Venta no encontrada");
             navigate("/dashboard/ventas");
           }
+        } catch (error) {
+          console.error("Error al cargar venta:", error);
+          toast.error("No se pudo cargar la venta");
+          navigate("/dashboard/ventas");
         }
       };
       cargarVentaEspecifica();
     }
   }, [mode, id, navigate]);
 
-  // ======== NAVEGACIÓN SIMPLIFICADA ========
+  // ======== NAVEGACIÓN ========
   const goToBackToList = () => navigate("/dashboard/ventas");
   const goToEdit = (ventaId) => navigate(`/dashboard/ventas/${ventaId}/editar`);
 
   // ======== ACTUALIZAR ESTADO DE VENTA ========
   const handleUpdateEstado = async () => {
     if (!ventaSeleccionada) return;
-    
+
     try {
       const res = await updateVenta(ventaSeleccionada.VentaId, {
         Estado: ventaSeleccionada.Estado,
         Total: ventaSeleccionada.Total,
         IVA: ventaSeleccionada.IVA
       });
-      
-      if (res.status !== false) {
-        // Actualizar en estado local
-        const ventasActualizadas = ventas.map(v => 
-          v.VentaId === ventaSeleccionada.VentaId 
+
+      if (res && !res.status) {
+        const ventasActualizadas = ventas.map(v =>
+          v.VentaId === ventaSeleccionada.VentaId
             ? { ...v, Estado: ventaSeleccionada.Estado }
             : v
         );
-        
         setVentas(ventasActualizadas);
         setVentasFiltradas(ventasActualizadas);
-        setAllData(ventasActualizadas); // Actualizar datos paginados
-        
-        toast.success(`Venta ${ventaSeleccionada.Estado.toLowerCase()} correctamente`);
+        setAllData(ventasActualizadas);
+        toast.success(`Venta actualizada a "${ventaSeleccionada.Estado}" correctamente`);
         goToBackToList();
       } else {
-        // Si falla backend, actualizar solo en frontend (datos mock)
-        const ventasActualizadas = ventas.map(v => 
-          v.VentaId === ventaSeleccionada.VentaId 
-            ? { ...v, Estado: ventaSeleccionada.Estado }
-            : v
-        );
-        
-        setVentas(ventasActualizadas);
-        setVentasFiltradas(ventasActualizadas);
-        setAllData(ventasActualizadas); // Actualizar datos paginados
-        
-        toast.success(`Estado cambiado a ${ventaSeleccionada.Estado} (modo demo)`);
-        goToBackToList();
+        throw new Error(res?.message || "Error al actualizar");
       }
     } catch (error) {
       console.error("Error actualizando venta:", error);
-      // Fallback: actualizar solo en frontend
-      const ventasActualizadas = ventas.map(v => 
-        v.VentaId === ventaSeleccionada.VentaId 
-          ? { ...v, Estado: ventaSeleccionada.Estado }
-          : v
-      );
-      
-      setVentas(ventasActualizadas);
-      setVentasFiltradas(ventasActualizadas);
-      setAllData(ventasActualizadas); // Actualizar datos paginados
-      
-      toast.success(`Estado cambiado a ${ventaSeleccionada.Estado} (modo demo)`);
-      goToBackToList();
+      toast.error("No se pudo actualizar la venta");
     }
   };
 
@@ -592,8 +420,8 @@ export const Ventas = () => {
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-2">Gestión de Ventas</h1>
         <p className="text-gray-600 mb-6">
-          Las ventas se generan automáticamente al finalizar una producción. 
-          Solo puede cambiar el estado de pago.
+          Las ventas se generan automáticamente cuando un <strong>pedido</strong> cambia a estado <strong>"terminado"</strong>.
+          Solo puede cambiar el estado de la venta.
         </p>
 
         {/* === LISTA DE VENTAS === */}
@@ -602,8 +430,6 @@ export const Ventas = () => {
             {/* BARRA DE BÚSQUEDA/FILTROS */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-
-                {/* Campo de búsqueda o selección de estado */}
                 {filtroCampo === "estado" ? (
                   <select
                     value={filtroValor}
@@ -612,7 +438,8 @@ export const Ventas = () => {
                   >
                     <option value="">Seleccionar estado</option>
                     <option value="Pendiente">Pendiente</option>
-                    <option value="Pagada">Pagada</option>
+                    <option value="Enviado">Enviado</option>
+                    <option value="Entregada">Entregada</option>
                     <option value="Cancelada">Cancelada</option>
                   </select>
                 ) : (
@@ -635,14 +462,13 @@ export const Ventas = () => {
                   </div>
                 )}
 
-                 <select
+                <select
                   value={filtroCampo}
                   onChange={(e) => setFiltroCampo(e.target.value)}
                   className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[140px]"
                 >
                   <option value="">Filtrar por campo</option>
                   <option value="ventaId">Venta ID</option>
-                  <option value="produccionId">Producción ID</option>
                   <option value="pedidoClienteId">Pedido ID</option>
                   <option value="nombreCliente">Cliente</option>
                   <option value="estado">Estado</option>
@@ -651,13 +477,13 @@ export const Ventas = () => {
               </div>
             </div>
 
-            {/* TABLA DE VENTAS - USAR paginatedData */}
+            {/* TABLA DE VENTAS */}
             <div className="bg-white rounded-xl shadow-sm border overflow-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-800 sticky top-0">
                   <tr>
                     <th className="px-4 py-3 text-white text-left">Venta ID</th>
-                    <th className="px-4 py-3 text-white text-left">Producción ID</th>
+                    <th className="px-4 py-3 text-white text-left">Pedido ID</th>
                     <th className="px-4 py-3 text-white text-left">Cliente</th>
                     <th className="px-4 py-3 text-white text-left">Fecha</th>
                     <th className="px-4 py-3 text-white text-left">Total</th>
@@ -677,22 +503,21 @@ export const Ventas = () => {
                   ) : paginatedData.length === 0 ? (
                     <tr>
                       <td colSpan="7" className="py-8 text-center text-gray-500">
-                        {filtroCampo || filtroValor 
-                          ? "No se encontraron ventas con los filtros aplicados" 
-                          : "No hay ventas registradas. Las ventas se generan automáticamente al finalizar producciones."}
+                        {filtroCampo || filtroValor
+                          ? "No se encontraron ventas con los filtros aplicados"
+                          : "No hay ventas registradas. Las ventas se generan automáticamente al terminar un pedido."}
                       </td>
                     </tr>
                   ) : (
                     paginatedData.map((venta) => {
                       const totalProductos = venta.detalle?.length || 0;
                       const totalUnidades = venta.detalle?.reduce((sum, d) => sum + d.Cantidad, 0) || 0;
-                      
                       return (
                         <tr key={venta.VentaId} className="hover:bg-slate-50">
                           <td className="py-4 px-6 font-medium">{venta.VentaId}</td>
                           <td className="py-4 px-6">
                             <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-                              {venta.ProduccionId}
+                              {venta.PedidoClienteId}
                             </span>
                           </td>
                           <td className="py-4 px-6">{venta.NombreCliente}</td>
@@ -705,24 +530,22 @@ export const Ventas = () => {
                           </td>
                           <td className="py-4 px-6">
                             <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              venta.Estado === 'Pagada' ? 'bg-green-100 text-green-800' :
+                              venta.Estado === 'Entregada' ? 'bg-green-100 text-green-800' :
                               venta.Estado === 'Cancelada' ? 'bg-red-100 text-red-800' :
+                              venta.Estado === 'Enviado' ? 'bg-blue-100 text-blue-800' :
                               'bg-yellow-100 text-yellow-800'
                             }`}>
                               {venta.Estado}
                             </span>
                           </td>
                           <td className="py-4 px-6">
-                            <div className="flex gap-3">
-                              <button
-                                onClick={() => goToEdit(venta.VentaId)}
-                                className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                                title="Ver/Editar"
-                              >
-                                <Eye size={16} />
-                                <span className="text-sm"></span>
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => goToEdit(venta.VentaId)}
+                              className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                              title="Ver/Editar"
+                            >
+                              <Eye size={16} />
+                            </button>
                           </td>
                         </tr>
                       );
@@ -730,8 +553,8 @@ export const Ventas = () => {
                   )}
                 </tbody>
               </table>
-              
-              {/* PAGINACIÓN - IGUAL QUE EN PRODUCTOSERVICIO */}
+
+              {/* PAGINACIÓN */}
               {paginatedData.length > 0 && (
                 <div className="border-t border-slate-200">
                   <Pagination
@@ -745,7 +568,7 @@ export const Ventas = () => {
                 </div>
               )}
 
-              {/* CONTADOR DE RESULTADOS */}
+              {/* CONTADOR */}
               {!cargando && paginatedData.length > 0 && (
                 <div className="bg-gray-50 border-t px-4 py-2 text-sm text-gray-600">
                   Mostrando {paginatedData.length} de {allData.length} ventas
@@ -757,9 +580,8 @@ export const Ventas = () => {
             {/* NOTA INFORMATIVA */}
             <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-800">
-                <strong>Nota:</strong> Las ventas se generan automáticamente cuando una producción 
-                se marca como "Finalizado". Cada venta muestra un resumen de productos. 
-                Para ver detalles completos, haga clic en "Ver/Editar".
+                <strong>Nota:</strong> Las ventas se generan automáticamente cuando un <strong>pedido</strong>
+                cambia a estado <strong>"terminado"</strong>. Cada venta incluye los productos del pedido original.
               </p>
             </div>
           </>
@@ -769,8 +591,8 @@ export const Ventas = () => {
         {mode === "edit" && ventaSeleccionada && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
-              <button 
-                onClick={goToBackToList} 
+              <button
+                onClick={goToBackToList}
                 className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"
               >
                 <ArrowLeft size={18} />
@@ -781,7 +603,7 @@ export const Ventas = () => {
             </div>
 
             <div className="space-y-6">
-              {/* INFORMACIÓN DE LA VENTA (SOLO LECTURA) */}
+              {/* INFORMACIÓN DE LA VENTA */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h4 className="font-semibold mb-4">Información de la venta</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -790,8 +612,8 @@ export const Ventas = () => {
                     <div className="font-medium">{ventaSeleccionada.VentaId}</div>
                   </div>
                   <div className="bg-white p-3 rounded shadow-sm">
-                    <div className="text-gray-600 text-sm">Producción ID</div>
-                    <div className="font-medium">{ventaSeleccionada.ProduccionId}</div>
+                    <div className="text-gray-600 text-sm">Pedido ID</div>
+                    <div className="font-medium">{ventaSeleccionada.PedidoClienteId}</div>
                   </div>
                   <div className="bg-white p-3 rounded shadow-sm">
                     <div className="text-gray-600 text-sm">Cliente</div>
@@ -818,8 +640,9 @@ export const Ventas = () => {
                   <div className="bg-white p-3 rounded shadow-sm">
                     <div className="text-gray-600 text-sm">Estado actual</div>
                     <div className={`px-2 py-1 rounded text-xs font-medium inline-block ${
-                      ventaSeleccionada.Estado === 'Pagada' ? 'bg-green-100 text-green-800' :
+                      ventaSeleccionada.Estado === 'Entregada' ? 'bg-green-100 text-green-800' :
                       ventaSeleccionada.Estado === 'Cancelada' ? 'bg-red-100 text-red-800' :
+                      ventaSeleccionada.Estado === 'Enviado' ? 'bg-blue-100 text-blue-800' :
                       'bg-yellow-100 text-yellow-800'
                     }`}>
                       {ventaSeleccionada.Estado}
@@ -828,33 +651,31 @@ export const Ventas = () => {
                 </div>
               </div>
 
-              {/* DETALLES DE PRODUCTOS CON ACORDEÓN */}
+              {/* DETALLES DE PRODUCTOS */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h4 className="font-semibold mb-4">Productos vendidos</h4>
                 <DetallesProductosAcordeon detalles={ventaSeleccionada.detalle} />
               </div>
 
-              {/* CAMBIAR ESTADO DE PAGO */}
+              {/* CAMBIAR ESTADO DE VENTA */}
               <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-                <h4 className="font-semibold mb-4">Cambiar estado de pago</h4>
+                <h4 className="font-semibold mb-4">Cambiar estado de la venta</h4>
                 <p className="text-sm text-gray-600 mb-4">
                   Seleccione el nuevo estado de la venta. Esta acción no se puede deshacer.
                 </p>
-                
+
                 <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                   <select
                     value={ventaSeleccionada.Estado}
-                    onChange={(e) => setVentaSeleccionada({
-                      ...ventaSeleccionada, 
-                      Estado: e.target.value
-                    })}
+                    onChange={(e) => setVentaSeleccionada({ ...ventaSeleccionada, Estado: e.target.value })}
                     className="border rounded-lg px-4 py-2 bg-white w-full sm:w-auto"
                   >
                     <option value="Pendiente">Pendiente</option>
-                    <option value="Pagada">Pagada</option>
+                    <option value="Enviado">Enviado</option>
+                    <option value="Entregada">Entregada</option>
                     <option value="Cancelada">Cancelada</option>
                   </select>
-                  
+
                   <div className="flex gap-2">
                     <button
                       onClick={handleUpdateEstado}
@@ -862,7 +683,6 @@ export const Ventas = () => {
                     >
                       Guardar cambios
                     </button>
-                    
                     <button
                       onClick={goToBackToList}
                       className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300"

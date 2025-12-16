@@ -15,7 +15,9 @@ export const Login = () => {
 
   const [isLogin, setIsLogin] = useState(true);
   const navigate = useNavigate();
-  const { login } = useAuth(); // CAMBIO: Usar login en lugar de setUser
+  
+  // MOVER useAuth AQUÍ, NO DENTRO DE handleSubmitLogin
+  const { setUser, login } = useAuth();
 
   const [tiposDocumento, setTiposDocumento] = useState([]);
 
@@ -191,102 +193,70 @@ export const Login = () => {
     }
   };
 
-  // En la función handleSubmit (líneas ~163-200):
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
 
-    // Validación campos obligatorios
-    const camposObligatorios = [
-      "CedulaId",
-      "TipoDocumentoId",
-      "NombreCompleto",
-      "Telefono",
-      "CorreoElectronico",
-      "Direccion",
-      openEditar ? "RoleId" : null
-    ].filter(Boolean);
+    // Validar todos los campos antes de enviar
+    let isValid = true;
+    const newErrors = { ...fieldErrors };
 
-    const camposVacios = camposObligatorios.filter(campo => !values[campo] || !values[campo].trim());
+    // Validar campos del formulario principal
+    Object.keys(values).forEach(key => {
+      if (!validateField(key, values[key])) {
+        isValid = false;
+        newErrors[key] = fieldErrors[key] || 'Este campo es requerido';
+      }
+    });
 
-    if (camposVacios.length > 0) {
-      toast.warning(`Los siguientes campos son obligatorios: ${camposVacios.join(", ")}`);
+    // Validar confirmación de contraseña
+    if (!validateConfirmPassword(confirmarContrasena)) {
+      isValid = false;
+    }
+
+    setFieldErrors(newErrors);
+
+    if (!isValid) {
+      toast.error("Por favor, complete todos los campos correctamente");
       return;
     }
 
-    // Validaciones existentes de correo, cédula y teléfono
-    if (correoError || cedulaError || telefonoError) {
-      toast.warning("Corrige los errores antes de enviar");
+    if (values.Contrasena !== confirmarContrasena) {
+      setContrasenaError("Las contraseñas no coinciden");
       return;
     }
+
+    setContrasenaError("");
 
     try {
-      if (editData) {
-        console.log("Datos a enviar para actualizar:", values); // Para debug
-
-        const response = await updateDatauser(editData.CedulaId, values);
-        console.log("Respuesta del servidor:", response.data); // Para debug
-
-        if (response.status === 200) {
-          toast.success("Usuario actualizado correctamente");
-
-          // Si el servidor devuelve el usuario actualizado, actualizarlo
-          if (response.data.user) {
-            // Actualizar editData con la respuesta del servidor
-            setEditData(response.data.user);
-
-            // Actualizar la lista completa de usuarios
-            const updatedList = await GetDataUser();
-
-            // ACTUALIZAR DATOS CON PAGINACIÓN 
-            setAllData(updatedList.data || []);
-            setTotalItems(updatedList.data?.length || 0);
-
-            // Actualizar también el estado user
-            setUser(updatedList.data || []);
-          } else {
-            // Si no viene en la respuesta, recargar toda la lista
-            const updatedList = await GetDataUser();
-            setAllData(updatedList.data || []);
-            setTotalItems(updatedList.data?.length || 0);
-            setUser(updatedList.data || []);
-          }
-
-          setOpenEditar(false);
-        }
-      } else {
-        const response = await postDataUsers(values);
-        if (response.status === 201) {
-          toast.success("Usuario creado correctamente");
-
-          // Refrescar lista completa
-          const updatedList = await GetDataUser();
-
-          // ACTUALIZAR DATOS CON PAGINACIÓN 
-          setAllData(updatedList.data || []);
-          setTotalItems(updatedList.data?.length || 0);
-          setUser(updatedList.data || []);
-
-          setOpenCreate(false);
-        }
+      const response = await axios.post("http://localhost:3000/auth/register", values);
+      if (response.status === 201) {
+        toast.success("Registro exitoso");
+        setIsLogin(true);
+        setValues({
+          CedulaId: "",
+          NombreCompleto: "",
+          TipoDocumentoId: "",
+          Telefono: "",
+          CorreoElectronico: "",
+          Direccion: "",
+          Contrasena: "",
+        });
+        setConfirmarContrasena("");
+        // Limpiar errores después del registro exitoso
+        setFieldErrors({
+          NombreCompleto: '',
+          CorreoElectronico: '',
+          TipoDocumentoId: '',
+          CedulaId: '',
+          Direccion: '',
+          Telefono: '',
+          Contrasena: '',
+          ConfirmarContrasena: ''
+        });
       }
-
-      // Solo resetear si no hay errores
-      if (!correoError && !cedulaError && !telefonoError) {
-        resetForm();
-      }
-
     } catch (error) {
-      console.error("Error:", error);
-
-      // Manejo de errores específicos
-      if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      } else if (error.message) {
-        toast.error(error.message);
-      } else {
-        toast.error("Error al procesar la solicitud");
-      }
+      console.error("Error en registro:", error);
+      toast.error(error.response?.data?.message || "Error al registrar");
     }
   };
 
@@ -305,22 +275,36 @@ export const Login = () => {
     try {
       const response = await axios.post("http://localhost:3000/auth/login", valuesLogin);
       const token = response.data.token;
-      const userData = response.data.user || {}; // Asegurarnos de obtener userData
+      localStorage.setItem("token", token);
 
-      // DEPURACIÓN: Ver qué contiene el token
-      console.log("Token recibido:", token);
       const decoded = jwtDecode(token);
       console.log("Token decodificado:", decoded);
-      console.log("Permisos en el token:", decoded.Permisos);
 
-      // Usar la nueva función login del contexto
-      login(token, userData);
+      // VERIFICAR QUE EL ROL SE ESTÁ OBTENIENDO CORRECTAMENTE
+      if (!decoded.Role) {
+        console.error("El token no contiene el Role");
+        toast.error("Error en la autenticación: Rol no encontrado");
+        return;
+      }
 
-      // Redirigir según el rol
+      // Guardar en localStorage los datos base
+      localStorage.setItem("usuario", JSON.stringify(decoded));
+
+      // USAR LA FUNCIÓN login QUE YA OBTUVIMOS FUERA
+      login(token, {
+        ...response.data.user,
+        Role: decoded.Role,
+        Permisos: decoded.Permisos || []
+      });
+
+      // Redirección basada en el rol
       if (decoded.Role.toLowerCase() === "administrador") {
         navigate("/dashboard/graficosEstadisticos");
       } else if (decoded.Role.toLowerCase() === "cliente") {
         navigate("/cliente/productos");
+      } else {
+        // Para otros roles, redirigir al dashboard por defecto
+        navigate("/dashboard/graficosEstadisticos");
       }
 
     } catch (error) {

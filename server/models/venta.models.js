@@ -1,3 +1,4 @@
+// models/venta.models.js
 import { v4 as uuidv4 } from "uuid";
 import connectDB from "../lib/db.js";
 
@@ -6,51 +7,49 @@ const sanitize = (v) => (v === undefined ? null : v);
 // Obtener todas las ventas
 export const getAllVentasModel = async () => {
   const connection = await connectDB();
-
   const [rows] = await connection.execute(`
     SELECT 
       v.VentaId,
-      v.ProduccionId,
-      p.PedidoClienteId,  -- Obtener PedidoClienteId desde Produccion
-      pc.NombreCliente,   -- Obtener nombre del cliente
+      v.PedidoClienteId,
+      u.NombreCompleto AS NombreCliente,  
       v.FechaVenta,
       v.Total,
       v.IVA,
       v.Estado
     FROM ventas v
-    JOIN produccion p ON v.ProduccionId = p.ProduccionId
-    JOIN pedidosclientes pc ON p.PedidoClienteId = pc.PedidoClienteId
+    LEFT JOIN pedidosclientes pc ON v.PedidoClienteId = pc.PedidoClienteId
+    LEFT JOIN usuarios u ON pc.ClienteId = u.CedulaId
   `);
-  
   return rows;
 };
 
-// Obtener una venta por ID
 export const getVentaByIdModel = async (ventaId) => {
   const connection = await connectDB();
   const [rows] = await connection.execute(
     `SELECT 
       v.*,
-      p.PedidoClienteId,
-      pc.NombreCliente
+      u.NombreCompleto AS NombreCliente,
+      u.Telefono,
+      u.CorreoElectronico AS Correo,
+      u.Direccion
      FROM ventas v
-     JOIN produccion p ON v.ProduccionId = p.ProduccionId
-     JOIN pedidosclientes pc ON p.PedidoClienteId = pc.PedidoClienteId
+     LEFT JOIN pedidosclientes pc ON v.PedidoClienteId = pc.PedidoClienteId
+     LEFT JOIN usuarios u ON pc.ClienteId = u.CedulaId
      WHERE v.VentaId = ?`,
     [ventaId]
   );
   return rows[0];
 };
 
-// Crear una nueva venta desde producción
-export const createVentaModel = async ({ ProduccionId, Total, IVA, Estado = "Pendiente" }) => {
+// Crear una nueva venta desde pedido
+export const createVentaModel = async ({ PedidoClienteId, Total, IVA, Estado = "Pendiente" }) => {
   const connection = await connectDB();
   const VentaId = uuidv4();
 
   await connection.execute(
-    `INSERT INTO ventas (VentaId, ProduccionId, FechaVenta, Total, IVA, Estado)
+    `INSERT INTO ventas (VentaId, PedidoClienteId, FechaVenta, Total, IVA, Estado)
      VALUES (?, ?, NOW(), ?, ?, ?)`,
-    [VentaId, ProduccionId, Total, IVA, Estado]
+    [VentaId, PedidoClienteId, Total, IVA, Estado]
   );
 
   return getVentaByIdModel(VentaId);
@@ -79,4 +78,14 @@ export const deleteVentaModel = async (ventaId) => {
     [ventaId]
   );
   return result;
+};
+
+// Verificar si ya existe una venta para un pedido
+export const existeVentaParaPedidoModel = async (pedidoClienteId) => {
+  const connection = await connectDB();
+  const [rows] = await connection.execute(
+    "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
+    [pedidoClienteId]
+  );
+  return rows.length > 0;
 };

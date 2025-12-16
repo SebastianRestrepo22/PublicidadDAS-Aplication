@@ -1,3 +1,5 @@
+// models/detalleVentas.models.js
+
 import { v4 as uuidv4 } from "uuid";
 import connectDB from "../lib/db.js";
 
@@ -14,21 +16,39 @@ export const getDetalleVentaByVentaIdModel = async (ventaId) => {
 };
 
 // Crear detalle de venta
-export const createDetalleVentaModel = async ({ VentaId, ProductoServicioId, Cantidad, PrecioUnitario, Descuento = 0.00, Subtotal }) => {
+export const createDetalleVentaModel = async ({ 
+  VentaId, 
+  ProductoServicioId, 
+  Nombre,           
+  Cantidad, 
+  PrecioUnitario, 
+  Descuento = 0.00, 
+  Subtotal 
+}) => {
   const connection = await connectDB();
   const DetalleVentaId = uuidv4();
 
   await connection.execute(
     `INSERT INTO detalleventas 
-    (DetalleVentaId, VentaId, ProductoServicioId, Cantidad, PrecioUnitario, Descuento, Subtotal)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [DetalleVentaId, VentaId, ProductoServicioId, Cantidad, PrecioUnitario, Descuento, Subtotal]
+     (DetalleVentaId, VentaId, ProductoServicioId, Nombre, Cantidad, PrecioUnitario, Descuento, Subtotal)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      DetalleVentaId,              
+      VentaId,
+      ProductoServicioId,
+      Nombre,                     
+      Cantidad,
+      PrecioUnitario,
+      Descuento,
+      Subtotal
+    ]
   );
 
   return {
     DetalleVentaId,
     VentaId,
     ProductoServicioId,
+    Nombre,
     Cantidad,
     PrecioUnitario,
     Descuento,
@@ -39,13 +59,43 @@ export const createDetalleVentaModel = async ({ VentaId, ProductoServicioId, Can
 // Actualizar detalle de venta
 export const updateDetalleVentaModel = async (detalleVentaId, data) => {
   const connection = await connectDB();
-  const { Cantidad, PrecioUnitario, Descuento, Subtotal } = data;
+  const { Cantidad, PrecioUnitario, Descuento, Subtotal, Nombre } = data; // ✅ Añade Nombre si quieres actualizarlo
+
+  const fields = [];
+  const values = [];
+
+  if (Cantidad !== undefined) {
+    fields.push("Cantidad = ?");
+    values.push(sanitize(Cantidad));
+  }
+  if (PrecioUnitario !== undefined) {
+    fields.push("PrecioUnitario = ?");
+    values.push(sanitize(PrecioUnitario));
+  }
+  if (Descuento !== undefined) {
+    fields.push("Descuento = ?");
+    values.push(sanitize(Descuento));
+  }
+  if (Subtotal !== undefined) {
+    fields.push("Subtotal = ?");
+    values.push(sanitize(Subtotal));
+  }
+  if (Nombre !== undefined) {
+    fields.push("Nombre = ?");
+    values.push(sanitize(Nombre));
+  }
+
+  if (fields.length === 0) {
+    throw new Error("No hay campos para actualizar");
+  }
+
+  values.push(detalleVentaId);
 
   const [result] = await connection.execute(
     `UPDATE detalleventas
-     SET Cantidad = ?, PrecioUnitario = ?, Descuento = ?, Subtotal = ?
+     SET ${fields.join(", ")}
      WHERE DetalleVentaId = ?`,
-    [sanitize(Cantidad), sanitize(PrecioUnitario), sanitize(Descuento), sanitize(Subtotal), detalleVentaId]
+    values
   );
 
   return result;

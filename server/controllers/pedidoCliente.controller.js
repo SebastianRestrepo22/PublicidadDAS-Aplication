@@ -186,6 +186,16 @@ export const updatePedidoCliente = async (req, res) => {
       }
     }
 
+    if (Estado === "terminado" && estadoAnterior !== "terminado") {
+      try {
+        await crearVentaDesdePedidoId(id); // ¡Usa el ID del pedido!
+        console.log(`Venta creada automáticamente para el pedido ${id}`);
+      } catch (err) {
+        console.error("Error al crear venta desde pedido:", err.message);
+        // No detener la actualización del pedido
+      }
+    }
+
     // Enviar correo si el estado cambió
     if (Estado && Estado !== estadoAnterior) {
       const cliente = await getClienteByIdModel(pedidoActual.ClienteId);
@@ -244,3 +254,5 @@ export const getMisPedidos = async (req, res) => {
     res.status(500).json({ error: "Error al obtener tus pedidos" });
   }
 };
+
+import { crearVentaDesdePedidoId } from "./ventas.controller.js";

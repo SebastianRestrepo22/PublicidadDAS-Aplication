@@ -5,7 +5,6 @@ import { QuienesSomos } from "../features/landing/quienessomos/quienesSomos";
 import { Login } from "../features/landing/login/login";
 import { Insumos } from "../features/dashboard/constrolinsumos/insumos/insumos";
 import { ProductoServicios } from "../features/dashboard/servicios/productoServicios";
-import { Proveedores } from "../features/dashboard/constrolinsumos/proveedores/proveedores";
 import { Usuarios } from "../features/dashboard/usuarios/usuarios";
 import { Roles } from "../features/dashboard/roles/roles";
 import { DashboardLayout } from "../features/dashboard/components/dashboardLoyout";
@@ -30,6 +29,7 @@ import { PedidoExitoso } from "../features/dashboard/gestionventas/pedidos/pedid
 import { ScrollToTop } from "../features/landing/components/ScrollToTop";
 import { Inicio } from "../features/landing/inicio/inicio";
 import { Compras } from "../features/dashboard/constrolinsumos/compras/compras";
+import { Proveedores } from "../features/dashboard/constrolinsumos/proveedores/proveedores";
 
 export const Routers = () => {
   return (

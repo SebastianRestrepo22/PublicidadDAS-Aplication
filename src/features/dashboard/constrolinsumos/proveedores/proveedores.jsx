@@ -10,6 +10,7 @@ import {
   updateProveedor,
   deleteProveedor,
 } from "./services/services.proveedores";
+import { Pagination } from "../../components/paginacion/pagination"; // 👈 Importado
 
 // Función auxiliar para obtener las primeras 3 letras o dígitos
 const getShortId = (id) => {
@@ -17,7 +18,7 @@ const getShortId = (id) => {
   return str.length > 3 ? str.substring(0, 3) : str;
 };
 
-// Validaciones
+// Validaciones ACTUALIZADAS: teléfono = 10 dígitos exactos
 const validateForm = (form, isEditing = false) => {
   const errors = {};
 
@@ -25,9 +26,9 @@ const validateForm = (form, isEditing = false) => {
     errors.nombreProveedor = "El nombre es obligatorio y debe tener al menos 2 caracteres.";
   }
 
-  const phoneRegex = /^[0-9]{7,15}$/;
+  const phoneRegex = /^[0-9]{10}$/; // 👈 CAMBIADO: exactamente 10 dígitos
   if (!form.telefono || !phoneRegex.test(form.telefono)) {
-    errors.telefono = "El teléfono debe contener entre 7 y 15 dígitos numéricos.";
+    errors.telefono = "El teléfono debe contener exactamente 10 dígitos numéricos.";
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -42,6 +43,46 @@ const validateForm = (form, isEditing = false) => {
   return errors;
 };
 
+// Función para validación en tiempo real de cada campo
+const validateField = (fieldName, value, formData) => {
+  switch (fieldName) {
+    case 'nombreProveedor':
+      if (!value || value.trim().length < 2) {
+        return "El nombre es obligatorio y debe tener al menos 2 caracteres.";
+      }
+      return '';
+
+    case 'telefono':
+      const phoneRegex = /^[0-9]{10}$/;
+      if (!value) {
+        return "El teléfono es obligatorio.";
+      }
+      if (!phoneRegex.test(value)) {
+        return "El teléfono debe contener exactamente 10 dígitos numéricos.";
+      }
+      return '';
+
+    case 'correo':
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!value) {
+        return "El correo electrónico es obligatorio.";
+      }
+      if (!emailRegex.test(value)) {
+        return "Ingrese un correo electrónico válido (ejemplo@dominio.com).";
+      }
+      return '';
+
+    case 'direccion':
+      if (!value || value.trim().length < 5) {
+        return "La dirección es obligatoria y debe tener al menos 5 caracteres.";
+      }
+      return '';
+
+    default:
+      return '';
+  }
+};
+
 export const Proveedores = () => {
   const [proveedores, setProveedores] = useState([]);
   const [estadoActivos, setEstadoActivo] = useState({});
@@ -53,6 +94,14 @@ export const Proveedores = () => {
   const [openEliminar, setOpenEliminar] = useState(false);
   const [filtroCampo, setFiltroCampo] = useState("");
   const [filtroText, setFiltroText] = useState("");
+
+  // 👇 Estados para paginación (AGREGADOS)
+  const [allData, setAllData] = useState([]);
+  const [paginatedData, setPaginatedData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [formCrear, setFormCrear] = useState({
     nombreProveedor: "",
@@ -72,6 +121,47 @@ export const Proveedores = () => {
 
   const [errorsCrear, setErrorsCrear] = useState({});
   const [errorsEditar, setErrorsEditar] = useState({});
+  const [touchedCrear, setTouchedCrear] = useState({});
+  const [touchedEditar, setTouchedEditar] = useState({});
+
+  // 👇 Función para paginar
+  const paginateData = (data) => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return data.slice(startIndex, endIndex);
+  };
+
+  // 👇 Efecto para aplicar filtro y actualizar datos para paginación
+  useEffect(() => {
+    let filtered = proveedores;
+    if (filtroCampo && filtroText.trim()) {
+      filtered = proveedores.filter((p) => {
+        const valor = String(p[filtroCampo] || "").toLowerCase();
+        return valor.includes(filtroText.toLowerCase());
+      });
+    }
+    setAllData(filtered);
+    setTotalItems(filtered.length);
+    setCurrentPage(1); // Reiniciar página al filtrar
+  }, [filtroText, filtroCampo, proveedores]);
+
+  // 👇 Efecto para paginación
+  useEffect(() => {
+    if (allData.length > 0) {
+      const totalPagesCalc = Math.ceil(allData.length / itemsPerPage);
+      setTotalPages(totalPagesCalc > 0 ? totalPagesCalc : 1);
+
+      if (currentPage > totalPagesCalc && totalPagesCalc > 0) {
+        setCurrentPage(totalPagesCalc);
+      }
+
+      const paginated = paginateData(allData);
+      setPaginatedData(paginated);
+    } else {
+      setPaginatedData([]);
+      setTotalPages(1);
+    }
+  }, [itemsPerPage, currentPage, allData]);
 
   useEffect(() => {
     fetchProveedores();
@@ -93,58 +183,174 @@ export const Proveedores = () => {
     }
   };
 
-  const proveedoresFiltrados = proveedores.filter((p) => {
-    if (!filtroCampo || !filtroText.trim()) return true;
-    const valor = String(p[filtroCampo] || "").toLowerCase();
-    return valor.includes(filtroText.toLowerCase());
-  });
+  // ❌ Esta línea ya NO se usa (pero la dejamos por si acaso)
+  // const proveedoresFiltrados = ...;
+
+  // Función para manejar cambios en tiempo real en crear
+  const handleCrearChange = (field, value) => {
+    setFormCrear(prev => ({
+      ...prev,
+      [field]: value
+    }));
+
+    // Si el campo ha sido tocado, validar en tiempo real
+    if (touchedCrear[field]) {
+      const error = validateField(field, value, formCrear);
+      setErrorsCrear(prev => ({
+        ...prev,
+        [field]: error
+      }));
+    }
+  };
+
+  // Función para manejar cambios en tiempo real en editar
+  const handleEditarChange = (field, value) => {
+    setFormEditar(prev => ({
+      ...prev,
+      [field]: value
+    }));
+
+    // Si el campo ha sido tocado, validar en tiempo real
+    if (touchedEditar[field]) {
+      const error = validateField(field, value, formEditar);
+      setErrorsEditar(prev => ({
+        ...prev,
+        [field]: error
+      }));
+    }
+  };
+
+  // Función para marcar campo como tocado (onBlur)
+  const handleFieldBlur = (field, formType = 'crear') => {
+    if (formType === 'crear') {
+      setTouchedCrear(prev => ({ ...prev, [field]: true }));
+      
+      // Validar campo después de tocar
+      const error = validateField(field, formCrear[field], formCrear);
+      setErrorsCrear(prev => ({
+        ...prev,
+        [field]: error
+      }));
+    } else {
+      setTouchedEditar(prev => ({ ...prev, [field]: true }));
+      
+      // Validar campo después de tocar
+      const error = validateField(field, formEditar[field], formEditar);
+      setErrorsEditar(prev => ({
+        ...prev,
+        [field]: error
+      }));
+    }
+  };
+
+  // Función para limpiar errores y touched al abrir modal crear
+  const openCreateModal = () => {
+    setFormCrear({
+      nombreProveedor: "",
+      telefono: "",
+      correo: "",
+      direccion: "",
+      estado: 1,
+    });
+    setErrorsCrear({});
+    setTouchedCrear({});
+    setOpenCreate(true);
+  };
 
   const handleCreate = async () => {
-    const errors = validateForm(formCrear);
-    if (Object.keys(errors).length > 0) {
-      setErrorsCrear(errors);
+    // Primero marcar todos los campos como tocados
+    const allFields = ['nombreProveedor', 'telefono', 'correo', 'direccion'];
+    const newTouched = {};
+    const newErrors = {};
+    
+    allFields.forEach(field => {
+      newTouched[field] = true;
+      const error = validateField(field, formCrear[field], formCrear);
+      if (error) newErrors[field] = error;
+    });
+    
+    setTouchedCrear(newTouched);
+    setErrorsCrear(newErrors);
+    
+    // Si hay errores, no proceder
+    if (Object.keys(newErrors).length > 0) {
       toast.error("Por favor corrige los errores en el formulario.");
       return;
     }
-    setErrorsCrear({});
+
     try {
-      await createProveedor(formCrear); // 👈
+      await createProveedor(formCrear);
       setOpenCreate(false);
-      setFormCrear({
-        nombreProveedor: "",
-        telefono: "",
-        correo: "",
-        direccion: "",
-        estado: 1,
-      });
+      setFormCrear({ nombreProveedor: "", telefono: "", correo: "", direccion: "", estado: 1 });
       fetchProveedores();
       toast.success("Proveedor creado exitosamente");
     } catch (err) {
-      toast.error("Error al crear proveedor: " + (err.message || err));
+      // 👇 MANEJO DE ERRORES DEL BACKEND
+      if (err.response && err.response.status === 400) {
+        const backendErrors = err.response.data.details || [];
+        const newErrors = {};
+        backendErrors.forEach(msg => {
+          if (msg.includes("nombre")) newErrors.nombreProveedor = msg;
+          else if (msg.includes("teléfono") || msg.includes("10 dígitos")) newErrors.telefono = msg;
+          else if (msg.includes("correo")) newErrors.correo = msg;
+          else if (msg.includes("dirección")) newErrors.direccion = msg;
+        });
+        setErrorsCrear(newErrors);
+        toast.error("Corrige los errores del formulario.");
+      } else {
+        toast.error("Error al crear proveedor: " + (err.response?.data?.error || err.message || "Error desconocido"));
+      }
     }
   };
 
   const handleUpdate = async () => {
-    const errors = validateForm(formEditar);
-    if (Object.keys(errors).length > 0) {
-      setErrorsEditar(errors);
+    // Primero marcar todos los campos como tocados
+    const allFields = ['nombreProveedor', 'telefono', 'correo', 'direccion'];
+    const newTouched = {};
+    const newErrors = {};
+    
+    allFields.forEach(field => {
+      newTouched[field] = true;
+      const error = validateField(field, formEditar[field], formEditar);
+      if (error) newErrors[field] = error;
+    });
+    
+    setTouchedEditar(newTouched);
+    setErrorsEditar(newErrors);
+    
+    // Si hay errores, no proceder
+    if (Object.keys(newErrors).length > 0) {
       toast.error("Por favor corrige los errores en el formulario.");
       return;
     }
-    setErrorsEditar({});
+
     try {
-      await updateProveedor(selectedProveedor.ProveedorId, formEditar); // 
+      await updateProveedor(selectedProveedor.ProveedorId, formEditar);
       setOpenEditar(false);
       fetchProveedores();
       toast.success("Proveedor actualizado exitosamente");
     } catch (err) {
-      toast.error("Error al actualizar proveedor: " + (err.message || err));
+      // 👇 MANEJO DE ERRORES DEL BACKEND
+      if (err.response && err.response.status === 400) {
+        const backendErrors = err.response.data.details || [];
+        const newErrors = {};
+        backendErrors.forEach(msg => {
+          if (msg.includes("nombre")) newErrors.nombreProveedor = msg;
+          else if (msg.includes("teléfono") || msg.includes("10 dígitos")) newErrors.telefono = msg;
+          else if (msg.includes("correo")) newErrors.correo = msg;
+          else if (msg.includes("dirección")) newErrors.direccion = msg;
+        });
+        setErrorsEditar(newErrors);
+        toast.error("Corrige los errores del formulario.");
+      } else {
+        toast.error("Error al actualizar proveedor: " + (err.response?.data?.error || err.message || "Error desconocido"));
+      }
     }
   };
 
   const handleDelete = async () => {
     try {
-      await deleteProveedor(selectedProveedor.ProveedorId); // 
+      await deleteProveedor(selectedProveedor.ProveedorId);
       setOpenEliminar(false);
       setSelectedProveedor(null);
       fetchProveedores();
@@ -164,6 +370,7 @@ export const Proveedores = () => {
       estado: Number(p.Estado) === 1 ? 1 : 0,
     });
     setErrorsEditar({});
+    setTouchedEditar({});
     setOpenEditar(true);
   };
 
@@ -195,6 +402,17 @@ export const Proveedores = () => {
       toast.error("Error al actualizar estado: " + (error.message || error));
     }
   };
+
+  // 👇 Funciones de paginación
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-5xl mx-auto">
@@ -203,10 +421,11 @@ export const Proveedores = () => {
             Gestión de proveedores
           </h1>
 
+          {/* 👇 Este bloque NO se modifica (como pediste) */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               <button
-                onClick={() => setOpenCreate(true)}
+                onClick={openCreateModal}
                 className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors"
               >
                 <Plus size={18} /> Nuevo proveedor
@@ -253,7 +472,8 @@ export const Proveedores = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {proveedoresFiltrados.map((p) => (
+                {/* 👇 AHORA usamos paginatedData en lugar de proveedoresFiltrados */}
+                {paginatedData.map((p) => (
                   <tr key={p.ProveedorId} className="hover:bg-slate-50 transition-colors duration-150">
                     <td className="py-4 px-6 text-sm font-medium text-slate-900">
                       {getShortId(p.ProveedorId)}
@@ -276,7 +496,7 @@ export const Proveedores = () => {
                           <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform transform peer-checked:translate-x-5"></div>
                         </div>
                         <span className="ml-3 text-sm text-slate-700">
-                          {estadoActivos[p.ProveedorId] === 1}
+                          {estadoActivos[p.ProveedorId] === 1 ? "Activo" : "Inactivo"} {/* 👈 Corregido texto */}
                         </span>
                       </label>
                     </td>
@@ -312,8 +532,23 @@ export const Proveedores = () => {
                 ))}
               </tbody>
             </table>
+
+            {/* 👇 Paginación al final de la tabla */}
+            {paginatedData.length > 0 && (
+              <div className="px-6 py-4 border-t border-slate-200">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                  itemsPerPage={itemsPerPage}
+                  totalItems={totalItems}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
+              </div>
+            )}
           </div>
 
+          {/* === Modales con validaciones en tiempo real === */}
           {/* Modal Crear */}
           <Modal open={openCreate} onClose={() => setOpenCreate(false)}>
             <div className="w-[450px] p-6 mx-auto text-center">
@@ -324,9 +559,10 @@ export const Proveedores = () => {
                   <input
                     placeholder="Nombre del proveedor"
                     value={formCrear.nombreProveedor}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsCrear.nombreProveedor ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsCrear.nombreProveedor ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-blue-500"
                       }`}
-                    onChange={(e) => setFormCrear({ ...formCrear, nombreProveedor: e.target.value })}
+                    onChange={(e) => handleCrearChange('nombreProveedor', e.target.value)}
+                    onBlur={() => handleFieldBlur('nombreProveedor', 'crear')}
                   />
                   {errorsCrear.nombreProveedor && <span className="text-red-500 text-xs mt-1">{errorsCrear.nombreProveedor}</span>}
                 </div>
@@ -335,9 +571,11 @@ export const Proveedores = () => {
                   <input
                     placeholder="Ej: 3001234567"
                     value={formCrear.telefono}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsCrear.telefono ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsCrear.telefono ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-blue-500"
                       }`}
-                    onChange={(e) => setFormCrear({ ...formCrear, telefono: e.target.value.replace(/\D/g, "") })}
+                    onChange={(e) => handleCrearChange('telefono', e.target.value.replace(/\D/g, ""))}
+                    onBlur={() => handleFieldBlur('telefono', 'crear')}
+                    maxLength={10}
                   />
                   {errorsCrear.telefono && <span className="text-red-500 text-xs mt-1">{errorsCrear.telefono}</span>}
                 </div>
@@ -347,9 +585,10 @@ export const Proveedores = () => {
                     type="email"
                     placeholder="proveedor@ejemplo.com"
                     value={formCrear.correo}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsCrear.correo ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsCrear.correo ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-blue-500"
                       }`}
-                    onChange={(e) => setFormCrear({ ...formCrear, correo: e.target.value })}
+                    onChange={(e) => handleCrearChange('correo', e.target.value)}
+                    onBlur={() => handleFieldBlur('correo', 'crear')}
                   />
                   {errorsCrear.correo && <span className="text-red-500 text-xs mt-1">{errorsCrear.correo}</span>}
                 </div>
@@ -358,9 +597,10 @@ export const Proveedores = () => {
                   <input
                     placeholder="Dirección completa"
                     value={formCrear.direccion}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsCrear.direccion ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsCrear.direccion ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-blue-500"
                       }`}
-                    onChange={(e) => setFormCrear({ ...formCrear, direccion: e.target.value })}
+                    onChange={(e) => handleCrearChange('direccion', e.target.value)}
+                    onBlur={() => handleFieldBlur('direccion', 'crear')}
                   />
                   {errorsCrear.direccion && <span className="text-red-500 text-xs mt-1">{errorsCrear.direccion}</span>}
                 </div>
@@ -368,7 +608,8 @@ export const Proveedores = () => {
                   <button
                     type="button"
                     onClick={handleCreate}
-                    className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 transition-colors"
+                    className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={Object.keys(errorsCrear).some(key => errorsCrear[key])}
                   >
                     Crear
                   </button>
@@ -393,9 +634,10 @@ export const Proveedores = () => {
                   <label className="text-sm font-medium text-gray-700">Nombre *</label>
                   <input
                     value={formEditar.nombreProveedor}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsEditar.nombreProveedor ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsEditar.nombreProveedor ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-blue-500"
                       }`}
-                    onChange={(e) => setFormEditar({ ...formEditar, nombreProveedor: e.target.value })}
+                    onChange={(e) => handleEditarChange('nombreProveedor', e.target.value)}
+                    onBlur={() => handleFieldBlur('nombreProveedor', 'editar')}
                   />
                   {errorsEditar.nombreProveedor && <span className="text-red-500 text-xs mt-1">{errorsEditar.nombreProveedor}</span>}
                 </div>
@@ -403,9 +645,11 @@ export const Proveedores = () => {
                   <label className="text-sm font-medium text-gray-700">Teléfono *</label>
                   <input
                     value={formEditar.telefono}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsEditar.telefono ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsEditar.telefono ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-blue-500"
                       }`}
-                    onChange={(e) => setFormEditar({ ...formEditar, telefono: e.target.value.replace(/\D/g, "") })}
+                    onChange={(e) => handleEditarChange('telefono', e.target.value.replace(/\D/g, ""))}
+                    onBlur={() => handleFieldBlur('telefono', 'editar')}
+                    maxLength={10}
                   />
                   {errorsEditar.telefono && <span className="text-red-500 text-xs mt-1">{errorsEditar.telefono}</span>}
                 </div>
@@ -414,9 +658,10 @@ export const Proveedores = () => {
                   <input
                     type="email"
                     value={formEditar.correo}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsEditar.correo ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsEditar.correo ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-blue-500"
                       }`}
-                    onChange={(e) => setFormEditar({ ...formEditar, correo: e.target.value })}
+                    onChange={(e) => handleEditarChange('correo', e.target.value)}
+                    onBlur={() => handleFieldBlur('correo', 'editar')}
                   />
                   {errorsEditar.correo && <span className="text-red-500 text-xs mt-1">{errorsEditar.correo}</span>}
                 </div>
@@ -424,9 +669,10 @@ export const Proveedores = () => {
                   <label className="text-sm font-medium text-gray-700">Dirección *</label>
                   <input
                     value={formEditar.direccion}
-                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsEditar.direccion ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${errorsEditar.direccion ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-blue-500"
                       }`}
-                    onChange={(e) => setFormEditar({ ...formEditar, direccion: e.target.value })}
+                    onChange={(e) => handleEditarChange('direccion', e.target.value)}
+                    onBlur={() => handleFieldBlur('direccion', 'editar')}
                   />
                   {errorsEditar.direccion && <span className="text-red-500 text-xs mt-1">{errorsEditar.direccion}</span>}
                 </div>
@@ -434,7 +680,8 @@ export const Proveedores = () => {
                   <button
                     type="button"
                     onClick={handleUpdate}
-                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={Object.keys(errorsEditar).some(key => errorsEditar[key])}
                   >
                     Guardar cambios
                   </button>

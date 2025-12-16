@@ -6,6 +6,7 @@ import Modal from "../components/modals/modal";
 
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { Pagination } from "../components/paginacion/pagination";
 
 export const Diseño = () => {
   const [categorias, setCategorias] = useState([]);
@@ -13,12 +14,20 @@ export const Diseño = () => {
   const [campoFiltro, setCampoFiltro] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [errorNombre, setErrorNombre] = useState("");
-  const [errorDescripcion, setErrorDescripcion] = useState(""); // Corregido nombre
+  const [errorDescripcion, setErrorDescripcion] = useState("");
 
   const [openCreate, setOpenCreate] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
   const [openVer, setOpenVer] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
+
+  // Estados para paginación
+  const [allData, setAllData] = useState([]); // TODOS LOS DATOS (filtrados o no)
+  const [paginatedData, setPaginatedData] = useState([]); // DATOS PAGINADOS PARA RENDER
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [formCrear, setFormCrear] = useState({
     nombreCategoria: "",
@@ -30,6 +39,59 @@ export const Diseño = () => {
     descripcion: "",
   });
 
+  // Función para paginar
+  const paginateData = (data) => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return data.slice(startIndex, endIndex);
+  };
+
+  // Aplicar filtro y actualizar datos
+  const applyFilter = () => {
+    let filtered = categorias;
+    if (busqueda) {
+      filtered = categorias.filter((c) => {
+        if (campoFiltro === "id") {
+          return c.CategoriaId.toString().includes(busqueda);
+        }
+        if (campoFiltro === "nombre") {
+          return c.Nombre.toLowerCase().includes(busqueda.toLowerCase());
+        }
+        return (
+          c.CategoriaId.toString().includes(busqueda) ||
+          c.Nombre.toLowerCase().includes(busqueda.toLowerCase())
+        );
+      });
+    }
+    setAllData(filtered);
+    setTotalItems(filtered.length);
+  };
+
+  // Efecto al cambiar búsqueda o filtro
+  useEffect(() => {
+    applyFilter();
+    setCurrentPage(1); // Reiniciar a la primera página al filtrar
+  }, [busqueda, campoFiltro, categorias]);
+
+  // Efecto para recalcular paginación cuando cambien los datos o la página
+  useEffect(() => {
+    if (allData.length > 0) {
+      const totalPagesCalc = Math.ceil(allData.length / itemsPerPage);
+      setTotalPages(totalPagesCalc > 0 ? totalPagesCalc : 1);
+
+      if (currentPage > totalPagesCalc && totalPagesCalc > 0) {
+        setCurrentPage(totalPagesCalc);
+      }
+
+      const paginated = paginateData(allData);
+      setPaginatedData(paginated);
+    } else {
+      setPaginatedData([]);
+      setTotalPages(1);
+    }
+  }, [itemsPerPage, currentPage, allData]);
+
+  // Cargar categorías al iniciar
   useEffect(() => {
     fetchCategorias();
   }, []);
@@ -120,19 +182,15 @@ export const Diseño = () => {
     setOpenEditar(true);
   };
 
-  const categoriasFiltradas = categorias.filter((c) => {
-    if (!busqueda) return true;
-    if (campoFiltro === "id") {
-      return c.CategoriaId.toString().includes(busqueda);
-    }
-    if (campoFiltro === "nombre") {
-      return c.Nombre.toLowerCase().includes(busqueda.toLowerCase());
-    }
-    return (
-      c.CategoriaId.toString().includes(busqueda) ||
-      c.Nombre.toLowerCase().includes(busqueda.toLowerCase())
-    );
-  });
+  // Funciones de paginación
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
@@ -142,9 +200,10 @@ export const Diseño = () => {
             Gestión diseño
           </h1>
 
-          {/* botón crear */}
+          {/* Sección de controles: centrada con botón, buscador y filtro */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              {/* Botón "Nuevo diseño" */}
               <button
                 onClick={() => setOpenCreate(true)}
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all"
@@ -152,108 +211,117 @@ export const Diseño = () => {
                 <Plus size={18} /> Nuevo diseño
               </button>
 
-              <select
-                value={campoFiltro}
-                onChange={(e) => setCampoFiltro(e.target.value)}
-                className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 min-w-[140px]"
-              >
-                <option value="">Filtrar por campo</option>
-                <option value="id">ID</option>
-                <option value="nombre">Nombre</option>
-              </select>
-
-              <div className="relative flex-1 max-w-md">
+              {/* Buscador */}
+              <div className="relative max-w-md w-full">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Buscar diseño"
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
-                  className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white text-slate-700"
+                  className="w-full h-11 pl-10 pr-4 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700"
                 />
               </div>
+
+              {/* Selector de filtro */}
+              <select
+                value={campoFiltro}
+                onChange={(e) => setCampoFiltro(e.target.value)}
+                className="h-11 px-4 border border-slate-300 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
+              >
+                <option value="">Filtrar por campo</option>
+                <option value="id">ID</option>
+                <option value="nombre">Nombre</option>
+              </select>
             </div>
           </div>
 
-          {/* tabla */}
+          {/* Tabla */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
                 <tr>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
-                    Nombre diseño
-                  </th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
-                    Descripción
-                  </th>
-                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
-                    Acciones
-                  </th>
+                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">ID</th>
+                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Nombre diseño</th>
+                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Descripción</th>
+                  <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {categoriasFiltradas.map((c) => (
-                  <tr
-                    key={c.CategoriaId}
-                    className="hover:bg-slate-50 transition-colors duration-150"
-                  >
-                    <td className="py-4 px-6 text-sm font-medium text-slate-900">
-                      {c.CategoriaId?.toString().substring(0, 3)} {/* 👈 SOLO 3 PRIMEROS CARACTERES */}
-                    </td>
-                    <td className="py-4 px-6 text-sm font-medium text-slate-900">
-                      {c.Nombre}
-                    </td>
-                    <td className="py-4 px-6 text-sm font-medium text-slate-900">
-                      {c.Descripcion}
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => openEditarModal(c)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-150"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedCategoria(c);
-                            setOpenVer(true);
-                          }}
-                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors duration-150"
-                        >
-                          <Eye size={16} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedCategoria(c);
-                            setOpenEliminar(true);
-                          }}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-150"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+                {paginatedData.length > 0 ? (
+                  paginatedData.map((c) => (
+                    <tr
+                      key={c.CategoriaId}
+                      className="hover:bg-slate-50 transition-colors duration-150"
+                    >
+                      <td className="py-4 px-6 text-sm font-medium text-slate-900">
+                        {c.CategoriaId?.toString().substring(0, 3)}
+                      </td>
+                      <td className="py-4 px-6 text-sm font-medium text-slate-900">{c.Nombre}</td>
+                      <td className="py-4 px-6 text-sm font-medium text-slate-900">{c.Descripcion}</td>
+                      <td className="py-4 px-6">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openEditarModal(c)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-150"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedCategoria(c);
+                              setOpenVer(true);
+                            }}
+                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors duration-150"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedCategoria(c);
+                              setOpenEliminar(true);
+                            }}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-150"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="py-6 text-center text-slate-500">
+                      No se encontraron diseños
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
+
+            {/* Paginación: solo si hay datos */}
+            {paginatedData.length > 0 && (
+              <div className="px-6 py-4 border-t border-slate-200">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                  itemsPerPage={itemsPerPage}
+                  totalItems={totalItems}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
+              </div>
+            )}
           </div>
 
+          {/* === Modales === */}
           {/* Modal Crear */}
           <Modal open={openCreate} onClose={() => setOpenCreate(false)}>
             <div className="w-[450px] p-6 mx-auto text-center">
-              <h3 className="text-lg font-black text-gray-800 mb-6">
-                Nuevo diseño
-              </h3>
+              <h3 className="text-lg font-black text-gray-800 mb-6">Nuevo diseño</h3>
               <form className="grid grid-cols-1 gap-6 text-left">
                 <div className="flex flex-col">
-                  <label className="mb-1 text-sm font-medium text-gray-700">
-                    Nombre diseño
-                  </label>
+                  <label className="mb-1 text-sm font-medium text-gray-700">Nombre diseño</label>
                   <input
                     placeholder="Ingrese el nombre del diseño"
                     value={formCrear.nombreCategoria}
@@ -270,14 +338,10 @@ export const Diseño = () => {
                       }
                     }}
                   />
-                  {errorNombre && (
-                    <p className="text-red-500 text-sm mt-1">{errorNombre}</p>
-                  )}
+                  {errorNombre && <p className="text-red-500 text-sm mt-1">{errorNombre}</p>}
                 </div>
                 <div className="flex flex-col">
-                  <label className="mb-1 text-sm font-medium text-gray-700">
-                    Descripción
-                  </label>
+                  <label className="mb-1 text-sm font-medium text-gray-700">Descripción</label>
                   <input
                     placeholder="Ingrese la descripción"
                     value={formCrear.descripcion}
@@ -294,9 +358,7 @@ export const Diseño = () => {
                       }
                     }}
                   />
-                  {errorDescripcion && (
-                    <p className="text-red-500 text-sm mt-1">{errorDescripcion}</p>
-                  )}
+                  {errorDescripcion && <p className="text-red-500 text-sm mt-1">{errorDescripcion}</p>}
                 </div>
                 <div className="col-span-2 flex gap-4 mt-4">
                   <button
@@ -321,14 +383,10 @@ export const Diseño = () => {
           {/* Modal Editar */}
           <Modal open={openEditar} onClose={() => setOpenEditar(false)}>
             <div className="w-[450px] p-6 mx-auto text-center">
-              <h3 className="text-lg font-black text-gray-800 mb-6">
-                Editar diseño
-              </h3>
+              <h3 className="text-lg font-black text-gray-800 mb-6">Editar diseño</h3>
               <form className="grid grid-cols-1 gap-6 text-left">
                 <div className="flex flex-col">
-                  <label className="mb-1 text-sm font-medium text-gray-700">
-                    Nombre diseño
-                  </label>
+                  <label className="mb-1 text-sm font-medium text-gray-700">Nombre diseño</label>
                   <input
                     placeholder="Ingrese el nombre del diseño"
                     value={formEditar.nombreCategoria}
@@ -342,9 +400,7 @@ export const Diseño = () => {
                   />
                 </div>
                 <div className="flex flex-col">
-                  <label className="mb-1 text-sm font-medium text-gray-700">
-                    Descripción
-                  </label>
+                  <label className="mb-1 text-sm font-medium text-gray-700">Descripción</label>
                   <input
                     placeholder="Ingrese la descripción"
                     value={formEditar.descripcion}
@@ -380,9 +436,7 @@ export const Diseño = () => {
           {/* Modal Ver */}
           <Modal open={openVer} onClose={() => setOpenVer(false)}>
             <div className="w-[450px] p-6 mx-auto text-center">
-              <h3 className="text-lg font-black text-gray-800 mb-6">
-                Ver diseño
-              </h3>
+              <h3 className="text-lg font-black text-gray-800 mb-6">Ver diseño</h3>
               {selectedCategoria && (
                 <div className="text-left space-y-2">
                   <p>ID: {selectedCategoria.CategoriaId}</p>
@@ -402,9 +456,7 @@ export const Diseño = () => {
           {/* Modal Eliminar */}
           <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
             <div className="w-[400px] p-6 mx-auto text-center">
-              <h3 className="text-lg font-black text-gray-800 mb-4">
-                Eliminar diseño
-              </h3>
+              <h3 className="text-lg font-black text-gray-800 mb-4">Eliminar diseño</h3>
               <p className="mb-6">¿Estás seguro de eliminar este diseño?</p>
               <div className="flex gap-4">
                 <button
@@ -424,6 +476,7 @@ export const Diseño = () => {
           </Modal>
         </div>
       </div>
+
       <ToastContainer
         position="top-right"
         autoClose={3000}

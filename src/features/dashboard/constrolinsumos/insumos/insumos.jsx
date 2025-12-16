@@ -9,6 +9,7 @@ import {
   updateInsumo, 
   deleteInsumo 
 } from "./services/services.insumos";
+import { Pagination } from "../../components/paginacion/pagination"; // 👈 Importado
 
 // Función para reducir el ID a 4 caracteres con puntos suspensivos
 const getShortId = (id) => {
@@ -29,6 +30,14 @@ export const Insumos = () => {
   const [openEditar, setOpenEditar] = useState(false);
   const [openVer, setOpenVer] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
+
+  // 👇 Estados para PAGINACIÓN
+  const [allData, setAllData] = useState([]);
+  const [paginatedData, setPaginatedData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [formCrear, setFormCrear] = useState({
     nombreInsumo: "",
@@ -54,6 +63,53 @@ export const Insumos = () => {
   useEffect(() => {
     fetchInsumos();
   }, []);
+
+  // 👇 Efecto para filtrar y preparar datos para paginación
+  useEffect(() => {
+    let filtered = insumos;
+    if (campoFiltro && busqueda.trim()) {
+      filtered = insumos.filter((i) => {
+        const id = i.InsumoId || i.id || "";
+        const nombre = i.Nombre || i.nombreInsumo || "";
+        const stock = i.Stock || i.stock || "";
+        
+        if (campoFiltro === "id") {
+          return id.toString().includes(busqueda);
+        }
+        if (campoFiltro === "nombre") {
+          return nombre.toLowerCase().includes(busqueda.toLowerCase());
+        }
+        if (campoFiltro === "stock") {
+          return stock.toString().includes(busqueda);
+        }
+        return (
+          id.toString().includes(busqueda) ||
+          nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+          stock.toString().includes(busqueda)
+        );
+      });
+    }
+    setAllData(filtered);
+    setTotalItems(filtered.length);
+    setCurrentPage(1); // Reiniciar página al filtrar
+  }, [busqueda, campoFiltro, insumos]);
+
+  // 👇 Efecto para paginar
+  useEffect(() => {
+    if (allData.length > 0) {
+      const totalPagesCalc = Math.ceil(allData.length / itemsPerPage);
+      setTotalPages(totalPagesCalc > 0 ? totalPagesCalc : 1);
+      if (currentPage > totalPagesCalc && totalPagesCalc > 0) {
+        setCurrentPage(totalPagesCalc);
+      }
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      setPaginatedData(allData.slice(startIndex, endIndex));
+    } else {
+      setPaginatedData([]);
+      setTotalPages(1);
+    }
+  }, [itemsPerPage, currentPage, allData]);
 
   // Resetear formulario de creación
   const resetCreateForm = () => {
@@ -218,28 +274,15 @@ export const Insumos = () => {
     setOpenEditar(true);
   };
 
-  // Filtro
-  const insumosFiltrados = insumos.filter((i) => {
-    if (!busqueda) return true;
-    const id = i.InsumoId || i.id || "";
-    const nombre = i.Nombre || i.nombreInsumo || "";
-    const stock = i.Stock || i.stock || "";
-    
-    if (campoFiltro === "id") {
-      return id.toString().includes(busqueda);
-    }
-    if (campoFiltro === "nombre") {
-      return nombre.toLowerCase().includes(busqueda.toLowerCase());
-    }
-    if (campoFiltro === "stock") {
-      return stock.toString().includes(busqueda);
-    }
-    return (
-      id.toString().includes(busqueda) ||
-      nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      stock.toString().includes(busqueda)
-    );
-  });
+  // 👇 Funciones de paginación
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
@@ -307,8 +350,8 @@ export const Insumos = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {insumosFiltrados.length > 0 ? (
-                    insumosFiltrados.map((i) => (
+                  {paginatedData.length > 0 ? (
+                    paginatedData.map((i) => (
                       <tr key={i.InsumoId || i.id} className="hover:bg-slate-50 transition-colors duration-150">
                         <td className="py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-slate-900 text-center align-middle font-mono">
                           {getShortId(i.InsumoId || i.id)}
@@ -362,6 +405,20 @@ export const Insumos = () => {
                 </tbody>
               </table>
             </div>
+
+            {/* 👇 PAGINACIÓN */}
+            {paginatedData.length > 0 && (
+              <div className="px-6 py-4 border-t border-slate-200">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                  itemsPerPage={itemsPerPage}
+                  totalItems={totalItems}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
+              </div>
+            )}
           </div>
 
           {/* MODALES */}

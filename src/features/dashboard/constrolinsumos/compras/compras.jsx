@@ -10,6 +10,7 @@ import {
     getAllInsumos,
     getAllProveedores
 } from "./services/services.compras";
+import { Pagination } from "../../components/paginacion/pagination"; // 👈 IMPORTANTE
 
 const getShortId = (id) => {
     const str = String(id || "");
@@ -100,6 +101,14 @@ export const Compras = () => {
     const [errores, setErrores] = useState([]);
     const [returnTo, setReturnTo] = useState(null);
 
+    // 👇 ESTADOS PARA PAGINACIÓN PRINCIPAL
+    const [allData, setAllData] = useState([]);
+    const [paginatedData, setPaginatedData] = useState([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(5);
+    const [totalItems, setTotalItems] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
+
     // Estados para la vista de selección de proveedor
     const [searchTermProveedores, setSearchTermProveedores] = useState("");
     const [currentPageProveedores, setCurrentPageProveedores] = useState(1);
@@ -117,7 +126,6 @@ export const Compras = () => {
     const [loadingProdInsumo, setLoadingProdInsumo] = useState(false);
     const [filterType, setFilterType] = useState("todos");
     const [currentDetailIndex, setCurrentDetailIndex] = useState(-1);
-    const itemsPerPage = 5;
 
     useEffect(() => {
         const fetchData = async () => {
@@ -155,11 +163,36 @@ export const Compras = () => {
         fetchCompras();
     }, []);
 
-    const comprasFiltradas = compras.filter((c) => {
-        if (!filtroCampo || !filtroText.trim()) return true;
-        const valor = String(c[filtroCampo] || "").toLowerCase();
-        return valor.includes(filtroText.toLowerCase());
-    });
+    // 👇 Reemplazar comprasFiltradas por lógica de paginación
+    useEffect(() => {
+        let filtered = compras;
+        if (filtroCampo && filtroText.trim()) {
+            filtered = compras.filter((c) => {
+                const valor = String(c[filtroCampo] || "").toLowerCase();
+                return valor.includes(filtroText.toLowerCase());
+            });
+        }
+        setAllData(filtered);
+        setTotalItems(filtered.length);
+        setCurrentPage(1);
+    }, [filtroText, filtroCampo, compras]);
+
+    // 👇 Efecto para paginar
+    useEffect(() => {
+        if (allData.length > 0) {
+            const totalPagesCalc = Math.ceil(allData.length / itemsPerPage);
+            setTotalPages(totalPagesCalc > 0 ? totalPagesCalc : 1);
+            if (currentPage > totalPagesCalc && totalPagesCalc > 0) {
+                setCurrentPage(totalPagesCalc);
+            }
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            setPaginatedData(allData.slice(startIndex, endIndex));
+        } else {
+            setPaginatedData([]);
+            setTotalPages(1);
+        }
+    }, [itemsPerPage, currentPage, allData]);
 
     const goToCreate = () => {
         setFormCrear({ ProveedorId: "", nombreProveedor: "", Total: 0, FechaRegistro: "", Estado: 1 });
@@ -173,7 +206,6 @@ export const Compras = () => {
             const detalles = await getDetallesByCompraId(compra.CompraId);
             const proveedor = proveedores.find(p => p.ProveedorId === compra.ProveedorId);
             const nombreProveedor = proveedor?.NombreProveedor || "";
-
             const detallesConTipo = detalles.map(d => {
                 if (d.ProductoId || d.ProductoServicioId) {
                     return {
@@ -193,7 +225,6 @@ export const Compras = () => {
                     return { ...d, TipoDetalle: "-" };
                 }
             });
-
             setSelectedCompra({
                 ...compra,
                 detalle: detallesConTipo,
@@ -212,7 +243,6 @@ export const Compras = () => {
             const detalles = await getDetallesByCompraId(compra.CompraId);
             const proveedor = proveedores.find(p => p.ProveedorId === compra.ProveedorId);
             const nombreProveedor = proveedor?.NombreProveedor || "";
-
             const detallesConTipo = detalles.map(d => {
                 if (d.ProductoId || d.ProductoServicioId) {
                     return {
@@ -232,7 +262,6 @@ export const Compras = () => {
                     return { ...d, TipoDetalle: "" };
                 }
             });
-
             setSelectedCompra({
                 ...compra,
                 detalle: detallesConTipo,
@@ -263,7 +292,6 @@ export const Compras = () => {
             if (search) params.set("search", search);
             const res = await fetch(`http://localhost:3000/api/proveedores?${params.toString()}`);
             const response = await res.json();
-
             let data = [];
             let total = 0;
             if (Array.isArray(response)) {
@@ -276,7 +304,6 @@ export const Compras = () => {
                 data = response.results;
                 total = response.total || data.length;
             }
-
             setProveedoresPaginados(data);
             setTotalProveedores(total);
             setTotalPagesProveedores(Math.ceil(total / itemsPerPage));
@@ -299,9 +326,7 @@ export const Compras = () => {
             params.set("page", page);
             params.set("limit", itemsPerPage);
             if (search) params.set("search", search);
-
             let prodData = [], insumoData = [];
-
             if (type !== "insumo") {
                 const resProductos = await fetch(`http://localhost:3000/service?${params.toString()}`);
                 const dataProd = await resProductos.json();
@@ -312,7 +337,6 @@ export const Compras = () => {
                 const dataIns = await resInsumos.json();
                 insumoData = Array.isArray(dataIns) ? dataIns.map(i => ({ ...i, tipo: 'insumo' })) : [];
             }
-
             if (type === "todos") {
                 const combinedData = [...prodData, ...insumoData].sort((a, b) => a.Nombre?.localeCompare(b.Nombre));
                 const combinedTotal = combinedData.length;
@@ -420,8 +444,6 @@ export const Compras = () => {
         ]);
     };
 
-    // ❌ Eliminado: eliminarDetalleCrear
-
     const actualizarDetalleCrear = (index, campo, valor) => {
         setDetallesCrear(prev => {
             const nuevos = [...prev];
@@ -450,8 +472,6 @@ export const Compras = () => {
             detalle: [...prev.detalle, { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }]
         }));
     };
-
-    // ❌ Eliminado: eliminarDetalleEditar
 
     const actualizarDetalleEditar = (index, campo, valor) => {
         setSelectedCompra(prev => {
@@ -492,9 +512,7 @@ export const Compras = () => {
                 Total: total,
                 Estado: formCrear.Estado,
             };
-
             const compraCreada = await createCompra(compraData);
-
             const detallesLimpios = detallesCrear.map(d => ({
                 ...d,
                 CompraId: compraCreada.CompraId,
@@ -502,11 +520,9 @@ export const Compras = () => {
                 InsumoId: d.TipoDetalle === "Insumo" ? d.InsumoId || null : null,
                 Subtotal: undefined,
             }));
-
             for (const d of detallesLimpios) {
                 await createDetalleCompra(d);
             }
-
             goToBackToList();
             fetchCompras();
         } catch (err) {
@@ -532,17 +548,12 @@ export const Compras = () => {
         setErrores([]);
         try {
             const total = selectedCompra.detalle.reduce((sum, item) => sum + (item.Subtotal || 0), 0);
-
             await updateCompra(selectedCompra.CompraId, {
                 ProveedorId: selectedCompra.ProveedorId,
                 Total: total,
                 FechaRegistro: formatearFechaParaInput(selectedCompra.FechaRegistro),
                 Estado: selectedCompra.Estado,
             });
-
-            // ❌ Se elimina la lógica de borrar y recrear detalles
-            // Si tu backend no admite actualización parcial, necesitas un endpoint distinto
-
             goToBackToList();
             fetchCompras();
         } catch (err) {
@@ -571,6 +582,16 @@ export const Compras = () => {
         } catch (err) {
             console.error("Error al actualizar estado", err);
         }
+    };
+
+    // 👇 FUNCIONES DE PAGINACIÓN
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+    };
+
+    const handleItemsPerPageChange = (newItemsPerPage) => {
+        setItemsPerPage(newItemsPerPage);
+        setCurrentPage(1);
     };
 
     return (
@@ -627,7 +648,7 @@ export const Compras = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {comprasFiltradas.map((compra) => (
+                                    {paginatedData.map((compra) => (
                                         <tr key={compra.CompraId} className="hover:bg-slate-50">
                                             <td className="py-4 px-6">{getShortId(compra.CompraId)}</td>
                                             <td className="py-4 px-6">{getShortId(compra.ProveedorId)}</td>
@@ -665,12 +686,11 @@ export const Compras = () => {
                                                     >
                                                         <Edit size={18} className="text-blue-600" />
                                                     </button>
-                                                    {/* ❌ Botón de eliminar REMOVIDO */}
                                                 </div>
                                             </td>
                                         </tr>
                                     ))}
-                                    {comprasFiltradas.length === 0 && (
+                                    {paginatedData.length === 0 && (
                                         <tr>
                                             <td colSpan={6} className="py-8 text-center text-gray-500">
                                                 No hay compras a mostrar
@@ -679,10 +699,25 @@ export const Compras = () => {
                                     )}
                                 </tbody>
                             </table>
+
+                            {/* 👇 PAGINACIÓN */}
+                            {paginatedData.length > 0 && (
+                                <div className="px-6 py-4 border-t border-slate-200">
+                                    <Pagination
+                                        currentPage={currentPage}
+                                        totalPages={totalPages}
+                                        onPageChange={handlePageChange}
+                                        itemsPerPage={itemsPerPage}
+                                        totalItems={totalItems}
+                                        onItemsPerPageChange={handleItemsPerPageChange}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </>
                 )}
 
+                {/* === Resto de vistas sin cambios (crear, editar, ver, selectores) === */}
                 {/* CREAR */}
                 {viewMode === "create" && (
                     <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -831,7 +866,6 @@ export const Compras = () => {
                                                     />
                                                 </td>
                                                 <td className="py-2 px-2 text-center">
-                                                    {/* ❌ Botón de eliminar artículo REMOVIDO */}
                                                     <span className="text-gray-400">—</span>
                                                 </td>
                                             </tr>
@@ -1014,7 +1048,6 @@ export const Compras = () => {
                                                     />
                                                 </td>
                                                 <td className="py-2 px-2 text-center">
-                                                    {/* ❌ Botón de eliminar artículo REMOVIDO */}
                                                     <span className="text-gray-400">—</span>
                                                 </td>
                                             </tr>
