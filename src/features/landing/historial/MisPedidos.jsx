@@ -33,12 +33,11 @@ const MisPedidos = () => {
   const { pedidos, loading } = useMisPedidos(clienteId);
 
   // Estados válidos según tu backend
-  const allStatuses = ['Todos', 'pendiente', 'aprobado', 'en_produccion', 'terminado', 'entregado', 'cancelado'];
+  const allStatuses = ['Todos', 'pendiente','en_produccion', 'terminado', 'entregado', 'cancelado'];
 
   const getEstadoLabel = (estado) => {
     const labels = {
       pendiente: 'Pendiente',
-      aprobado: 'Aprobado',
       en_produccion: 'En Producción',
       terminado: 'Terminado',
       entregado: 'Entregado',
@@ -50,7 +49,6 @@ const MisPedidos = () => {
   const getEstadoColor = (estado) => {
     switch (estado?.toLowerCase()) {
       case 'pendiente': return 'bg-yellow-100 text-yellow-800';
-      case 'aprobado': return 'bg-blue-100 text-blue-800';
       case 'en_produccion': return 'bg-purple-100 text-purple-800';
       case 'terminado': return 'bg-orange-100 text-orange-800';
       case 'entregado': return 'bg-green-100 text-green-800';

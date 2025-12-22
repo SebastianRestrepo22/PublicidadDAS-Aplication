@@ -54,11 +54,12 @@ export const actualizarCita = async (req, res) => {
   }
 };
 
+// src/controllers/cita.controller.js
 export const eliminarCita = async (req, res) => {
   try {
     await deleteCita(req.params.id);
     res.json({ message: "Cita eliminada" });
   } catch {
-    res.status(500).json({ message: "Error al eliminar cita" });
+    res.status(500).json({ message: "Error al eliminar cita" }); // ✅ corregido
   }
 };

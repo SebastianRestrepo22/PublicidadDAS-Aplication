@@ -5,10 +5,12 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import * as produccionService from "./services/services.produccion";
-//  Importar servicios necesarios
+// Importar servicios necesarios
 import { getAllPedidosClientes } from "../pedidos/services/services.pedidosClientes";
 import { getAllInsumos as getAllInsumosService } from "../produccion/services/services.produccion";
 import { updatePedidoCliente } from "../pedidos/services/services.pedidosClientes";
+// Importar componente de paginación
+import { Pagination } from "../../components/paginacion/pagination";
 
 const formatDate = (dateString) => {
   if (!dateString) return "—";
@@ -53,17 +55,12 @@ export const Produccion = () => {
   // ─── DETECCIÓN DE MODO ───────────────────────────────────────
   const mode = useMemo(() => {
     const path = location.pathname;
-
-    // Patrones específicos primero (más específicos arriba)
     if (path.includes('/seleccionar-insumo/')) {
       return path.includes('/editar/') ? 'select-insumo-edit' : 'select-insumo';
     }
-
     if (path.includes('/seleccionar-pedido')) {
       return path.includes('/editar/') ? 'select-pedido-edit' : 'select-pedido';
     }
-
-    // Modos principales
     if (path === "/dashboard/produccion/nuevo") return 'create';
     if (path.match(/\/dashboard\/produccion\/[^/]+\/editar$/)) return 'edit';
     if (path.match(/\/dashboard\/produccion\/[^/]+$/)) {
@@ -72,11 +69,8 @@ export const Produccion = () => {
         return 'view';
       }
     }
-
     return 'list';
   }, [location.pathname]);
-
-  console.log("📍 Modo detectado:", mode, "ID:", id);
 
   const isEditMode = mode === "edit";
   const isCreateMode = mode === "create";
@@ -86,6 +80,14 @@ export const Produccion = () => {
 
   // ─── ESTADOS ─────────────────────────────────────────────────
   const [producciones, setProducciones] = useState([]);
+
+  // 👇 Estados para paginación (reemplazan el filtrado simple)
+  const [allData, setAllData] = useState([]);
+  const [paginatedData, setPaginatedData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [filtroCampo, setFiltroCampo] = useState("");
   const [filtroText, setFiltroText] = useState("");
 
@@ -114,8 +116,15 @@ export const Produccion = () => {
 
   // Estados para selección
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 4;
+  const [currentPageSelect, setCurrentPageSelect] = useState(1);
+  const itemsPerPageSelect = 4;
+
+  // ─── FUNCIÓN AUXILIAR DE PAGINACIÓN ───────────────────────────
+  const paginateData = (data) => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return data.slice(startIndex, endIndex);
+  };
 
   // ─── CARGAR DATOS INICIALES ─────────────────────────────────
   useEffect(() => {
@@ -125,11 +134,6 @@ export const Produccion = () => {
           getAllPedidosClientes(),
           getAllInsumosService()
         ]);
-
-        console.log(" Pedidos cargados:", pedidosData.length);
-        console.log(" Insumos cargados:", insumosData.length);
-
-        // Filtrar solo pedidos confirmados para producción
         const pedidosConfirmados = pedidosData.filter(p => p.Estado === "confirmado");
         setPedidos(pedidosConfirmados);
         setInsumos(insumosData);
@@ -138,7 +142,6 @@ export const Produccion = () => {
         toast.error("Error al cargar datos iniciales");
       }
     };
-
     cargarDatosIniciales();
   }, []);
 
@@ -147,7 +150,17 @@ export const Produccion = () => {
     setLoading(true);
     try {
       const data = await produccionService.getAllProducciones();
-      setProducciones(data);
+      setAllData(data);
+      setTotalItems(data.length);
+
+      const totalPagesCalc = Math.ceil(data.length / itemsPerPage);
+      setTotalPages(totalPagesCalc > 0 ? totalPagesCalc : 1);
+      if (currentPage > totalPagesCalc && totalPagesCalc > 0) {
+        setCurrentPage(totalPagesCalc);
+      }
+
+      const paginated = paginateData(data);
+      setPaginatedData(paginated);
     } catch (err) {
       console.error("Error cargando producciones:", err);
       toast.error("Error al cargar producciones");
@@ -162,89 +175,95 @@ export const Produccion = () => {
     }
   }, [mode]);
 
-  // ─── CARGAR DETALLE DE PRODUCCIÓN ────────────────────────────
+  // ─── EFECTO: RECALCULAR PAGINACIÓN CUANDO CAMBIA FILTRO O PÁGINA ───────
   useEffect(() => {
-  if ((isViewMode || isEditMode) && id) {
-    // Solo cargar si NO hay un formEditar existente en modo edición
-    // (para evitar sobrescribir cambios locales al volver de selección)
-    if (isEditMode && formEditar) {
-      console.log(" Formulario ya existe en modo edición. No se recarga.");
-      return;
+    if (allData.length === 0) return;
+
+    // Aplicar filtro
+    const filtered = allData.filter((p) => {
+      if (!filtroCampo || !filtroText.trim()) return true;
+      const valor = String(p[filtroCampo] || "").toLowerCase();
+      return valor.includes(filtroText.toLowerCase());
+    });
+
+    setTotalItems(filtered.length);
+    const totalPagesCalc = Math.ceil(filtered.length / itemsPerPage);
+    setTotalPages(totalPagesCalc > 0 ? totalPagesCalc : 1);
+
+    // Ajustar página si es necesario
+    if (currentPage > totalPagesCalc && totalPagesCalc > 0) {
+      setCurrentPage(totalPagesCalc);
     }
 
-    const cargarProduccionDetalle = async () => {
-      setLoading(true);
-      try {
-        console.log("🔍 Cargando producción con ID:", id);
-        const produccionCompleta = await produccionService.getProduccionCompleta(id);
-        if (!produccionCompleta) {
-          throw new Error("Producción no encontrada");
+    // Paginar
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginated = filtered.slice(startIndex, startIndex + itemsPerPage);
+    setPaginatedData(paginated);
+  }, [filtroCampo, filtroText, currentPage, itemsPerPage, allData]);
+
+  // ─── Resto de lógica (carga detalle, selección, edición, etc.) ───────
+  useEffect(() => {
+    if ((isViewMode || isEditMode) && id) {
+      if (isEditMode && formEditar) return;
+      const cargarProduccionDetalle = async () => {
+        setLoading(true);
+        try {
+          const produccionCompleta = await produccionService.getProduccionCompleta(id);
+          if (!produccionCompleta) throw new Error("Producción no encontrada");
+
+          const detalleConInfo = produccionCompleta.detalle?.map(item => ({
+            ...item,
+            InsumoInfo: insumos.find(i => i.InsumoId === item.InsumoId) || null
+          })) || [];
+
+          const datosProduccion = { ...produccionCompleta, detalle: detalleConInfo };
+          setProduccionDetalle(datosProduccion);
+
+          if (isEditMode) {
+            setFormEditar({
+              ProduccionId: produccionCompleta.ProduccionId,
+              PedidoClienteId: produccionCompleta.PedidoClienteId,
+              Estado: produccionCompleta.Estado,
+              FechaInicio: formatDateForInput(produccionCompleta.FechaInicio),
+              FechaFin: formatDateForInput(produccionCompleta.FechaFin),
+              detalle: detalleConInfo.map(item => ({
+                DetalleProduccionId: item.DetalleProduccionId,
+                InsumoId: item.InsumoId,
+                CantidadUsada: item.CantidadUsada,
+                _tempId: item.DetalleProduccionId || crypto.randomUUID(),
+              }))
+            });
+          }
+        } catch (err) {
+          console.error(" Error cargando producción:", err);
+          toast.error("Error al cargar producción");
+          navigate("/dashboard/produccion");
+        } finally {
+          setLoading(false);
         }
-        const detalleConInfo = produccionCompleta.detalle?.map(item => ({
-          ...item,
-          InsumoInfo: insumos.find(i => i.InsumoId === item.InsumoId) || null
-        })) || [];
-        const datosProduccion = {
-          ...produccionCompleta,
-          detalle: detalleConInfo
-        };
-        setProduccionDetalle(datosProduccion);
-        if (isEditMode) {
-          setFormEditar({
-            ProduccionId: produccionCompleta.ProduccionId,
-            PedidoClienteId: produccionCompleta.PedidoClienteId,
-            Estado: produccionCompleta.Estado,
-            FechaInicio: formatDateForInput(produccionCompleta.FechaInicio),
-            FechaFin: formatDateForInput(produccionCompleta.FechaFin),
-            detalle: detalleConInfo.map(item => ({
-              DetalleProduccionId: item.DetalleProduccionId,
-              InsumoId: item.InsumoId,
-              CantidadUsada: item.CantidadUsada,
-              _tempId: item.DetalleProduccionId || crypto.randomUUID(),
-            }))
-          });
-        }
-      } catch (err) {
-        console.error(" Error cargando producción:", err);
-        toast.error("Error al cargar producción");
-        navigate("/dashboard/produccion");
-      } finally {
-        setLoading(false);
+      };
+
+      if (insumos.length > 0) {
+        cargarProduccionDetalle();
+      } else {
+        cargarProduccionDetalle();
       }
-    };
-
-    if (insumos.length > 0) {
-      cargarProduccionDetalle();
-    } else {
-      // Si no hay insumos, cargar igual (se actualiza después si es necesario)
-      cargarProduccionDetalle();
     }
-  }
-}, [mode, id, navigate, insumos, isViewMode, isEditMode, formEditar]); //  Añadido formEditar como dependencia
+  }, [mode, id, navigate, insumos, isViewMode, isEditMode, formEditar]);
 
-  // ─── RESETEAR PAGINACIÓN ─────────────────────────────────────
   useEffect(() => {
     if (isSelectPedidoMode || isSelectInsumoMode) {
       setSearchTerm("");
-      setCurrentPage(1);
+      setCurrentPageSelect(1);
     }
   }, [isSelectPedidoMode, isSelectInsumoMode]);
-
-  // ─── FILTROS ─────────────────────────────────────────────────
-  const produccionesFiltradas = producciones.filter((p) => {
-    if (!filtroCampo || !filtroText.trim()) return true;
-    const valor = String(p[filtroCampo] || "").toLowerCase();
-    return valor.includes(filtroText.toLowerCase());
-  });
 
   // ─── NAVEGACIÓN ──────────────────────────────────────────────
   const goToBackToList = () => {
     setErrores({});
     navigate("/dashboard/produccion");
   };
-
   const goToCreate = () => navigate("/dashboard/produccion/nuevo");
-
   const goToView = (produccionId) => {
     if (!produccionId) {
       toast.error("ID de producción inválido");
@@ -252,7 +271,6 @@ export const Produccion = () => {
     }
     navigate(`/dashboard/produccion/${produccionId}`);
   };
-
   const goToEdit = (produccionId) => {
     if (!produccionId) {
       toast.error("ID de producción inválido");
@@ -260,7 +278,6 @@ export const Produccion = () => {
     }
     navigate(`/dashboard/produccion/${produccionId}/editar`);
   };
-
   const goToSelectPedido = () => {
     const path = location.pathname;
     if (path.includes("/nuevo") && !path.includes("/editar")) {
@@ -269,7 +286,6 @@ export const Produccion = () => {
       navigate(`/dashboard/produccion/${id}/editar/seleccionar-pedido`);
     }
   };
-
   const goToSelectInsumo = (index) => {
     const path = location.pathname;
     if (path.includes("/nuevo") && !path.includes("/editar")) {
@@ -278,7 +294,6 @@ export const Produccion = () => {
       navigate(`/dashboard/produccion/${id}/editar/seleccionar-insumo/${index}`);
     }
   };
-
   const goBackToForm = () => {
     const path = location.pathname;
     if (path.includes("/nuevo") && !path.includes("/editar")) {
@@ -292,7 +307,6 @@ export const Produccion = () => {
 
   // ─── MANEJO DE SELECCIONES ───────────────────────────────────
   const handleSelectPedido = (pedidoId) => {
-    console.log(" Pedido seleccionado:", pedidoId);
     if (mode === "select-pedido") {
       setFormCrear((prev) => ({ ...prev, PedidoClienteId: pedidoId }));
     } else if (mode === "select-pedido-edit") {
@@ -300,16 +314,12 @@ export const Produccion = () => {
     }
     goBackToForm();
   };
-
   const handleSelectInsumo = (insumoId) => {
     const idx = parseInt(detalleIndex, 10);
-    console.log(" Insumo seleccionado:", insumoId, "para índice:", idx);
-
     if (isNaN(idx)) {
       toast.error("Índice de detalle inválido");
       return;
     }
-
     if (mode === "select-insumo") {
       setDetallesCrear((prev) => {
         const copy = [...prev];
@@ -320,29 +330,24 @@ export const Produccion = () => {
       setFormEditar((prev) => {
         if (!prev) return prev;
         const copyDetalle = [...prev.detalle];
-        copyDetalle[idx] = {
-          ...copyDetalle[idx],
-          InsumoId: insumoId
-        };
+        copyDetalle[idx] = { ...copyDetalle[idx], InsumoId: insumoId };
         return { ...prev, detalle: copyDetalle };
       });
     }
     goBackToForm();
   };
 
-  // ─── MANEJO DE DETALLES (CREAR) ──────────────────────────────
+  // ─── MANEJO DE DETALLES (CREAR / EDITAR) ──────────────────────
   const añadirDetalleCrear = () =>
     setDetallesCrear((prev) => [
       ...prev,
       { _tempId: crypto.randomUUID(), InsumoId: "", CantidadUsada: 1 },
     ]);
-
   const eliminarDetalleCrear = (index) => {
     if (detallesCrear.length > 1) {
       setDetallesCrear((prev) => prev.filter((_, i) => i !== index));
     }
   };
-
   const actualizarDetalleCrear = (index, campo, valor) => {
     setDetallesCrear((prev) => {
       const copy = [...prev];
@@ -350,8 +355,6 @@ export const Produccion = () => {
       return copy;
     });
   };
-
-  // ─── MANEJO DE DETALLES (EDITAR) ─────────────────────────────
   const añadirDetalleEditar = () => {
     if (!formEditar) return;
     setFormEditar((prev) => ({
@@ -362,7 +365,6 @@ export const Produccion = () => {
       ],
     }));
   };
-
   const eliminarDetalleEditar = (index) => {
     if (!formEditar || formEditar.detalle.length <= 1) return;
     setFormEditar((prev) => ({
@@ -370,7 +372,6 @@ export const Produccion = () => {
       detalle: prev.detalle.filter((_, i) => i !== index),
     }));
   };
-
   const actualizarDetalleEditar = (index, campo, valor) => {
     setFormEditar((prev) => {
       if (!prev) return prev;
@@ -401,7 +402,6 @@ export const Produccion = () => {
   // ─── ACTUALIZAR PEDIDO A "TERMINADO" ─────────────────────────
   const actualizarPedidoATerminado = async (pedidoId) => {
     try {
-      console.log("🔄 Actualizando pedido:", pedidoId, "a terminado");
       await updatePedidoCliente(pedidoId, { Estado: "terminado" });
       toast.success(`✅ Pedido #${getShortId(pedidoId)} actualizado a "terminado"`);
     } catch (err) {
@@ -413,33 +413,27 @@ export const Produccion = () => {
   // ─── ALERTAS CONFIRMACIÓN ────────────────────────────────────
   const confirmDelete = async (idProduccion) => {
     if (!window.confirm("¿Está seguro de eliminar esta producción? Esta acción no se puede deshacer.")) return;
-
     try {
       await produccionService.deleteProduccion(idProduccion);
-      setProducciones((prev) => prev.filter((p) => p.ProduccionId !== idProduccion));
+      setAllData(prev => prev.filter(p => p.ProduccionId !== idProduccion));
       toast.success("Producción eliminada exitosamente");
     } catch (err) {
       toast.error("Error al eliminar producción: " + err.message);
     }
   };
-
   const confirmToggleEstado = async (idProduccion, nuevoEstado) => {
     if (!window.confirm(`¿Está seguro de cambiar el estado a "${nuevoEstado}"?`)) return;
-
     try {
-      const produccionActual = producciones.find(p => p.ProduccionId === idProduccion);
+      const produccionActual = allData.find(p => p.ProduccionId === idProduccion);
       const eraFinalizado = produccionActual?.Estado === "Finalizado";
       const seraFinalizado = nuevoEstado === "Finalizado";
-
       await produccionService.updateProduccion(idProduccion, { Estado: nuevoEstado });
-      setProducciones((prev) =>
-        prev.map((p) => (p.ProduccionId === idProduccion ? { ...p, Estado: nuevoEstado } : p))
+      setAllData(prev =>
+        prev.map(p => (p.ProduccionId === idProduccion ? { ...p, Estado: nuevoEstado } : p))
       );
-
       if (seraFinalizado && !eraFinalizado && produccionActual?.PedidoClienteId) {
         await actualizarPedidoATerminado(produccionActual.PedidoClienteId);
       }
-
       toast.success(`Estado actualizado a "${nuevoEstado}"`);
     } catch (err) {
       toast.error("Error al actualizar estado: " + err.message);
@@ -448,42 +442,23 @@ export const Produccion = () => {
 
   // ─── CRUD - CREAR ────────────────────────────────────────────
   const handleCreate = async () => {
-    console.log(" Iniciando creación de producción...");
-
     const errores = validarFormulario(formCrear, detallesCrear);
     if (Object.keys(errores).length) {
       setErrores(errores);
       toast.error("Por favor corrige los errores antes de continuar");
       return;
     }
-
     if (!window.confirm("¿Está seguro de crear esta producción?")) return;
-
     setLoading(true);
     try {
       const detallesLimpios = detallesCrear
-        .map((d) => ({
-          InsumoId: d.InsumoId.trim(),
-          CantidadUsada: Number(d.CantidadUsada),
-        }))
+        .map((d) => ({ InsumoId: d.InsumoId.trim(), CantidadUsada: Number(d.CantidadUsada) }))
         .filter((d) => d.InsumoId);
-
-      console.log("📤 Datos a enviar para CREAR:", {
-        ...formCrear,
-        detalle: detallesLimpios,
-      });
-
-      // Tu servicio createProduccion espera { detalle: [], ...otrosCampos }
       const resultado = await produccionService.createProduccion({
         ...formCrear,
         detalle: detallesLimpios,
       });
-
-      console.log("✅ Producción creada:", resultado);
-
       toast.success("Producción creada exitosamente");
-
-      // Resetear formulario
       setFormCrear({
         PedidoClienteId: "",
         Estado: "En Proceso",
@@ -492,15 +467,13 @@ export const Produccion = () => {
       });
       setDetallesCrear([{ _tempId: crypto.randomUUID(), InsumoId: "", CantidadUsada: 1 }]);
       setErrores({});
-
-      // Ir a la vista de la producción creada
-      if (resultado && resultado.ProduccionId) {
+      if (resultado?.ProduccionId) {
         navigate(`/dashboard/produccion/${resultado.ProduccionId}`);
       } else {
         goToBackToList();
       }
     } catch (err) {
-      console.error(" Error al crear producción:", err);
+      console.error("Error al crear producción:", err);
       toast.error("Error al crear producción: " + (err.response?.data?.message || err.message || "Error desconocido"));
     } finally {
       setLoading(false);
@@ -509,30 +482,23 @@ export const Produccion = () => {
 
   // ─── CRUD - EDITAR ───────────────────────────────────────────
   const handleEdit = async () => {
-    console.log(" Iniciando edición de producción...");
-
     if (!formEditar) {
       toast.error("No hay datos para editar");
       return;
     }
-
     const errores = validarFormulario(formEditar, formEditar.detalle);
     if (Object.keys(errores).length) {
       setErrores(errores);
       toast.error("Por favor corrige los errores antes de continuar");
       return;
     }
-
     if (!window.confirm("¿Está seguro de guardar los cambios?")) return;
-
     setLoading(true);
     try {
-      // Obtener estado anterior para verificar si se finalizó
-      const produccionAnterior = producciones.find(p => p.ProduccionId === id);
+      const produccionAnterior = allData.find(p => p.ProduccionId === id);
       const eraFinalizada = produccionAnterior?.Estado === "Finalizado";
       const seraFinalizada = formEditar.Estado === "Finalizado";
 
-      // Datos para actualizar la producción principal
       const produccionData = {
         PedidoClienteId: formEditar.PedidoClienteId,
         Estado: formEditar.Estado,
@@ -540,44 +506,29 @@ export const Produccion = () => {
         FechaFin: formEditar.FechaFin || null,
       };
 
-      // Preparar detalles (sin los campos temporales)
       const detallesLimpios = formEditar.detalle
         .map((d) => ({
-          // DetalleProduccionId puede ser undefined para nuevos detalles
           DetalleProduccionId: d.DetalleProduccionId,
           InsumoId: d.InsumoId.trim(),
           CantidadUsada: Number(d.CantidadUsada),
         }))
         .filter((d) => d.InsumoId);
 
-      console.log("📤 Datos a enviar para EDITAR:", {
-        produccionId: formEditar.ProduccionId,
-        produccionData,
-        detallesLimpios,
-      });
-
-      // Usar updateProduccionConDetalles que maneja producción + detalles
       await produccionService.updateProduccionConDetalles(
         formEditar.ProduccionId,
         produccionData,
         detallesLimpios
       );
 
-      // Si se finaliza la producción y no estaba finalizada antes
       if (seraFinalizada && !eraFinalizada) {
         await actualizarPedidoATerminado(formEditar.PedidoClienteId);
       }
-
       toast.success("Producción actualizada exitosamente");
-
-      // Actualizar la lista de producciones
       await fetchProducciones();
-
-      // Ir a la vista de la producción editada
       navigate(`/dashboard/produccion/${id}`);
     } catch (err) {
-      console.error("❌ Error al editar producción:", err);
-      toast.error("Error al editar producción: " + (err.response?.data?.message || err.message || "Error desconocido"));
+      console.error("Error al editar producción:", err);
+      toast.error("Error al editar producción: " + (err.message || "Error desconocido"));
     } finally {
       setLoading(false);
     }
@@ -589,16 +540,13 @@ export const Produccion = () => {
 
   const getFilteredAndPaginatedData = (data, term) => {
     const filtered = data.filter((item) =>
-      Object.values(item).some((val) =>
-        String(val).toLowerCase().includes(term.toLowerCase())
-      )
+      Object.values(item).some((val) => String(val).toLowerCase().includes(term.toLowerCase()))
     );
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginated = filtered.slice(startIndex, startIndex + itemsPerPage);
+    const startIndex = (currentPageSelect - 1) * itemsPerPageSelect;
+    const paginated = filtered.slice(startIndex, startIndex + itemsPerPageSelect);
     return { filtered, paginated, total: filtered.length };
   };
 
-  // ─── OBTENER NOMBRE DE INSUMO ────────────────────────────────
   const getNombreInsumo = (insumoId) => {
     const insumo = insumos.find(i => i.InsumoId === insumoId);
     return insumo ? insumo.Nombre : `Insumo #${getShortId(insumoId)}`;
@@ -607,8 +555,7 @@ export const Produccion = () => {
   // ─── RENDER: SELECCIÓN DE PEDIDO ─────────────────────────────
   if (isSelectPedidoMode) {
     const { filtered: pedidosFiltrados, paginated: pedidosPaginados, total } = getFilteredAndPaginatedData(pedidos, searchTerm);
-    const totalPages = Math.ceil(total / itemsPerPage);
-
+    const totalPages = Math.ceil(total / itemsPerPageSelect);
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
         <div className="max-w-4xl mx-auto">
@@ -618,7 +565,6 @@ export const Produccion = () => {
             </button>
             <h2 className="text-2xl font-bold text-slate-800">Seleccionar Pedido</h2>
           </div>
-
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
@@ -627,12 +573,11 @@ export const Produccion = () => {
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
-                setCurrentPage(1);
+                setCurrentPageSelect(1);
               }}
               className="w-full pl-10 pr-4 py-3 border rounded-lg"
             />
           </div>
-
           <div className="bg-white rounded-xl shadow-sm border divide-y max-h-[500px] overflow-auto">
             {pedidosPaginados.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
@@ -657,21 +602,20 @@ export const Produccion = () => {
               ))
             )}
           </div>
-
           {totalPages > 1 && (
             <div className="flex justify-center mt-4 gap-2">
               <button
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className={`px-3 py-1 rounded ${currentPage === 1 ? "text-gray-400" : "text-blue-600 hover:bg-blue-50"}`}
+                onClick={() => setCurrentPageSelect((prev) => Math.max(1, prev - 1))}
+                disabled={currentPageSelect === 1}
+                className={`px-3 py-1 rounded ${currentPageSelect === 1 ? "text-gray-400" : "text-blue-600 hover:bg-blue-50"}`}
               >
                 Anterior
               </button>
-              <span className="px-3 py-1 text-gray-600">Página {currentPage} de {totalPages}</span>
+              <span className="px-3 py-1 text-gray-600">Página {currentPageSelect} de {totalPages}</span>
               <button
-                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className={`px-3 py-1 rounded ${currentPage === totalPages ? "text-gray-400" : "text-blue-600 hover:bg-blue-50"}`}
+                onClick={() => setCurrentPageSelect((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPageSelect === totalPages}
+                className={`px-3 py-1 rounded ${currentPageSelect === totalPages ? "text-gray-400" : "text-blue-600 hover:bg-blue-50"}`}
               >
                 Siguiente
               </button>
@@ -686,8 +630,7 @@ export const Produccion = () => {
   // ─── RENDER: SELECCIÓN DE INSUMO ─────────────────────────────
   if (isSelectInsumoMode) {
     const { filtered: insumosFiltrados, paginated: insumosPaginados, total } = getFilteredAndPaginatedData(insumos, searchTerm);
-    const totalPages = Math.ceil(total / itemsPerPage);
-
+    const totalPages = Math.ceil(total / itemsPerPageSelect);
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
         <div className="max-w-4xl mx-auto">
@@ -697,7 +640,6 @@ export const Produccion = () => {
             </button>
             <h2 className="text-2xl font-bold text-slate-800">Seleccionar Insumo</h2>
           </div>
-
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
@@ -706,12 +648,11 @@ export const Produccion = () => {
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
-                setCurrentPage(1);
+                setCurrentPageSelect(1);
               }}
               className="w-full pl-10 pr-4 py-3 border rounded-lg"
             />
           </div>
-
           <div className="bg-white rounded-xl shadow-sm border divide-y max-h-[500px] overflow-auto">
             {insumosPaginados.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
@@ -736,21 +677,20 @@ export const Produccion = () => {
               ))
             )}
           </div>
-
           {totalPages > 1 && (
             <div className="flex justify-center mt-4 gap-2">
               <button
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className={`px-3 py-1 rounded ${currentPage === 1 ? "text-gray-400" : "text-blue-600 hover:bg-blue-50"}`}
+                onClick={() => setCurrentPageSelect((prev) => Math.max(1, prev - 1))}
+                disabled={currentPageSelect === 1}
+                className={`px-3 py-1 rounded ${currentPageSelect === 1 ? "text-gray-400" : "text-blue-600 hover:bg-blue-50"}`}
               >
                 Anterior
               </button>
-              <span className="px-3 py-1 text-gray-600">Página {currentPage} de {totalPages}</span>
+              <span className="px-3 py-1 text-gray-600">Página {currentPageSelect} de {totalPages}</span>
               <button
-                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className={`px-3 py-1 rounded ${currentPage === totalPages ? "text-gray-400" : "text-blue-600 hover:bg-blue-50"}`}
+                onClick={() => setCurrentPageSelect((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPageSelect === totalPages}
+                className={`px-3 py-1 rounded ${currentPageSelect === totalPages ? "text-gray-400" : "text-blue-600 hover:bg-blue-50"}`}
               >
                 Siguiente
               </button>
@@ -768,7 +708,6 @@ export const Produccion = () => {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Producción</h1>
-
           <div className="bg-white rounded-xl shadow-sm border p-6 mb-6 flex flex-col sm:flex-row gap-4 items-center">
             <button
               onClick={goToCreate}
@@ -776,7 +715,6 @@ export const Produccion = () => {
             >
               <Plus size={18} /> Nueva producción
             </button>
-
             <div className="flex-1 max-w-md">
               <div className="relative">
                 <input
@@ -789,7 +727,6 @@ export const Produccion = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               </div>
             </div>
-
             <div className="w-full sm:w-auto">
               <select
                 value={filtroCampo}
@@ -805,83 +742,94 @@ export const Produccion = () => {
               </select>
             </div>
           </div>
-
           <div className="bg-white rounded-xl shadow-sm border overflow-auto">
             {loading ? (
               <div className="p-8 text-center">
                 <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
               </div>
             ) : (
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-800 sticky top-0">
-                  <tr>
-                    <th className="px-4 py-3 text-white text-left">ID Producción</th>
-                    <th className="px-4 py-3 text-white text-left">Pedido ID</th>
-                    <th className="px-4 py-3 text-white text-left">Fecha Inicio</th>
-                    <th className="px-4 py-3 text-white text-left">Fecha Fin</th>
-                    <th className="px-4 py-3 text-white text-left">Estado</th>
-                    <th className="px-4 py-3 text-white text-left">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {produccionesFiltradas.length === 0 ? (
+              <>
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-800 sticky top-0">
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-gray-500">
-                        {producciones.length === 0
-                          ? "No hay producciones registradas."
-                          : filtroText
+                      <th className="px-4 py-3 text-white text-left">ID Producción</th>
+                      <th className="px-4 py-3 text-white text-left">Pedido ID</th>
+                      <th className="px-4 py-3 text-white text-left">Fecha Inicio</th>
+                      <th className="px-4 py-3 text-white text-left">Fecha Fin</th>
+                      <th className="px-4 py-3 text-white text-left">Estado</th>
+                      <th className="px-4 py-3 text-white text-left">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {paginatedData.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-gray-500">
+                          {allData.length === 0
+                            ? "No hay producciones registradas."
+                            : filtroText
                             ? `No se encontraron producciones con "${filtroText}"`
                             : "No hay resultados"}
-                      </td>
-                    </tr>
-                  ) : (
-                    produccionesFiltradas.map((p) => (
-                      <tr key={p.ProduccionId} className="hover:bg-slate-50">
-                        <td className="py-4 px-4">#{getShortId(p.ProduccionId)}</td>
-                        <td className="py-4 px-4">#{getShortId(p.PedidoClienteId)}</td>
-                        <td className="py-4 px-4">{formatDate(p.FechaInicio)}</td>
-                        <td className="py-4 px-4">{formatDate(p.FechaFin)}</td>
-                        <td className="py-4 px-4">
-                          <button
-                            onClick={() => confirmToggleEstado(
-                              p.ProduccionId,
-                              p.Estado === "En Proceso" ? "Finalizado" : "En Proceso"
-                            )}
-                            className={`px-3 py-1 rounded-full text-xs font-medium ${getEstadoColor(p.Estado)} hover:opacity-80 transition-opacity`}
-                          >
-                            {p.Estado}
-                          </button>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="flex gap-3">
-                            <button
-                              onClick={() => goToView(p.ProduccionId)}
-                              className="p-1 hover:bg-emerald-50 rounded"
-                              title="Ver detalles"
-                            >
-                              <Eye size={16} className="text-emerald-600" />
-                            </button>
-                            <button
-                              onClick={() => goToEdit(p.ProduccionId)}
-                              className="p-1 hover:bg-blue-50 rounded"
-                              title="Editar"
-                            >
-                              <Edit size={16} className="text-blue-600" />
-                            </button>
-                            <button
-                              onClick={() => confirmDelete(p.ProduccionId)}
-                              className="p-1 hover:bg-red-50 rounded"
-                              title="Eliminar"
-                            >
-                              <Trash2 size={16} className="text-red-600" />
-                            </button>
-                          </div>
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      paginatedData.map((p) => (
+                        <tr key={p.ProduccionId} className="hover:bg-slate-50">
+                          <td className="py-4 px-4">#{getShortId(p.ProduccionId)}</td>
+                          <td className="py-4 px-4">#{getShortId(p.PedidoClienteId)}</td>
+                          <td className="py-4 px-4">{formatDate(p.FechaInicio)}</td>
+                          <td className="py-4 px-4">{formatDate(p.FechaFin)}</td>
+                          <td className="py-4 px-4">
+                            <button
+                              onClick={() => confirmToggleEstado(
+                                p.ProduccionId,
+                                p.Estado === "En Proceso" ? "Finalizado" : "En Proceso"
+                              )}
+                              className={`px-3 py-1 rounded-full text-xs font-medium ${getEstadoColor(p.Estado)} hover:opacity-80 transition-opacity`}
+                            >
+                              {p.Estado}
+                            </button>
+                          </td>
+                          <td className="py-4 px-4">
+                            <div className="flex gap-3">
+                              <button
+                                onClick={() => goToView(p.ProduccionId)}
+                                className="p-1 hover:bg-emerald-50 rounded"
+                                title="Ver detalles"
+                              >
+                                <Eye size={16} className="text-emerald-600" />
+                              </button>
+                              <button
+                                onClick={() => goToEdit(p.ProduccionId)}
+                                className="p-1 hover:bg-blue-50 rounded"
+                                title="Editar"
+                              >
+                                <Edit size={16} className="text-blue-600" />
+                              </button>
+                              <button
+                                onClick={() => confirmDelete(p.ProduccionId)}
+                                className="p-1 hover:bg-red-50 rounded"
+                                title="Eliminar"
+                              >
+                                <Trash2 size={16} className="text-red-600" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+                {allData.length > 0 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={totalItems}
+                    onItemsPerPageChange={setItemsPerPage}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
@@ -901,14 +849,12 @@ export const Produccion = () => {
             </button>
             <h3 className="text-lg font-bold">Nueva producción</h3>
           </div>
-
           <div className="bg-white rounded-xl shadow-sm border p-6">
             {errores.detalles && (
               <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-4">
                 {errores.detalles}
               </div>
             )}
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Pedido Cliente *</label>
@@ -924,7 +870,6 @@ export const Produccion = () => {
                 </button>
                 {errores.pedido && <span className="text-red-500 text-xs">{errores.pedido}</span>}
               </div>
-
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Estado</label>
                 <select
@@ -936,7 +881,6 @@ export const Produccion = () => {
                   <option value="Finalizado">Finalizado</option>
                 </select>
               </div>
-
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Fecha Inicio *</label>
                 <input
@@ -947,7 +891,6 @@ export const Produccion = () => {
                 />
                 {errores.fechaInicio && <span className="text-red-500 text-xs">{errores.fechaInicio}</span>}
               </div>
-
               <div className="flex flex-col gap-2">
                 <label className="font-medium">Fecha Fin (opcional)</label>
                 <input
@@ -958,7 +901,6 @@ export const Produccion = () => {
                 />
               </div>
             </div>
-
             <div className="mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h4 className="font-semibold">Insumos utilizados *</h4>
@@ -966,7 +908,6 @@ export const Produccion = () => {
                   <Plus size={15} /> Añadir insumo
                 </button>
               </div>
-
               <div className="grid grid-cols-1 gap-4">
                 {detallesCrear.map((d, index) => (
                   <div key={d._tempId} className="grid grid-cols-1 md:grid-cols-3 gap-3 border p-3 rounded">
@@ -984,7 +925,6 @@ export const Produccion = () => {
                       </button>
                       {errores[`insumo-${index}`] && <span className="text-red-500 text-xs">{errores[`insumo-${index}`]}</span>}
                     </div>
-
                     <div className="flex flex-col gap-2">
                       <label>Cantidad *</label>
                       <input
@@ -997,7 +937,6 @@ export const Produccion = () => {
                       />
                       {errores[`cantidad-${index}`] && <span className="text-red-500 text-xs">{errores[`cantidad-${index}`]}</span>}
                     </div>
-
                     <div className="flex items-end">
                       {detallesCrear.length > 1 && (
                         <button
@@ -1012,7 +951,6 @@ export const Produccion = () => {
                 ))}
               </div>
             </div>
-
             <div className="flex gap-4 mt-6">
               <button
                 onClick={handleCreate}
@@ -1030,7 +968,6 @@ export const Produccion = () => {
                   </>
                 )}
               </button>
-
               <button
                 onClick={goToBackToList}
                 disabled={loading}
@@ -1046,7 +983,7 @@ export const Produccion = () => {
     );
   }
 
-  // ─── RENDER: VER (SOLO LECTURA) ──────────────────────────────
+  // ─── RENDER: VER ─────────────────────────────────────────────
   if (mode === "view") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
@@ -1057,7 +994,6 @@ export const Produccion = () => {
             </button>
             <h3 className="text-lg font-bold">Producción #{getShortId(id)}</h3>
           </div>
-
           <div className="bg-white rounded-xl shadow-sm border p-6">
             {loading ? (
               <div className="p-8 text-center">
@@ -1066,42 +1002,34 @@ export const Produccion = () => {
               </div>
             ) : produccionDetalle ? (
               <div className="space-y-6">
-                {/* Información principal */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="text-sm text-gray-500">Producción ID</div>
                     <div className="font-bold">#{getShortId(produccionDetalle.ProduccionId)}</div>
                   </div>
-
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="text-sm text-gray-500">Pedido ID</div>
                     <div className="font-bold">#{getShortId(produccionDetalle.PedidoClienteId)}</div>
                   </div>
-
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="text-sm text-gray-500">Estado</div>
                     <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEstadoColor(produccionDetalle.Estado)}`}>
                       {produccionDetalle.Estado}
                     </div>
                   </div>
-
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="text-sm text-gray-500">Fecha Inicio</div>
                     <div className="font-bold">{formatDate(produccionDetalle.FechaInicio)}</div>
                   </div>
-
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="text-sm text-gray-500">Fecha Fin</div>
                     <div className="font-bold">{formatDate(produccionDetalle.FechaFin)}</div>
                   </div>
-
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="text-sm text-gray-500">Total Insumos</div>
                     <div className="font-bold">{produccionDetalle.detalle?.length || 0}</div>
                   </div>
                 </div>
-
-                {/* Insumos utilizados */}
                 {produccionDetalle.detalle?.length > 0 ? (
                   <div>
                     <h4 className="font-semibold mb-4">Insumos utilizados</h4>
@@ -1125,11 +1053,9 @@ export const Produccion = () => {
                                   <div className="text-xs text-gray-500 mt-1">{d.InsumoInfo.Descripcion}</div>
                                 )}
                               </td>
-
                               <td className="py-3 px-4">
                                 <span className="font-semibold">{d.CantidadUsada}</span> unidades
                               </td>
-
                               <td className="py-3 px-4">
                                 {d.InsumoInfo?.Categoria || "Sin categoría"}
                               </td>
@@ -1144,8 +1070,6 @@ export const Produccion = () => {
                     <p className="text-yellow-700">No hay insumos registrados para esta producción.</p>
                   </div>
                 )}
-
-                {/* Solo botón para volver a la lista */}
                 <div className="pt-4 border-t">
                   <button
                     onClick={goToBackToList}
@@ -1184,7 +1108,6 @@ export const Produccion = () => {
             </button>
             <h3 className="text-lg font-bold">Editar producción #{getShortId(id)}</h3>
           </div>
-
           <div className="bg-white rounded-xl shadow-sm border p-6">
             {loading && !formEditar ? (
               <div className="p-8 text-center">
@@ -1198,7 +1121,6 @@ export const Produccion = () => {
                     {errores.detalles}
                   </div>
                 )}
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div className="flex flex-col gap-2">
                     <label className="font-medium">Pedido Cliente *</label>
@@ -1214,7 +1136,6 @@ export const Produccion = () => {
                     </button>
                     {errores.pedido && <span className="text-red-500 text-xs">{errores.pedido}</span>}
                   </div>
-
                   <div className="flex flex-col gap-2">
                     <label className="font-medium">Estado</label>
                     <select
@@ -1230,7 +1151,6 @@ export const Produccion = () => {
                         "Al marcar como Finalizado, el pedido asociado se actualizará a 'terminado'"}
                     </div>
                   </div>
-
                   <div className="flex flex-col gap-2">
                     <label className="font-medium">Fecha Inicio *</label>
                     <input
@@ -1241,7 +1161,6 @@ export const Produccion = () => {
                     />
                     {errores.fechaInicio && <span className="text-red-500 text-xs">{errores.fechaInicio}</span>}
                   </div>
-
                   <div className="flex flex-col gap-2">
                     <label className="font-medium">Fecha Fin (opcional)</label>
                     <input
@@ -1252,7 +1171,6 @@ export const Produccion = () => {
                     />
                   </div>
                 </div>
-
                 <div className="mb-6">
                   <div className="flex justify-between items-center mb-4">
                     <h4 className="font-semibold">Insumos utilizados *</h4>
@@ -1260,7 +1178,6 @@ export const Produccion = () => {
                       <Plus size={15} /> Añadir insumo
                     </button>
                   </div>
-
                   <div className="grid grid-cols-1 gap-4">
                     {formEditar.detalle.map((d, index) => (
                       <div key={d._tempId} className="grid grid-cols-1 md:grid-cols-3 gap-3 border p-3 rounded">
@@ -1278,7 +1195,6 @@ export const Produccion = () => {
                           </button>
                           {errores[`insumo-${index}`] && <span className="text-red-500 text-xs">{errores[`insumo-${index}`]}</span>}
                         </div>
-
                         <div className="flex flex-col gap-2">
                           <label>Cantidad *</label>
                           <input
@@ -1291,7 +1207,6 @@ export const Produccion = () => {
                           />
                           {errores[`cantidad-${index}`] && <span className="text-red-500 text-xs">{errores[`cantidad-${index}`]}</span>}
                         </div>
-
                         <div className="flex items-end">
                           {formEditar.detalle.length > 1 && (
                             <button
@@ -1306,7 +1221,6 @@ export const Produccion = () => {
                     ))}
                   </div>
                 </div>
-
                 <div className="flex gap-4 mt-6">
                   <button
                     onClick={handleEdit}
@@ -1324,7 +1238,6 @@ export const Produccion = () => {
                       </>
                     )}
                   </button>
-
                   <button
                     onClick={() => navigate(`/dashboard/produccion/${id}`)}
                     disabled={loading}

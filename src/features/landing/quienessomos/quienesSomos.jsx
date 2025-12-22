@@ -2,6 +2,7 @@
 import { Briefcase } from "lucide-react";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer"
+import { History, Target, Eye } from "lucide-react";
 
 export const QuienesSomos = () => {
     return (
@@ -124,60 +125,46 @@ export const QuienesSomos = () => {
                 </h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                    <img 
-                    src="/multimedia/experiencia-1.png" 
-                    alt="experiencia 1" 
-                    className="w-full h-64 object-cover rounded-lg shadow-lg transition-transform duration-500 hover:scale-105"
+                    <img
+                        src="/multimedia/experiencia-1.png"
+                        alt="experiencia 1"
+                        className="w-full h-64 object-cover rounded-lg shadow-lg transition-transform duration-500 hover:scale-105"
                     />
 
-                    <img 
-                    src="/multimedia/experiencia-2.jpg" 
-                    alt="experiencia 2" 
-                    className="w-full h-64 object-cover rounded-lg shadow-lg transition-transform duration-500 hover:scale-105"
+                    <img
+                        src="/multimedia/experiencia-2.jpg"
+                        alt="experiencia 2"
+                        className="w-full h-64 object-cover rounded-lg shadow-lg transition-transform duration-500 hover:scale-105"
                     />
 
-                    <img 
-                    src="/multimedia/experiencia-3.jpeg" 
-                    alt="experiencia 3" 
-                    className="w-full h-64 object-cover rounded-lg shadow-lg transition-transform duration-500 hover:scale-105"
+                    <img
+                        src="/multimedia/experiencia-3.jpeg"
+                        alt="experiencia 3"
+                        className="w-full h-64 object-cover rounded-lg shadow-lg transition-transform duration-500 hover:scale-105"
                     />
 
-                    <img 
-                    src="/multimedia/experiencia-4.jpeg" 
-                    alt="experiencia 4" 
-                    className="w-full h-64 object-cover rounded-lg shadow-lg transition-transform duration-500 hover:scale-105"
-                     />
+                    <img
+                        src="/multimedia/experiencia-4.jpeg"
+                        alt="experiencia 4"
+                        className="w-full h-64 object-cover rounded-lg shadow-lg transition-transform duration-500 hover:scale-105"
+                    />
 
                 </div>
-                
+
             </section>
 
 
-            <section className="w-full bg-grey py-16 px-8 lg:px-20">
+            <section className="w-full bg-gray-100 py-16 px-8 lg:px-20">
                 <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
-                    Conocenos un poco mas
+                    Conócenos un poco más
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+                    {/* Historia */}
                     <div className="bg-white p-6 rounded-2xl shadow hover:shadow-lg transition">
                         <div className="flex justify-center mb-4">
-                            <svg
-                                className="w-12 h-12 text-pink-600"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                                viewBox="0 0 24 24"
-
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M12 4v16m8-8H4"
-                                />
-                            </svg>
+                            <History className="w-12 h-12 text-pink-600" />
                         </div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                            HISTORIA
-                        </h3>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">HISTORIA</h3>
                         <p className="text-gray-600">
                             Design and Style es una microempresa de litografía ubicada en Itagüí, con más de 4 años en
                             el mercado. Ofrece servicios de impresión en papel, gran formato y personalización de productos
@@ -187,65 +174,39 @@ export const QuienesSomos = () => {
                         </p>
                     </div>
 
+                    {/* Misión */}
                     <div className="bg-white p-6 rounded-2xl shadow hover:shadow-lg transition">
                         <div className="flex justify-center mb-4">
-                            <svg
-                                className="w-12 h-12 text-pink-600"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M12 4v16m8-8H4"
-                                />
-                            </svg>
+                            <Target className="w-12 h-12 text-pink-600" />
                         </div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                            MISION
-                        </h3>
-                        <p className="text-gray-900">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">MISIÓN</h3>
+                        <p className="text-gray-600">
                             En Design and Style nos dedicamos a ofrecer soluciones de impresión y personalización de alta calidad,
                             adaptadas a las necesidades tanto de clientes individuales como corporativos. Nuestro compromiso es brindar
                             una experiencia ágil, moderna y cercana, utilizando herramientas digitales para facilitar y garantizar resultados visuales
                             que superen las expectativas.
-
                             <span className="font-semibold">Confianza</span>
                         </p>
                     </div>
 
+                    {/* Visión */}
                     <div className="bg-white p-6 rounded-2xl shadow hover:shadow-lg transition">
                         <div className="flex justify-center mb-4">
-                            <svg
-                                className="w-12 h-12 text-pink-600"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M12 4v16m8-8H4"
-                                />
-                            </svg>
+                            <Eye className="w-12 h-12 text-pink-600" />
                         </div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                            VISION
-                        </h3>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">VISIÓN</h3>
                         <p className="text-gray-600">
                             Aspiramos a consolidarnos como una empresa líder en servicios de impresión personalizada
                             de Medellín, reconocida por su innovación, eficiencia y enfoque centrado en el cliente. Buscamos evolucionar continuamente, integrando nuevas tecnologías,
                             nuestros canales de atención y métodos de pago, para ofrecer soluciones
                             efectivas que fortalezcan la identidad visual de nuestros clientes.
-
                         </p>
                     </div>
                 </div>
-
             </section>
+
+
+
 
             <Footer />
         </>

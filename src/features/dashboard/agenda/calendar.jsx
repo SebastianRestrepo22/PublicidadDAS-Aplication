@@ -1,3 +1,4 @@
+// src/features/dashboard/agenda/calendar.jsx
 import React from "react";
 
 export default function Calendar({
@@ -7,8 +8,8 @@ export default function Calendar({
   getAppointmentsForDate,
 }) {
   const monthNames = [
-    "Enero","Febrero","Marzo","Abril","Mayo","Junio",
-    "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
   ];
 
   const year = selectedDate.getFullYear();
@@ -18,7 +19,7 @@ export default function Calendar({
   const lastDayOfMonth = new Date(year, month + 1, 0);
 
   const daysInMonth = [];
-  const startDay = firstDayOfMonth.getDay();
+  const startDay = firstDayOfMonth.getDay(); // 0 = domingo
   const totalDays = lastDayOfMonth.getDate();
 
   for (let i = 0; i < startDay; i++) daysInMonth.push(null);
@@ -48,7 +49,7 @@ export default function Calendar({
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center font-semibold">
+      <div className="grid grid-cols-7 gap-1 text-center font-semibold text-gray-600">
         <div>D</div><div>L</div><div>M</div><div>M</div>
         <div>J</div><div>V</div><div>S</div>
       </div>
@@ -58,24 +59,37 @@ export default function Calendar({
           if (day === null) return <div key={idx} className="p-2"></div>;
 
           const isSelected = day.toDateString() === selectedDate.toDateString();
-          const appointmentsForDay =
-            getAppointmentsForDate ? getAppointmentsForDate(day) : [];
+          const appointmentsForDay = getAppointmentsForDate ? getAppointmentsForDate(day) : [];
 
           return (
             <div
               key={idx}
               onClick={() => onDateSelect(day)}
-              className={`p-2 rounded cursor-pointer hover:bg-gray-100
-                ${appointmentsForDay.length > 0 ? "bg-red-200" : ""}
-                ${isSelected ? "bg-blue-500 text-white hover:bg-blue-600" : ""}
+              className={`p-2 rounded cursor-pointer relative
+                ${isSelected 
+                  ? "bg-blue-600 text-white" 
+                  : appointmentsForDay.length > 0 
+                    ? "bg-red-50 hover:bg-red-100" 
+                    : "hover:bg-gray-100"}
               `}
             >
-              <div>{day.getDate()}</div>
+              <div className="font-medium">{day.getDate()}</div>
 
+              {/* Mostrar descripciones breves de las citas */}
               {appointmentsForDay.length > 0 && (
-                <div className="text-xs text-gray-500">
-                  {appointmentsForDay.length} cita
-                  {appointmentsForDay.length > 1 ? "s" : ""}
+                <div className="mt-1 space-y-1 max-h-24 overflow-y-auto">
+                  {appointmentsForDay.map((apt, i) => (
+                    <div
+                      key={i}
+                      className={`text-xs px-1 py-0.5 rounded truncate
+                        ${isSelected ? "bg-white text-blue-800" : "bg-red-100 text-red-800"}
+                      `}
+                      title={apt.descripcion || "Sin descripción"}
+                    >
+                      {apt.descripcion?.slice(0, 20) || "Cita"}
+                      {apt.descripcion && apt.descripcion.length > 20 ? "…" : ""}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

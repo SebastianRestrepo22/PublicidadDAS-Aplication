@@ -1,7 +1,10 @@
+// src/features/dashboard/agenda/Agenda.jsx
 import React, { useState, useEffect } from "react";
 import Calendar from "./calendar";
 import CitaForm from "./cita-form";
 import CitaList from "./cita-list";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 export default function Agenda() {
   const [appointments, setAppointments] = useState([]);
@@ -9,70 +12,126 @@ export default function Agenda() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [viewMode, setViewMode] = useState("calendar");
+  const [loading, setLoading] = useState(true);
 
-  // 🔵 Cargar citas desde backend (CORREGIDO: /api/cita)
+  const fetchAppointments = async () => {
+    try {
+      const res = await fetch("http://localhost:3000/api/cita");
+      if (!res.ok) throw new Error("Error al cargar citas");
+      const data = await res.json();
+      const formatted = data.map((apt) => ({
+        ...apt,
+        id: apt.citaId, // 🔑 Corrección crítica
+        date: new Date(apt.date),
+      }));
+      setAppointments(formatted);
+    } catch (err) {
+      toast.error("Error al cargar citas:", err);
+      toast.error("No se pudieron cargar las citas.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetch("http://localhost:3000/api/cita")
-      .then((res) => res.json())
-      .then((data) => {
-        const formatted = data.map((apt) => ({
-          ...apt,
-          date: new Date(apt.date),
-        }));
-        setAppointments(formatted);
-      })
-      .catch((err) => console.error("Error al cargar citas:", err));
+    fetchAppointments();
   }, []);
 
-  // 🔵 Crear cita (CORREGIDO: /api/cita)
   const handleCreateAppointment = async (appointmentData) => {
+    // Normalizar time a HH:mm si no tiene segundos
+    const time = appointmentData.time.length === 5
+      ? `${appointmentData.time}:00`
+      : appointmentData.time;
+
     const formatted = {
       ...appointmentData,
-      date: appointmentData.date.toISOString().split("T")[0],
+      date: appointmentData.date.toISOString().split("T")[0], // YYYY-MM-DD
+      time,
     };
 
-    const res = await fetch("http://localhost:3000/api/cita", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formatted),
-    });
-
-    if (!res.ok) {
-      alert("Ya existe una cita en esa fecha y hora");
-      return;
-    }
-
-    window.location.reload();
-  };
-
-  // 🔵 Actualizar cita (CORREGIDO: /api/cita/:id)
-  const handleUpdateAppointment = async (appointmentData) => {
-    const formatted = {
-      ...appointmentData,
-      date: appointmentData.date.toISOString().split("T")[0],
-    };
-
-    const res = await fetch(
-      `http://localhost:3000/api/cita/${editingAppointment.id}`,
-      {
-        method: "PUT",
+    try {
+      const res = await fetch("http://localhost:3000/api/cita", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formatted),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        toast.error(errorData.message || "Ya existe una cita en esa fecha y hora");
+        return;
       }
-    );
 
-    if (!res.ok) {
-      alert("Ya existe otra cita en esa fecha y hora");
-      return;
+      toast.success("Cita creada exitosamente");
+      setIsFormOpen(false);
+      setEditingAppointment(null);
+      fetchAppointments();
+    } catch (err) {
+      console.error("Error al crear cita:", err);
+      toast.error("Error inesperado al crear la cita.");
     }
-
-    window.location.reload();
   };
 
-  // 🔵 Eliminar cita (CORREGIDO: /api/cita/:id)
+  const handleUpdateAppointment = async (appointmentData) => {
+    const time = appointmentData.time.length === 5
+      ? `${appointmentData.time}:00`
+      : appointmentData.time;
+
+    const formatted = {
+      ...appointmentData,
+      date: appointmentData.date.toISOString().split("T")[0],
+      time,
+    };
+
+    try {
+      const res = await fetch(
+        `http://localhost:3000/api/cita/${editingAppointment.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formatted),
+        }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        toast.error(errorData.message || "Ya existe otra cita en esa fecha y hora");
+        return;
+      }
+
+      toast.success("Cita actualizada correctamente");
+      setIsFormOpen(false);
+      setEditingAppointment(null);
+      fetchAppointments();
+    } catch (err) {
+      console.error("Error al actualizar cita:", err);
+      toast.error("Error inesperado al actualizar la cita.");
+    }
+  };
+
   const handleDeleteAppointment = async (id) => {
-    await fetch(`http://localhost:3000/api/cita/${id}`, { method: "DELETE" });
-    window.location.reload();
+    if (!id) {
+      toast.error("ID de cita no válido");
+      return;
+    }
+    if (!window.confirm("¿Seguro que deseas eliminar esta cita?")) return;
+
+    try {
+      const res = await fetch(`http://localhost:3000/api/cita/${id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        toast.success("Cita eliminada correctamente");
+        fetchAppointments();
+      } else {
+        const errorData = await res.json();
+        toast.error(errorData.message || "No se pudo eliminar la cita.");
+      }
+    } catch (err) {
+      console.error("Error al eliminar cita:", err);
+      toast.error("Error de red al eliminar la cita.");
+    }
   };
 
   const handleEditAppointment = (appointment) => {
@@ -87,12 +146,12 @@ export default function Agenda() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-white px-8 pt-4 pb-8">
+    <div className="w-full min-h-screen bg-white px-6 pt-4 pb-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Agenda</h1>
-          <p className="text-gray-500">Gestiona tus citas y trabajos</p>
+          <p className="text-gray-500">Gestiona tus citas y recordatorios</p>
         </div>
 
         <div className="flex items-center gap-4">
@@ -126,7 +185,7 @@ export default function Agenda() {
             }}
             className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition"
           >
-            Nueva cita
+            Nuevo recordatorio
           </button>
         </div>
       </div>
@@ -155,28 +214,50 @@ export default function Agenda() {
         </div>
       )}
 
+      {/* Contenido principal */}
       {!isFormOpen &&
         (viewMode === "calendar" ? (
           <div className="flex justify-center mt-6">
             <div className="w-full max-w-4xl bg-white p-6 rounded-lg shadow">
-              <Calendar
-                selectedDate={selectedDate}
-                onDateSelect={setSelectedDate}
-                appointments={appointments}
-                getAppointmentsForDate={getAppointmentsForDate}
-              />
+              {loading ? (
+                <div className="text-center py-8">Cargando agenda...</div>
+              ) : (
+                <Calendar
+                  selectedDate={selectedDate}
+                  onDateSelect={setSelectedDate}
+                  appointments={appointments}
+                  getAppointmentsForDate={getAppointmentsForDate}
+                />
+              )}
             </div>
           </div>
         ) : (
           <div className="bg-white p-6 rounded-lg shadow mt-6">
-            <CitaList
-              appointments={appointments}
-              onEdit={handleEditAppointment}
-              onDelete={handleDeleteAppointment}
-              showDate={true}
-            />
+            {loading ? (
+              <div className="text-center py-8">Cargando lista...</div>
+            ) : (
+              <CitaList
+                appointments={appointments}
+                onEdit={handleEditAppointment}
+                onDelete={handleDeleteAppointment}
+                showDate={true}
+              />
+            )}
           </div>
         ))}
+
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
     </div>
   );
 }

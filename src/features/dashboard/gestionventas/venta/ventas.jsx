@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Eye, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { getVentas, getVentaById, updateVenta } from "../venta/ventas.service.js";
+import { getVentas, getVentaById, updateVenta } from "../venta/services/service.ventas.js";
 import { toast } from "react-toastify";
 import { Pagination } from "../../components/paginacion/pagination.jsx";
 

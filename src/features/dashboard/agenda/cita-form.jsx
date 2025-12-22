@@ -124,7 +124,6 @@ export default function CitaForm({
           <option value="pendiente">Pendiente</option>
           <option value="confirmado">Confirmado</option>
           <option value="completado">Completado</option>
-          <option value="cancelado">Cancelado</option>
         </select>
       </div>
 

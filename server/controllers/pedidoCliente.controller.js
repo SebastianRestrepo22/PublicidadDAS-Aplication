@@ -14,6 +14,7 @@ import {
   deleteDetallePedidoModel
 } from "../models/detallePedidoCliente.model.js";
 import { crearProduccionDesdePedido } from "../services/produccion.service.js"; // ✅ Solo esta función se usa
+import { crearVentaDesdePedidoId } from "./ventas.controller.js";
 import QRCode from "qrcode";
 
 // GET /pedidos-clientes → público o protegido según tu diseño
@@ -186,6 +187,7 @@ export const updatePedidoCliente = async (req, res) => {
       }
     }
 
+    //  CREAR VENTA cuando pasa a "terminado"
     if (Estado === "terminado" && estadoAnterior !== "terminado") {
       try {
         await crearVentaDesdePedidoId(id); // ¡Usa el ID del pedido!
@@ -254,5 +256,3 @@ export const getMisPedidos = async (req, res) => {
     res.status(500).json({ error: "Error al obtener tus pedidos" });
   }
 };
-
-import { crearVentaDesdePedidoId } from "./ventas.controller.js";

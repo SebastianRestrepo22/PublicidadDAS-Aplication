@@ -49,7 +49,7 @@ export const Navbar = () => {
                 <div className="flex items-center gap-2 mr-6">
                     {!user ? (
                         <li className="hidden md:inline-flex items-center gap-2 bg-blue-500 text-white px-5 py-1 rounded-lg hover:bg-blue-600 transition-all font-medium">
-                            <Link to='/login'>Registro</Link>
+                            <Link to='/login'>Registro/login</Link>
                         </li>
                     ) : (
                         <>
@@ -116,7 +116,7 @@ export const Navbar = () => {
                         <li><Link to='/quienessomos' onClick={() => setMenuOpen(false)}>¿Quiénes somos?</Link></li>
 
                         <li className="bg-blue-500 text-white px-5 py-1 rounded-lg">
-                            <Link to='/login' onClick={() => setMenuOpen(false)}>Registro</Link>
+                            <Link to='/login' onClick={() => setMenuOpen(false)}>Registro/login</Link>
                         </li>
                     </>
                 ) : (

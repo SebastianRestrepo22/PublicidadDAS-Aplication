@@ -1,3 +1,4 @@
+// src/features/dashboard/agenda/cita-list.jsx
 import React from "react";
 
 export default function CitaList({ appointments, onEdit, onDelete, showDate = false }) {

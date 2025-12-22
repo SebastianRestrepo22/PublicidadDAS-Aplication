@@ -16,7 +16,6 @@ import "react-toastify/dist/ReactToastify.css";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer";
 
-
 export const Productos = () => {
   const navigate = useNavigate();
   const { cart, addToCart } = useCart();
@@ -52,7 +51,7 @@ export const Productos = () => {
   const featuredProducts = productos
     .filter((p) => p.Descuento > 0)
     .sort(() => 0.5 - Math.random())
-    .slice(0, 4);
+    .slice(0, 6);
 
   const filteredProducts = productos.filter((producto) => {
     const matchesCategory =
@@ -64,7 +63,6 @@ export const Productos = () => {
     return matchesCategory && matchesSearch;
   });
 
-  // ─── Funciones de interacción ───────────────────────────────────────
   const handleAddClick = (producto) => {
     if (producto.EsPersonalizado) {
       navigate("/carritoproducto", {
@@ -116,7 +114,6 @@ export const Productos = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <Navbar />
-      {/* Header con buscador */}
       <header className="bg-white border-b border-slate-200 sticky top-[56px] z-40">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -142,23 +139,22 @@ export const Productos = () => {
         </div>
       </header>
 
-      {/* Contenido principal */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Área de productos y carrusel */}
           <div className="flex-1 space-y-8">
             {/* Carrusel */}
             {featuredProducts.length > 0 && (
-              <section className="relative top-[56px]">
-                <h2 className="text-2xl font-bold mb-4 text-slate-800 ">Productos Destacados</h2>
-                <div className="relative overflow-hidden rounded-2xl bg-white shadow-lg">
+              <section>
+                {/* ✅ Subtítulo bajado más: mb-8 */}
+                <h2 className="text-2xl font-bold mt-10 text-slate-800">Productos Destacados</h2>
+                <div className="relative overflow-hidden mt-5 rounded-2xl bg-white shadow-lg">
                   <div
-                    className="flex transition-transform duration-500 ease-in-out"
+                    className="flex transition-transform duration-300 ease-in-out"
                     style={{ transform: `translateX(-${currentSlide * 100}%)` }}
                   >
                     {featuredProducts.map((producto) => (
                       <div key={producto.ProductoServicioId} className="min-w-full">
-                        <div className="relative h-[400px] md:h-[500px]">
+                        <div className="relative h-64 md:h-[320px]">
                           {producto.UrlImagen ? (
                             <img
                               src={producto.UrlImagen}
@@ -174,30 +170,30 @@ export const Productos = () => {
                             />
                           )}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                          <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
+                          <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
                             <div className="max-w-2xl">
-                              <h3 className="text-3xl md:text-4xl font-bold mb-3">
+                              <h3 className="text-xl md:text-2xl font-bold mb-2">
                                 {producto.Nombre}
                               </h3>
-                              <div className="flex items-center gap-4 mb-4">
-                                <span className="text-2xl md:text-3xl font-bold">
+                              <div className="flex items-center gap-3 mb-3">
+                                <span className="text-lg md:text-xl font-bold">
                                   {formatPrice(
                                     producto.Precio -
-                                      (producto.Precio * producto.Descuento) / 100
+                                    (producto.Precio * producto.Descuento) / 100
                                   )}
                                 </span>
                                 {producto.Descuento > 0 && (
-                                  <span className="text-sm bg-red-500 text-white px-2 py-1 rounded">
+                                  <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded">
                                     -{producto.Descuento}%
                                   </span>
                                 )}
                               </div>
-                              <div className="flex gap-3">
+                              <div className="flex gap-2">
                                 <button
                                   onClick={() => handleAddClick(producto)}
-                                  className="bg-white text-black px-6 py-3 rounded-lg font-medium hover:bg-gray-100 transition"
+                                  className="bg-white text-black px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100"
                                 >
-                                  <ShoppingCart className="h-5 w-5 mr-2 inline" />
+                                  <ShoppingCart className="h-4 w-4 mr-1 inline" />
                                   Añadir al Carrito
                                 </button>
                               </div>
@@ -208,29 +204,26 @@ export const Productos = () => {
                     ))}
                   </div>
 
-                  {/* Controles de carrusel */}
                   <button
                     onClick={prevSlide}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-black rounded-full p-3 shadow-lg"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-black rounded-full p-2 shadow-lg"
                   >
-                    <ChevronLeft className="h-6 w-6" />
+                    <ChevronLeft className="h-5 w-5" />
                   </button>
                   <button
                     onClick={nextSlide}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-black rounded-full p-3 shadow-lg"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-black rounded-full p-2 shadow-lg"
                   >
-                    <ChevronRight className="h-6 w-6" />
+                    <ChevronRight className="h-5 w-5" />
                   </button>
 
-                  {/* Indicadores */}
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
                     {featuredProducts.map((_, index) => (
                       <button
                         key={index}
                         onClick={() => setCurrentSlide(index)}
-                        className={`h-2 rounded-full transition-all ${
-                          currentSlide === index ? "w-8 bg-white" : "w-2 bg-white/50"
-                        }`}
+                        className={`h-1.5 rounded-full transition-all ${currentSlide === index ? "w-6 bg-white" : "w-1.5 bg-white/50"
+                          }`}
                       />
                     ))}
                   </div>
@@ -240,8 +233,8 @@ export const Productos = () => {
 
             {/* Listado de productos */}
             <section>
-              <div className="flex items-center justify-between mb-4 ">
-                <h2 className="text-2xl font-bold text-slate-800 ">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-slate-800">
                   Todos los Productos
                   {selectedCategory !== "all" && (
                     <span className="text-slate-600 ml-2">
@@ -260,26 +253,26 @@ export const Productos = () => {
                   {filteredProducts.map((producto) => (
                     <div
                       key={producto.ProductoServicioId}
-                      className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 group"
+                      className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-200"
                     >
                       <div className="relative h-64 overflow-hidden">
                         <img
                           src={producto.UrlImagen || "/multimedia/placeholder.jpg"}
                           alt={producto.Nombre}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          className="w-full h-full object-cover"
                           onError={(e) => (e.currentTarget.src = "/multimedia/placeholder.jpg")}
                         />
-                        <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* ✅ Botones estáticos (siempre visibles) */}
+                        <div className="absolute top-3 right-3 flex gap-2">
                           <button
                             onClick={() => toggleFavorite(producto.ProductoServicioId)}
                             className="bg-white/90 hover:bg-white text-black rounded-full p-2 shadow-lg"
                           >
                             <Heart
-                              className={`h-5 w-5 ${
-                                favorites.includes(producto.ProductoServicioId)
+                              className={`h-5 w-5 ${favorites.includes(producto.ProductoServicioId)
                                   ? "fill-red-500 text-red-500"
                                   : ""
-                              }`}
+                                }`}
                             />
                           </button>
                           <button
@@ -304,15 +297,16 @@ export const Productos = () => {
                             </span>
                           )}
                           <span
-                            className={`text-lg font-bold ${
-                              producto.Descuento > 0 ? "text-red-600 line-through" : "text-blue-600"
-                            }`}
+                            className={`text-lg font-bold ${producto.Descuento > 0 ? "text-red-600 line-through" : "text-blue-600"
+                              }`}
                           >
                             {formatPrice(producto.Precio)}
                           </span>
                           {producto.Descuento > 0 && (
                             <span className="text-lg font-bold text-blue-600">
-                              {formatPrice(producto.Precio - (producto.Precio * producto.Descuento) / 100)}
+                              {formatPrice(
+                                producto.Precio - (producto.Precio * producto.Descuento) / 100
+                              )}
                             </span>
                           )}
                         </div>
@@ -324,18 +318,18 @@ export const Productos = () => {
             </section>
           </div>
 
-          {/* Sidebar derecho */}
-          <aside className="lg:w-80 shrink-0 ">
-            <div className="sticky top-24 space-y-8 ">
-              {/* Categorías */}
+          {/* Sidebar */}
+          <aside className="lg:w-80 shrink-0">
+            <div className="sticky top-24 space-y-8">
               <div className="bg-white rounded-xl shadow-md p-6">
                 <h3 className="font-bold text-lg mb-4 text-slate-800">Categorías</h3>
                 <div className="space-y-2">
                   <button
                     onClick={() => setSelectedCategory("all")}
-                    className={`w-full flex items-center justify-between p-3 rounded-lg transition ${
-                      selectedCategory === "all" ? "bg-blue-600 text-white" : "text-slate-700 hover:bg-slate-100"
-                    }`}
+                    className={`w-full flex items-center justify-between p-3 rounded-lg transition ${selectedCategory === "all"
+                        ? "bg-blue-600 text-white"
+                        : "text-slate-700 hover:bg-slate-100"
+                      }`}
                   >
                     <span className="font-medium">Todos los Productos</span>
                     <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded">
@@ -346,22 +340,24 @@ export const Productos = () => {
                     <button
                       key={cat.CategoriaId}
                       onClick={() => setSelectedCategory(String(cat.CategoriaId))}
-                      className={`w-full flex items-center justify-between p-3 rounded-lg transition ${
-                        selectedCategory === String(cat.CategoriaId)
+                      className={`w-full flex items-center justify-between p-3 rounded-lg transition ${selectedCategory === String(cat.CategoriaId)
                           ? "bg-blue-600 text-white"
                           : "text-slate-700 hover:bg-slate-100"
-                      }`}
+                        }`}
                     >
                       <span className="font-medium">{cat.Nombre}</span>
                       <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded">
-                        {productos.filter((p) => String(p.CategoriaId) === String(cat.CategoriaId)).length}
+                        {
+                          productos.filter(
+                            (p) => String(p.CategoriaId) === String(cat.CategoriaId)
+                          ).length
+                        }
                       </span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Oferta especial */}
               <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-xl shadow-md p-6">
                 <h3 className="font-bold text-lg mb-2">¡Oferta Especial!</h3>
                 <p className="text-sm opacity-90 mb-4">
@@ -377,7 +373,12 @@ export const Productos = () => {
       </div>
 
       <Footer />
-      <ToastContainer position="top-right" autoClose={3000} />
+      <ToastContainer
+        position="bottom-right"
+        autoClose={3000}
+        hideProgressBar
+        newestOnTop
+      />
     </div>
   );
 };
