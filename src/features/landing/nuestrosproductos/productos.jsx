@@ -116,15 +116,7 @@ export const Productos = () => {
       <Navbar />
       <header className="bg-white border-b border-slate-200 sticky top-[56px] z-40">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-slate-800">
-                Productos que no puedes perder
-              </h1>
-              <p className="text-slate-600 mt-2">
-                Descubre nuestros productos y transforma tus ideas en impresiones únicas.
-              </p>
-            </div>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-center gap-4">
             <div className="relative w-full md:w-96">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
@@ -253,7 +245,8 @@ export const Productos = () => {
                   {filteredProducts.map((producto) => (
                     <div
                       key={producto.ProductoServicioId}
-                      className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-200"
+                      onClick={() => navigate(`/productos/${producto.ProductoServicioId}`, { state: { producto } })}
+                      className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-200 cursor-pointer"
                     >
                       <div className="relative h-64 overflow-hidden">
                         <img
@@ -270,8 +263,8 @@ export const Productos = () => {
                           >
                             <Heart
                               className={`h-5 w-5 ${favorites.includes(producto.ProductoServicioId)
-                                  ? "fill-red-500 text-red-500"
-                                  : ""
+                                ? "fill-red-500 text-red-500"
+                                : ""
                                 }`}
                             />
                           </button>
@@ -327,8 +320,8 @@ export const Productos = () => {
                   <button
                     onClick={() => setSelectedCategory("all")}
                     className={`w-full flex items-center justify-between p-3 rounded-lg transition ${selectedCategory === "all"
-                        ? "bg-blue-600 text-white"
-                        : "text-slate-700 hover:bg-slate-100"
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-700 hover:bg-slate-100"
                       }`}
                   >
                     <span className="font-medium">Todos los Productos</span>
@@ -341,8 +334,8 @@ export const Productos = () => {
                       key={cat.CategoriaId}
                       onClick={() => setSelectedCategory(String(cat.CategoriaId))}
                       className={`w-full flex items-center justify-between p-3 rounded-lg transition ${selectedCategory === String(cat.CategoriaId)
-                          ? "bg-blue-600 text-white"
-                          : "text-slate-700 hover:bg-slate-100"
+                        ? "bg-blue-600 text-white"
+                        : "text-slate-700 hover:bg-slate-100"
                         }`}
                     >
                       <span className="font-medium">{cat.Nombre}</span>

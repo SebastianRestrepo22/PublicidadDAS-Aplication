@@ -1,6 +1,5 @@
 import { Route, Routes } from "react-router-dom";
 import { Productos } from "../features/landing/nuestrosproductos/productos";
-import { Servicios } from "../features/landing/nuestrosproductos/servicios";
 import { QuienesSomos } from "../features/landing/quienessomos/quienesSomos";
 import { Login } from "../features/landing/login/login";
 import { Insumos } from "../features/dashboard/constrolinsumos/insumos/insumos";
@@ -10,7 +9,6 @@ import { Roles } from "../features/dashboard/roles/roles";
 import { DashboardLayout } from "../features/dashboard/components/dashboardLoyout";
 import { Error404 } from "../features/404/error404";
 import { GraficosEstadisticos } from "../features/dashboard/dashboard/graficoEstadisticos";
-import Agenda from "../features/dashboard/agenda/agenda";
 import { Diseño } from "../features/dashboard/categoriadediseño/diseño";
 import { RecuperarContrasena } from "../features/landing/login/RecuperarContrasena";
 import { RestablecerContrasena } from "../features/landing/login/RestablecerContrasena";
@@ -30,6 +28,9 @@ import { ScrollToTop } from "../features/landing/components/ScrollToTop";
 import { Inicio } from "../features/landing/inicio/inicio";
 import { Compras } from "../features/dashboard/constrolinsumos/compras/compras";
 import { Proveedores } from "../features/dashboard/constrolinsumos/proveedores/proveedores";
+import { Servicios } from "../features/landing/nuestrosservicios/servicios";
+import { ProductoDetalle } from "../features/landing/nuestrosproductos/productodetalle";
+import { ServicioDetalle } from "../features/landing/nuestrosservicios/servicioDetalle";
 
 export const Routers = () => {
   return (
@@ -37,7 +38,9 @@ export const Routers = () => {
       <Routes>
         <Route path="/" element={<Inicio />} />
         <Route path="/productos" element={<Productos />} />
+        <Route path="/productos/:id" element={<ProductoDetalle />} />
         <Route path="/servicios" element={<Servicios />} />
+        <Route path="/servicios/:id" element={<ServicioDetalle/>} />
 
         {/* Rutas cliente protegidas */}
         <Route
@@ -114,7 +117,6 @@ export const Routers = () => {
 
           <Route path="diseño" element={<Diseño />} />
           <Route path="categoriaDeDiseño" element={<Diseño />} />
-          <Route path="agenda" element={<Agenda />} />
           <Route path="ventas" element={<Ventas />} />
 
           <Route path="pedidosClientes" element={<PedidosClientes />} />

@@ -14,7 +14,6 @@ import pedidoClienteRoutes from "./routes/pedidoCliente.routes.js";
 import detallePedidoClienteRoutes from "./routes/detallePedidoCliente.routes.js";
 import detalleProduccionRoutes from "./routes/detalleProduccion.routes.js";
 import produccionRoutes from "./routes/produccion.routes.js";
-import citaRoutes from "./routes/cita.routes.js";
 import ventasRoutes from "./routes/venta.routes.js";
 import detalleVentasRoutes from "./routes/detalleVentas.routes.js"
 import voucherRoutes from './routes/voucher.routes.js';
@@ -60,7 +59,6 @@ app.use("/api/pedidos-clientes", pedidoClienteRoutes);
 app.use("/api/detalle-pedido", detallePedidoClienteRoutes);
 app.use("/api/detalle-produccion", detalleProduccionRoutes);
 app.use("/api/produccion", produccionRoutes);
-app.use("/api/cita", citaRoutes);
 app.use("/api/ventas", ventasRoutes);
 app.use("/api/detalle-ventas", detalleVentasRoutes);
 app.use('/api/voucher', voucherRoutes);
