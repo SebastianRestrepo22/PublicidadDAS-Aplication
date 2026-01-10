@@ -4,7 +4,8 @@ import {
   ImageIcon,
   Upload,
   X,
-  ChevronLeft,
+  ArrowLeft,
+
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { GetDataServices } from "../../dashboard/servicios/services/services.servicios";
@@ -18,16 +19,12 @@ export const ServicioDetalle = () => {
   const [formData, setFormData] = useState({
     Nombre: "",
     Descripcion: "",
-    Precio: 0,
-    Descuento: 0,
     Tamaño: "Mediana",
-    UrlImagen: "",
   });
 
   const [archivosAdjuntos, setArchivosAdjuntos] = useState([]);
   const [imagenPreview, setImagenPreview] = useState("");
 
-  // Cargar servicio desde API
   useEffect(() => {
     const fetchServicio = async () => {
       try {
@@ -46,10 +43,7 @@ export const ServicioDetalle = () => {
         setFormData({
           Nombre: servicioEncontrado.Nombre || "",
           Descripcion: servicioEncontrado.Descripcion || "",
-          Precio: servicioEncontrado.Precio || 0,
-          Descuento: servicioEncontrado.Descuento || 0,
           Tamaño: servicioEncontrado.Tamaño || "Mediana",
-          UrlImagen: servicioEncontrado.UrlImagen || "",
         });
         setImagenPreview(servicioEncontrado.UrlImagen || "");
       } catch (err) {
@@ -96,15 +90,14 @@ export const ServicioDetalle = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // 🔜 Aquí integrarías tu llamada al backend para guardar
     toast.success("Servicio actualizado exitosamente");
     navigate("/servicios");
   };
 
   const precioConDescuento =
-    formData.Descuento > 0
-      ? formData.Precio * (1 - formData.Descuento / 100)
-      : formData.Precio;
+    servicio?.Descuento > 0
+      ? servicio.Precio * (1 - servicio.Descuento / 100)
+      : servicio?.Precio || 0;
 
   const formatPrice = (precio) => {
     return new Intl.NumberFormat("es-CO", {
@@ -127,16 +120,15 @@ export const ServicioDetalle = () => {
       <div className="max-w-7xl mx-auto">
         <button
           onClick={() => navigate("/servicios")}
-          className="flex items-center text-blue-600 hover:text-blue-800 mb-6 font-medium"
+          className="flex items-center text-blue-600 hover:text-blue-800 mb-6 font-medium rounded-full bg-blue-100"
         >
-          <ChevronLeft className="w-5 h-5 mr-1" />
-          Volver a servicios
+          <ArrowLeft className="h-12 w-12" />
         </button>
 
         <div className="bg-white rounded-lg shadow-lg overflow-hidden">
           <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-5 md:p-6">
             <h1 className="text-2xl md:text-3xl font-bold text-white">
-              Editar Servicio
+              Detalles del Servicio
             </h1>
           </div>
 
@@ -170,40 +162,6 @@ export const ServicioDetalle = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Precio (COP)
-                  </label>
-                  <input
-                    type="number"
-                    name="Precio"
-                    value={formData.Precio}
-                    onChange={handleInputChange}
-                    min="0"
-                    step="0.01"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Descuento (%)
-                  </label>
-                  <input
-                    type="number"
-                    name="Descuento"
-                    value={formData.Descuento}
-                    onChange={handleInputChange}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Tamaño
@@ -220,6 +178,25 @@ export const ServicioDetalle = () => {
                 </select>
               </div>
 
+              {/* Precio y Descuento (solo lectura) */}
+              <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                <div>
+                  <span className="text-sm font-medium text-gray-600">Precio:</span>
+                  <span className="ml-2 font-semibold text-blue-600">
+                    {formatPrice(servicio.Precio)}
+                  </span>
+                </div>
+                {servicio.Descuento > 0 && (
+                  <div>
+                    <span className="text-sm font-medium text-gray-600">Descuento:</span>
+                    <span className="ml-2 font-semibold text-green-600">
+                      -{servicio.Descuento}%
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Adjuntar archivos */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Adjuntar Archivos (Imágenes, PDFs, etc.)
@@ -285,86 +262,42 @@ export const ServicioDetalle = () => {
               </button>
             </div>
 
-            {/* Columna Derecha - Vista Previa */}
+            {/* Columna Derecha - Solo Resumen */}
             <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Vista Previa</h3>
-
-                <div className="bg-white rounded-lg shadow-lg overflow-hidden border-2 border-gray-200">
-                  <div className="h-64 overflow-hidden bg-gray-200">
-                    {imagenPreview ? (
-                      <img
-                        src={imagenPreview}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <ImageIcon className="w-16 h-16 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-6">
-                    <h3 className="text-xl md:text-2xl font-semibold mb-2">
-                      {formData.Nombre || "Nombre del servicio"}
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                      {formData.Descripcion || "Descripción del servicio"}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        {formData.Descuento > 0 ? (
-                          <div>
-                            <span className="text-gray-400 line-through text-lg">
-                              {formatPrice(formData.Precio)}
-                            </span>
-                            <span className="text-green-600 font-bold text-xl md:text-2xl ml-2">
-                              {formatPrice(precioConDescuento)}
-                            </span>
-                            <span className="text-xs md:text-sm bg-green-100 text-green-600 px-2 py-1 rounded ml-2">
-                              -{formData.Descuento}%
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-800 font-bold text-xl md:text-2xl">
-                            {formatPrice(formData.Precio)}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs md:text-sm bg-blue-100 text-blue-600 px-2 py-1 rounded font-medium">
-                        {formData.Tamaño}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-semibold text-blue-900 mb-2">Resumen</h4>
-                  <div className="space-y-1 text-sm">
-                    <p>
-                      <span className="font-medium">Precio original:</span>{" "}
-                      {formatPrice(formData.Precio)}
-                    </p>
-                    {formData.Descuento > 0 && (
-                      <>
-                        <p>
-                          <span className="font-medium">Descuento:</span>{" "}
-                          {formData.Descuento}%
-                        </p>
-                        <p>
-                          <span className="font-medium">Precio final:</span>{" "}
-                          {formatPrice(precioConDescuento)}
-                        </p>
-                        <p className="text-green-600 font-medium">
-                          Ahorro:{" "}
-                          {formatPrice(formData.Precio - precioConDescuento)}
-                        </p>
-                      </>
-                    )}
-                    <p>
-                      <span className="font-medium">Tamaño:</span> {formData.Tamaño}
-                    </p>
-                  </div>
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <h3 className="font-semibold text-blue-900 text-lg mb-3">Resumen del Servicio</h3>
+                <div className="space-y-2 text-sm">
+                  <p>
+                    <span className="font-medium">Nombre:</span>{" "}
+                    {formData.Nombre || servicio.Nombre}
+                  </p>
+                  <p>
+                    <span className="font-medium">Descripción:</span>{" "}
+                    {formData.Descripcion || servicio.Descripcion}
+                  </p>
+                  <p>
+                    <span className="font-medium">Tamaño:</span>{" "}
+                    {formData.Tamaño || servicio.Tamaño}
+                  </p>
+                  <p>
+                    <span className="font-medium">Precio:</span>{" "}
+                    {formatPrice(servicio.Precio)}
+                  </p>
+                  {servicio.Descuento > 0 && (
+                    <>
+                      <p>
+                        <span className="font-medium">Descuento:</span>{" "}
+                        {servicio.Descuento}%
+                      </p>
+                      <p>
+                        <span className="font-medium">Precio final:</span>{" "}
+                        {formatPrice(precioConDescuento)}
+                      </p>
+                      <p className="text-green-600 font-medium">
+                        Ahorro: {formatPrice(servicio.Precio - precioConDescuento)}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
