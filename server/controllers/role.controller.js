@@ -1,5 +1,6 @@
 import connectDB from '../lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
+import { createDataRole, getDataAllRoles, getDataRolesById, updateDataRoles, rolesAsociados, deleteDataRole, changeDataStatus, validarDataRol, buscarRolesModel, getdataPermisos, getDataRolePermissions, existenPermisos, deletePermissos, actualizarPermisos, getDataRolUser, getDataPermissonRol } from '../models/role.model.js';
 
 // Crear rol
 export const createRole = async (req, res) => {
@@ -13,11 +14,12 @@ export const createRole = async (req, res) => {
 
     const RoleId = uuidv4(); // Genera UUID manualmente
 
-    const connection = await connectDB();
-    await connection.execute(
-      'INSERT INTO roles (RoleId, Nombre, Estado) VALUES (?, ?, ?)',
-      [RoleId, Nombre, Estado]
-    );
+    await createDataRole({
+      RoleId,
+      Nombre,
+      Estado
+    });
+
 
     res.status(201).json({
       message: 'Rol creado correctamente',
@@ -37,8 +39,14 @@ export const createRole = async (req, res) => {
 // Listar todos los roles
 export const getAllRoles = async (req, res) => {
   try {
-    const connection = await connectDB();
-    const [roles] = await connection.execute('SELECT * FROM roles ORDER BY Nombre');
+    const roles = await getDataAllRoles();
+
+    if (roles.length === 0) {
+      return res.status(409).json({
+        message: 'No hay roles'
+      });
+    };
+
     res.status(200).json(roles);
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener los roles', error: error.message });
@@ -49,10 +57,11 @@ export const getAllRoles = async (req, res) => {
 export const getRoleById = async (req, res) => {
   try {
     const { id } = req.params;
-    const connection = await connectDB();
-    const [roles] = await connection.execute('SELECT * FROM roles WHERE RoleId = ?', [id]);
+    const roles = await getDataRolesById(id);
 
-    if (roles.length === 0) return res.status(404).json({ message: 'Rol no encontrado' });
+    if (roles.length === 0) {
+      return res.status(409).json({ message: 'Rol no encontrado' });
+    }
     res.status(200).json(roles[0]);
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener el rol', error: error.message });
@@ -69,13 +78,9 @@ export const updateRole = async (req, res) => {
       return res.status(400).json({ message: 'El nombre del rol no puede estar vacío' });
     }
 
-    const connection = await connectDB();
-    const [result] = await connection.execute(
-      'UPDATE roles SET Nombre = ?, Estado = ? WHERE RoleId = ?',
-      [Nombre, Estado, id]
-    );
+    const result = await updateDataRoles({ id, Nombre, Estado })
 
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Rol no encontrado' });
+    if (result.affectedRows === 0) return res.status(409).json({ message: 'Rol no encontrado' });
 
     res.status(200).json({
       message: 'Rol actualizado correctamente',
@@ -91,13 +96,7 @@ export const updateRole = async (req, res) => {
 export const deleteRole = async (req, res) => {
   const { id } = req.params;
   try {
-    const connection = await connectDB();
-
-    // Verifica si hay usuarios asociados a este rol
-    const [users] = await connection.execute(
-      'SELECT * FROM usuarios WHERE RoleId = ?',
-      [id]
-    );
+    const users = await rolesAsociados(id);
 
     if (users.length > 0) {
       return res.status(400).json({
@@ -106,7 +105,7 @@ export const deleteRole = async (req, res) => {
     }
 
     // Si no hay usuarios, elimina el rol
-    await connection.execute('DELETE FROM roles WHERE RoleId = ?', [id]);
+    await deleteDataRole(id);
     res.status(200).json({ message: 'Rol eliminado correctamente' });
 
   } catch (error) {
@@ -124,10 +123,7 @@ export const changeState = async (req, res) => {
     const connection = await connectDB();
 
     // Verifica si hay usuarios asociados a este rol
-    const [users] = await connection.execute(
-      'SELECT * FROM usuarios WHERE RoleId = ?',
-      [id]
-    );
+    const users = await rolesAsociados(id);
 
     if (users.length > 0) {
       return res.status(400).json({
@@ -136,10 +132,7 @@ export const changeState = async (req, res) => {
     }
 
     // Si no hay usuarios, actualiza el estado
-    const [result] = await connection.execute(
-      'UPDATE roles SET Estado = ? WHERE RoleId = ?',
-      [estado, id]
-    );
+    const result = await changeDataStatus(estado, id);     
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Rol no encontrado' });
@@ -157,11 +150,7 @@ export const validarRol = async (req, res) => {
   const { rol } = req.query;
 
   try {
-    const connection = await connectDB();
-    const [roles] = await connection.execute(
-      'SELECT * FROM roles WHERE Nombre = ?',
-      [rol]
-    );
+    const roles = await validarDataRol(rol);
 
     res.status(200).json({ exists: roles.length > 0 });
   } catch (error) {
@@ -181,47 +170,26 @@ export const buscarRoles = async (req, res) => {
   };
 
   const columna = columnasPermitidas[campo];
+
   if (!columna) {
     return res.status(400).json({ message: 'Campo de búsqueda inválido' });
   }
 
   try {
-    const connection = await connectDB();
-    let query = "";
-    let params = [];
-
-    if (columna === "Estado") {
-      // Comparación exacta para ENUM
-      query = `SELECT * FROM roles WHERE ${columna} = ?`;
-      // Normalizamos para mayúscula inicial
-      const valorNormalizado =
-        valor.toLowerCase() === "activo" ? "Activo" :
-          valor.toLowerCase() === "inactivo" ? "Inactivo" :
-            valor;
-      params = [valorNormalizado];
-    } else {
-      // Búsqueda flexible para otros campos
-      query = `SELECT * FROM roles WHERE ${columna} LIKE ?`;
-      params = [`%${valor}%`];
-    }
-
-    const [roles] = await connection.execute(query, params);
+    const roles = await buscarRolesModel(columna, valor);
     res.status(200).json(roles);
   } catch (error) {
-    console.error("Error al buscar roles:", error);
-    res.status(500).json({ message: "Error interno del servidor" });
+    console.error('Error al buscar roles:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
-};
+}; 
 
 // ========== NUEVAS FUNCIONES PARA PERMISOS ==========
 
 // Obtener todos los permisos disponibles
 export const getAllPermissions = async (req, res) => {
   try {
-    const connection = await connectDB();
-    const [permisos] = await connection.execute(
-      'SELECT * FROM permisos ORDER BY Modulo, Nombre'
-    );
+   const permisos = await getdataPermisos();
     res.status(200).json(permisos);
   } catch (error) {
     console.error('Error al obtener permisos:', error);
@@ -233,14 +201,7 @@ export const getAllPermissions = async (req, res) => {
 export const getRolePermissions = async (req, res) => {
   try {
     const { id } = req.params;
-    const connection = await connectDB();
-
-    const [permisos] = await connection.execute(
-      `SELECT p.* FROM permisos p
-       JOIN rol_permisos rp ON p.PermisoId = rp.PermisoId
-       WHERE rp.RoleId = ?`,
-      [id]
-    );
+    const permisos = await getDataRolePermissions(id);
 
     res.status(200).json(permisos);
   } catch (error) {
@@ -253,71 +214,61 @@ export const getRolePermissions = async (req, res) => {
 export const updateRolePermissions = async (req, res) => {
   const { id } = req.params;
   const { permisos } = req.body;
-  
-  console.log('Actualizando permisos para rol:', { 
-    roleId: id, 
+
+  console.log('Actualizando permisos para rol:', {
+    roleId: id,
     permisosCount: permisos?.length || 0,
-    permisos: permisos 
+    permisos: permisos
   });
-  
+
   if (!Array.isArray(permisos)) {
     return res.status(400).json({ message: 'Formato de permisos inválido. Se esperaba un array.' });
   }
 
   try {
-    const pool = await connectDB();
-    
-    // 1. Verificar que el rol existe
-    const [roles] = await pool.execute(
-      'SELECT * FROM roles WHERE RoleId = ?',
-      [id]
-    );
-    
+    const roles = await getDataRolesById(id);
+
     if (roles.length === 0) {
       return res.status(404).json({ message: 'Rol no encontrado' });
     }
-    
+
     // 2. Eliminar permisos actuales
     console.log('Eliminando permisos antiguos para rol:', id);
-    await pool.execute('DELETE FROM rol_permisos WHERE RoleId = ?', [id]);
-    
+    await deletePermissos(id);
+
     // 3. Si no hay nuevos permisos, terminar aquí
     if (permisos.length === 0) {
-      return res.status(200).json({ 
+      return res.status(200).json({
         message: 'Permisos actualizados correctamente (sin permisos)',
         totalPermisos: 0
       });
     }
-    
+
     // 4. Verificar que los permisos existen
     console.log('Verificando que los permisos existen...');
     const placeholders = permisos.map(() => '?').join(',');
-    const [existentes] = await pool.execute(
-      `SELECT PermisoId FROM permisos WHERE PermisoId IN (${placeholders})`,
-      permisos
-    );
-    
+
+    const existentes = await existenPermisos({placeholders, permisos});
+
     const permisosExistentes = existentes.map(p => p.PermisoId);
     const permisosInexistentes = permisos.filter(p => !permisosExistentes.includes(p));
-    
+
     if (permisosInexistentes.length > 0) {
       console.log('Permisos no encontrados:', permisosInexistentes);
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Algunos permisos no existen en la base de datos',
         permisosInexistentes: permisosInexistentes
       });
     }
-    
+
     // 5. Insertar nuevos permisos (uno por uno para mejor control)
     console.log(`Insertando ${permisos.length} permisos...`);
     for (let i = 0; i < permisos.length; i++) {
       const permisoId = permisos[i];
       try {
-        await pool.execute(
-          'INSERT INTO rol_permisos (RoleId, PermisoId) VALUES (?, ?)',
-          [id, permisoId]
-        );
-        console.log(`Permiso ${i+1}/${permisos.length} insertado:`, permisoId);
+        await actualizarPermisos(id, permisoId);
+
+        console.log(`Permiso ${i + 1}/${permisos.length} insertado:`, permisoId);
       } catch (insertError) {
         // Si hay error de duplicado (no debería pasar porque borramos primero), continuar
         if (insertError.code === 'ER_DUP_ENTRY') {
@@ -327,9 +278,9 @@ export const updateRolePermissions = async (req, res) => {
         throw insertError;
       }
     }
-    
+
     console.log('Permisos actualizados exitosamente');
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'Permisos actualizados correctamente',
       totalPermisos: permisos.length,
       roleId: id,
@@ -342,24 +293,24 @@ export const updateRolePermissions = async (req, res) => {
       sqlState: error.sqlState,
       sqlMessage: error.sqlMessage
     });
-    
+
     // Errores específicos
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ 
+      return res.status(409).json({
         message: 'Error de duplicación. Algunos permisos ya estaban asignados.',
         error: error.sqlMessage
       });
     }
-    
+
     if (error.code === 'ER_NO_REFERENCED_ROW_2') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Error de integridad referencial. El rol o algunos permisos no existen.',
         error: error.sqlMessage
       });
     }
-    
+
     // Error genérico
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error interno del servidor al actualizar permisos',
       error: error.message,
       code: error.code,
@@ -373,13 +324,9 @@ export const getUserPermissions = async (req, res) => {
   const { userId } = req.params;
 
   try {
-    const connection = await connectDB();
 
     // Obtener rol del usuario
-    const [users] = await connection.execute(
-      'SELECT RoleId FROM usuarios WHERE CedulaId = ?',
-      [userId]
-    );
+    const users = await getDataRolUser(userId);
 
     if (users.length === 0) {
       return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -388,13 +335,7 @@ export const getUserPermissions = async (req, res) => {
     const { RoleId } = users[0];
 
     // Obtener permisos del rol
-    const [permisos] = await connection.execute(
-      `SELECT p.PermisoId, p.Nombre, p.Modulo 
-       FROM permisos p
-       JOIN rol_permisos rp ON p.PermisoId = rp.PermisoId
-       WHERE rp.RoleId = ?`,
-      [RoleId]
-    );
+    const permisos = await getDataPermissonRol(roleId);
 
     res.status(200).json(permisos);
   } catch (error) {

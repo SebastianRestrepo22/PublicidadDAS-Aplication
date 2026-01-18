@@ -9,7 +9,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { GetDataServices } from "../../dashboard/servicios/services/services.servicios";
+import { GetDataservicios } from "../../dashboard/servicios/services/services.servicios";
 import { getAllCategorias } from "../../dashboard/categoriadediseño/services/services.categoria";
 import { useCart } from "../../../context/CartContext";
 import { toast, ToastContainer } from "react-toastify";
@@ -30,7 +30,7 @@ export const Servicios = () => {
     const fetchData = async () => {
       try {
         const [serviciosRes, categoriasRes] = await Promise.all([
-          GetDataServices(),
+          GetDataservicios(),
           getAllCategorias(),
         ]);
 

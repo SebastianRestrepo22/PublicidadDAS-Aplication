@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../../../context/CartContext";
-import { GetDataServices } from "../../dashboard/servicios/services/services.servicios";
+import { GetDataproductos } from "../../dashboard/productos/services/services.products";
 import { getAllCategorias } from "../../dashboard/categoriadediseño/services/services.categoria";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -31,7 +31,7 @@ export const Productos = () => {
     const fetchData = async () => {
       try {
         const [productosRes, categoriasRes] = await Promise.all([
-          GetDataServices(),
+          GetDataproductos(),
           getAllCategorias(),
         ]);
 
@@ -124,7 +124,7 @@ export const Productos = () => {
                 placeholder="Buscar producto..."
                 className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => setSearchkQuery(e.target.value)}
               />
             </div>
           </div>

@@ -174,9 +174,6 @@ export const updatePedidoClienteModel = async (id, data) => {
   return result;
 };
 
-// ███████████████████████████████████████████
-// ELIMINAR (sin cambios)
-// ███████████████████████████████████████████
 
 export const deletePedidoClienteModel = async (id) => {
   const connection = await connectDB();

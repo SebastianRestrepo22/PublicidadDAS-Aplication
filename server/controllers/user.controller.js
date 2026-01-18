@@ -3,6 +3,7 @@ import connectDB from '../lib/db.js';
 import { sendResetPasswordEmail } from '../utils/email.js';
 import dayjs from "dayjs"; // para manejar expiraciones
 import crypto from "crypto";
+import { buscarUsuarioData, correoExiste, creatByAdmin, deleteDataUser, getAllDataUsers, getUsuarioById, hashPassword, obtenerUsuarioActualizado, pedidosUsuarios, resetTokenModel, rolCliente, telefonoExistente, traerDatosActuales, updateDataUser, validarDataCedula } from '../models/user.model.js';
 
 // Crear usuari
 export const createUser = async (req, res) => {
@@ -13,26 +14,19 @@ export const createUser = async (req, res) => {
         Telefono,
         CorreoElectronico,
         Direccion,
-        Contrasena
+        Contrasena,
     } = req.body;
 
     try {
-        const connection = await connectDB();
 
-        // Verifica si el correo ya existe
-        const [existente] = await connection.execute(
-            'SELECT * FROM usuarios WHERE CorreoElectronico = ?',
-            [CorreoElectronico]
-        );
-        if (existente.length > 0) {
+        const existente = await correoExiste(CorreoElectronico);
+        
+        if (existente) {
             return res.status(409).json({ message: 'Usuario ya existe' });
         }
 
         // Busca el rol "cliente"
-        const [roles] = await connection.execute(
-            'SELECT * FROM roles WHERE Nombre = ?',
-            ['cliente']
-        );
+        const roles = await rolCliente();
         if (roles.length === 0) {
             return res.status(400).json({ message: "Rol 'cliente' no encontrado en BD" });
         }
@@ -44,23 +38,7 @@ export const createUser = async (req, res) => {
             const resetToken = crypto.randomBytes(32).toString("hex");
             const resetTokenExpire = dayjs().add(1, "hour").toDate();
 
-            await connection.execute(
-                `INSERT INTO usuarios 
-                 (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId, resetToken, resetTokenExpire)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    CedulaId,
-                    TipoDocumentoId,
-                    NombreCompleto,
-                    Telefono,
-                    CorreoElectronico,
-                    Direccion,
-                    null,
-                    rol.RoleId,
-                    resetToken,
-                    resetTokenExpire
-                ]
-            );
+            await creatByAdmin({CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, rol, resetToken, resetTokenExpire});
             // Enviar correo con link al frontend   
             await sendResetPasswordEmail(CorreoElectronico, resetToken);
 
@@ -77,12 +55,7 @@ export const createUser = async (req, res) => {
 // Listar todos los usuarios
 export const getAllUsers = async (req, res) => {
     try {
-        const connection = await connectDB();
-        const [users] = await connection.execute(
-            `SELECT u.*, r.Nombre AS RolNombre 
-        FROM usuarios u 
-        JOIN roles r ON u.RoleId = r.RoleId`
-        );
+        const users = await getAllDataUsers();
         res.status(200).json(users);
     } catch (error) {
         console.error('Error al obtener usuarios:', error);
@@ -94,14 +67,7 @@ export const getAllUsers = async (req, res) => {
 export const getUserById = async (req, res) => {
     const { id } = req.params;
     try {
-        const connection = await connectDB();
-        const [users] = await connection.execute(
-            `SELECT u.*, r.Nombre AS RolNombre 
-        FROM usuarios u 
-        JOIN roles r ON u.RoleId = r.RoleId 
-        WHERE u.CedulaId = ?`,
-            [id]
-        );
+        const users = await getUsuarioById(id);
 
         if (users.length === 0) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -119,13 +85,7 @@ export const updateUser = async (req, res) => {
     const { id } = req.params;
 
     try {
-        const connection = await connectDB();
-
-        // Traer datos actuales
-        const [rows] = await connection.execute(
-            'SELECT * FROM usuarios WHERE CedulaId = ?',
-            [id]
-        );
+        const rows = await traerDatosActuales({ CedulaId: id });
 
         if (rows.length === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
 
@@ -138,37 +98,19 @@ export const updateUser = async (req, res) => {
             Telefono: req.body.Telefono ?? currentUser.Telefono,
             CorreoElectronico: req.body.CorreoElectronico ?? currentUser.CorreoElectronico,
             Direccion: req.body.Direccion ?? currentUser.Direccion,
-            RoleId: req.body.RoleId ?? currentUser.RoleId // ← ESTA ES LA CORRECCIÓN IMPORTANTE
+            RoleId: req.body.RoleId ?? currentUser.RoleId 
         };
 
-        // Ejecutar update
-        await connection.execute(
-            `UPDATE usuarios SET TipoDocumentoId=?, NombreCompleto=?, Telefono=?, CorreoElectronico=?, Direccion=?, RoleId=? WHERE CedulaId=?`,
-            [
-                updatedUser.TipoDocumentoId,
-                updatedUser.NombreCompleto,
-                updatedUser.Telefono,
-                updatedUser.CorreoElectronico,
-                updatedUser.Direccion,
-                updatedUser.RoleId, // ← Usar el RoleId actualizado
-                id
-            ]
-        );
-
+        await updateDataUser({id, updatedUser});
+        
         // Obtener el usuario actualizado con información del rol
-        const [users] = await connection.execute(
-            `SELECT u.*, r.Nombre AS RolNombre 
-       FROM usuarios u 
-       LEFT JOIN roles r ON u.RoleId = r.RoleId 
-       WHERE u.CedulaId = ?`,
-            [id]
-        );
+        const users = await obtenerUsuarioActualizado(id)
 
         const userUpdated = users[0];
 
         res.status(200).json({
             message: 'Usuario actualizado correctamente',
-            user: userUpdated // ← Devolver el usuario actualizado
+            user: userUpdated // Devolver el usuario actualizado
         });
 
     } catch (error) {
@@ -181,13 +123,7 @@ export const updateUser = async (req, res) => {
 export const deleteUser = async (req, res) => {
     const { id } = req.params;
     try {
-        const connection = await connectDB();
-
-        // Verificar si el usuario tiene pedidos asociados
-        const [pedidos] = await connection.execute(
-            'SELECT * FROM pedidosclientes WHERE ClienteId = ?',
-            [id]
-        );
+        const pedidos = await pedidosUsuarios(id);
 
         if (pedidos.length > 0) {
             return res.status(409).json({
@@ -195,10 +131,7 @@ export const deleteUser = async (req, res) => {
             });
         }
 
-        const [result] = await connection.execute(
-            'DELETE FROM usuarios WHERE CedulaId = ?',
-            [id]
-        );
+        const result = await deleteDataUser(id);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -213,19 +146,14 @@ export const deleteUser = async (req, res) => {
 
 // Validar si correo ya existe
 export const validarCorreo = async (req, res) => {
-    const { correo } = req.query;
-    try {
-        const connection = await connectDB();
-        const [usuarios] = await connection.execute(
-            'SELECT * FROM usuarios WHERE CorreoElectronico = ?',
-            [correo]
-        );
-
-        res.status(200).json({ exists: usuarios.length > 0 });
-    } catch (error) {
-        console.error('Error al validar correo:', error);
-        res.status(500).json({ message: 'Error interno del servidor' });
-    }
+  const { correo } = req.query;
+  try {
+    const existe = await correoExiste(correo);
+    res.status(200).json({ exists: existe });
+  } catch (error) {
+    console.error('Error al validar correo:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
 };
 
 // Validar si la cedula ya existe
@@ -233,11 +161,7 @@ export const validarCedula = async (req, res) => {
     const { cedula } = req.query;
 
     try {
-        const connection = await connectDB();
-        const [usuarios] = await connection.execute(
-            'SELECT * FROM usuarios WHERE CedulaId = ?',
-            [cedula]
-        );
+        const usuarios = await validarDataCedula(cedula);
 
         res.status(200).json({ exists: usuarios.length > 0 });
     } catch (error) {
@@ -251,11 +175,7 @@ export const validarTelefono = async (req, res) => {
     const { telefono } = req.query;
 
     try {
-        const connection = await connectDB();
-        const [usuarios] = await connection.execute(
-            'SELECT * FROM usuarios WHERE Telefono = ?',
-            [telefono]
-        );
+        const usuarios = await telefonoExistente(telefono);
 
         res.status(200).json({ exists: usuarios.length > 0 });
     } catch (error) {
@@ -277,7 +197,7 @@ export const buscarUsuarios = async (req, res) => {
         correo: "u.CorreoElectronico",
         telefono: "u.Telefono",
         rol: "r.Nombre",
-        tipoDocumento: "td.Nombre" // 👈 Nuevo: tipo de documento
+        tipoDocumento: "td.Nombre"
     };
 
     const columna = columnasPermitidas[campo];
@@ -286,20 +206,7 @@ export const buscarUsuarios = async (req, res) => {
     }
 
     try {
-        const connection = await connectDB();
-
-        const [usuarios] = await connection.execute(
-            `SELECT 
-      u.*, 
-      r.Nombre AS RolNombre, 
-      td.Nombre AS TipoDocumentoNombre
-   FROM usuarios u
-   JOIN roles r ON u.RoleId = r.RoleId
-   JOIN TipoDocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
-   WHERE ${columna} LIKE ?`,
-            [`%${valor}%`]
-        );
-
+        const usuarios = await buscarUsuarioData(columna, valor);
 
         res.status(200).json(usuarios);
     } catch (error) {
@@ -317,19 +224,12 @@ export const resetPassword = async (req, res) => {
     }
 
     try {
-        const connection = await connectDB();
-        const [users] = await connection.execute(
-            'SELECT * FROM usuarios WHERE resetToken = ? AND resetTokenExpire > ?',
-            [token, new Date()]
-        );
+        const users = await resetTokenModel(token);
 
         if (users.length === 0) return res.status(400).json({ message: "Token inválido o expirado" });
 
         const hash = await bcrypt.hash(nuevaContrasena, 10);
-        await connection.execute(
-            'UPDATE usuarios SET Contrasena = ?, resetToken = NULL, resetTokenExpire = NULL WHERE CedulaId = ?',
-            [hash, users[0].CedulaId]
-        );
+        await hashPassword(hash)
 
         res.status(200).json({ message: "Contraseña establecida correctamente" });
     } catch (error) {
@@ -343,11 +243,7 @@ export const showResetForm = async (req, res) => {
     const { token } = req.params;
 
     try {
-        const connection = await connectDB();
-        const [users] = await connection.execute(
-            'SELECT * FROM usuarios WHERE resetToken = ? AND resetTokenExpire > ?',
-            [token, new Date()]
-        );
+        const users = await resetTokenModel(token);
 
         if (users.length === 0) {
             // Token inválido o expirado → puedes redirigir a una página de error en frontend

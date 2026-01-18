@@ -8,13 +8,13 @@ export const initRolesAndAdmin = async () => {
     // Crear roles si no existen
     const roles = ['Cliente', 'Administrador']; // Capitalizados para consistencia
     const createdRoles = {};
-    
+
     for (const roleName of roles) {
         const [existingRole] = await connection.execute(
             'SELECT * FROM roles WHERE Nombre = ?',
             [roleName]
         );
-        
+
         if (existingRole.length === 0) {
             const roleId = uuidv4();
             await connection.execute(
@@ -28,46 +28,52 @@ export const initRolesAndAdmin = async () => {
         }
     }
 
-    // 1. CREAR PERMISOS BÁSICOS SI NO EXISTEN
-    const permisosBasicos = [
-        { Nombre: 'ver_dashboard', Descripcion: 'Ver panel de control', Modulo: 'Dashboard' },
-        { Nombre: 'gestionar_roles', Descripcion: 'Gestionar roles de usuario', Modulo: 'Roles' },
+    const PERMISOS_SISTEMA = [
+        // Dashboard / Gráficos
+        { Nombre: 'ver_dashboard', Descripcion: 'Ver gráficos estadísticos del sistema', Modulo: 'Dashboard' },
+
+        // Roles
         { Nombre: 'ver_roles', Descripcion: 'Ver lista de roles', Modulo: 'Roles' },
-        { Nombre: 'gestionar_usuarios', Descripcion: 'Gestionar usuarios', Modulo: 'Usuarios' },
+        { Nombre: 'gestionar_roles', Descripcion: 'Crear, editar o eliminar roles', Modulo: 'Roles' },
+
+        // Usuarios
         { Nombre: 'ver_usuarios', Descripcion: 'Ver lista de usuarios', Modulo: 'Usuarios' },
-        { Nombre: 'gestionar_servicios', Descripcion: 'Gestionar servicios', Modulo: 'Servicios' },
-        { Nombre: 'ver_servicios', Descripcion: 'Ver servicios', Modulo: 'Servicios' },
-        { Nombre: 'gestionar_proveedores', Descripcion: 'Gestionar proveedores', Modulo: 'Insumos' },
-        { Nombre: 'ver_proveedores', Descripcion: 'Ver proveedores', Modulo: 'Insumos' },
-        { Nombre: 'gestionar_compras', Descripcion: 'Gestionar compras', Modulo: 'Insumos' },
-        { Nombre: 'ver_compras', Descripcion: 'Ver compras', Modulo: 'Insumos' },
-        { Nombre: 'gestionar_insumos', Descripcion: 'Gestionar insumos', Modulo: 'Insumos' },
-        { Nombre: 'ver_insumos', Descripcion: 'Ver insumos', Modulo: 'Insumos' },
-        { Nombre: 'gestionar_diseno', Descripcion: 'Gestionar diseño', Modulo: 'Diseño' },
-        { Nombre: 'ver_diseno', Descripcion: 'Ver diseño', Modulo: 'Diseño' },
-        { Nombre: 'gestionar_pedidos', Descripcion: 'Gestionar pedidos', Modulo: 'Ventas' },
-        { Nombre: 'ver_pedidos', Descripcion: 'Ver pedidos', Modulo: 'Ventas' },
-        { Nombre: 'gestionar_produccion', Descripcion: 'Gestionar producción', Modulo: 'Ventas' },
-        { Nombre: 'ver_produccion', Descripcion: 'Ver producción', Modulo: 'Ventas' },
-        { Nombre: 'gestionar_ventas', Descripcion: 'Gestionar ventas', Modulo: 'Ventas' },
-        { Nombre: 'ver_ventas', Descripcion: 'Ver ventas', Modulo: 'Ventas' },
-        { Nombre: 'ver_comprobantes', Descripcion: 'Ver comprobantes', Modulo: 'Comprobantes' },
-        { Nombre: 'gestionar_comprobantes', Descripcion: 'Gestionar comprobantes', Modulo: 'Comprobantes' },
-        { Nombre: 'gestionar_agenda', Descripcion: 'Gestionar agenda', Modulo: 'Agenda' },
-        { Nombre: 'ver_agenda', Descripcion: 'Ver agenda', Modulo: 'Agenda' },
-        // Permisos específicos para cliente
-        { Nombre: 'ver_productos_cliente', Descripcion: 'Ver productos como cliente', Modulo: 'Cliente' },
-        { Nombre: 'hacer_pedidos', Descripcion: 'Realizar pedidos', Modulo: 'Cliente' },
-        { Nombre: 'ver_mis_pedidos', Descripcion: 'Ver mis pedidos', Modulo: 'Cliente' },
-        { Nombre: 'gestionar_perfil', Descripcion: 'Gestionar perfil de cliente', Modulo: 'Cliente' }
+        { Nombre: 'gestionar_usuarios', Descripcion: 'Crear, editar o eliminar usuarios', Modulo: 'Usuarios' },
+
+        // Categorías
+        { Nombre: 'ver_categorias', Descripcion: 'Ver lista de categorías', Modulo: 'Categorias' },
+        { Nombre: 'gestionar_categorias', Descripcion: 'Crear, editar o eliminar categorías', Modulo: 'Categorias' },
+
+        // Productos
+        { Nombre: 'ver_productos', Descripcion: 'Ver lista de productos', Modulo: 'Productos' },
+        { Nombre: 'gestionar_productos', Descripcion: 'Crear, editar o eliminar productos', Modulo: 'Productos' },
+
+        // Servicios
+        { Nombre: 'ver_servicios', Descripcion: 'Ver lista de servicios', Modulo: 'Servicios' },
+        { Nombre: 'gestionar_servicios', Descripcion: 'Crear, editar o eliminar servicios', Modulo: 'Servicios' },
+
+        // Insumos
+        { Nombre: 'ver_proveedores', Descripcion: 'Ver lista de proveedores', Modulo: 'Insumos' },
+        { Nombre: 'gestionar_proveedores', Descripcion: 'Crear, editar o eliminar proveedores', Modulo: 'Insumos' },
+        { Nombre: 'ver_compras', Descripcion: 'Ver lista de compras', Modulo: 'Insumos' },
+        { Nombre: 'gestionar_compras', Descripcion: 'Registrar o modificar compras', Modulo: 'Insumos' },
+        { Nombre: 'ver_insumos', Descripcion: 'Ver lista de insumos', Modulo: 'Insumos' },
+        { Nombre: 'gestionar_insumos', Descripcion: 'Registrar o modificar insumos', Modulo: 'Insumos' },
+
+        // Ventas
+        { Nombre: 'ver_pedidos', Descripcion: 'Ver lista de pedidos de clientes', Modulo: 'Ventas' },
+        { Nombre: 'gestionar_pedidos', Descripcion: 'Actualizar estado de pedidos', Modulo: 'Ventas' },
+        { Nombre: 'ver_ventas', Descripcion: 'Ver lista de ventas', Modulo: 'Ventas' },
+        { Nombre: 'gestionar_ventas', Descripcion: 'Actualizar ventas o generar facturas', Modulo: 'Ventas' }
     ];
 
-    for (const permiso of permisosBasicos) {
+
+    for (const permiso of PERMISOS_SISTEMA) {
         const [existingPermiso] = await connection.execute(
             'SELECT * FROM permisos WHERE Nombre = ?',
             [permiso.Nombre]
         );
-        
+
         if (existingPermiso.length === 0) {
             await connection.execute(
                 'INSERT INTO permisos (PermisoId, Nombre, Descripcion, Modulo) VALUES (?, ?, ?, ?)',
@@ -79,14 +85,14 @@ export const initRolesAndAdmin = async () => {
 
     // 2. ASIGNAR TODOS LOS PERMISOS AL ADMINISTRADOR
     const [allPermisos] = await connection.execute('SELECT PermisoId FROM permisos');
-    
+
     for (const permiso of allPermisos) {
         // Verificar si ya existe la asignación
         const [existingAssignment] = await connection.execute(
             'SELECT * FROM rol_permisos WHERE RoleId = ? AND PermisoId = ?',
             [createdRoles['Administrador'], permiso.PermisoId]
         );
-        
+
         if (existingAssignment.length === 0) {
             await connection.execute(
                 'INSERT INTO rol_permisos (RoleId, PermisoId) VALUES (?, ?)',
@@ -100,13 +106,13 @@ export const initRolesAndAdmin = async () => {
     const [clientePermisos] = await connection.execute(
         'SELECT PermisoId FROM permisos WHERE Modulo = "Cliente"'
     );
-    
+
     for (const permiso of clientePermisos) {
         const [existingAssignment] = await connection.execute(
             'SELECT * FROM rol_permisos WHERE RoleId = ? AND PermisoId = ?',
             [createdRoles['Cliente'], permiso.PermisoId]
         );
-        
+
         if (existingAssignment.length === 0) {
             await connection.execute(
                 'INSERT INTO rol_permisos (RoleId, PermisoId) VALUES (?, ?)',
@@ -127,7 +133,7 @@ export const initRolesAndAdmin = async () => {
         const [tipoDoc] = await connection.execute(
             "SELECT TipoDocumentoId FROM tipodocumento WHERE Nombre = 'Cédula de Ciudadanía' LIMIT 1"
         );
-        
+
         const tipoDocumentoId = tipoDoc.length > 0 ? tipoDoc[0].TipoDocumentoId : null;
 
         const password = 'admin123';
@@ -138,7 +144,7 @@ export const initRolesAndAdmin = async () => {
              (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                "1000000000", 
+                "1000000000",
                 tipoDocumentoId,
                 'Administrador',
                 '0000000000',

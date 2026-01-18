@@ -21,106 +21,115 @@ import { useAuth } from "../../../context/AuthContext";
 
 // Mapeo de rutas a permisos requeridos
 const permissionMap = {
-  "/dashboard/graficosEstadisticos": ["ver_dashboard"],
+  // Roles
   "/dashboard/roles": ["ver_roles"],
+
+  // Usuarios
   "/dashboard/usuarios": ["ver_usuarios"],
-  "/dashboard/Diseño": ["ver_diseno"],
-  "/dashboard/productoServicio": ["ver_servicios"],
+
+  // Categorías
+  "/dashboard/categorias": ["ver_categorias"],
+
+  // Productos y Servicios
+  "/dashboard/producto": ["ver_productos"],
+  "/dashboard/Servicio": ["ver_servicios"],
+
+  // Proveedores / Insumos
   "/dashboard/proveedores": ["ver_proveedores"],
   "/dashboard/compras": ["ver_compras"],
   "/dashboard/insumos": ["ver_insumos"],
+
+  // Ventas
   "/dashboard/pedidosClientes": ["ver_pedidos"],
-  "/dashboard/produccion": ["ver_produccion"],
   "/dashboard/ventas": ["ver_ventas"],
-  "/dashboard/agenda": ["ver_agenda"],
-  "/dashboard/gestionVentas": ["ver_ventas", "ver_pedidos", "ver_produccion"], // Cualquiera de estos
+
+  // Gestión avanzada (cualquiera de estos)
+  "/dashboard/gestionVentas": [
+    "ver_ventas",
+    "ver_pedidos"
+  ]
 };
+
 
 // Configuración completa del menú con permisos
 const menuItems = [
-  { 
-    icon: BarChart3, 
-    label: "Gráficos Estadísticos", 
+  {
+    icon: BarChart3,
+    label: "Gráficos Estadísticos",
     to: "/dashboard/graficosEstadisticos",
     requiredPermission: "ver_dashboard"
   },
-  { 
-    icon: UserCheck, 
-    label: "Roles", 
+  {
+    icon: UserCheck,
+    label: "Roles",
     to: "/dashboard/roles",
     requiredPermission: "ver_roles"
   },
-  { 
-    icon: Users, 
-    label: "Usuarios", 
+  {
+    icon: Users,
+    label: "Usuarios",
     to: "/dashboard/usuarios",
     requiredPermission: "ver_usuarios"
   },
-  { 
-    icon: Palette, 
-    label: "Diseño", 
-    to: "/dashboard/Diseño",
-    requiredPermission: "ver_diseno"
+  {
+    icon: Palette,
+    label: "Diseño",
+    to: "/dashboard/diseño",
+    requiredPermission: "ver_categorias"
   },
-  { 
-    icon: Wrench, 
-    label: "Servicios", 
-    to: "/dashboard/productoServicio",
+  {
+    icon: Wrench,
+    label: "Productos",
+    to: "/dashboard/producto",
+    requiredPermission: "ver_productos"
+  },
+  {
+    icon: Wrench,
+    label: "Servicios",
+    to: "/dashboard/servicio",
     requiredPermission: "ver_servicios"
   },
   {
     icon: Package,
     label: "Control Insumos",
-    to: "/dashboard/insumos",
     hasSubmenu: true,
     submenu: [
-      { 
-        label: "Proveedores", 
+      {
+        label: "Proveedores",
         to: "/dashboard/proveedores",
         requiredPermission: "ver_proveedores"
       },
-      { 
-        label: "Compras", 
+      {
+        label: "Compras",
         to: "/dashboard/compras",
         requiredPermission: "ver_compras"
       },
-      { 
-        label: "Insumos", 
+      {
+        label: "Insumos",
         to: "/dashboard/insumos",
         requiredPermission: "ver_insumos"
-      },
-    ],
+      }
+    ]
   },
   {
     icon: ShoppingCart,
-    label: "Gestión de Ventas",
-    to: "/dashboard/gestionVentas",
+    label: "Ventas",
     hasSubmenu: true,
     submenu: [
-      { 
-        label: "Pedidos", 
+      {
+        label: "Pedidos",
         to: "/dashboard/pedidosClientes",
         requiredPermission: "ver_pedidos"
       },
-      { 
-        label: "Produccion", 
-        to: "/dashboard/produccion",
-        requiredPermission: "ver_produccion"
-      },
-      { 
-        label: "Venta", 
+      {
+        label: "Ventas",
         to: "/dashboard/ventas",
         requiredPermission: "ver_ventas"
       }
     ]
-  },
-  { 
-    icon: CalendarDays, 
-    label: "Agenda", 
-    to: "/dashboard/agenda",
-    requiredPermission: "ver_agenda"
   }
 ];
+
 
 export const Sidebar = () => {
   const { logout, user, permissions = [] } = useAuth();

@@ -2,9 +2,9 @@ import axios from "axios"
 const url = 'http://localhost:3000/'
 
 // Listar todos los datos
-export const GetDataservicios = async () => {
+export const GetDataproductos = async () => {
     try {
-        const response = await axios.get(url + 'servicio')
+        const response = await axios.get(url + 'producto')
         console.log("------------ ", response)
         return response
     } catch (error) {
@@ -13,9 +13,9 @@ export const GetDataservicios = async () => {
 }
 
 // Listar los datos de un regitro
-export const postDataservicios = async (data) => {
+export const postDataproductos = async (data) => {
     try {
-        const response = await axios.post(url + 'servicio', data)
+        const response = await axios.post(url + 'producto', data)
         return response
     } catch (error) {
         return { status: false, message: "No esta la api : ", error }
@@ -23,9 +23,9 @@ export const postDataservicios = async (data) => {
 }
 
 // Actualizar un registro
-export const updateDataservicios = async (id, data) => {
+export const updateDataproductos = async (id, data) => {
     try {
-        const response = await axios.put(url + `servicio/${id}`, data);
+        const response = await axios.put(url + `producto/${id}`, data);
         return response; // Devuelve la respuesta de la API
     } catch (error) {
         return { status: false, message: "No se puede actualizar el usuario : ", error }; // Manejo de errores
@@ -33,9 +33,9 @@ export const updateDataservicios = async (id, data) => {
 }
 
 // Eliminar un registro
-export const deleteDataservicio = async (id) => {
+export const deleteDataproducto = async (id) => {
     try {
-        const response = await axios.delete(url + `servicio/${id}`);
+        const response = await axios.delete(url + `producto/${id}`);
         return response; // Devuelve la respuesta de la API
     } catch (error) {
         return { status: false, message: "No se puede eliminar el usuario : ", error }; // Manejo de errores
@@ -44,9 +44,9 @@ export const deleteDataservicio = async (id) => {
 
 //Buscar usuarios
 
-export const buscarservicios = async (campo, valor) => {
+export const buscarProductos = async (campo, valor) => {
   const response = await axios.get(
-    `${url}servicio/buscar`,
+    `${url}producto/buscar`,
     { params: { campo, valor } }
   );
   return response.data.results;

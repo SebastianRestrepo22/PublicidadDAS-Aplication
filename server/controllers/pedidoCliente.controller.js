@@ -13,7 +13,6 @@ import {
   getDetallePedidoByPedidoIdModel,
   deleteDetallePedidoModel
 } from "../models/detallePedidoCliente.model.js";
-import { crearProduccionDesdePedido } from "../services/produccion.service.js"; // ✅ Solo esta función se usa
 import { crearVentaDesdePedidoId } from "./ventas.controller.js";
 import QRCode from "qrcode";
 
@@ -176,16 +175,6 @@ export const updatePedidoCliente = async (req, res) => {
       return res.status(404).json({ error: "Pedido no encontrado" });
     }
 
-    // ✅ CREAR PRODUCCIÓN AUTOMÁTICA AL CAMBIAR A "en_produccion"
-    if (Estado === "en_produccion" && estadoAnterior !== "en_produccion") {
-      try {
-        await crearProduccionDesdePedido(id); // ✅ Usar función importada correctamente
-        console.log(`✅ Producción automática creada para el pedido ${id}`);
-      } catch (err) {
-        console.error("⚠️ Error al crear producción automática:", err.message);
-        // No se rechaza la actualización del pedido
-      }
-    }
 
     //  CREAR VENTA cuando pasa a "terminado"
     if (Estado === "terminado" && estadoAnterior !== "terminado") {

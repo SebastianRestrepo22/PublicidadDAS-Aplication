@@ -154,7 +154,7 @@ export const Login = () => {
   const getLoginError = (fieldName) => loginErrors[fieldName] || '';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100 flex flex-col relative overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100 flex flex-col relative overflow-hidden">
       <Navbar />
       <div className="flex flex-1 items-center justify-center p-4 relative pt-16">
         {/* Fondos decorativos */}
@@ -190,9 +190,6 @@ export const Login = () => {
                 >
                   <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl p-5 border border-white/20">
                     <div className="text-center mb-6">
-                      <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-3xl mb-3 shadow-xl transform hover:scale-110 transition-transform duration-300">
-                        <Lock className="text-white" size={28} />
-                      </div>
                       <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
                         Iniciar Sesión
                       </h1>
@@ -298,16 +295,13 @@ export const Login = () => {
                     }`}
                 >
                   <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 flex flex-col max-h-[85vh]">
-                    <div className="p-5 text-center mb-0">
-                      <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 rounded-3xl mb-3 shadow-xl transform hover:scale-110 transition-transform duration-300">
-                        <User className="text-white" size={28} />
-                      </div>
+                    <div className="p-2 text-center mb-0">
                       <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 bg-clip-text text-transparent mb-2">
                         Crear Cuenta
                       </h1>
                     </div>
 
-                    <div className="overflow-y-auto p-5 flex-1">
+                    <div className="p-3 flex-1">
                       <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="group">

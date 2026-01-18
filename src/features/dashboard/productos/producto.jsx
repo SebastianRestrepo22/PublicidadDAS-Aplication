@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
-import { Search, Plus, Edit, Eye, Trash2, ArrowLeft } from "lucide-react";
-import { buscarServicios, deleteDataService, GetDataServices, postDataServices, updateDataServices } from "./services/services.servicios";
+import { Search, Plus, Edit, Eye, Trash2, ArrowLeft, X } from "lucide-react";
+import { deleteDataproducto, GetDataproductos, postDataproductos, updateDataproductos, buscarProductos } from "./services/services.products.js";
 import { getAllCategorias } from "../categoriadediseño/services/services.categoria.js";
 import axios from "axios";
 
@@ -10,29 +10,29 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Pagination } from "../components/paginacion/pagination.jsx";
 
-export const ProductoServicios = () => {
+import Modal from "../components/modals/modal.jsx";
+
+export const ProductosDashboard = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
 
   // Estabilizamos 'mode' con useMemo
   const mode = useMemo(() => {
-    if (location.pathname === "/dashboard/productoServicio/nuevo") return "create";
-    if (id && location.pathname === `/dashboard/productoServicio/${id}/editar`) return "edit";
-    if (id && location.pathname === `/dashboard/productoServicio/${id}`) return "view";
+    if (location.pathname === "/dashboard/producto/nuevo") return "create";
+    if (id && location.pathname === `/dashboard/producto/${id}/editar`) return "edit";
+    if (id && location.pathname === `/dashboard/producto/${id}`) return "view";
     return "list";
   }, [location.pathname, id]);
 
   const [values, setValues] = useState({
-    ProductoServicioId: "",
-    Tipo: "",
+    ProductoId: "",
     Nombre: "",
     Descripcion: "",
-    UrlImagen: "",
+    Imagen: "",
     Precio: "",
     Descuento: "",
     Stock: "",
-    EsPersonalizado: false,
     CategoriaId: ""
   });
   const [submitted, setSubmitted] = useState(false);
@@ -42,6 +42,8 @@ export const ProductoServicios = () => {
 
   const [editData, setEditData] = useState(null);
   const [categorias, setCategorias] = useState([]);
+
+  const [openEliminar, setOpenEliminar] = useState(false);
 
   // ======================================================
   // ESTADOS DE PAGINACIÓN - COPIAR TAL CUAL
@@ -77,34 +79,33 @@ export const ProductoServicios = () => {
   // CARGA DE DATOS CON PAGINACIÓN
   // ======================================================
   useEffect(() => {
-    const cargarProductoServicio = async () => {
+    const cargarProducto = async () => {
       // Solo cargamos datos en modo lista
       if (mode !== "list") return;
-      
+
       try {
         let resultados;
         if (filtroCampo && filtroValor) {
-          // Búsqueda por filtro
-          resultados = await buscarServicios(filtroCampo, filtroValor);
+          const res = await buscarProductos(filtroCampo, filtroValor);
+          resultados = Array.isArray(res) ? res : [];
         } else {
-          // Si no hay filtro, obtener todos
-          const todos = await GetDataServices();
-          resultados = todos?.data || [];
+          const todos = await GetDataproductos();
+          resultados = Array.isArray(todos?.data) ? todos.data : [];
         }
-        
+
         // 1. Guardar todos los datos
         setAllData(Array.isArray(resultados) ? resultados : []);
         setTotalItems(Array.isArray(resultados) ? resultados.length : 0);
-        
+
         // 2. Calcular total de páginas
         const totalPages = Math.ceil(resultados.length / itemsPerPage);
         setTotalPages(totalPages > 0 ? totalPages : 1);
-        
+
         // 3. Ajustar página actual si es necesario
         if (currentPage > totalPages && totalPages > 0) {
           setCurrentPage(totalPages);
         }
-        
+
         // 4. Paginar los datos
         const paginatedData = paginateData(Array.isArray(resultados) ? resultados : []);
         setPaginatedData(paginatedData);
@@ -116,8 +117,15 @@ export const ProductoServicios = () => {
         setTotalPages(1);
       }
     };
-    cargarProductoServicio();
+    cargarProducto();
   }, [filtroCampo, filtroValor, currentPage, itemsPerPage, mode]);
+
+  useEffect(() => {
+    if (filtroCampo && filtroValor) {
+      setCurrentPage(1);
+    }
+  }, [filtroCampo, filtroValor]);
+
 
   // ======================================================
   // EFECTO PARA RECALCULAR PAGINACIÓN - COPIAR TAL CUAL
@@ -126,11 +134,11 @@ export const ProductoServicios = () => {
     if (allData.length > 0 && mode === "list") {
       const totalPages = Math.ceil(allData.length / itemsPerPage);
       setTotalPages(totalPages > 0 ? totalPages : 1);
-      
+
       if (currentPage > totalPages && totalPages > 0) {
         setCurrentPage(totalPages);
       }
-      
+
       const paginatedData = paginateData(allData);
       setPaginatedData(paginatedData);
     }
@@ -139,12 +147,12 @@ export const ProductoServicios = () => {
   // Cargar datos para ver/editar
   useEffect(() => {
     if (mode === "view" || mode === "edit") {
-      const cargarProductoServicio = async () => {
+      const cargarProducto = async () => {
         try {
-          const todos = await GetDataServices();
+          const todos = await GetDataproductos();
           const resultados = todos?.data || [];
-          const producto = resultados.find(p => p.ProductoServicioId === id);
-          
+          const producto = resultados.find(p => p.ProductoId === id);
+
           if (producto) {
             setEditData(producto);
             setValues({ ...producto });
@@ -158,53 +166,41 @@ export const ProductoServicios = () => {
           goToBackToList();
         }
       };
-      cargarProductoServicio();
+      cargarProducto();
     }
   }, [mode, id]);
 
   // Navegación entre pestañas
   const goToBackToList = () => {
-    navigate("/dashboard/productoServicio");
+    navigate("/dashboard/producto");
     resetForm();
   };
 
   const goToCreate = () => {
-    navigate("/dashboard/productoServicio/nuevo");
+    navigate("/dashboard/producto/nuevo");
     resetForm();
   };
 
-  const goToView = (productoId) => {
-    navigate(`/dashboard/productoServicio/${productoId}`);
+  const goToView = (ProductoId) => {
+    navigate(`/dashboard/producto/${ProductoId}`);
   };
 
-  const goToEdit = (productoId) => {
-    navigate(`/dashboard/productoServicio/${productoId}/editar`);
+  const goToEdit = (ProductoId) => {
+    navigate(`/dashboard/producto/${ProductoId}/editar`);
   };
 
   const handleChanges = (e) => {
     const { name, value } = e.target;
-    
-    if (name === "Tipo" && value === "Servicio") {
-      setValues({ 
-        ...values, 
-        [name]: value,
-        Stock: "0"
-      });
-    } else if (name === "Tipo" && value === "Producto") {
-      setValues({ 
-        ...values, 
-        [name]: value,
-        Stock: values.Stock === "0" ? "" : values.Stock
-      });
-    } else {
-      setValues({ ...values, [name]: value });
-    }
+    setValues({
+      ...values,
+      [name]: value
+    });
   };
 
   const handleNombreBlur = async () => {
     if (values.Nombre === originalNombre) return;
     try {
-      const response = await axios.get(`http://localhost:3000/service/validar-nombre?nombre=${values.Nombre}`);
+      const response = await axios.get(`http://localhost:3000/Producto/validar-nombre?nombre=${values.Nombre}`);
       setNombreError(response.data.exists ? 'Este nombre ya está registrado' : '');
     } catch {
       setNombreError('No se pudo validar el nombre');
@@ -213,15 +209,13 @@ export const ProductoServicios = () => {
 
   const resetForm = () => {
     setValues({
-      ProductoServicioId: "",
-      Tipo: "",
+      ProductoId: "",
       Nombre: "",
       Descripcion: "",
-      UrlImagen: "",
+      Imagen: "",
       Precio: "",
       Descuento: "",
       Stock: "",
-      EsPersonalizado: false,
       CategoriaId: ""
     });
     setEditData(null);
@@ -236,22 +230,17 @@ export const ProductoServicios = () => {
     e.preventDefault();
     setSubmitted(true);
 
-    if (values.Tipo === "Producto" && (!values.Stock || values.Stock <= 0)) {
-      toast.error("Para productos, debe ingresar un stock mayor a 0");
-      return;
-    }
-
     try {
       if (editData) {
-        const response = await updateDataServices(editData.ProductoServicioId, values);
+        const response = await updateDataproductos(editData.ProductoId, values);
         if (response.status === 200) {
-          toast.success("Producto/servicio actualizado correctamente");
+          toast.success("Producto actualizado correctamente");
           goToBackToList();
         }
       } else {
-        const response = await postDataServices(values);
+        const response = await postDataproductos(values);
         if (response.status === 201) {
-          toast.success("Producto/servicio creado correctamente");
+          toast.success("Producto creado correctamente");
           goToBackToList();
         }
       }
@@ -266,21 +255,28 @@ export const ProductoServicios = () => {
   // ======================================================
   const handleDelete = async (id) => {
     try {
-      const response = await deleteDataService(id);
+      const response = await deleteDataproducto(id);
       if (response.status === 200 || response.status === 201) {
         toast.success(response.data.message);
         // Recargar datos después de eliminar
-        const updatedList = await GetDataServices();
+        const updatedList = await GetDataproductos();
         if (updatedList?.data) {
           setAllData(updatedList.data);
           setTotalItems(updatedList.data.length);
         }
+        setOpenEliminar(false);
+
       } else {
-        toast.error(response.message || "No se pudo eliminar el producto/servicio");
+        toast.error(response.message || "No se pudo eliminar el producto");
       }
     } catch (error) {
-      toast.error(error.message || "Error al eliminar el producto/servicio");
+      toast.error(error.message || "Error al eliminar el producto");
     }
+  };
+
+  const handleDeleteClick = (producto) => {
+    setEditData(producto);
+    setOpenEliminar(true);
   };
 
   // ======================================================
@@ -296,17 +292,11 @@ export const ProductoServicios = () => {
   };
 
   const handleEditClick = (u) => {
-    goToEdit(u.ProductoServicioId);
+    goToEdit(u.ProductoId);
   };
 
   const handleViewClick = (u) => {
-    goToView(u.ProductoServicioId);
-  };
-
-  const handleDeleteClick = (u) => {
-    if (window.confirm("¿Estás seguro de eliminar este producto/servicio?")) {
-      handleDelete(u.ProductoServicioId);
-    }
+    goToView(u.ProductoId);
   };
 
   // Función para renderizar el formulario
@@ -316,25 +306,6 @@ export const ProductoServicios = () => {
     return (
       <form onSubmit={handleSubmit} className="flex flex-col gap-6 p-4 bg-white rounded-lg shadow-md">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex flex-col gap-1">
-            <label className="font-medium">Tipo</label>
-            <select
-              name="Tipo"
-              value={values.Tipo || ""}
-              onChange={handleChanges}
-              className={`w-full h-10 px-3 border rounded-lg bg-[#EEECEC] focus:outline-none focus:ring-2 focus:ring-blue-500
-              ${submitted && !values.Tipo.trim() ? "border-red-500" : "border-gray-300"}`}>
-              <option value="">Seleccione tipo</option>
-              <option value="Producto">Producto</option>
-              <option value="Servicio">Servicio</option>
-            </select>
-            <div className="min-h-[16px] mt-0.5">
-              {(!values.Tipo.trim() && submitted) && (
-                <p className="text-red-500 text-[12px] leading-4">Seleccione un tipo</p>
-              )}
-            </div>
-          </div>
-
           <div className="flex flex-col gap-1">
             <label className="font-medium">Nombre</label>
             <input
@@ -382,11 +353,11 @@ export const ProductoServicios = () => {
             <input
               type="text"
               placeholder="http://..."
-              name="UrlImagen"
-              value={values.UrlImagen}
+              name="Imagen"
+              value={values.Imagen}
               onChange={handleChanges}
               className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-              ${submitted && !values.UrlImagen.trim() ? "border-red-500" : "border-gray-300"}`} />
+              ${submitted && !values.Imagen.trim() ? "border-red-500" : "border-gray-300"}`} />
 
             <input
               type="file"
@@ -398,7 +369,7 @@ export const ProductoServicios = () => {
                   reader.onloadend = () => {
                     handleChanges({
                       target: {
-                        name: "UrlImagen",
+                        name: "Imagen",
                         value: reader.result,
                       },
                     });
@@ -409,17 +380,17 @@ export const ProductoServicios = () => {
               className="w-full h-10 px-3 border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="min-h-[16px] mt-0.5">
-              {(!values.UrlImagen.trim() && submitted) && (
+              {(!values.Imagen.trim() && submitted) && (
                 <p className="text-red-500 text-[12px] leading-4">Seleccione o ingrese una imagen</p>
               )}
             </div>
           </div>
 
-          {values.UrlImagen && (
+          {values.Imagen && (
             <div className="flex-shrink-0">
               <p className="text-sm text-gray-500 mb-1">Vista previa:</p>
               <img
-                src={values.UrlImagen}
+                src={values.Imagen}
                 alt="Vista previa"
                 className="w-[80px] h-[80px] object-cover rounded border border-gray-300"
               />
@@ -473,16 +444,6 @@ export const ProductoServicios = () => {
                 ${values.Tipo === "Servicio" ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-white"}
                 ${submitted && values.Tipo === "Producto" && (!values.Stock || values.Stock <= 0) ? "border-red-500" : "border-gray-300"}`}
             />
-            <div className="min-h-[16px] mt-0.5">
-              {values.Tipo === "Servicio" && (
-                <p className="text-blue-600 text-[12px] leading-4">
-                  ⓘ Los servicios no requieren stock (automáticamente se establece en 0)
-                </p>
-              )}
-              {submitted && values.Tipo === "Producto" && (!values.Stock || values.Stock <= 0) && (
-                <p className="text-red-500 text-[12px] leading-4">Para productos, debe ingresar un stock mayor a 0</p>
-              )}
-            </div>
           </div>
         </div>
 
@@ -509,19 +470,6 @@ export const ProductoServicios = () => {
             </div>
 
           </div>
-
-          <div className="flex flex-col items-start gap-1">
-            <label className="font-medium">Es personalizado</label>
-            <input
-              type="checkbox"
-              name="EsPersonalizado"
-              checked={values.EsPersonalizado || false}
-              onChange={(e) =>
-                setValues({ ...values, EsPersonalizado: e.target.checked })
-              }
-              className="w-5 h-5 border-gray-300 focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
         </div>
 
         <div className="flex gap-4 mt-4">
@@ -542,26 +490,24 @@ export const ProductoServicios = () => {
 
   const renderView = () => {
     if (!editData) return <div>Cargando...</div>;
-    
+
     return (
       <div className="text-left space-y-4 p-4 bg-white rounded-lg shadow-md">
         <h3 className="text-lg font-black text-gray-800 mb-4">Detalles del Producto/Servicio</h3>
         <div className="grid grid-cols-2 gap-4">
-          <div><strong>ID:</strong> {editData.ProductoServicioId}</div>
-          <div><strong>Tipo:</strong> {editData.Tipo}</div>
+          <div><strong>ID:</strong> {editData.ProductoId}</div>
           <div><strong>Nombre:</strong> {editData.Nombre}</div>
           <div><strong>Descripción:</strong> {editData.Descripcion || "—"}</div>
           <div><strong>Precio:</strong> ${editData.Precio}</div>
           <div><strong>Descuento:</strong> {editData.Descuento}%</div>
           <div><strong>Stock:</strong> {editData.Stock}</div>
-          <div><strong>Es personalizado:</strong> {editData.EsPersonalizado ? "Sí" : "No"}</div>
           <div><strong>Categoría:</strong> {categorias.find(c => c.CategoriaId === editData.CategoriaId)?.Nombre || editData.CategoriaId}</div>
         </div>
-        {editData.UrlImagen && (
+        {editData.Imagen && (
           <div className="mt-4">
             <p className="font-medium mb-2">Imagen:</p>
             <img
-              src={editData.UrlImagen}
+              src={editData.Imagen}
               alt={editData.Nombre}
               className="w-40 h-40 object-cover rounded-lg border"
             />
@@ -583,7 +529,7 @@ export const ProductoServicios = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-full mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">
-          Gestión de productos/servicios
+          Gestión de productos
         </h1>
 
         {/* === LISTA === */}
@@ -595,7 +541,7 @@ export const ProductoServicios = () => {
                 onClick={goToCreate}
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow"
               >
-                <Plus size={18} /> Nuevo producto/servicio
+                <Plus size={18} /> Nuevo producto
               </button>
 
               <div className="relative flex-1 max-w-md">
@@ -604,29 +550,49 @@ export const ProductoServicios = () => {
                   value={filtroValor}
                   onChange={(e) => setFiltroValor(e.target.value)}
                   type="text"
-                  placeholder="Buscar producto/servicio"
+                  placeholder="Buscar producto"
                   className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-700"
                 />
               </div>
 
-               <select
+              <select
                 value={filtroCampo}
                 onChange={(e) => setFiltroCampo(e.target.value)}
                 className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[180px]"
               >
                 <option value="">Filtrar por campo</option>
-                <option value="tipo">Tipo</option>
                 <option value="nombre">Nombre</option>
                 <option value="descripcion">Descripción</option>
-                <option value="url">URL</option>
                 <option value="precio">Precio</option>
                 <option value="descuento">Descuento</option>
                 <option value="stock">Stock</option>
-                <option value="personalizado">Personalizado</option>
                 <option value="categoria">CategoriaId</option>
               </select>
 
             </div>
+
+            <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
+              <div className="w-[400px] p-6 mx-auto text-center bg-white rounded-xl shadow-lg">
+                <h3 className="text-lg font-black text-gray-800 mb-4">Eliminar producto</h3>
+                <p className="mb-6 text-gray-600">¿Estás seguro de eliminar este producto?</p>
+                <div className="flex gap-4">
+                  <button
+                    className="flex-1 bg-red-500 text-white py-2.5 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2 font-medium"
+                    onClick={() => handleDelete(editData.ProductoId)}
+                  >
+                    <Trash2 size={16} />
+                    Eliminar
+                  </button>
+                  <button
+                    className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors flex items-center justify-center gap-2 font-medium"
+                    onClick={() => setOpenEliminar(false)}
+                  >
+                    <X size={16} />
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </Modal>
 
             {/* TABLA - USAR paginatedData */}
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -635,14 +601,12 @@ export const ProductoServicios = () => {
                   <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
                     <tr>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">ID</th>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Tipo</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Nombre</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Descripción</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Imagen</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Precio</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Descuento</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Stock</th>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Personalizado</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Categoría</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Acciones</th>
                     </tr>
@@ -650,14 +614,9 @@ export const ProductoServicios = () => {
                   <tbody className="divide-y divide-slate-100">
                     {paginatedData.length > 0 ? (
                       paginatedData.map((p) => (
-                        <tr key={p.ProductoServicioId} className="hover:bg-slate-50 transition-colors duration-150">
-                          <td className="py-3 px-4 text-sm text-gray-700 truncate max-w-[100px]" title={p.ProductoServicioId}>
-                            {p.ProductoServicioId.slice(0, 3)}...
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${p.Tipo === 'Producto' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
-                              {p.Tipo}
-                            </span>
+                        <tr key={p.ProductoId} className="hover:bg-slate-50 transition-colors duration-150">
+                          <td className="py-3 px-4 text-sm text-gray-700 truncate max-w-[100px]" title={p.ProductoId}>
+                            {p.ProductoId.slice(0, 3)}...
                           </td>
                           <td className="py-3 px-4 text-sm font-medium text-gray-900 truncate max-w-[150px]" title={p.Nombre}>
                             {p.Nombre}
@@ -666,11 +625,11 @@ export const ProductoServicios = () => {
                             {p.Descripcion || "—"}
                           </td>
                           <td className="py-3 px-4">
-                            {p.UrlImagen ? (
+                            {p.Imagen ? (
                               <div className="flex items-center justify-center">
-                                <img 
-                                  src={p.UrlImagen} 
-                                  alt={p.Nombre} 
+                                <img
+                                  src={p.Imagen}
+                                  alt={p.Nombre}
                                   className="w-10 h-10 object-cover rounded-md border border-gray-200"
                                 />
                               </div>
@@ -691,24 +650,9 @@ export const ProductoServicios = () => {
                             )}
                           </td>
                           <td className="py-3 px-4">
-                            {p.Tipo === "Servicio" ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600" title="Servicio - Stock no aplica">
-                                N/A
-                              </span>
-                            ) : (
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${p.Stock > 10 ? 'bg-green-100 text-green-800' : p.Stock > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                                {p.Stock}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            {p.EsPersonalizado ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                Sí
-                              </span>
-                            ) : (
-                              <span className="text-gray-500 text-sm">No</span>
-                            )}
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${p.Stock > 10 ? 'bg-green-100 text-green-800' : p.Stock > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                              {p.Stock}
+                            </span>
                           </td>
                           <td className="py-3 px-4 text-sm text-gray-700 truncate max-w-[120px]" title={categorias.find(c => c.CategoriaId === p.CategoriaId)?.Nombre}>
                             {categorias.find(c => c.CategoriaId === p.CategoriaId)?.Nombre || "—"}
@@ -745,8 +689,8 @@ export const ProductoServicios = () => {
                         <td colSpan={11} className="py-12 text-center">
                           <div className="flex flex-col items-center justify-center text-gray-400">
                             <Search size={48} className="mb-3 opacity-50" />
-                            <p className="text-lg font-medium">No hay productos o servicios registrados</p>
-                            <p className="text-sm mt-1">Comienza creando un nuevo producto o servicio</p>
+                            <p className="text-lg font-medium">No hay productos registrados</p>
+                            <p className="text-sm mt-1">Comienza creando un nuevo producto</p>
                           </div>
                         </td>
                       </tr>
@@ -754,7 +698,7 @@ export const ProductoServicios = () => {
                   </tbody>
                 </table>
               </div>
-              
+
               {/* COMPONENTE DE PAGINACIÓN */}
               {paginatedData.length > 0 && (
                 <Pagination
@@ -777,7 +721,7 @@ export const ProductoServicios = () => {
               <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
                 <ArrowLeft size={18} />
               </button>
-              <h3 className="text-lg font-bold">Nuevo producto/servicio</h3>
+              <h3 className="text-lg font-bold">Nuevo producto</h3>
             </div>
             {renderForm()}
           </div>
@@ -791,7 +735,7 @@ export const ProductoServicios = () => {
                 <ArrowLeft size={18} />
               </button>
               <h3 className="text-lg font-bold">
-                Ver producto/servicio #{editData?.ProductoServicioId || id}
+                Ver producto #{editData?.ProductoId || id}
               </h3>
             </div>
             {renderView()}
@@ -806,7 +750,7 @@ export const ProductoServicios = () => {
                 <ArrowLeft size={18} />
               </button>
               <h3 className="text-lg font-bold">
-                Editar producto/servicio #{editData?.ProductoServicioId || id}
+                Editar producto #{editData?.ProductoId || id}
               </h3>
             </div>
             {renderForm()}

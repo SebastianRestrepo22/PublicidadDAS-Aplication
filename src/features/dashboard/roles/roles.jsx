@@ -696,7 +696,7 @@ export const Roles = () => {
             </div>
           </Modal>
 
-          {/* Tabla - CORREGIDO: Solo mostrar el toggle, sin texto */}
+          {/* Tabla */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full">

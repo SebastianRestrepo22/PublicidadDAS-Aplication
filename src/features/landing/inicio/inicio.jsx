@@ -18,25 +18,25 @@ export const Inicio = () => {
             icon: "payments",
             title: "Calidad al cliente",
             description: "Eres nuestro mayor objetivo .",
-            image: "/multimedia/espacio_1.png",
+            image: "/multimedia/pape1.jpg",
         },
         {
             icon: "public",
             title: "Confianza estandar",
             description: "Queremos lo mejor para ti por eso trabajamos duro en ello.",
-            image: "/multimedia/espacio_2.png",
+            image: "/multimedia/pape2.jpg",
         },
         {
             icon: "group",
             title: "Encuentra lo que buscas",
             description: "Somos escogidos por la gran variedad de productos que ofrecemos.",
-            image: "/multimedia/espacio_1.png",
+            image: "/multimedia/pape3.jpg",
         },
         {
             icon: "group",
             title: "Pedidos seguros",
             description: "Tus pedidos con nostros estan seguros.",
-            image: "/multimedia/espacio_1.png",
+            image: "/multimedia/pape4.jpg",
         }
     ];
 
@@ -161,14 +161,14 @@ export const Inicio = () => {
                         </p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                             {[
-                                { name: "VOLANTES", img: "/multimedia/volantes.jpg", alt: "Volantes" },
-                                { name: "CARTELES", img: "/multimedia/carteles.jpg", alt: "Carteles" },
-                                { name: "CATÁLOGOS", img: "/multimedia/catalogo.jpg", alt: "Catálogos" },
+                                { name: "LAPICEROS", img: "/multimedia/lapiceros.jpg", alt: "Lapiceros" },
+                                { name: "PAPEL IRIS", img: "/multimedia/iris.png", alt: "Papeliris" },
+                                { name: "MARCADORES", img: "/multimedia/marcadores.jpg", alt: "Marcadores" },
                                 { name: "AGENDA Y CUADERNOS", img: "/multimedia/cuadernos.jpg", alt: "Agenda y Cuaderno" },
-                                { name: "POSTERS", img: "/multimedia/posters.jpg", alt: "Posters" },
-                                { name: "PENDONES", img: "/multimedia/pendon.jpg", alt: "Pendones" },
-                                { name: "ETIQUETAS Y ADHESIVOS", img: "/multimedia/etiquetas.png", alt: "Etiquetas y Adhesivos" },
-                                { name: "AVISOS LUMINOSOS", img: "/multimedia/aviso.jpg", alt: "Avisos Luminosos" },
+                                { name: "REGLA", img: "/multimedia/regla1.jpg", alt: "Reglas" },
+                                { name: "TIJERAS", img: "/multimedia/tijeras.jpg", alt: "Tijeras" },
+                                { name: "COLORES", img: "/multimedia/colores.jpg", alt: "Colores" },
+                                { name: "BORRADOR SACAPUNTA", img: "/multimedia/borradorsaca.png", alt: "Borradorsaca" },
                             ].map((item, index) => (
                                 <div
                                     key={index}
@@ -270,58 +270,6 @@ export const Inicio = () => {
                                             />
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"></div>
                                         </div>
-
-                                        {/* Badge de métodos de pago (solo para índice 2) */}
-                                        {activeIndex === 2 && (
-                                            <motion.div
-                                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                                transition={{ duration: 0.4, delay: 0.2 }}
-                                                className="absolute top-8 right-8 bg-white rounded-xl shadow-2xl p-5 max-w-xs"
-                                            >
-                                                <p className="text-sm font-semibold text-gray-800 mb-3">
-                                                    Paga online vía nuestro checkout
-                                                </p>
-                                                <div className="grid grid-cols-3 gap-2 mb-3">
-                                                    <div className="bg-gray-50 rounded-lg p-2 flex items-center justify-center h-10">
-                                                        <span className="text-blue-700 font-bold text-sm">VISA</span>
-                                                    </div>
-                                                    <div className="bg-gray-50 rounded-lg p-2 flex items-center justify-center h-10">
-                                                        <div className="flex space-x-1">
-                                                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                                                            <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="bg-gray-50 rounded-lg p-2 flex items-center justify-center h-10">
-                                                        <span className="text-blue-600 font-bold text-xs">AMERICAN<br />EXPRESS</span>
-                                                    </div>
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-2 mb-4">
-                                                    <div className="bg-gray-50 rounded-lg p-2 flex items-center justify-center h-10">
-                                                        <span className="text-blue-600 font-bold text-sm">PayPal</span>
-                                                    </div>
-                                                    <div className="bg-gray-50 rounded-lg p-2 flex items-center justify-center h-10">
-                                                        <span className="text-gray-900 font-semibold text-sm">Apple Pay</span>
-                                                    </div>
-                                                    <div className="bg-gray-50 rounded-lg p-2 flex items-center justify-center h-10">
-                                                        <span className="font-bold text-sm">G Pay</span>
-                                                    </div>
-                                                </div>
-                                                <div className="border-t pt-3">
-                                                    <p className="text-sm font-semibold text-gray-800 mb-2">
-                                                        Paga vía transferencia bancaria
-                                                    </p>
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <div className="bg-gray-50 rounded-lg p-2 flex items-center justify-center h-10">
-                                                            <span className="text-gray-700 text-xs font-semibold">JP Morgan</span>
-                                                        </div>
-                                                        <div className="bg-gray-50 rounded-lg p-2 flex items-center justify-center h-10">
-                                                            <span className="text-blue-600 text-sm font-bold">citibank</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </motion.div>
-                                        )}
                                     </motion.div>
                                 </AnimatePresence>
                             </div>

@@ -3,13 +3,11 @@ import { Productos } from "../features/landing/nuestrosproductos/productos";
 import { QuienesSomos } from "../features/landing/quienessomos/quienesSomos";
 import { Login } from "../features/landing/login/login";
 import { Insumos } from "../features/dashboard/constrolinsumos/insumos/insumos";
-import { ProductoServicios } from "../features/dashboard/servicios/productoServicios";
 import { Usuarios } from "../features/dashboard/usuarios/usuarios";
 import { Roles } from "../features/dashboard/roles/roles";
 import { DashboardLayout } from "../features/dashboard/components/dashboardLoyout";
 import { Error404 } from "../features/404/error404";
 import { GraficosEstadisticos } from "../features/dashboard/dashboard/graficoEstadisticos";
-import { Diseño } from "../features/dashboard/categoriadediseño/diseño";
 import { RecuperarContrasena } from "../features/landing/login/RecuperarContrasena";
 import { RestablecerContrasena } from "../features/landing/login/RestablecerContrasena";
 import { CarritoCompras } from "../features/landing/carritoCompras/carritoCompras";
@@ -21,7 +19,6 @@ import { Perfil } from "../features/landing/carritoCompras/perfil/perfil";
 import MisPedidos from "../features/landing/historial/MisPedidos";
 import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidosClientes";
 import { Ventas } from "../features/dashboard/gestionventas/venta/ventas";
-import { Produccion } from "../features/dashboard/gestionventas/produccion/produccion";
 import { Checkout } from "../features/landing/carritoCompras/checkout/checkout";
 import { PedidoExitoso } from "../features/dashboard/gestionventas/pedidos/pedidoExitoso/pedidoExitoso";
 import { ScrollToTop } from "../features/landing/components/ScrollToTop";
@@ -31,6 +28,9 @@ import { Proveedores } from "../features/dashboard/constrolinsumos/proveedores/p
 import { Servicios } from "../features/landing/nuestrosservicios/servicios";
 import { ProductoDetalle } from "../features/landing/nuestrosproductos/productodetalle";
 import { ServicioDetalle } from "../features/landing/nuestrosservicios/servicioDetalle";
+import { Diseño } from "../features/dashboard/categoriadediseño/diseño";
+import { ProductosDashboard } from "../features/dashboard/productos/producto";
+import { ServiciosDashboard } from "../features/dashboard/servicios/servicio";
 
 export const Routers = () => {
   return (
@@ -105,18 +105,22 @@ export const Routers = () => {
           }
         >
           <Route path="graficosEstadisticos" element={<GraficosEstadisticos />} />
+          <Route path="diseño" element={<Diseño/>} />
           <Route path="usuarios" element={<Usuarios />} />
           <Route path="roles" element={<Roles />} />
           <Route path="insumos" element={<Insumos />} />
           <Route path="proveedores" element={<Proveedores />} />
 
-          <Route path="productoServicio" element={<ProductoServicios />} />
-          <Route path="productoServicio/nuevo" element={<ProductoServicios />} />
-          <Route path="productoServicio/:id" element={<ProductoServicios />} />
-          <Route path="productoServicio/:id/editar" element={<ProductoServicios />} />
+          <Route path="producto" element={<ProductosDashboard />} />
+          <Route path="producto/nuevo" element={<ProductosDashboard />} />
+          <Route path="producto/:id" element={<ProductosDashboard />} />
+          <Route path="producto/:id/editar" element={<ProductosDashboard />} />
 
-          <Route path="diseño" element={<Diseño />} />
-          <Route path="categoriaDeDiseño" element={<Diseño />} />
+          <Route path="servicio" element={<ServiciosDashboard />} />
+          <Route path="servicio/nuevo" element={<ServiciosDashboard />} />
+          <Route path="servicio/:id" element={<ServiciosDashboard />} />
+          <Route path="servicio/:id/editar" element={<ServiciosDashboard />} />
+
           <Route path="ventas" element={<Ventas />} />
 
           <Route path="pedidosClientes" element={<PedidosClientes />} />
@@ -129,18 +133,6 @@ export const Routers = () => {
           <Route path="compras/:id" element={<Compras />} />
           <Route path="compras/:id/editar" element={<Compras />} />
 
-          <Route path="produccion" element={<Produccion />} />
-          <Route path="produccion/nuevo" element={<Produccion />} />
-          <Route path="produccion/nuevo/seleccionar-pedido" element={<Produccion />} />
-          <Route path="produccion/nuevo/seleccionar-insumo/:detalleIndex" element={<Produccion />} />
-
-          {/* Rutas de edición → deben ir ANTES de la ruta general de "ver" */}
-          <Route path="produccion/:id/editar/seleccionar-pedido" element={<Produccion />} />
-          <Route path="produccion/:id/editar/seleccionar-insumo/:detalleIndex" element={<Produccion />} />
-          <Route path="produccion/:id/editar" element={<Produccion />} />
-
-          {/* Ruta de "ver" → debe ir al FINAL */}
-          <Route path="produccion/:id" element={<Produccion />} />
 
           <Route path="ventas/nuevo" element={<Ventas />} />
           <Route path="ventas/:id" element={<Ventas />} />
