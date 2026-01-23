@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Heart,
   ShoppingCart,
@@ -6,6 +6,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Star,
+  X,
+  Tag,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../../../context/CartContext";
@@ -26,44 +28,91 @@ export const Productos = () => {
   const [favorites, setFavorites] = useState([]);
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
+  const [productosConColores, setProductosConColores] = useState({});
+  const [showOfertasModal, setShowOfertasModal] = useState(false);
+  const [productosOferta, setProductosOferta] = useState([]);
+  const [isLoading, setIsLoading] = useState(true); // Añadido estado de carga
+
+  // Mover la función fuera del useEffect para evitar dependencias cíclicas
+  const prepararProductosOferta = useCallback((productosData) => {
+    // Filtrar productos con descuento
+    const productosConDescuento = productosData.filter(p => p.Descuento > 0);
+    
+    // Seleccionar 3 productos aleatorios
+    const ofertasAleatorias = [...productosConDescuento]
+      .sort(() => 0.5 - Math.random())
+      .slice(0, 3);
+    
+    setProductosOferta(ofertasAleatorias);
+  }, []);
 
   useEffect(() => {
+    let isMounted = true; // Flag para prevenir actualizaciones después del desmontaje
+
     const fetchData = async () => {
       try {
+        setIsLoading(true);
         const [productosRes, categoriasRes] = await Promise.all([
           GetDataproductos(),
           getAllCategorias(),
         ]);
 
-        const productosSolo = productosRes.data.filter((p) => p.Tipo === "producto");
-        setProductos(productosSolo);
+        // Verificar que el componente aún esté montado
+        if (!isMounted) return;
 
-        if (categoriasRes?.data) {
-          setCategorias(categoriasRes.data);
-        }
+        const productosData = productosRes.data || [];
+        setProductos(productosData);
+        setCategorias(categoriasRes.data || []);
+
+        // Identificar productos con colores (asumiendo que vienen con propiedad 'Colores')
+        const coloresMap = {};
+        productosData.forEach(producto => {
+          const tieneColores = producto.Colores && Array.isArray(producto.Colores) && producto.Colores.length > 0;
+          coloresMap[producto.ProductoId] = tieneColores;
+        });
+        setProductosConColores(coloresMap);
+
+        // Preparar productos en oferta para el modal
+        prepararProductosOferta(productosData);
       } catch (err) {
+        console.error("Error al cargar productos o categorías:", err);
         toast.error("Error al cargar productos o categorías");
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
-    fetchData();
-  }, []);
 
-  const featuredProducts = productos
-    .filter((p) => p.Descuento > 0)
-    .sort(() => 0.5 - Math.random())
-    .slice(0, 6);
+    fetchData();
+
+    // Cleanup function para prevenir memory leaks
+    return () => {
+      isMounted = false;
+    };
+  }, [prepararProductosOferta]); // Añadir prepararProductosOferta como dependencia
+
+  const featuredProducts = useMemo(() => {
+    return productos
+      .filter((p) => p.Descuento > 0)
+      .sort(() => 0.5 - Math.random())
+      .slice(0, 6);
+  }, [productos]);
 
   const filteredProducts = productos.filter((producto) => {
     const matchesCategory =
       selectedCategory === "all" ||
-      String(producto.CategoriaId) === selectedCategory;
+      String(producto.CategoriaId || "") === selectedCategory;
+
     const matchesSearch = producto.Nombre.toLowerCase().includes(
       searchQuery.toLowerCase()
     );
     return matchesCategory && matchesSearch;
   });
 
-  const handleAddClick = (producto) => {
+  // NUEVA LÓGICA: Verificar si producto tiene colores antes de agregar al carrito
+  const handleAddClick = useCallback((producto) => {
+    // Primero verificar si es personalizado (lógica existente)
     if (producto.EsPersonalizado) {
       navigate("/carritoproducto", {
         state: { item: producto, from: "/productos" },
@@ -71,9 +120,23 @@ export const Productos = () => {
       return;
     }
 
+    // NUEVA LÓGICA: Verificar si el producto tiene colores asociados
+    const tieneColores = productosConColores[producto.ProductoId] || 
+                        (producto.Colores && Array.isArray(producto.Colores) && producto.Colores.length > 0);
+
+    if (tieneColores) {
+      // Producto con variantes (colores): redirigir a página de detalle
+      navigate(`/productos/${producto.ProductoId}`, { 
+        state: { producto } 
+      });
+      toast.info(`Por favor selecciona un color para ${producto.Nombre}`);
+      return;
+    }
+
+    // Producto sin colores: agregar directamente al carrito (lógica original)
     const stock = producto.Stock ?? producto.stock ?? null;
     const existing = cart.find(
-      (item) => item.ProductoServicioId === producto.ProductoServicioId
+      (item) => item.ProductoId === producto.ProductoId
     );
     const currentQuantity = existing ? existing.quantity : 0;
     const newQuantity = currentQuantity + 1;
@@ -85,31 +148,82 @@ export const Productos = () => {
 
     addToCart(producto, {}, 1);
     toast.success(`${producto.Nombre} agregado al carrito`);
-  };
+  }, [productosConColores, cart, addToCart, navigate]);
 
-  const toggleFavorite = (id) => {
+  // Función para agregar producto desde el modal
+  const handleAddFromModal = useCallback((producto) => {
+    // Verificar si el producto tiene colores
+    const tieneColores = productosConColores[producto.ProductoId] || 
+                        (producto.Colores && Array.isArray(producto.Colores) && producto.Colores.length > 0);
+
+    if (tieneColores) {
+      // Cerrar modal y redirigir a detalle
+      setShowOfertasModal(false);
+      navigate(`/productos/${producto.ProductoId}`, { 
+        state: { producto } 
+      });
+      toast.info(`Por favor selecciona un color para ${producto.Nombre}`);
+      return;
+    }
+
+    // Producto sin colores: agregar directamente
+    const stock = producto.Stock ?? producto.stock ?? null;
+    const existing = cart.find(
+      (item) => item.ProductoId === producto.ProductoId
+    );
+    const currentQuantity = existing ? existing.quantity : 0;
+    const newQuantity = currentQuantity + 1;
+
+    if (stock !== null && newQuantity > stock) {
+      toast.error(`Solo hay ${stock} unidades disponibles`);
+      return;
+    }
+
+    addToCart(producto, {}, 1);
+    toast.success(`${producto.Nombre} agregado al carrito desde ofertas`);
+  }, [productosConColores, cart, addToCart, navigate]);
+
+  const toggleFavorite = useCallback((id) => {
     setFavorites((prev) =>
       prev.includes(id) ? prev.filter((fav) => fav !== id) : [...prev, id]
     );
-  };
+  }, []);
 
-  const nextSlide = () => {
+  const nextSlide = useCallback(() => {
     setCurrentSlide((prev) => (prev + 1) % featuredProducts.length);
-  };
+  }, [featuredProducts.length]);
 
-  const prevSlide = () => {
+  const prevSlide = useCallback(() => {
     setCurrentSlide(
       (prev) => (prev - 1 + featuredProducts.length) % featuredProducts.length
     );
-  };
+  }, [featuredProducts.length]);
 
-  const formatPrice = (precio) => {
+  const formatPrice = useCallback((precio) => {
     return new Intl.NumberFormat("es-CO", {
       style: "currency",
       currency: "COP",
       minimumFractionDigits: 0,
     }).format(precio);
-  };
+  }, []);
+
+  const calcularPrecioConDescuento = useCallback((precio, descuento) => {
+    return precio - (precio * descuento) / 100;
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <Navbar />
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-slate-600 text-lg">Cargando productos...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -124,20 +238,19 @@ export const Productos = () => {
                 placeholder="Buscar producto..."
                 className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={searchQuery}
-                onChange={(e) => setSearchkQuery(e.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-[80px]">
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 space-y-8">
             {/* Carrusel */}
             {featuredProducts.length > 0 && (
               <section>
-                {/* ✅ Subtítulo bajado más: mb-8 */}
                 <h2 className="text-2xl font-bold mt-10 text-slate-800">Productos Destacados</h2>
                 <div className="relative overflow-hidden mt-5 rounded-2xl bg-white shadow-lg">
                   <div
@@ -145,11 +258,11 @@ export const Productos = () => {
                     style={{ transform: `translateX(-${currentSlide * 100}%)` }}
                   >
                     {featuredProducts.map((producto) => (
-                      <div key={producto.ProductoServicioId} className="min-w-full">
+                      <div key={producto.ProductoId} className="min-w-full">
                         <div className="relative h-64 md:h-[320px]">
-                          {producto.UrlImagen ? (
+                          {producto.Imagen ? (
                             <img
-                              src={producto.UrlImagen}
+                              src={producto.Imagen}
                               alt={producto.Nombre}
                               className="w-full h-full object-cover"
                             />
@@ -170,8 +283,7 @@ export const Productos = () => {
                               <div className="flex items-center gap-3 mb-3">
                                 <span className="text-lg md:text-xl font-bold">
                                   {formatPrice(
-                                    producto.Precio -
-                                    (producto.Precio * producto.Descuento) / 100
+                                    calcularPrecioConDescuento(producto.Precio, producto.Descuento)
                                   )}
                                 </span>
                                 {producto.Descuento > 0 && (
@@ -182,7 +294,10 @@ export const Productos = () => {
                               </div>
                               <div className="flex gap-2">
                                 <button
-                                  onClick={() => handleAddClick(producto)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddClick(producto);
+                                  }}
                                   className="bg-white text-black px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100"
                                 >
                                   <ShoppingCart className="h-4 w-4 mr-1 inline" />
@@ -244,32 +359,24 @@ export const Productos = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredProducts.map((producto) => (
                     <div
-                      key={producto.ProductoServicioId}
-                      onClick={() => navigate(`/productos/${producto.ProductoServicioId}`, { state: { producto } })}
+                      key={producto.ProductoId}
+                      onClick={() => navigate(`/productos/${producto.ProductoId}`, { state: { producto } })}
                       className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-200 cursor-pointer"
                     >
                       <div className="relative h-64 overflow-hidden">
                         <img
-                          src={producto.UrlImagen || "/multimedia/placeholder.jpg"}
+                          src={producto.Imagen || "/multimedia/placeholder.jpg"}
                           alt={producto.Nombre}
                           className="w-full h-full object-cover"
                           onError={(e) => (e.currentTarget.src = "/multimedia/placeholder.jpg")}
                         />
-                        {/* ✅ Botones estáticos (siempre visibles) */}
+                        {/* Botones estáticos (siempre visibles) */}
                         <div className="absolute top-3 right-3 flex gap-2">
                           <button
-                            onClick={() => toggleFavorite(producto.ProductoServicioId)}
-                            className="bg-white/90 hover:bg-white text-black rounded-full p-2 shadow-lg"
-                          >
-                            <Heart
-                              className={`h-5 w-5 ${favorites.includes(producto.ProductoServicioId)
-                                ? "fill-red-500 text-red-500"
-                                : ""
-                                }`}
-                            />
-                          </button>
-                          <button
-                            onClick={() => handleAddClick(producto)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddClick(producto);
+                            }}
                             className="bg-white/90 hover:bg-white text-black rounded-full p-2 shadow-lg"
                           >
                             <ShoppingCart className="h-5 w-5" />
@@ -297,9 +404,7 @@ export const Productos = () => {
                           </span>
                           {producto.Descuento > 0 && (
                             <span className="text-lg font-bold text-blue-600">
-                              {formatPrice(
-                                producto.Precio - (producto.Precio * producto.Descuento) / 100
-                              )}
+                              {formatPrice(calcularPrecioConDescuento(producto.Precio, producto.Descuento))}
                             </span>
                           )}
                         </div>
@@ -356,7 +461,10 @@ export const Productos = () => {
                 <p className="text-sm opacity-90 mb-4">
                   Obtén 20% de descuento en tu primera orden de más de $200
                 </p>
-                <button className="w-full bg-white text-blue-600 py-2 rounded-lg font-medium hover:bg-gray-100 transition">
+                <button 
+                  onClick={() => setShowOfertasModal(true)}
+                  className="w-full bg-white text-blue-600 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
+                >
                   Ver Ofertas
                 </button>
               </div>
@@ -364,6 +472,141 @@ export const Productos = () => {
           </aside>
         </div>
       </div>
+
+      {/* Modal de Ofertas */}
+      {showOfertasModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            {/* Encabezado del Modal */}
+            <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Tag className="h-6 w-6" />
+                  <div>
+                    <h2 className="text-2xl font-bold">Ofertas Especiales</h2>
+                    <p className="text-blue-100 text-sm">
+                      20% de descuento en tu primera orden de más de $200
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowOfertasModal(false)}
+                  className="bg-white/20 hover:bg-white/30 rounded-full p-2 transition"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              {productosOferta.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">
+                  <Tag className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+                  <p className="text-lg">No hay ofertas disponibles en este momento</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid md:grid-cols-3 gap-6 mb-8">
+                    {productosOferta.map((producto) => (
+                      <div
+                        key={producto.ProductoId}
+                        className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200"
+                      >
+                        <div className="relative h-48">
+                          <img
+                            src={producto.Imagen || "/multimedia/placeholder.jpg"}
+                            alt={producto.Nombre}
+                            className="w-full h-full object-cover"
+                            onError={(e) => (e.currentTarget.src = "/multimedia/placeholder.jpg")}
+                          />
+                          <div className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded-md font-bold text-sm">
+                            -{producto.Descuento}%
+                          </div>
+                          <button
+                            onClick={() => handleAddFromModal(producto)}
+                            className="absolute bottom-3 right-3 bg-blue-600 text-white rounded-full p-2 hover:bg-blue-700 shadow-lg"
+                          >
+                            <ShoppingCart className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div className="p-4">
+                          <h3 className="font-semibold text-slate-800 mb-2 line-clamp-1">
+                            {producto.Nombre}
+                          </h3>
+                          <p className="text-sm text-slate-600 mb-3 line-clamp-2">
+                            {producto.Descripcion}
+                          </p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col">
+                              <span className="text-sm text-slate-500 line-through">
+                                {formatPrice(producto.Precio)}
+                              </span>
+                              <span className="text-lg font-bold text-blue-600">
+                                {formatPrice(calcularPrecioConDescuento(producto.Precio, producto.Descuento))}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setShowOfertasModal(false);
+                                navigate(`/productos/${producto.ProductoId}`, { 
+                                  state: { producto } 
+                                });
+                              }}
+                              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                            >
+                              Ver detalles →
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Información adicional */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+                    <div className="flex items-start gap-4">
+                      <div className="bg-blue-100 p-3 rounded-lg">
+                        <Tag className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-800 mb-2">¿Cómo funciona la oferta?</h3>
+                        <ul className="text-sm text-slate-600 space-y-1">
+                          <li>• Aplica para órdenes superiores a $200.000</li>
+                          <li>• El descuento se aplica automáticamente al finalizar la compra</li>
+                          <li>• Válido solo para la primera compra de cada cliente</li>
+                          <li>• No acumulable con otras promociones</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Pie del Modal */}
+            <div className="border-t border-slate-200 p-4 bg-slate-50">
+              <div className="flex justify-between items-center">
+                <button
+                  onClick={() => {
+                    setShowOfertasModal(false);
+                    navigate('/productos');
+                  }}
+                  className="text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Ver todas las ofertas →
+                </button>
+                <button
+                  onClick={() => setShowOfertasModal(false)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
       <ToastContainer

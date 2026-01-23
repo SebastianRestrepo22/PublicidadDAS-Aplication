@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Navbar } from "../components/Navbar";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { jwtDecode } from "jwt-decode";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useAuth } from "../../../context/AuthContext";
@@ -24,11 +23,12 @@ export const Login = () => {
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  
+  // ✅ CORREGIDO: Usar login del contexto
+  const { login } = useAuth();
 
   const [tiposDocumento, setTiposDocumento] = useState([]);
 
-  // Cargar tipos de documento (esto sí puede estar en frontend)
   useEffect(() => {
     const fetchTiposDocumento = async () => {
       try {
@@ -46,11 +46,9 @@ export const Login = () => {
     fetchTiposDocumento();
   }, []);
 
-  // ✅ ERRORES ÚNICOS: solo los que vienen del backend
   const [loginErrors, setLoginErrors] = useState({});
   const [registerErrors, setRegisterErrors] = useState({});
 
-  // Registro - valores
   const [values, setValues] = useState({
     CedulaId: "",
     TipoDocumentoId: "",
@@ -66,7 +64,6 @@ export const Login = () => {
   const handleChanges = (e) => {
     const { name, value } = e.target;
     setValues({ ...values, [name]: value });
-    // Limpiar errores del campo al escribir
     if (registerErrors[name]) {
       setRegisterErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -75,7 +72,6 @@ export const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // ✅ Validación mínima en frontend: campos vacíos (opcional, pero mejora UX)
     if (!values.Contrasena || !confirmarContrasena) {
       toast.error("Por favor completa todos los campos");
       return;
@@ -86,13 +82,11 @@ export const Login = () => {
       return;
     }
 
-    // ✅ ENVIAR TODO AL BACKEND
     try {
       const response = await axios.post("http://localhost:3000/auth/register", values);
       if (response.status === 201) {
         toast.success("Registro exitoso");
         setIsLogin(true);
-        // Resetear formulario
         setValues({
           CedulaId: "", TipoDocumentoId: "", NombreCompleto: "",
           Telefono: "", CorreoElectronico: "", Direccion: "", Contrasena: "",
@@ -103,7 +97,6 @@ export const Login = () => {
     } catch (error) {
       console.error("Error en registro:", error);
       if (error.response?.data?.errors) {
-        // ✅ El backend devuelve un objeto con errores por campo
         setRegisterErrors(error.response.data.errors);
       } else {
         toast.error(error.response?.data?.message || "Error al registrar");
@@ -111,7 +104,6 @@ export const Login = () => {
     }
   };
 
-  // Login
   const [valuesLogin, setValuesLogin] = useState({
     CorreoElectronico: "",
     Contrasena: "",
@@ -129,16 +121,29 @@ export const Login = () => {
     try {
       const response = await axios.post("http://localhost:3000/auth/login", valuesLogin);
       const token = response.data.token;
-      localStorage.setItem("token", token);
-      const decoded = jwtDecode(token);
-      localStorage.setItem("usuario", JSON.stringify(decoded));
-      setUser(decoded);
-
-      if (decoded.Role.toLowerCase() === "administrador") {
+      
+      // ✅ Obtener userData de la respuesta (ajusta según tu backend)
+      const userData = response.data.user || {
+        NombreCompleto: response.data.nombre || response.data.NombreCompleto,
+        CorreoElectronico: valuesLogin.CorreoElectronico,
+        Role: response.data.role || response.data.Role,
+        Permisos: response.data.permisos || response.data.Permisos || []
+      };
+      
+      // ✅ CORREGIDO: Usar la función login del contexto
+      login(token, userData);
+      
+      // Navegar inmediatamente después del login
+      const userRole = (userData.Role || "").toLowerCase();
+      
+      if (userRole === "administrador") {
         navigate("/dashboard/graficosEstadisticos");
-      } else if (decoded.Role.toLowerCase() === "cliente") {
+      } else if (userRole === "cliente") {
         navigate("/cliente/productos");
+      } else {
+        navigate("/dashboard/graficosEstadisticos");
       }
+      
     } catch (error) {
       console.error("Error en login:", error);
       if (error.response?.data?.errors) {
@@ -149,10 +154,10 @@ export const Login = () => {
     }
   };
 
-  // ✅ Función para obtener error (solo del backend ahora)
   const getRegisterError = (fieldName) => registerErrors[fieldName] || '';
   const getLoginError = (fieldName) => loginErrors[fieldName] || '';
 
+  // El resto del JSX permanece igual...
   return (
     <div className="h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100 flex flex-col relative overflow-hidden">
       <Navbar />
@@ -513,7 +518,6 @@ export const Login = () => {
                                 value={confirmarContrasena}
                                 onChange={(e) => {
                                   setConfirmarContrasena(e.target.value);
-                                  // Solo validar coincidencia en frontend (seguridad básica)
                                   if (values.Contrasena !== e.target.value) {
                                     setRegisterErrors(prev => ({ ...prev, ConfirmarContrasena: "Las contraseñas no coinciden" }));
                                   } else {

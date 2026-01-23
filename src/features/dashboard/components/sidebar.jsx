@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
-  LayoutDashboard,
   BarChart3,
   Users,
   UserCheck,
@@ -9,49 +8,13 @@ import {
   Package,
   Palette,
   ShoppingCart,
-  CreditCard,
   ChevronDown,
   ChevronRight,
-  CalendarDays,
   LogOut,
-  MonitorCheck,
 } from "lucide-react";
 import Modal from "./modals/modal";
 import { useAuth } from "../../../context/AuthContext";
 
-// Mapeo de rutas a permisos requeridos
-const permissionMap = {
-  // Roles
-  "/dashboard/roles": ["ver_roles"],
-
-  // Usuarios
-  "/dashboard/usuarios": ["ver_usuarios"],
-
-  // Categorías
-  "/dashboard/categorias": ["ver_categorias"],
-
-  // Productos y Servicios
-  "/dashboard/producto": ["ver_productos"],
-  "/dashboard/Servicio": ["ver_servicios"],
-
-  // Proveedores / Insumos
-  "/dashboard/proveedores": ["ver_proveedores"],
-  "/dashboard/compras": ["ver_compras"],
-  "/dashboard/insumos": ["ver_insumos"],
-
-  // Ventas
-  "/dashboard/pedidosClientes": ["ver_pedidos"],
-  "/dashboard/ventas": ["ver_ventas"],
-
-  // Gestión avanzada (cualquiera de estos)
-  "/dashboard/gestionVentas": [
-    "ver_ventas",
-    "ver_pedidos"
-  ]
-};
-
-
-// Configuración completa del menú con permisos
 const menuItems = [
   {
     icon: BarChart3,
@@ -130,91 +93,56 @@ const menuItems = [
   }
 ];
 
-
 export const Sidebar = () => {
-  const { logout, user, permissions = [] } = useAuth();
+  const { logout, user, loading, hasPermission } = useAuth();
   const [openModal, setOpenModal] = useState(false);
   const [expandedItems, setExpandedItems] = useState([]);
   const [filteredMenuItems, setFilteredMenuItems] = useState([]);
 
-  // Verificar si el usuario tiene un permiso específico
-  const hasPermission = (permissionName) => {
-    if (!permissions || permissions.length === 0) {
-      return false;
-    }
-    
-    // Si es administrador, tiene todos los permisos
-    if (user?.Role?.toLowerCase() === "administrador") {
-      return true;
-    }
-    
-    return permissions.includes(permissionName);
-  };
-
-  // Verificar si tiene al menos uno de varios permisos
-  const hasAnyPermission = (permissionNames) => {
-    if (!permissionNames || permissionNames.length === 0) return true;
-    
-    if (user?.Role?.toLowerCase() === "administrador") {
-      return true;
-    }
-    
-    return permissionNames.some(perm => hasPermission(perm));
-  };
-
-  // Filtrar los items del menú basado en permisos
-  const filterMenuItems = () => {
-    return menuItems.filter(item => {
-      // Verificar permiso para el item principal
-      const mainItemHasPermission = hasPermission(item.requiredPermission);
-      
-      // Si no tiene submenú, solo verificar permiso principal
-      if (!item.hasSubmenu) {
-        return mainItemHasPermission;
-      }
-      
-      // Si tiene submenú, filtrar subitems primero
-      if (item.submenu) {
-        const filteredSubmenu = item.submenu.filter(subItem => 
-          hasPermission(subItem.requiredPermission)
-        );
-        
-        // Mostrar el item principal si:
-        // 1. Tiene permiso para el item principal O
-        // 2. Tiene permiso para al menos un subitem
-        const hasSubPermission = filteredSubmenu.length > 0;
-        
-        // Guardar el submenú filtrado
-        item.filteredSubmenu = filteredSubmenu;
-        
-        return mainItemHasPermission || hasSubPermission;
-      }
-      
-      return mainItemHasPermission;
-    });
-  };
-
-  // Efecto para filtrar items cuando cambian los permisos
+  // Filtrar menú basado en permisos
   useEffect(() => {
-    const filtered = filterMenuItems();
+    if (loading || !user) {
+      setFilteredMenuItems([]);
+      return;
+    }
+
+    // Si es administrador, mostrar todo
+    if (user.Role === "administrador") {
+      setFilteredMenuItems(menuItems);
+      return;
+    }
+
+    const filtered = menuItems
+      .map(item => {
+        if (!item.hasSubmenu) {
+          return hasPermission(item.requiredPermission) ? item : null;
+        }
+
+        const filteredSubmenu = item.submenu?.filter(subItem =>
+          hasPermission(subItem.requiredPermission)
+        ) || [];
+
+        return filteredSubmenu.length > 0 ? {
+          ...item,
+          filteredSubmenu
+        } : null;
+      })
+      .filter(Boolean);
+
     setFilteredMenuItems(filtered);
-  }, [permissions, user]);
+  }, [user, loading, hasPermission]);
 
   const toggleSubmenu = (index) => {
-    setExpandedItems((prev) =>
-      prev.includes(index)
-        ? prev.filter((i) => i !== index)
-        : [...prev, index]
+    setExpandedItems(prev =>
+      prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
     );
   };
 
-  // Si no hay usuario (no está autenticado), no mostrar sidebar
   if (!user) {
     return null;
   }
 
-  // Si está cargando, mostrar esqueleto
-  if (permissions === null) {
+  if (loading) {
     return (
       <div className="w-48 min-h-screen bg-gray-900 space-y-3 py-4 text-white flex flex-col justify-between">
         <div className="p-4 pb-6 border-b border-gray-700">
@@ -232,7 +160,6 @@ export const Sidebar = () => {
 
   return (
     <div className="w-48 min-h-screen bg-gray-900 space-y-3 py-4 text-white flex flex-col justify-between">
-      {/* Encabezado con información del usuario */}
       <div className="p-4 pb-6 border-b border-gray-700">
         <h1 className="text-lg font-bold text-white tracking-tight">Dashboard</h1>
         <div className="mt-2">
@@ -245,45 +172,29 @@ export const Sidebar = () => {
         </div>
       </div>
 
-      {/* Menú */}
       <nav className="flex-1 overflow-y-auto scrollbar-hide">
         <ul className="space-y-1">
           {filteredMenuItems.length > 0 ? (
             filteredMenuItems.map((item, index) => {
               const filteredSubmenu = item.filteredSubmenu || item.submenu;
               const hasVisibleSubmenu = filteredSubmenu && filteredSubmenu.length > 0;
-              
+
               return (
                 <li key={index}>
-                  <div
-                    className={`flex items-center justify-between px-4 py-3 hover:bg-gray-800 rounded-md transition-colors duration-200 group ${item.hasSubmenu && hasVisibleSubmenu ? "cursor-pointer" : ""
-                      }`}
-                  >
+                  <div className={`flex items-center justify-between px-4 py-3 hover:bg-gray-800 rounded-md transition-colors duration-200 group ${item.hasSubmenu && hasVisibleSubmenu ? "cursor-pointer" : ""}`}>
                     {!item.hasSubmenu ? (
-                      <Link 
-                        to={item.to} 
-                        className="flex items-center gap-3 flex-1"
-                        title={item.label}
-                      >
+                      <Link to={item.to} className="flex items-center gap-3 flex-1" title={item.label}>
                         <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
                         <span className="text-xs font-medium">{item.label}</span>
                       </Link>
                     ) : (
                       <div className="flex items-center flex-1 justify-between">
-                        <Link 
-                          to={item.to} 
-                          className="flex items-center gap-3 flex-1"
-                          title={item.label}
-                        >
+                        <Link to={item.to} className="flex items-center gap-3 flex-1" title={item.label}>
                           <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
                           <span className="text-xs font-medium">{item.label}</span>
                         </Link>
                         {hasVisibleSubmenu && (
-                          <button
-                            onClick={() => toggleSubmenu(index)}
-                            className="ml-1 focus:outline-none"
-                            aria-label={expandedItems.includes(index) ? "Contraer menú" : "Expandir menú"}
-                          >
+                          <button onClick={() => toggleSubmenu(index)} className="ml-1 focus:outline-none">
                             {expandedItems.includes(index) ? (
                               <ChevronDown className="w-4 h-4 transition-transform duration-200" />
                             ) : (
@@ -299,11 +210,7 @@ export const Sidebar = () => {
                     <ul className="ml-5 mt-1 space-y-3 py-4 border-l border-gray-700 pl-3">
                       {filteredSubmenu.map((subItem, subIndex) => (
                         <li key={subIndex}>
-                          <Link
-                            to={subItem.to}
-                            className="block px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors duration-200"
-                            title={subItem.label}
-                          >
+                          <Link to={subItem.to} className="block px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors duration-200">
                             {subItem.label}
                           </Link>
                         </li>
@@ -314,50 +221,34 @@ export const Sidebar = () => {
               );
             })
           ) : (
-            <div className="px-4 py-8 text-center">
-              <p className="text-sm text-gray-400">
-                No tienes permisos para acceder a ninguna sección
-              </p>
-              <p className="text-xs text-gray-500 mt-2">
-                Contacta al administrador
-              </p>
-            </div>
+            !loading && user && (
+              <div className="px-4 py-8 text-center">
+                <p className="text-sm text-gray-400">
+                  No tienes permisos para acceder a ninguna sección
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Contacta al administrador
+                </p>
+              </div>
+            )
           )}
         </ul>
       </nav>
 
-      {/* Botón de salir */}
       <div className="p-4 border-t border-gray-700">
-        <button
-          onClick={() => setOpenModal(true)}
-          className="w-full flex items-center justify-center gap-2 bg-red-600 text-white text-sm font-medium py-3 px-3 rounded-md hover:bg-red-700 transition-colors"
-        >
+        <button onClick={() => setOpenModal(true)} className="w-full flex items-center justify-center gap-2 bg-red-600 text-white text-sm font-medium py-3 px-3 rounded-md hover:bg-red-700 transition-colors">
           <LogOut className="w-3 h-3" />
           Salir
         </button>
 
-        {/* Modal de confirmación de logout */}
-        <Modal
-          open={openModal}
-          onClose={() => setOpenModal(false)}
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
-        >
+        <Modal open={openModal} onClose={() => setOpenModal(false)} className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
           <div className="w-[400px] p-6 mx-auto text-center bg-white rounded shadow-lg relative z-50">
             <p className="mb-6 text-black">¿Está seguro que quiere cerrar sesión?</p>
             <div className="flex gap-4">
-              <button
-                className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 transition-colors"
-                onClick={() => {
-                  logout();
-                  setOpenModal(false);
-                }}
-              >
+              <button className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 transition-colors" onClick={() => { logout(); setOpenModal(false); }}>
                 Cerrar sesión
               </button>
-              <button
-                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition-colors"
-                onClick={() => setOpenModal(false)}
-              >
+              <button className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition-colors" onClick={() => setOpenModal(false)}>
                 Cancelar
               </button>
             </div>

@@ -22,43 +22,74 @@ export const CartProvider = ({ children }) => {
     }
   }, [cart]);
 
-  const addToCart = (product, options = {}, quantity = 1) => {
+  const addToCart = (product, customization = {}, quantity = 1) => {
     const stock = product.Stock ?? product.stock ?? null;
-
-    const itemId =
-      product.ProductoServicioId ?? product.ServiceId ?? product.id ?? null;
-
-    const existingLine = cart.find((l) => {
-      if (l.ProductoServicioId !== itemId) return false;
-
-      if (!l.EsPersonalizado) return true;
-
-      return (
-        l.options?.alto === options.alto &&
-        l.options?.ancho === options.ancho &&
-        l.options?.descripcion === options.descripcion
-      );
+    
+    // Crear un ID único para este item específico basado en el producto y personalización
+    const productId = product.ProductoId || product.ServicioId || product.id;
+    
+    // Crear un "fingerprint" único que considere producto + personalización
+    const itemFingerprint = JSON.stringify({
+      productId,
+      color: customization.color,
+      size: customization.size,
+      personalizacion: customization,
+      // Incluir otros campos de personalización únicos
+      ...customization
     });
 
-    if (existingLine) {
+    // Buscar si ya existe un item IDÉNTICO (mismo producto + misma personalización)
+    const existingLineIndex = cart.findIndex((l) => {
+      // Primero verificar si es el mismo producto
+      if (l.ProductoId !== product.ProductoId && 
+          l.ServicioId !== product.ServicioId) {
+        return false;
+      }
+      
+      // Para productos con color, verificar que el color sea el mismo
+      if (customization.color && l.customization?.color !== customization.color) {
+        return false;
+      }
+      
+      // Para servicios personalizados, comparar toda la personalización
+      if (product.EsPersonalizado || customization.Nombre) {
+        const existingFingerprint = JSON.stringify({
+          productId: l.ProductoId || l.ServicioId,
+          color: l.customization?.color,
+          size: l.customization?.size,
+          personalizacion: l.customization
+        });
+        return existingFingerprint === itemFingerprint;
+      }
+      
+      // Para productos sin personalización, son iguales si son el mismo producto
+      return true;
+    });
+
+    if (existingLineIndex !== -1) {
+      // Producto IDÉNTICO encontrado, actualizar cantidad
+      const existingLine = cart[existingLineIndex];
       const newQuantity = existingLine.quantity + quantity;
 
       // Validación de stock solo para productos
-      if (
-        typeof stock === "number" &&
-        stock > 0 &&
-        product.Tipo === "Producto" &&
-        newQuantity > stock
-      ) {
+      if (stock !== null && newQuantity > stock) {
         toast.error(`Solo hay ${stock} unidades disponibles`);
         return;
       }
 
-      updateQuantity(existingLine.id, newQuantity);
+      // Actualizar cantidad del item existente
+      const updatedCart = [...cart];
+      updatedCart[existingLineIndex] = {
+        ...existingLine,
+        quantity: newQuantity
+      };
+      setCart(updatedCart);
+      
       toast.success(`${product.Nombre} actualizado en el carrito`);
       return;
     }
 
+    // PRODUCTO NUEVO O CON PERSONALIZACIÓN DIFERENTE - agregar como nuevo item
     const discount = product.Descuento || product.descuento || 0;
     const originalPrice = product.Precio || product.precio || 0;
 
@@ -67,36 +98,42 @@ export const CartProvider = ({ children }) => {
         ? originalPrice - (originalPrice * discount) / 100
         : originalPrice;
 
+    // Determinar el tipo
+    const itemType = product.ServicioId || product.EsPersonalizado ? "servicio" : "producto";
+
     const cartLine = {
       id: uuidv4(),
-      ProductoServicioId: itemId,
+      // IDs del producto/servicio
+      ProductoId: product.ProductoId || null,
+      ServicioId: product.ServicioId || null,
+      // Información básica
       Nombre: product.Nombre || "Producto",
+      Descripcion: product.Descripcion || "",
       Precio: finalPrice,
-      UrlImagen: options.urlImagen || product.UrlImagen || product.Url || "",
-      quantity: Math.max(1, parseInt(quantity, 10) || 1),
+      Descuento: discount,
+      // Imágenes
+      UrlImagen: product.UrlImagen || product.Imagen || product.Url || "",
+      Imagen: product.Imagen || product.UrlImagen || "",
+      // Stock y cantidad
       Stock: stock,
-      Tipo: product.Tipo || "Producto",
-      EsPersonalizado:
-        product.EsPersonalizado ??
-        product.esPersonalizado ??
-        product.Customizable ??
-        options.EsPersonalizado ??
-        false,
-      options: {
-        alto: options.alto || null,
-        ancho: options.ancho || null,
-        descripcion: options.descripcion || "",
-        ...options,
+      stock: stock, // Duplicado para compatibilidad
+      quantity: Math.max(1, parseInt(quantity, 10) || 1),
+      // Tipo y personalización
+      Tipo: itemType,
+      EsPersonalizado: product.EsPersonalizado || false,
+      // Personalización completa
+      customization: {
+        color: customization.color || null,
+        size: customization.size || null,
+        ...customization
       },
+      // Información adicional del producto/servicio
+      CategoriaId: product.CategoriaId,
+      createdAt: new Date().toISOString()
     };
 
     // Validación de stock inicial solo para productos
-    if (
-      typeof stock === "number" &&
-      stock > 0 &&
-      product.Tipo === "Producto" &&
-      cartLine.quantity > stock
-    ) {
+    if (stock !== null && cartLine.quantity > stock) {
       toast.error(`Solo hay ${stock} unidades disponibles`);
       return;
     }
@@ -112,20 +149,18 @@ export const CartProvider = ({ children }) => {
   const updateQuantity = (lineId, newQuantity) => {
     setCart((prev) =>
       prev.map((l) => {
+        if (l.id !== lineId) return l;
+        
         const stock = l.Stock ?? null;
+        const validatedQuantity = Math.max(1, newQuantity);
 
         // Validación de stock solo para productos
-        if (
-          typeof stock === "number" &&
-          stock > 0 &&
-          l.Tipo === "Producto" &&
-          newQuantity > stock
-        ) {
+        if (stock !== null && validatedQuantity > stock) {
           toast.error(`Solo hay ${stock} unidades disponibles`);
-          return l;
+          return { ...l, quantity: stock }; // Establecer al máximo disponible
         }
 
-        return { ...l, quantity: Math.max(1, newQuantity) };
+        return { ...l, quantity: validatedQuantity };
       })
     );
   };
@@ -137,7 +172,31 @@ export const CartProvider = ({ children }) => {
           ? {
               ...item,
               ...changes,
-              options: { ...item.options, ...(changes.options || {}) },
+              customization: { 
+                ...item.customization, 
+                ...(changes.customization || {}) 
+              },
+              options: { 
+                ...item.options, 
+                ...(changes.options || {}) 
+              }
+            }
+          : item
+      )
+    );
+  };
+
+  // Función especial para actualizar color
+  const updateItemColor = (lineId, color) => {
+    setCart((prev) =>
+      prev.map((item) =>
+        item.id === lineId
+          ? {
+              ...item,
+              customization: { 
+                ...item.customization, 
+                color: color 
+              }
             }
           : item
       )
@@ -160,6 +219,7 @@ export const CartProvider = ({ children }) => {
         removeFromCart,
         updateQuantity,
         updateItem,
+        updateItemColor,
         clearCart,
         getTotal,
       }}

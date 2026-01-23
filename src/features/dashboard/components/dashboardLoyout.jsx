@@ -1,34 +1,31 @@
 import { useEffect } from "react"
 import { Sidebar } from "./sidebar"
-
 import { Outlet, useNavigate } from "react-router-dom"
-import axios from "axios"
+import { useAuth } from "../../../context/AuthContext"
 
-export function DashboardLayout({ children }) {
+export function DashboardLayout() {
+  const { user, loading } = useAuth()
   const navigate = useNavigate()
-  const fetchUser = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await axios.get('http://localhost:3000/auth/dashboard', {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      })
-      if (response.status === 201) {
-        navigate('/login')
-      }
-    } catch (error) {
-      if (error.response?.status === 401) {
-        navigate('/login');
-      } else {
-        console.error("Error inesperado:", error);
-      }
-    }
-  }
 
   useEffect(() => {
-    fetchUser()
-  }, [])
+    // Si no hay usuario y no está cargando, redirige al login
+    if (!loading && !user) {
+      navigate('/login')
+    }
+  }, [user, loading, navigate])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
+
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
@@ -36,7 +33,6 @@ export function DashboardLayout({ children }) {
         <main className="flex-1 p-6 overflow-auto">
           <Outlet />
         </main>
-
       </div>
     </div>
   )

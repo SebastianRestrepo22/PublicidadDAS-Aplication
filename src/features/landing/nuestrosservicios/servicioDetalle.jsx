@@ -5,32 +5,34 @@ import {
   Upload,
   X,
   ArrowLeft,
-
+  Save,
+  Edit2,
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { GetDataservicios } from "../../dashboard/servicios/services/services.servicios";
 import { toast } from "react-toastify";
+import { Navbar } from "../components/Navbar";
+import { Footer } from "../components/footer";
+import { useCart } from "../../../context/CartContext";
 
 export const ServicioDetalle = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { addToCart } = useCart();
 
   const [servicio, setServicio] = useState(null);
-  const [formData, setFormData] = useState({
-    Nombre: "",
-    Descripcion: "",
-    Tamaño: "Mediana",
-  });
-
+  const [descripcion, setDescripcion] = useState("");
+  const [tamano, setTamano] = useState("Mediana");
   const [archivosAdjuntos, setArchivosAdjuntos] = useState([]);
   const [imagenPreview, setImagenPreview] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchServicio = async () => {
       try {
         const res = await GetDataservicios();
         const servicioEncontrado = res.data.find(
-          (s) => s.ProductoServicioId === id && s.Tipo === "servicio"
+          (s) => s.ServicioId === id
         );
 
         if (!servicioEncontrado) {
@@ -40,12 +42,8 @@ export const ServicioDetalle = () => {
         }
 
         setServicio(servicioEncontrado);
-        setFormData({
-          Nombre: servicioEncontrado.Nombre || "",
-          Descripcion: servicioEncontrado.Descripcion || "",
-          Tamaño: servicioEncontrado.Tamaño || "Mediana",
-        });
-        setImagenPreview(servicioEncontrado.UrlImagen || "");
+        setTamano(servicioEncontrado.Tamano || "Mediana");
+        setImagenPreview(servicioEncontrado.Imagen || servicioEncontrado.UrlImagen || "");
       } catch (err) {
         console.error(err);
         toast.error("Error al cargar el servicio");
@@ -55,14 +53,6 @@ export const ServicioDetalle = () => {
 
     if (id) fetchServicio();
   }, [id, navigate]);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
 
   const handleFileUpload = (e) => {
     const files = Array.from(e.target.files);
@@ -88,10 +78,77 @@ export const ServicioDetalle = () => {
     );
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    toast.success("Servicio actualizado exitosamente");
-    navigate("/servicios");
+    
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
+
+    try {
+      // Calcular precio con descuento
+      const precioConDescuento = servicio.Descuento > 0
+        ? servicio.Precio * (1 - servicio.Descuento / 100)
+        : servicio.Precio;
+
+      // Preparar objeto de servicio para agregar al carrito
+      // Usando EXACTAMENTE los campos que se guardan en DetallePedidosClientes
+      const servicioParaCarrito = {
+        ServicioId: servicio.ServicioId,
+        ProductoId: null, // Para servicios, ProductoId es null
+        Nombre: servicio.Nombre,
+        Descripcion: descripcion || "Servicio personalizado", // Descripción del usuario
+        Precio: precioConDescuento,
+        Descuento: servicio.Descuento || 0,
+        Imagen: imagenPreview || servicio.Imagen || servicio.UrlImagen || "",
+        Tamaño: tamano, // Tamaño seleccionado por el usuario
+        // Campos que se guardan en DetallePedidosClientes
+        customization: {
+          Descripcion: descripcion, // Se guarda en campo Descripcion
+          Tamaño: tamano, // Se guarda en campo Tamaño
+          UrlImagen: imagenPreview, // Se guarda en campo UrlImagen
+          archivosAdjuntos: archivosAdjuntos.map(f => ({
+            nombre: f.nombre,
+            tipo: f.tipo,
+            tamaño: f.tamaño
+          })),
+          // Información del servicio base
+          ServicioBase: {
+            Nombre: servicio.Nombre,
+            PrecioOriginal: servicio.Precio,
+            Descuento: servicio.Descuento
+          }
+        },
+        // Estos campos son para el frontend
+        EsPersonalizado: true,
+        CategoriaId: servicio.CategoriaId
+      };
+
+      // AGREGAR AL CARRITO
+      // Pasar solo los campos que realmente se guardarán
+      addToCart(servicioParaCarrito, {
+        // SOLO los campos que van a DetallePedidosClientes
+        Descripcion: descripcion, // → campo Descripcion en DB
+        Tamaño: tamano, // → campo Tamaño en DB
+        UrlImagen: imagenPreview, // → campo UrlImagen en DB
+        // Estos van como metadata adicional
+        archivosAdjuntos: archivosAdjuntos.length,
+        tipo: "servicio"
+      }, 1);
+
+      toast.success(`"${servicio.Nombre}" agregado al carrito`);
+      
+      // Redirigir al carrito de compras
+      setTimeout(() => {
+        navigate("/carritodecompras");
+      }, 1000);
+
+    } catch (error) {
+      console.error("Error al agregar al carrito:", error);
+      toast.error("Error al agregar el servicio al carrito");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const precioConDescuento =
@@ -109,124 +166,113 @@ export const ServicioDetalle = () => {
 
   if (!servicio) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-600">Cargando servicio...</p>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-slate-600 text-lg">Cargando servicio...</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <Navbar />
+
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <button
           onClick={() => navigate("/servicios")}
-          className="flex items-center text-blue-600 hover:text-blue-800 mb-6 font-medium rounded-full bg-blue-100"
+          className="flex items-center text-blue-600 hover:text-blue-800 mb-6 font-medium"
         >
-          <ArrowLeft className="h-12 w-12" />
+          <ArrowLeft className="h-6 w-6 mr-2" />
+          Volver a Servicios
         </button>
 
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-5 md:p-6">
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
             <h1 className="text-2xl md:text-3xl font-bold text-white">
-              Detalles del Servicio
+              Personaliza tu Servicio: {servicio.Nombre}
             </h1>
+            <p className="text-blue-100 mt-2">
+              Describe lo que necesitas y sube imágenes de referencia
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 p-6 md:p-8">
-            {/* Columna Izquierda - Formulario */}
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6 md:p-8">
+            {/* Columna Izquierda - Formulario de personalización */}
             <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre del Servicio
-                </label>
-                <input
-                  type="text"
-                  name="Nombre"
-                  value={formData.Nombre}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
+              <h2 className="text-xl font-bold text-slate-800">Detalles de Personalización</h2>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Descripción
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Descripción del servicio *
                 </label>
                 <textarea
-                  name="Descripcion"
-                  value={formData.Descripcion}
-                  onChange={handleInputChange}
-                  rows="4"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                  placeholder="Describe en detalle lo que necesitas. Ej: Necesito un diseño moderno para un restaurante de comida italiana, con colores rojo y blanco..."
+                  rows="5"
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                  disabled={isSubmitting}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Tamaño
                 </label>
                 <select
-                  name="Tamaño"
-                  value={formData.Tamaño}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={tamano}
+                  onChange={(e) => setTamano(e.target.value)}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={isSubmitting}
                 >
-                  <option value="Pequeña">Pequeña</option>
-                  <option value="Mediana">Mediana</option>
-                  <option value="Grande">Grande</option>
+                  <option value="Pequeña">Pequeña (hasta A5)</option>
+                  <option value="Mediana">Mediana (A4)</option>
+                  <option value="Grande">Grande (A3 o mayor)</option>
                 </select>
-              </div>
-
-              {/* Precio y Descuento (solo lectura) */}
-              <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                <div>
-                  <span className="text-sm font-medium text-gray-600">Precio:</span>
-                  <span className="ml-2 font-semibold text-blue-600">
-                    {formatPrice(servicio.Precio)}
-                  </span>
-                </div>
-                {servicio.Descuento > 0 && (
-                  <div>
-                    <span className="text-sm font-medium text-gray-600">Descuento:</span>
-                    <span className="ml-2 font-semibold text-green-600">
-                      -{servicio.Descuento}%
-                    </span>
-                  </div>
-                )}
               </div>
 
               {/* Adjuntar archivos */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Adjuntar Archivos (Imágenes, PDFs, etc.)
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Adjuntar Archivos de Referencia
                 </label>
-                <label className="flex items-center justify-center w-full px-4 py-6 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors">
-                  <div className="text-center">
-                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <span className="text-sm text-gray-600">
-                      Haz clic para subir archivos
-                    </span>
-                  </div>
+                <p className="text-sm text-slate-500 mb-3">
+                  Sube imágenes, logos, documentos o cualquier archivo que sirva como referencia para tu proyecto.
+                </p>
+                <label className="flex flex-col items-center justify-center w-full px-4 py-8 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors">
+                  <Upload className="w-10 h-10 text-slate-400 mb-3" />
+                  <span className="text-sm text-slate-600 mb-1">
+                    Arrastra archivos aquí o haz clic para seleccionar
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    Imágenes, PDF, Word, PowerPoint (Max 10MB por archivo)
+                  </span>
                   <input
                     type="file"
                     multiple
                     onChange={handleFileUpload}
                     className="hidden"
-                    accept="image/*,.pdf,.doc,.docx"
+                    accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.txt"
+                    disabled={isSubmitting}
                   />
                 </label>
               </div>
 
               {archivosAdjuntos.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium text-gray-700">
-                    Archivos adjuntos:
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-slate-700">
+                    Archivos adjuntos ({archivosAdjuntos.length}):
                   </h3>
                   {archivosAdjuntos.map((archivo) => (
                     <div
                       key={archivo.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
                     >
                       <div className="flex items-center space-x-3">
                         {archivo.tipo.startsWith("image/") ? (
@@ -235,8 +281,8 @@ export const ServicioDetalle = () => {
                           <FileText className="w-5 h-5 text-red-500" />
                         )}
                         <div>
-                          <p className="text-sm font-medium">{archivo.nombre}</p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-sm font-medium text-slate-800">{archivo.nombre}</p>
+                          <p className="text-xs text-slate-500">
                             {(archivo.tamaño / 1024).toFixed(2)} KB
                           </p>
                         </div>
@@ -244,7 +290,8 @@ export const ServicioDetalle = () => {
                       <button
                         type="button"
                         onClick={() => eliminarArchivo(archivo.id)}
-                        className="text-red-500 hover:text-red-700"
+                        className="text-red-500 hover:text-red-700 p-1"
+                        disabled={isSubmitting}
                       >
                         <X className="w-5 h-5" />
                       </button>
@@ -252,58 +299,119 @@ export const ServicioDetalle = () => {
                   ))}
                 </div>
               )}
-
-              <button
-                type="button"
-                onClick={handleSubmit}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-              >
-                Guardar Cambios
-              </button>
             </div>
 
-            {/* Columna Derecha - Solo Resumen */}
+            {/* Columna Derecha - Resumen y Precio */}
             <div className="space-y-6">
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <h3 className="font-semibold text-blue-900 text-lg mb-3">Resumen del Servicio</h3>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    <span className="font-medium">Nombre:</span>{" "}
-                    {formData.Nombre || servicio.Nombre}
-                  </p>
-                  <p>
-                    <span className="font-medium">Descripción:</span>{" "}
-                    {formData.Descripcion || servicio.Descripcion}
-                  </p>
-                  <p>
-                    <span className="font-medium">Tamaño:</span>{" "}
-                    {formData.Tamaño || servicio.Tamaño}
-                  </p>
-                  <p>
-                    <span className="font-medium">Precio:</span>{" "}
-                    {formatPrice(servicio.Precio)}
-                  </p>
-                  {servicio.Descuento > 0 && (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+                <h3 className="font-bold text-blue-900 text-xl mb-4">Resumen del Servicio</h3>
+
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold text-slate-700 mb-2">Servicio Base</h4>
+                    <p className="text-slate-800 font-medium">{servicio.Nombre}</p>
+                    <p className="text-sm text-slate-600 mt-1">{servicio.Descripcion}</p>
+                  </div>
+
+                  <div className="border-t border-blue-200 pt-4">
+                    <h4 className="font-semibold text-slate-700 mb-3">Detalles de Precio</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Precio base:</span>
+                        <span className="font-medium">{formatPrice(servicio.Precio)}</span>
+                      </div>
+
+                      {servicio.Descuento > 0 && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Descuento ({servicio.Descuento}%):</span>
+                            <span className="text-green-600 font-medium">
+                              -{formatPrice(servicio.Precio * (servicio.Descuento / 100))}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-lg font-bold pt-2 border-t border-blue-200">
+                            <span className="text-slate-800">Precio final:</span>
+                            <span className="text-blue-600">{formatPrice(precioConDescuento)}</span>
+                          </div>
+                          <p className="text-sm text-green-600 bg-green-50 p-2 rounded">
+                            ¡Estás ahorrando {formatPrice(servicio.Precio - precioConDescuento)}!
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-blue-200 pt-4">
+                    <h4 className="font-semibold text-slate-700 mb-3">Tu Personalización</h4>
+                    <div className="space-y-2 text-sm">
+                      {descripcion && (
+                        <div>
+                          <span className="font-medium">Descripción:</span>
+                          <p className="text-slate-600 mt-1">{descripcion}</p>
+                        </div>
+                      )}
+                      <p><span className="font-medium">Tamaño:</span> {tamano}</p>
+                      {archivosAdjuntos.length > 0 && (
+                        <p><span className="font-medium">Archivos adjuntos:</span> {archivosAdjuntos.length}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 p-4 bg-white rounded-lg border border-blue-200">
+                  <h4 className="font-bold text-slate-800 mb-3">¿Qué incluye?</h4>
+                  <ul className="space-y-2 text-sm text-slate-600">
+                    <li className="flex items-start gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5"></div>
+                      <span>Diseño personalizado según tus especificaciones</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5"></div>
+                      <span>Revisiones hasta que quedes satisfecho</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5"></div>
+                      <span>Archivos en formatos editables y listos para imprimir</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5"></div>
+                      <span>Soporte y asesoría durante el proceso</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !descripcion.trim()}
+                  className={`w-full mt-6 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl ${
+                    isSubmitting || !descripcion.trim()
+                      ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed" 
+                      : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  }`}
+                >
+                  {isSubmitting ? (
                     <>
-                      <p>
-                        <span className="font-medium">Descuento:</span>{" "}
-                        {servicio.Descuento}%
-                      </p>
-                      <p>
-                        <span className="font-medium">Precio final:</span>{" "}
-                        {formatPrice(precioConDescuento)}
-                      </p>
-                      <p className="text-green-600 font-medium">
-                        Ahorro: {formatPrice(servicio.Precio - precioConDescuento)}
-                      </p>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-5 w-5" />
+                      Agregar al Carrito - {formatPrice(precioConDescuento)}
                     </>
                   )}
-                </div>
+                </button>
+
+                <p className="text-xs text-slate-500 text-center mt-3">
+                  Al continuar, aceptas nuestros términos y condiciones. El pago se realizará al confirmar el carrito.
+                </p>
               </div>
             </div>
-          </div>
+          </form>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 };

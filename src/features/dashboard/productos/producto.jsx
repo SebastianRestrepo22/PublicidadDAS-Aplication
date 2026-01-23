@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import { Search, Plus, Edit, Eye, Trash2, ArrowLeft, X } from "lucide-react";
-import { deleteDataproducto, GetDataproductos, postDataproductos, updateDataproductos, buscarProductos } from "./services/services.products.js";
+import { deleteDataproducto, GetDataproductos, postDataproductos, updateDataproductos, buscarProductos, getColores, updateColoresProducto, getColoresProducto } from "./services/services.products.js";
 import { getAllCategorias } from "../categoriadediseño/services/services.categoria.js";
 import axios from "axios";
 
@@ -35,6 +35,11 @@ export const ProductosDashboard = () => {
     Stock: "",
     CategoriaId: ""
   });
+
+  const [colores, setColores] = useState([]);
+  const [coloresSeleccionados, setColoresSeleccionados] = useState([]);
+  const [openColores, setOpenColores] = useState(false);
+
   const [submitted, setSubmitted] = useState(false);
 
   const [originalNombre, setOriginalNombre] = useState('');
@@ -65,6 +70,14 @@ export const ProductosDashboard = () => {
     };
     fetchCategoria();
   }, []);
+
+  //Funciones para cargar los colores
+  useEffect(() => {
+    getColores()
+      .then(setColores)
+      .catch(console.error);
+  }, []);
+
 
   // ======================================================
   // FUNCIÓN PARA PAGINAR - COPIAR TAL CUAL
@@ -170,15 +183,33 @@ export const ProductosDashboard = () => {
     }
   }, [mode, id]);
 
+  useEffect(() => {
+    if (mode === "edit" || mode === "view") {
+      getColoresProducto(id)
+        .then(colores => {
+          setColoresSeleccionados(colores.map(c => c.ColorId));
+        })
+        .catch(console.error);
+    }
+  }, [mode, id]);
+
+  useEffect(() => {
+    if (mode === "create") {
+      setColoresSeleccionados([]);
+    }
+  }, [mode]);
+
   // Navegación entre pestañas
   const goToBackToList = () => {
     navigate("/dashboard/producto");
     resetForm();
+    setColoresSeleccionados([]);
   };
 
   const goToCreate = () => {
     navigate("/dashboard/producto/nuevo");
     resetForm();
+    setColoresSeleccionados([]);
   };
 
   const goToView = (ProductoId) => {
@@ -198,14 +229,22 @@ export const ProductosDashboard = () => {
   };
 
   const handleNombreBlur = async () => {
+    if (!values.Nombre.trim()) return;
     if (values.Nombre === originalNombre) return;
+
     try {
-      const response = await axios.get(`http://localhost:3000/Producto/validar-nombre?nombre=${values.Nombre}`);
-      setNombreError(response.data.exists ? 'Este nombre ya está registrado' : '');
-    } catch {
+      const res = await axios.get(
+        `http://localhost:3000/producto/validar-nombre`,
+        { params: { Nombre: values.Nombre } }
+      );
+
+      setNombreError(res.data.exists ? 'Este nombre ya está registrado' : '');
+    } catch (error) {
+      console.error(error);
       setNombreError('No se pudo validar el nombre');
     }
   };
+
 
   const resetForm = () => {
     setValues({
@@ -234,12 +273,17 @@ export const ProductosDashboard = () => {
       if (editData) {
         const response = await updateDataproductos(editData.ProductoId, values);
         if (response.status === 200) {
+          await updateColoresProducto(editData.ProductoId, coloresSeleccionados);
           toast.success("Producto actualizado correctamente");
           goToBackToList();
         }
       } else {
         const response = await postDataproductos(values);
         if (response.status === 201) {
+          const nuevoProductoId = response.data.ProductoId;
+
+          await updateColoresProducto(nuevoProductoId, coloresSeleccionados);
+
           toast.success("Producto creado correctamente");
           goToBackToList();
         }
@@ -305,7 +349,7 @@ export const ProductosDashboard = () => {
 
     return (
       <form onSubmit={handleSubmit} className="flex flex-col gap-6 p-4 bg-white rounded-lg shadow-md">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div className="flex flex-col gap-1">
             <label className="font-medium">Nombre</label>
             <input
@@ -344,6 +388,23 @@ export const ProductosDashboard = () => {
               )}
             </div>
           </div>
+
+          <div className="flex flex-col gap-1">
+            {/* Label fantasma para igualar altura */}
+            <label className="opacity-0 select-none">Colores</label>
+
+            <button
+              type="button"
+              onClick={() => setOpenColores(true)}
+              className="h-10 px-4 text-sm bg-blue-500 text-white rounded-lg w-fit"
+            >
+              Seleccionar colores ({coloresSeleccionados.length})
+            </button>
+
+            {/* Espacio para mensaje de error (igual que inputs) */}
+            <div className="min-h-[16px]" />
+          </div>
+
         </div>
 
         <div className="flex flex-col md:flex-row gap-4">
@@ -484,6 +545,43 @@ export const ProductosDashboard = () => {
             Cancelar
           </button>
         </div>
+
+        <Modal open={openColores} onClose={() => setOpenColores(false)}>
+          <div className="p-6 bg-white rounded-xl w-[400px]">
+            <h3 className="font-bold mb-4">Seleccionar colores</h3>
+
+            <div className="grid grid-cols-3 gap-3">
+              {colores.map(color => (
+                <label key={color.ColorId} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={coloresSeleccionados.includes(color.ColorId)}
+                    onChange={() => {
+                      setColoresSeleccionados(prev =>
+                        prev.includes(color.ColorId)
+                          ? prev.filter(c => c !== color.ColorId)
+                          : [...prev, color.ColorId]
+                      );
+                    }}
+                  />
+                  <span
+                    className="w-4 h-4 rounded-full border"
+                    style={{ backgroundColor: color.Hex }}
+                  />
+                  <span className="text-sm">{color.Nombre}</span>
+                </label>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              className="mt-4 w-full bg-green-500 text-white py-2 rounded"
+              onClick={() => setOpenColores(false)}
+            >
+              Confirmar
+            </button>
+          </div>
+        </Modal>
       </form>
     );
   };
@@ -502,6 +600,26 @@ export const ProductosDashboard = () => {
           <div><strong>Descuento:</strong> {editData.Descuento}%</div>
           <div><strong>Stock:</strong> {editData.Stock}</div>
           <div><strong>Categoría:</strong> {categorias.find(c => c.CategoriaId === editData.CategoriaId)?.Nombre || editData.CategoriaId}</div>
+          <div>
+            <strong>Colores:</strong>
+            <div className="flex gap-2 mt-2">
+              {coloresSeleccionados.length > 0 ? (
+                colores
+                  .filter(c => coloresSeleccionados.includes(c.ColorId))
+                  .map(c => (
+                    <span
+                      key={c.ColorId}
+                      className="w-6 h-6 rounded-full border"
+                      style={{ backgroundColor: c.Hex }}
+                      title={c.Nombre}
+                    />
+                  ))
+              ) : (
+                <span className="text-gray-400">—</span>
+              )}
+            </div>
+          </div>
+
         </div>
         {editData.Imagen && (
           <div className="mt-4">
@@ -608,6 +726,7 @@ export const ProductosDashboard = () => {
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Descuento</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Stock</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Categoría</th>
+                      <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Colores</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Acciones</th>
                     </tr>
                   </thead>
@@ -657,6 +776,30 @@ export const ProductosDashboard = () => {
                           <td className="py-3 px-4 text-sm text-gray-700 truncate max-w-[120px]" title={categorias.find(c => c.CategoriaId === p.CategoriaId)?.Nombre}>
                             {categorias.find(c => c.CategoriaId === p.CategoriaId)?.Nombre || "—"}
                           </td>
+                          <td className="py-3 px-4">
+                            <div className="flex gap-1 flex-wrap">
+                              {p.Colores && (
+                                <>
+                                  {p.Colores.slice(0, 3).map(c => (
+                                    <span
+                                      key={c.ColorId}
+                                      className="w-4 h-4 rounded-full border"
+                                      style={{ backgroundColor: c.Hex }}
+                                      title={c.Nombre}
+                                    />
+                                  ))}
+
+                                  {p.Colores.length > 3 && (
+                                    <span className="text-xs text-gray-500 ml-1">
+                                      +{p.Colores.length - 3}
+                                    </span>
+                                  )}
+                                </>
+                              )}
+
+                            </div>
+                          </td>
+
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-2">
                               <button

@@ -20,6 +20,7 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer";
+import { getColoresProducto, getProductoByIdService } from "../../dashboard/productos/services/services.products";
 
 export const ProductoDetalle = () => {
   const { id } = useParams();
@@ -28,25 +29,72 @@ export const ProductoDetalle = () => {
   const { addToCart, cart } = useCart();
 
   const [producto, setProducto] = useState(location.state?.producto || null);
+  const [coloresProducto, setColoresProducto] = useState([]);
   const [cantidad, setCantidad] = useState(1);
   const [colorSeleccionado, setColorSeleccionado] = useState("");
   const [isFavorite, setIsFavorite] = useState(false);
   const [imagenSeleccionada, setImagenSeleccionada] = useState(0);
+  const [tieneColores, setTieneColores] = useState(false);
 
-  // Simular múltiples imágenes reales (ajusta esto cuando tengas URLs reales)
   const imagenesGaleria = [
     producto?.UrlImagen || "/multimedia/placeholder.jpg",
     producto?.UrlImagen2 || producto?.UrlImagen || "/multimedia/placeholder.jpg",
     producto?.UrlImagen3 || producto?.UrlImagen || "/multimedia/placeholder.jpg",
     producto?.UrlImagen4 || producto?.UrlImagen || "/multimedia/placeholder.jpg",
-  ].filter(img => img); // Elimina valores vacíos si existen
+  ].filter(img => img);
 
   useEffect(() => {
-    if (!producto && id) {
-      toast.error("Producto no encontrado");
-      navigate("/productos");
+    const fetchColores = async () => {
+      try {
+        const colores = await getColoresProducto(id);
+        setColoresProducto(colores);
+        
+        // Determinar si el producto tiene colores
+        const tieneColores = colores && Array.isArray(colores) && colores.length > 0;
+        setTieneColores(tieneColores);
+        
+        // Si solo hay un color, seleccionarlo automáticamente
+        if (tieneColores && colores.length === 1) {
+          setColorSeleccionado(colores[0].Nombre);
+        }
+      } catch (err) {
+        toast.error("No se pudieron cargar los colores");
+      }
+    };
+
+    if (!producto) {
+      const fetchProducto = async () => {
+        try {
+          const productoData = await getProductoByIdService(id);
+          setProducto(productoData);
+          
+          // Verificar si el producto viene con colores desde la API
+          if (productoData.Colores && Array.isArray(productoData.Colores) && productoData.Colores.length > 0) {
+            setTieneColores(true);
+            setColoresProducto(productoData.Colores);
+          }
+        } catch (err) {
+          toast.error("Producto no encontrado");
+          navigate("/productos");
+        }
+      };
+      fetchProducto();
+    } else {
+      // Si el producto viene por location.state, verificar si tiene colores
+      if (producto.Colores && Array.isArray(producto.Colores) && producto.Colores.length > 0) {
+        setTieneColores(true);
+        setColoresProducto(producto.Colores);
+      } else {
+        // Si no viene con colores, hacer fetch
+        fetchColores();
+      }
     }
-  }, [id, producto, navigate]);
+
+    // Si el producto existe pero no tiene colores en state, hacer fetch
+    if (producto && !producto.Colores) {
+      fetchColores();
+    }
+  }, [id, navigate, producto]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -80,11 +128,18 @@ export const ProductoDetalle = () => {
       : producto.Precio;
 
   const handleAddToCart = () => {
+    // Productos personalizados requieren color
     if (producto.EsPersonalizado) {
       if (!colorSeleccionado) {
         toast.error("Por favor selecciona un color");
         return;
       }
+    }
+    
+    // Productos con colores (no personalizados) también requieren selección de color
+    if (tieneColores && !producto.EsPersonalizado && !colorSeleccionado) {
+      toast.error("Por favor selecciona un color antes de agregar al carrito");
+      return;
     }
 
     const stock = producto.Stock ?? producto.stock ?? null;
@@ -99,34 +154,23 @@ export const ProductoDetalle = () => {
       return;
     }
 
-    const customizacion = producto.EsPersonalizado
-      ? { color: colorSeleccionado }
-      : {};
+    // Incluir color en la personalización si existe
+    const customizacion = {};
+    if (producto.EsPersonalizado || colorSeleccionado) {
+      customizacion.color = colorSeleccionado;
+    }
 
     addToCart(producto, customizacion, cantidad);
     toast.success(
-      `${cantidad} ${producto.Nombre} agregado${cantidad > 1 ? "s" : ""} al carrito`
+      `${cantidad} ${producto.Nombre}${colorSeleccionado ? ` (${colorSeleccionado})` : ''} agregado${cantidad > 1 ? "s" : ""} al carrito`
     );
   };
-
-  const coloresDisponibles = [
-    { nombre: "Blanco", hex: "#FFFFFF", border: true },
-    { nombre: "Negro", hex: "#000000" },
-    { nombre: "Azul", hex: "#3B82F6" },
-    { nombre: "Rojo", hex: "#EF4444" },
-    { nombre: "Verde", hex: "#10B981" },
-    { nombre: "Amarillo", hex: "#F59E0B" },
-    { nombre: "Rosa", hex: "#EC4899" },
-    { nombre: "Morado", hex: "#8B5CF6" },
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
       <Navbar />
 
-      {/* Contenedor principal con margen superior para visibilidad */}
       <div className="max-w-7xl mx-auto px-4 py-6 w-full ">
-        {/* ✅ Botón "Volver" bien visible al inicio */}
         <div className="max-w-7xl mx-auto px-4 py-10 ">
           <button
             onClick={() => navigate(-1)}
@@ -136,9 +180,7 @@ export const ProductoDetalle = () => {
           </button>
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="grid md:grid-cols-2 gap-8 p-6 md:p-8">
-              {/* Columna Izquierda - Imagen del Producto */}
               <div className="space-y-4">
-                {/* Imagen principal */}
                 <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 group">
                   <img
                     src={imagenesGaleria[imagenSeleccionada] || "/multimedia/placeholder.jpg"}
@@ -151,17 +193,8 @@ export const ProductoDetalle = () => {
                       -{producto.Descuento}% OFF
                     </div>
                   )}
-                  <button
-                    onClick={() => setIsFavorite(!isFavorite)}
-                    className="absolute top-4 right-4 bg-white/90 hover:bg-white text-black rounded-full p-2.5 shadow-lg transition z-10"
-                  >
-                    <Heart
-                      className={`h-5 w-5 transition-colors ${isFavorite ? "fill-red-500 text-red-500" : ""}`}
-                    />
-                  </button>
                 </div>
 
-                {/* Mini galería con las 4 posiciones */}
                 {imagenesGaleria.length > 1 && (
                   <div className="grid grid-cols-4 gap-2">
                     {imagenesGaleria.map((img, i) => (
@@ -185,7 +218,6 @@ export const ProductoDetalle = () => {
                 )}
               </div>
 
-              {/* Columna Derecha - Información del Producto */}
               <div className="space-y-6">
                 <div>
                   <h1 className="text-2xl md:text-3xl font-bold text-slate-800 mb-3">
@@ -222,52 +254,45 @@ export const ProductoDetalle = () => {
                   )}
                 </div>
 
-                {/* Dimensiones */}
-                <div className="border-t border-slate-200 pt-6">
-                  <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2 text-lg">
-                    <Ruler className="h-5 w-5 text-blue-600" />
-                    Dimensiones
-                  </h3>
-                  <div className="text-slate-700 space-y-1">
-                    <p><strong>Alto:</strong> {producto.Alto ? `${producto.Alto} cm` : 'No especificado'}</p>
-                    <p><strong>Ancho:</strong> {producto.Ancho ? `${producto.Ancho} cm` : 'No especificado'}</p>
-                  </div>
-                </div>
-
-                {/* Colores disponibles */}
-                <div className="border-t border-slate-200 pt-6">
-                  <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2 text-lg">
-                    <Palette className="h-5 w-5 text-blue-600" />
-                    Colores Disponibles
-                    {producto.EsPersonalizado && <span className="text-red-500 text-sm">*</span>}
-                  </h3>
-                  <div className="flex flex-wrap gap-3">
-                    {coloresDisponibles.map((color) => (
-                      <button
-                        key={color.nombre}
-                        onClick={() => setColorSeleccionado(color.nombre)}
-                        className={`group relative flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all ${colorSeleccionado === color.nombre
-                          ? "border-blue-600 bg-blue-50 shadow-md"
-                          : "border-slate-200 hover:border-slate-300 hover:shadow-sm"
-                          }`}
-                      >
-                        <div
-                          className={`w-6 h-6 rounded-full shadow-sm ${color.border ? "border-2 border-slate-300" : ""
+                {/* Mostrar sección de colores solo si el producto tiene colores */}
+                {tieneColores && (
+                  <div className="border-t border-slate-200 pt-6">
+                    <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2 text-lg">
+                      <Palette className="h-5 w-5 text-blue-600" />
+                      Colores Disponibles
+                      {producto.EsPersonalizado && <span className="text-red-500 text-sm">*</span>}
+                      <span className="text-sm text-slate-500 font-normal ml-auto">
+                        {coloresProducto.length} opciones
+                      </span>
+                    </h3>
+                    <div className="flex flex-wrap gap-3">
+                      {coloresProducto.map((color) => (
+                        <button
+                          key={color.ColorId}
+                          onClick={() => setColorSeleccionado(color.Nombre)}
+                          className={`group relative flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all ${colorSeleccionado === color.Nombre
+                            ? "border-blue-600 bg-blue-50 shadow-md"
+                            : "border-slate-200 hover:border-slate-300 hover:shadow-sm"
                             }`}
-                          style={{ backgroundColor: color.hex }}
-                        />
-                        <span className="text-sm font-medium text-slate-700">
-                          {color.nombre}
-                        </span>
-                        {colorSeleccionado === color.nombre && (
-                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-600 rounded-full"></div>
-                        )}
-                      </button>
-                    ))}
+                          style={{ backgroundColor: color.Hex }}
+                        >
+                          <span className="text-sm font-medium text-slate-700">{color.Nombre}</span>
+                          {colorSeleccionado === color.Nombre && (
+                            <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-600 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs">✓</span>
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    {!colorSeleccionado && (
+                      <p className="text-sm text-amber-600 mt-2">
+                        ⚠️ Por favor selecciona un color antes de agregar al carrito
+                      </p>
+                    )}
                   </div>
-                </div>
+                )}
 
-                {/* Cantidad */}
                 <div className="border-t border-slate-200 pt-6">
                   <h3 className="font-semibold text-slate-800 mb-3 text-lg">
                     Cantidad
@@ -314,16 +339,17 @@ export const ProductoDetalle = () => {
                   </div>
                 </div>
 
-                {/* Botón Agregar al Carrito - Negro como prefieres */}
                 <button
                   onClick={handleAddToCart}
-                  className="w-full bg-black hover:bg-slate-800 text-white py-4 md:py-5 rounded-xl font-semibold text-base md:text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  className="w-full bg-black hover:bg-slate-800 text-white py-4 md:py-5 rounded-xl font-semibold text-base md:text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:bg-slate-400 disabled:cursor-not-allowed"
+                  disabled={tieneColores && !colorSeleccionado}
                 >
                   <ShoppingCart className="h-5 w-5 md:h-6 md:w-6" />
-                  Agregar al Carrito - {formatPrice(precioFinal * cantidad)}
+                  {tieneColores && !colorSeleccionado 
+                    ? "Selecciona un color" 
+                    : `Agregar al Carrito - ${formatPrice(precioFinal * cantidad)}`}
                 </button>
 
-                {/* Info adicional */}
                 <div className="grid grid-cols-3 gap-3 pt-4">
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 text-center">
                     <Truck className="h-5 w-5 text-blue-600 mx-auto mb-1" />

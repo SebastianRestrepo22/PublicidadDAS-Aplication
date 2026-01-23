@@ -11,8 +11,6 @@ import { GraficosEstadisticos } from "../features/dashboard/dashboard/graficoEst
 import { RecuperarContrasena } from "../features/landing/login/RecuperarContrasena";
 import { RestablecerContrasena } from "../features/landing/login/RestablecerContrasena";
 import { CarritoCompras } from "../features/landing/carritoCompras/carritoCompras";
-import { EditarCarritoProducto } from "../features/landing/carritoCompras/CarritoProductos/editarCarritoProducto";
-import { CarritoProducto } from "../features/landing/carritoCompras/CarritoProductos/carritoProducto";
 import { PrivateRoute } from "./PrivateRoute";
 import { ProtectedRouteAdmin } from "./ProtectedRouteAdmin";
 import { Perfil } from "../features/landing/carritoCompras/perfil/perfil";
@@ -26,11 +24,12 @@ import { Inicio } from "../features/landing/inicio/inicio";
 import { Compras } from "../features/dashboard/constrolinsumos/compras/compras";
 import { Proveedores } from "../features/dashboard/constrolinsumos/proveedores/proveedores";
 import { Servicios } from "../features/landing/nuestrosservicios/servicios";
-import { ProductoDetalle } from "../features/landing/nuestrosproductos/productodetalle";
 import { ServicioDetalle } from "../features/landing/nuestrosservicios/servicioDetalle";
 import { Diseño } from "../features/dashboard/categoriadediseño/diseño";
 import { ProductosDashboard } from "../features/dashboard/productos/producto";
 import { ServiciosDashboard } from "../features/dashboard/servicios/servicio";
+import { ProductoDetalle } from "../features/landing/nuestrosproductos/productoDetalle";
+import { EditarCarritoServicio } from "../features/landing/carritoCompras/CarritoProductos/editarCarritoServicio";
 
 export const Routers = () => {
   return (
@@ -82,8 +81,7 @@ export const Routers = () => {
         <Route path="/recuperar-contrasena" element={<RecuperarContrasena />} />
         <Route path="/reset-password/:token" element={<RestablecerContrasena />} />
         <Route path="/carritodecompras" element={<CarritoCompras />} />
-        <Route path="/carritoproducto" element={<CarritoProducto />} />
-        <Route path="/editarcarritoproducto" element={<EditarCarritoProducto />} />
+        <Route path="/editarcarritoservicio" element={<EditarCarritoServicio />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route
           path="/pedido-exitoso"

@@ -202,14 +202,22 @@ export const ServiciosDashboard = () => {
     };
 
     const handleNombreBlur = async () => {
+        if (!values.Nombre.trim()) return;
         if (values.Nombre === originalNombre) return;
+
         try {
-            const response = await axios.get(`http://localhost:3000/servicio/validar-nombre?nombre=${values.Nombre}`);
-            setNombreError(response.data.exists ? 'Este nombre ya está registrado' : '');
-        } catch {
+            const res = await axios.get(
+                `http://localhost:3000/servicio/validar-nombre`,
+                { params: { Nombre: values.Nombre } }
+            );
+
+            setNombreError(res.data.exists ? 'Este nombre ya está registrado' : '');
+        } catch (error) {
+            console.error(error);
             setNombreError('No se pudo validar el nombre');
         }
     };
+
 
     const resetForm = () => {
         setValues({
@@ -460,7 +468,7 @@ export const ServiciosDashboard = () => {
                         </div>
                     </div>
 
-                     <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1">
                         <label>Categoría ID</label>
                         <select
                             name="CategoriaId"

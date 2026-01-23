@@ -41,9 +41,25 @@ export const getDataProductoById = async (ProductoId) => {
 
 // Obtener todos los productos
 export const getDataAllProductos = async () => {
-  const [rows] = await dbPool.query(
-    `SELECT * FROM Productos`
-  );
+  const [rows] = await dbPool.query(`
+    SELECT
+      p.ProductoId,
+      p.Nombre,
+      p.Descripcion,
+      p.Imagen,
+      p.Precio,
+      p.Descuento,
+      p.Stock,
+      p.CategoriaId,
+      c.ColorId,
+      c.Nombre AS ColorNombre,
+      c.Hex
+    FROM Productos p
+    LEFT JOIN ProductoColores pc ON pc.ProductoId = p.ProductoId
+    LEFT JOIN Colores c ON c.ColorId = pc.ColorId
+    ORDER BY p.Nombre
+  `);
+
   return rows;
 };
 

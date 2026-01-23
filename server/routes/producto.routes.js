@@ -8,6 +8,7 @@ import {
     validarNombre,
     buscarProducto
 } from '../controllers/productos.controller.js';
+import { getColoresProducto, updateColoresProducto  } from '../controllers/color.controller.js';
 
 const router = express.Router();
 
@@ -22,6 +23,12 @@ router.post('/', postProducto);
 
 // Obtener todos los productos
 router.get('/', getAllProducto);
+
+// RELACIÓN PRODUCTO ↔ COLORES
+
+router.get('/:id/colores', getColoresProducto);
+
+router.post('/:id/colores', updateColoresProducto );
 
 // Obtener producto/servicio por ID
 router.get('/:id', getProductoById);

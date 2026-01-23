@@ -17,6 +17,8 @@ import detalleVentasRoutes from "./routes/detalleVentas.routes.js"
 import productoRouter from './routes/producto.routes.js';
 import servicioRouter from './routes/services.routes.js';
 import voucherRoutes from './routes/voucher.routes.js';
+import colorRoutes from "./routes/color.routes.js";
+
 // Rutas de autenticación y usuarios
 import authRouter from './routes/authRoutes.js';
 import roleRouter from './routes/role.routes.js';
@@ -45,6 +47,9 @@ app.use('/comprobantes', express.static(path.join(__dirname, '../public/comproba
 app.use('/auth', authRouter);
 app.use('/roles', roleRouter);
 app.use('/user', userRouter);
+app.use('/producto', productoRouter);
+app.use('/servicio', servicioRouter);
+app.use("/colores", colorRoutes);
 app.use('/tipos-documento', tipoDocumentoRoutes);
 
 // Rutas de negocio
@@ -58,8 +63,6 @@ app.use("/api/detalle-pedido", detallePedidoClienteRoutes);
 app.use("/api/ventas", ventasRoutes);
 app.use("/api/detalle-ventas", detalleVentasRoutes);
 app.use('/api/voucher', voucherRoutes);
-app.use('/producto', productoRouter);
-app.use('/servicio', servicioRouter);
 app.use(express.static("public")); 
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
