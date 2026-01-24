@@ -49,7 +49,6 @@ export const Usuarios = () => {
   };
 
   //Traer los tipos de documentos
-
   const [tiposDocumento, setTiposDocumento] = useState([]);
   useEffect(() => {
     const fetchTiposDocumento = async () => {
@@ -83,7 +82,6 @@ export const Usuarios = () => {
   }, []);
 
   //Buscar usuarios
-
   const [filtroCampo, setFiltroCampo] = useState('');
   const [filtroValor, setFiltroValor] = useState('');
 
@@ -156,6 +154,10 @@ export const Usuarios = () => {
   const [cedulaError, setCedulaError] = useState("");
   const [telefonoError, setTelefonoError] = useState("");
 
+  // Nuevos estados para validaciones de formato
+  const [cedulaFormatoError, setCedulaFormatoError] = useState("");
+  const [telefonoFormatoError, setTelefonoFormatoError] = useState("");
+
   // Obtener usuarios al cargar
   useEffect(() => {
     const fetchUsers = async () => {
@@ -165,19 +167,107 @@ export const Usuarios = () => {
     fetchUsers();
   }, []);
 
-  // Manejo de cambios en inputs
+  // Manejo de cambios en inputs con validación de solo números
   const handleChanges = (e) => {
     const { name, value } = e.target;
-    setValues({ ...values, [name]: value });
+    
+    // Validación para campos numéricos (Cédula y Teléfono)
+    if (name === "CedulaId" || name === "Telefono") {
+      // Solo permitir números
+      const numericValue = value.replace(/[^0-9]/g, '');
+      
+      // Validar longitud máxima según el campo
+      let maxLength = 0;
+      if (name === "CedulaId") {
+        maxLength = 10; // Cédula colombiana: 6-10 dígitos
+      } else if (name === "Telefono") {
+        maxLength = 10; // Teléfono colombiano: 10 dígitos
+      }
+      
+      // Limitar longitud
+      const limitedValue = numericValue.slice(0, maxLength);
+      
+      setValues({ ...values, [name]: limitedValue });
+      
+      // Validación de formato en tiempo real
+      if (name === "CedulaId") {
+        validateCedulaFormat(limitedValue);
+      } else if (name === "Telefono") {
+        validateTelefonoFormat(limitedValue);
+      }
+    } else {
+      setValues({ ...values, [name]: value });
+    }
   };
 
-  // Validaciones
+  // Función para validar formato de cédula colombiana
+  const validateCedulaFormat = (cedula) => {
+    if (!cedula) {
+      setCedulaFormatoError("");
+      return;
+    }
+    
+    // Validar que sea numérico (ya se hace en handleChanges)
+    // Validar longitud: en Colombia las cédulas tienen entre 6 y 10 dígitos
+    if (cedula.length < 6 || cedula.length > 10) {
+      setCedulaFormatoError("La cédula debe tener entre 6 y 10 dígitos");
+      return;
+    }
+    
+    // Validar que no empiece con 0 (opcional, depende de tus reglas)
+    if (cedula.startsWith('0')) {
+      setCedulaFormatoError("La cédula no puede comenzar con 0");
+      return;
+    }
+    
+    // Si pasa todas las validaciones
+    setCedulaFormatoError("");
+  };
+
+  // Función para validar formato de teléfono colombiano
+  const validateTelefonoFormat = (telefono) => {
+    if (!telefono) {
+      setTelefonoFormatoError("");
+      return;
+    }
+    
+    // Validar longitud exacta: 10 dígitos para Colombia
+    if (telefono.length !== 10) {
+      setTelefonoFormatoError("El teléfono debe tener 10 dígitos");
+      return;
+    }
+    
+    // Validar que empiece con 3 (celulares en Colombia empiezan con 3)
+    // O con 60, 4, etc. dependiendo del tipo
+    const codigosAreaValidos = ['3', '60', '4', '5', '6', '7', '8'];
+    const codigoValido = codigosAreaValidos.some(codigo => 
+      telefono.startsWith(codigo)
+    );
+    
+    if (!codigoValido) {
+      setTelefonoFormatoError("El teléfono debe comenzar con un código válido (3, 60, 4, 5, 6, 7, 8)");
+      return;
+    }
+    
+    // Si pasa todas las validaciones
+    setTelefonoFormatoError("");
+  };
+
+  // Validaciones de existencia en BD
   const [originalCorreo, setOriginalCorreo] = useState("");
   const [originalCedula, setOriginalCedula] = useState("");
   const [originalTelefono, setOriginalTelefono] = useState("");
 
   const handleCorreoBlur = async () => {
-    if (setValues.Nombre === originalCorreo) return;
+    if (values.CorreoElectronico === originalCorreo) return;
+    
+    // Validación básica de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (values.CorreoElectronico && !emailRegex.test(values.CorreoElectronico)) {
+      setCorreoError('Ingrese un correo electrónico válido');
+      return;
+    }
+    
     try {
       const response = await axios.get(`http://localhost:3000/user/validar-correo?correo=${values.CorreoElectronico}`);
       setCorreoError(response.data.exists ? 'Este correo ya está registrado' : '');
@@ -187,7 +277,12 @@ export const Usuarios = () => {
   };
 
   const handleCedulaBlur = async () => {
-    if (setValues.Nombre === originalCedula) return;
+    if (values.CedulaId === originalCedula) return;
+    
+    // Primero validar formato
+    validateCedulaFormat(values.CedulaId);
+    if (cedulaFormatoError) return;
+    
     try {
       const response = await axios.get(`http://localhost:3000/user/validar-cedula?cedula=${values.CedulaId}`);
       setCedulaError(response.data.exists ? 'Esta cédula ya está registrada' : '');
@@ -197,8 +292,12 @@ export const Usuarios = () => {
   };
 
   const handleTelefonoBlur = async () => {
-    if (setValues.Nombre === originalTelefono) return; //Trae el valor original
-
+    if (values.Telefono === originalTelefono) return;
+    
+    // Primero validar formato
+    validateTelefonoFormat(values.Telefono);
+    if (telefonoFormatoError) return;
+    
     try {
       const response = await axios.get(`http://localhost:3000/user/validar-telefono?telefono=${values.Telefono}`);
       setTelefonoError(response.data.exists ? 'Este teléfono ya está registrado' : '');
@@ -212,7 +311,11 @@ export const Usuarios = () => {
     e.preventDefault();
     setSubmitted(true);
 
-    // Validación campos obligatorios
+    // Validar formatos antes de enviar
+    validateCedulaFormat(values.CedulaId);
+    validateTelefonoFormat(values.Telefono);
+
+    // Validación campos obligatorios - AHORA INCLUYE RoleId SIEMPRE
     const camposObligatorios = [
       "CedulaId",
       "TipoDocumentoId",
@@ -220,18 +323,30 @@ export const Usuarios = () => {
       "Telefono",
       "CorreoElectronico",
       "Direccion",
-      openEditar ? "RoleId" : null
+      "RoleId" // Ahora siempre es obligatorio en creación y edición
     ].filter(Boolean);
 
-    const camposVacios = camposObligatorios.filter(campo => !values[campo] || !values[campo].trim());
+    const camposVacios = camposObligatorios.filter(campo => !values[campo] || !values[campo].toString().trim());
 
     if (camposVacios.length > 0) {
       toast.warning(`Los siguientes campos son obligatorios: ${camposVacios.join(", ")}`);
       return; // Detiene el envío
     }
 
+    // Validar formato de cédula antes de enviar
+    if (values.CedulaId.length < 6 || values.CedulaId.length > 10) {
+      toast.warning("La cédula debe tener entre 6 y 10 dígitos");
+      return;
+    }
+
+    // Validar formato de teléfono antes de enviar
+    if (values.Telefono.length !== 10) {
+      toast.warning("El teléfono debe tener exactamente 10 dígitos");
+      return;
+    }
+
     // Validaciones existentes de correo, cédula y teléfono
-    if (correoError || cedulaError || telefonoError) {
+    if (correoError || cedulaError || telefonoError || cedulaFormatoError || telefonoFormatoError) {
       toast.warning("Corrige los errores antes de enviar");
       return;
     }
@@ -285,6 +400,8 @@ export const Usuarios = () => {
     setCedulaError("");
     setCorreoError("");
     setTelefonoError("");
+    setCedulaFormatoError("");
+    setTelefonoFormatoError("");
     setSubmitted(false); // esto evita que muestre validaciones al abrir
   };
 
@@ -346,6 +463,8 @@ export const Usuarios = () => {
     setCedulaError('');
     setCorreoError('');
     setTelefonoError('');
+    setCedulaFormatoError('');
+    setTelefonoFormatoError('');
     setOpenEditar(true);
   };
 
@@ -362,7 +481,8 @@ export const Usuarios = () => {
 
   // Formulario para modales
   const renderModalForm = (type = "create") => {
-    const isReadOnly = type === "editar";
+    const isReadOnly = type === "ver";
+    const isCreate = type === "create";
     const buttonLabel = type === "create" ? "Crear" : type === "editar" ? "Guardar" : "Cerrar";
 
     return (
@@ -374,8 +494,9 @@ export const Usuarios = () => {
             name="TipoDocumentoId"
             value={values.TipoDocumentoId || ""}
             onChange={handleChanges}
+            disabled={isReadOnly}
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${submitted && !values.TipoDocumentoId ? "border-red-500" : "border-gray-300"}`}
+      ${submitted && !values.TipoDocumentoId ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
           >
             <option value="">Seleccione un tipo de documento</option>
             {tiposDocumento.map((tipo) => (
@@ -393,23 +514,30 @@ export const Usuarios = () => {
 
         {/* Cédula */}
         <div className="flex flex-col">
-          <label className="mb-1">Cédula</label>
+          <label className="mb-1">Cédula *</label>
           <input
             type="text"
             name="CedulaId"
             value={values.CedulaId}
-            placeholder="Ingrese su cédula"
-            readOnly={isReadOnly}
+            placeholder="Ingrese su cédula (6-10 dígitos)"
+            readOnly={isReadOnly || (type === "editar")}
             onChange={handleChanges}
-            onBlur={handleCedulaBlur}
+            onBlur={!isReadOnly ? handleCedulaBlur : undefined}
+            maxLength="10"
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 
-      ${(submitted && !values.CedulaId.trim()) || cedulaError ? "border-red-500" : "border-gray-300"}`}
+      ${(submitted && !values.CedulaId.trim()) || cedulaError || cedulaFormatoError ? "border-red-500" : "border-gray-300"} ${(isReadOnly || type === "editar") ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
-          <div className="min-h-[16px] mt-0.5">
+          <div className="min-h-[32px] mt-0.5">
             {(!values.CedulaId.trim() && submitted) ? (
               <p className="text-red-500 text-[12px] leading-4">Ingrese una cédula válida</p>
             ) : cedulaError ? (
               <p className="text-red-500 text-[12px] leading-4">{cedulaError}</p>
+            ) : cedulaFormatoError ? (
+              <p className="text-red-500 text-[12px] leading-4">{cedulaFormatoError}</p>
+            ) : values.CedulaId ? (
+              <p className="text-gray-500 text-[11px] leading-4">
+                {values.CedulaId.length}/10 dígitos • Solo números permitidos
+              </p>
             ) : null}
           </div>
         </div>
@@ -422,9 +550,10 @@ export const Usuarios = () => {
             name="NombreCompleto"
             value={values.NombreCompleto}
             placeholder="Ingrese su nombre"
+            readOnly={isReadOnly}
             onChange={handleChanges}
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${submitted && !values.NombreCompleto.trim() ? "border-red-500" : "border-gray-300"}`}
+      ${submitted && !values.NombreCompleto.trim() ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
           <div className="min-h-[16px] mt-0.5">
             {(!values.NombreCompleto.trim() && submitted) && (
@@ -441,9 +570,10 @@ export const Usuarios = () => {
             name="Direccion"
             value={values.Direccion}
             placeholder="Ingrese su dirección"
+            readOnly={isReadOnly}
             onChange={handleChanges}
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${submitted && !values.Direccion.trim() ? "border-red-500" : "border-gray-300"}`}
+      ${submitted && !values.Direccion.trim() ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
           <div className="min-h-[16px] mt-0.5">
             {(!values.Direccion.trim() && submitted) && (
@@ -459,11 +589,12 @@ export const Usuarios = () => {
             type="email"
             name="CorreoElectronico"
             value={values.CorreoElectronico}
-            placeholder="Ingrese su correo"
+            placeholder="ejemplo@correo.com"
+            readOnly={isReadOnly}
             onChange={handleChanges}
-            onBlur={handleCorreoBlur}
+            onBlur={!isReadOnly ? handleCorreoBlur : undefined}
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${(submitted && !values.CorreoElectronico.trim()) || correoError ? "border-red-500" : "border-gray-300"}`}
+      ${(submitted && !values.CorreoElectronico.trim()) || correoError ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
           <div className="min-h-[16px] mt-0.5">
             {(!values.CorreoElectronico.trim() && submitted) ? (
@@ -476,61 +607,74 @@ export const Usuarios = () => {
 
         {/* Teléfono */}
         <div className="flex flex-col">
-          <label className="mb-1">Teléfono</label>
+          <label className="mb-1">Teléfono *</label>
           <input
             type="text"
             name="Telefono"
             value={values.Telefono}
-            placeholder="Ingrese su teléfono"
+            placeholder="Ej: 3001234567 (10 dígitos)"
+            readOnly={isReadOnly}
             onChange={handleChanges}
-            onBlur={handleTelefonoBlur}
+            onBlur={!isReadOnly ? handleTelefonoBlur : undefined}
+            maxLength="10"
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${(submitted && !values.Telefono.trim()) || telefonoError ? "border-red-500" : "border-gray-300"}`}
+      ${(submitted && !values.Telefono.trim()) || telefonoError || telefonoFormatoError ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
-          <div className="min-h-[16px] mt-0.5">
+          <div className="min-h-[32px] mt-0.5">
             {(!values.Telefono.trim() && submitted) ? (
-              <p className="text-red-500 text-[12px] leading-4">Ingrese un número</p>
+              <p className="text-red-500 text-[12px] leading-4">Ingrese un número de teléfono</p>
             ) : telefonoError ? (
               <p className="text-red-500 text-[12px] leading-4">{telefonoError}</p>
+            ) : telefonoFormatoError ? (
+              <p className="text-red-500 text-[12px] leading-4">{telefonoFormatoError}</p>
+            ) : values.Telefono ? (
+              <p className="text-gray-500 text-[11px] leading-4">
+                {values.Telefono.length}/10 dígitos • Solo números permitidos
+                {values.Telefono.length === 10 && " ✓ Formato válido"}
+              </p>
             ) : null}
           </div>
         </div>
 
-        {/* Rol solo si se edita */}
-        {openEditar && (
-          <div className="flex flex-col col-span-1 md:col-span-2">
-            <label className="mb-1">Rol</label>
-            <select
-              name="RoleId"
-              value={values.RoleId || ""}
-              onChange={handleChanges}
-              className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-        ${submitted && !values.RoleId ? "border-red-500" : "border-gray-300"}`}
-            >
-              <option value="">Seleccione un rol</option>
-              {roles.map((rol) => (
-                <option key={rol.RoleId} value={rol.RoleId}>
-                  {rol.Nombre}
-                </option>
-              ))}
-            </select>
-            <div className="min-h-[16px] mt-0.5">
-              {(!values.RoleId && submitted) && (
-                <p className="text-red-500 text-[12px] leading-4">Seleccione un rol</p>
-              )}
-            </div>
+        {/* Campo de Rol - AHORA SIEMPRE VISIBLE */}
+        <div className="flex flex-col col-span-1 md:col-span-2">
+          <label className="mb-1">Rol</label>
+          <select
+            name="RoleId"
+            value={values.RoleId || ""}
+            onChange={handleChanges}
+            disabled={isReadOnly}
+            className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
+        ${submitted && !values.RoleId ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
+          >
+            <option value="">Seleccione un rol</option>
+            {roles.map((rol) => (
+              <option key={rol.RoleId} value={rol.RoleId}>
+                {rol.Nombre}
+              </option>
+            ))}
+          </select>
+          <div className="min-h-[16px] mt-0.5">
+            {(!values.RoleId && submitted) && (
+              <p className="text-red-500 text-[12px] leading-4">Seleccione un rol</p>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Botones */}
         <div className="col-span-1 md:col-span-2 flex gap-4 mt-3">
-          <button className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors">
-            {buttonLabel}
-          </button>
-
+          {type !== "ver" && (
+            <button 
+              type="submit"
+              className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
+            >
+              {buttonLabel}
+            </button>
+          )}
+          
           <button
             type="button"
-            className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+            className={`flex-1 ${type === "ver" ? "w-full" : ""} bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors`}
             onClick={() => {
               setOpenCreate(false);
               setOpenEditar(false);
@@ -539,12 +683,10 @@ export const Usuarios = () => {
               resetForm();
             }}
           >
-            Cerrar
+            {type === "ver" ? "Cerrar" : "Cancelar"}
           </button>
         </div>
       </form>
-
-
     );
   };
 
@@ -556,13 +698,13 @@ export const Usuarios = () => {
         <p><strong>Tipo de documento:</strong> {tiposDocumento.find(tipo => tipo.TipoDocumentoId === editData.TipoDocumentoId)?.Nombre}</p>
         <p><strong>ID:</strong> {editData.CedulaId}</p>
         <p><strong>Nombre:</strong> {editData.NombreCompleto}</p>
-        <p><strong>Telfono:</strong> {editData.Telefono}</p>
-        <p><strong>Correo electronico:</strong> {editData.CorreoElectronico}</p>
+        <p><strong>Teléfono:</strong> {editData.Telefono}</p>
+        <p><strong>Correo electrónico:</strong> {editData.CorreoElectronico}</p>
         <p><strong>Dirección:</strong> {editData.Direccion}</p>
         <p><strong>Rol:</strong> {editData.RolNombre}</p>
         <div className="mt-4 text-center">
           <button
-            className="bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 w-[400px]"
+            className="bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 w-full"
             onClick={() => setOpenVer(false)}
           >
             Cerrar
@@ -572,10 +714,9 @@ export const Usuarios = () => {
     );
   };
 
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue p-6">
-      <div className="max-w-7xl mx-auto"> {/* Cambiado de max-w-5xl a max-w-7xl para más espacio */}
+      <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de usuarios</h1>
 
         {/* Filtros */}
@@ -641,7 +782,7 @@ export const Usuarios = () => {
           resetForm();
         }}>
           <div className="w-[450px] p-6 mx-auto text-center">
-            <h3 className="text-lg font-black text-gray-800 mb-6">Ver rol</h3>
+            <h3 className="text-lg font-black text-gray-800 mb-6">Ver usuario</h3>
             {renderView()}
           </div>
         </Modal>
@@ -664,9 +805,9 @@ export const Usuarios = () => {
           </div>
         </Modal>
 
-        {/* Tabla - Cambios realizados aquí */}
+        {/* Tabla */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="overflow-x-visible"> {/* Cambiado de overflow-x-auto a overflow-x-visible */}
+          <div className="overflow-x-visible">
             <table className="w-full">
               <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
                 <tr>
@@ -711,7 +852,7 @@ export const Usuarios = () => {
                 ) : (
                   <tr>
                     <td colSpan="8" className="text-center py-4">
-                      No se econtraron usuarios
+                      No se encontraron usuarios
                     </td>
                   </tr>
                 )}

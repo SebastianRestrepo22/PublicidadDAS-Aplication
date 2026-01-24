@@ -5,7 +5,7 @@ import dayjs from "dayjs"; // para manejar expiraciones
 import crypto from "crypto";
 import { buscarUsuarioData, correoExiste, creatByAdmin, deleteDataUser, getAllDataUsers, getUsuarioById, hashPassword, obtenerUsuarioActualizado, pedidosUsuarios, resetTokenModel, rolCliente, telefonoExistente, traerDatosActuales, updateDataUser, validarDataCedula } from '../models/user.model.js';
 
-// Crear usuari
+// Crear usuario
 export const createUser = async (req, res) => {
     const {
         CedulaId,
@@ -15,6 +15,7 @@ export const createUser = async (req, res) => {
         CorreoElectronico,
         Direccion,
         Contrasena,
+        RoleId
     } = req.body;
 
     try {
@@ -25,20 +26,12 @@ export const createUser = async (req, res) => {
             return res.status(409).json({ message: 'Usuario ya existe' });
         }
 
-        // Busca el rol "cliente"
-        const roles = await rolCliente();
-        if (roles.length === 0) {
-            return res.status(400).json({ message: "Rol 'cliente' no encontrado en BD" });
-        }
-
-        const rol = roles[0];
-
         if (!Contrasena) {
             // Usuario creado por admin sin contraseña → enviar link de creación
             const resetToken = crypto.randomBytes(32).toString("hex");
             const resetTokenExpire = dayjs().add(1, "hour").toDate();
 
-            await creatByAdmin({CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, rol, resetToken, resetTokenExpire});
+            await creatByAdmin({CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, RoleId, resetToken, resetTokenExpire});
             // Enviar correo con link al frontend   
             await sendResetPasswordEmail(CorreoElectronico, resetToken);
 

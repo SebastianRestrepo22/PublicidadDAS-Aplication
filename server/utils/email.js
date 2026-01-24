@@ -14,7 +14,7 @@ const transporter = nodemailer.createTransport({
 export const sendResetPasswordEmail = async (correo, token) => {
   try {
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com", // Ajusta a tu SMTP
+      host: "smtp.gmail.com",
       port: 587,
       secure: false,
       auth: {
@@ -27,20 +27,216 @@ export const sendResetPasswordEmail = async (correo, token) => {
     const resetUrl = `http://localhost:5173/reset-password/${token}`;
 
     const info = await transporter.sendMail({
-      from: '"Mi App" <tu_correo@ejemplo.com>',
+      from: `"Gestión de Usuarios" <${process.env.EMAIL_USER}>`,
       to: correo,
-      subject: "Restablecer contraseña",
+      subject: "🚀 ¡Bienvenido! Establece tu contraseña",
       html: `
-        <p>Haz clic en el enlace para restablecer tu contraseña:</p>
-        <a href="${resetUrl}">${resetUrl}</a>
-        <p>El enlace expira en 1 hora.</p>
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Establecer Contraseña</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              margin: 0;
+              padding: 0;
+              background-color: #f5f7fa;
+            }
+            .container {
+              max-width: 600px;
+              margin: 0 auto;
+              background-color: #ffffff;
+              border-radius: 12px;
+              overflow: hidden;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            }
+            .header {
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              padding: 30px 20px;
+              text-align: center;
+              color: white;
+            }
+            .logo {
+              font-size: 28px;
+              font-weight: bold;
+              margin-bottom: 10px;
+            }
+            .content {
+              padding: 40px 30px;
+            }
+            .welcome-text {
+              font-size: 18px;
+              margin-bottom: 20px;
+              color: #2d3748;
+            }
+            .highlight {
+              background-color: #f7fafc;
+              border-left: 4px solid #4299e1;
+              padding: 15px;
+              margin: 25px 0;
+              border-radius: 4px;
+            }
+            .button-container {
+              text-align: center;
+              margin: 35px 0;
+            }
+            .reset-button {
+              display: inline-block;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              text-decoration: none;
+              padding: 16px 32px;
+              border-radius: 8px;
+              font-weight: bold;
+              font-size: 16px;
+              transition: transform 0.2s, box-shadow 0.2s;
+              box-shadow: 0 4px 6px rgba(102, 126, 234, 0.4);
+            }
+            .reset-button:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 6px 12px rgba(102, 126, 234, 0.5);
+            }
+            .link-alternative {
+              font-size: 14px;
+              color: #718096;
+              margin-top: 15px;
+              word-break: break-all;
+            }
+            .expiry-note {
+              background-color: #fffaf0;
+              border: 1px solid #fed7d7;
+              border-radius: 8px;
+              padding: 15px;
+              margin-top: 30px;
+              text-align: center;
+              color: #c53030;
+            }
+            .steps {
+              margin: 30px 0;
+              padding-left: 20px;
+            }
+            .steps li {
+              margin-bottom: 12px;
+              color: #4a5568;
+            }
+            .footer {
+              background-color: #f7fafc;
+              padding: 20px;
+              text-align: center;
+              color: #718096;
+              font-size: 14px;
+              border-top: 1px solid #e2e8f0;
+            }
+            .security-note {
+              font-size: 12px;
+              color: #a0aec0;
+              margin-top: 15px;
+              font-style: italic;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">🔐 Gestión de Usuarios</div>
+              <h1 style="margin: 10px 0 0 0; font-weight: 300;">¡Tu cuenta ha sido creada!</h1>
+            </div>
+            
+            <div class="content">
+              <p class="welcome-text">Hola,</p>
+              
+              <p>Nos complace informarte que tu cuenta en nuestro sistema ha sido creada exitosamente. 
+              Para completar tu registro y acceder a todas las funcionalidades, debes establecer tu contraseña.</p>
+              
+              <div class="highlight">
+                <strong>📋 Información importante:</strong>
+                <p>Este enlace es personal e intransferible. Por seguridad, no lo compartas con nadie.</p>
+              </div>
+              
+              <div class="button-container">
+                <a href="${resetUrl}" class="reset-button">
+                  🚀 Establecer mi contraseña
+                </a>
+                <p class="link-alternative">
+                  Si el botón no funciona, copia y pega este enlace en tu navegador:<br>
+                  <a href="${resetUrl}" style="color: #4299e1;">${resetUrl}</a>
+                </p>
+              </div>
+              
+              <div class="expiry-note">
+                ⏰ <strong>IMPORTANTE:</strong> Este enlace expirará en 1 hora por motivos de seguridad.
+              </div>
+              
+              <h3 style="color: #2d3748; margin-top: 30px;">¿Qué hacer a continuación?</h3>
+              <ol class="steps">
+                <li>Haz clic en el botón "Establecer mi contraseña"</li>
+                <li>Crea una contraseña segura (mínimo 8 caracteres)</li>
+                <li>Confirma tu nueva contraseña</li>
+                <li>¡Listo! Podrás acceder a tu cuenta inmediatamente</li>
+              </ol>
+              
+              <p style="color: #4a5568; margin-top: 25px;">
+                <strong>💡 Consejo de seguridad:</strong><br>
+                Usa una contraseña que combine letras mayúsculas, minúsculas, números y símbolos.
+              </p>
+            </div>
+            
+            <div class="footer">
+              <p>Este correo fue enviado automáticamente como parte del proceso de creación de cuenta.</p>
+              <p>Si no solicitaste crear una cuenta, puedes ignorar este mensaje con seguridad.</p>
+              <p class="security-note">
+                🔒 Por tu seguridad, nunca te pediremos tu contraseña por correo electrónico.
+              </p>
+              <p style="margin-top: 15px; font-size: 12px; color: #cbd5e0;">
+                © ${new Date().getFullYear()} Gestión de Usuarios. Todos los derechos reservados.
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      // También incluimos una versión en texto plano para clientes de correo que no soportan HTML
+      text: `
+¡BIENVENIDO/A A GESTIÓN DE USUARIOS!
+
+Nos complace informarte que tu cuenta ha sido creada exitosamente. 
+Para completar tu registro y acceder a todas las funcionalidades, debes establecer tu contraseña.
+
+ENLACE PARA ESTABLECER CONTRASEÑA:
+${resetUrl}
+
+📋 INFORMACIÓN IMPORTANTE:
+- Este enlace es personal e intransferible
+- Por seguridad, no lo compartas con nadie
+- ⏰ El enlace expira en 1 hora
+
+PASOS A SEGUIR:
+1. Haz clic en el enlace de arriba
+2. Crea una contraseña segura (mínimo 8 caracteres)
+3. Confirma tu nueva contraseña
+4. ¡Listo! Podrás acceder a tu cuenta inmediatamente
+
+💡 CONSEJO DE SEGURIDAD:
+Usa una contraseña que combine letras mayúsculas, minúsculas, números y símbolos.
+
+---
+🔒 Por tu seguridad, nunca te pediremos tu contraseña por correo electrónico.
+
+Este correo fue enviado automáticamente como parte del proceso de creación de cuenta.
+Si no solicitaste crear una cuenta, puedes ignorar este mensaje con seguridad.
+
+© ${new Date().getFullYear()} Gestión de Usuarios. Todos los derechos reservados.
       `,
     });
 
-    console.log("Correo enviado: %s", info.messageId);
+    console.log(" Correo de bienvenida enviado a: %s", correo);
     return true;
   } catch (error) {
-    console.error("Error enviando correo:", error);
+    console.error(" Error enviando correo de bienvenida:", error);
     return false;
   }
 };

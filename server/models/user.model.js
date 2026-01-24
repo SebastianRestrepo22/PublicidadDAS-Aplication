@@ -76,7 +76,7 @@ export const rolCliente = async () => {
   return roles;
 };
 
-export const creatByAdmin = async ({ CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, rol, resetToken, resetTokenExpire }) => {
+export const creatByAdmin = async ({ CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, RoleId, resetToken, resetTokenExpire }) => {
   await dbPool.query(
     `INSERT INTO usuarios 
                      (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId, resetToken, resetTokenExpire)
@@ -89,7 +89,7 @@ export const creatByAdmin = async ({ CedulaId, TipoDocumentoId, NombreCompleto, 
       CorreoElectronico,
       Direccion,
       null,
-      rol.RoleId,
+      RoleId,
       resetToken,
       resetTokenExpire
     ]
