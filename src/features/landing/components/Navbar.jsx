@@ -39,7 +39,6 @@ export const Navbar = () => {
                             <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to='/cliente/productos'>Productos</Link></li>
                             <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to='/cliente/servicios'>Servicios</Link></li>
                             <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to='/cliente/MisPedidos'>Mis pedidos</Link></li>
-
                         </>
                     )}
 
@@ -123,6 +122,8 @@ export const Navbar = () => {
                     <>
                         <li><Link to='/cliente/productos' onClick={() => setMenuOpen(false)}>Productos</Link></li>
                         <li><Link to='/cliente/servicios' onClick={() => setMenuOpen(false)}>Servicios</Link></li>
+                        <li><Link className="text-white font-bold text-[17px] hover:text-cyan-500 duration-500" to='/cliente/MisPedidos'>Mis pedidos</Link></li>
+
                     </>
                 )}
             </ul>
@@ -156,15 +157,3 @@ export const Navbar = () => {
         </header>
     );
 };
-
-
-
-
-
-
-
-
-
-
-
-

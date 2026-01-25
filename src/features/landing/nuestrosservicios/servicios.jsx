@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer";
 import {
-  Heart,
   ShoppingCart,
   Search,
   ChevronLeft,
@@ -13,13 +12,11 @@ import {
 import { useNavigate } from "react-router-dom";
 import { GetDataservicios } from "../../dashboard/servicios/services/services.servicios";
 import { getAllCategorias } from "../../dashboard/categoriadediseño/services/services.categoria";
-import { useCart } from "../../../context/CartContext";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 export const Servicios = () => {
   const navigate = useNavigate();
-  const { addToCart } = useCart();
 
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -92,20 +89,14 @@ export const Servicios = () => {
     return matchesCategory && matchesSearch;
   });
 
-  const handleAddClick = (servicio) => {
-    navigate("/carritoproducto", {
-      state: { item: servicio, from: "/servicios" },
-    });
+  // Función para navegar al detalle del servicio
+  const handleViewDetails = (servicioId, e) => {
+    if (e) e.stopPropagation();
+    navigate(`/servicios/${servicioId}`);
   };
 
-  const handleAddFromModal = (servicio) => {
-    setShowOfertasModal(false);
-    navigate("/carritoproducto", {
-      state: { item: servicio, from: "/servicios" },
-    });
-  };
-
-  const toggleFavorite = (id) => {
+  const toggleFavorite = (id, e) => {
+    if (e) e.stopPropagation();
     setFavorites((prev) =>
       prev.includes(id) ? prev.filter((fav) => fav !== id) : [...prev, id]
     );
@@ -166,7 +157,7 @@ export const Servicios = () => {
           </div>
         </div>
       </header>
-      
+
       <div className="max-w-7xl mx-auto px-4 py-[80px]">
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 space-y-8 mt-8">
@@ -205,14 +196,17 @@ export const Servicios = () => {
                               </div>
                               <div className="flex gap-2">
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAddClick(servicio);
-                                  }}
+                                  onClick={(e) => handleViewDetails(servicio.ServicioId, e)}
                                   className="bg-white text-black px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100"
                                 >
                                   <ShoppingCart className="h-4 w-4 mr-1 inline" />
-                                  Contratar Servicio
+                                  Ver Detalles
+                                </button>
+                                <button
+                                  onClick={(e) => handleViewDetails(servicio.ServicioId, e)}
+                                  className="bg-transparent border border-white text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10"
+                                >
+                                  Más Información
                                 </button>
                               </div>
                             </div>
@@ -275,7 +269,7 @@ export const Servicios = () => {
                   {filteredServices.map((servicio) => (
                     <div
                       key={servicio.ServicioId}
-                      onClick={() => navigate(`/servicios/${servicio.ServicioId}`)}
+                      onClick={(e) => handleViewDetails(servicio.ServicioId, e)}
                       className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-200 cursor-pointer"
                     >
                       <div className="relative h-64 overflow-hidden">
@@ -290,24 +284,7 @@ export const Servicios = () => {
                         {/* Botones estáticos (siempre visibles) */}
                         <div className="absolute top-3 right-3 flex gap-2">
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleFavorite(servicio.ServicioId);
-                            }}
-                            className="bg-white/90 hover:bg-white text-black rounded-full p-2 shadow-lg"
-                          >
-                            <Heart
-                              className={`h-5 w-5 ${favorites.includes(servicio.ServicioId)
-                                ? "fill-red-500 text-red-500"
-                                : ""
-                                }`}
-                            />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAddClick(servicio);
-                            }}
+                            onClick={(e) => handleViewDetails(servicio.ServicioId, e)}
                             className="bg-white/90 hover:bg-white text-black rounded-full p-2 shadow-lg"
                           >
                             <ShoppingCart className="h-5 w-5" />
@@ -391,9 +368,9 @@ export const Servicios = () => {
               <div className="bg-gradient-to-br from-green-600 to-teal-700 text-white rounded-xl shadow-md p-6">
                 <h3 className="font-bold text-lg mb-2">¡Oferta Especial en Servicios!</h3>
                 <p className="text-sm opacity-90 mb-4">
-                  Obtén 15% de descuento en tu primer servicio personalizado
+                  Obtén descuentos en varios de los servicios que ofrecemos
                 </p>
-                <button 
+                <button
                   onClick={() => setShowOfertasModal(true)}
                   className="w-full bg-white text-green-600 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
                 >
@@ -408,17 +385,14 @@ export const Servicios = () => {
       {/* Modal de Ofertas para Servicios */}
       {showOfertasModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
             {/* Encabezado del Modal */}
-            <div className="sticky top-0 z-10 bg-gradient-to-r from-green-600 to-teal-700 text-white p-6">
+            <div className="shrink-0 bg-gradient-to-r from-green-600 to-teal-700 text-white p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Tag className="h-6 w-6" />
                   <div>
                     <h2 className="text-2xl font-bold">Ofertas Especiales en Servicios</h2>
-                    <p className="text-green-100 text-sm">
-                      15% de descuento en tu primer servicio personalizado
-                    </p>
                   </div>
                 </div>
                 <button
@@ -430,102 +404,98 @@ export const Servicios = () => {
               </div>
             </div>
 
-            {/* Contenido del Modal */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              {serviciosOferta.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
-                  <Tag className="h-12 w-12 mx-auto mb-4 text-slate-300" />
-                  <p className="text-lg">No hay ofertas disponibles en este momento</p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid md:grid-cols-3 gap-6 mb-8">
-                    {serviciosOferta.map((servicio) => (
-                      <div
-                        key={servicio.ServicioId}
-                        className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200"
-                      >
-                        <div className="relative h-48">
-                          <img
-                            src={servicio.Imagen || "/multimedia/placeholder.jpg"}
-                            alt={servicio.Nombre}
-                            className="w-full h-full object-cover"
-                            onError={(e) => (e.currentTarget.src = "/multimedia/placeholder.jpg")}
-                          />
-                          <div className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded-md font-bold text-sm">
-                            -{servicio.Descuento}%
-                          </div>
-                          <button
-                            onClick={() => handleAddFromModal(servicio)}
-                            className="absolute bottom-3 right-3 bg-green-600 text-white rounded-full p-2 hover:bg-green-700 shadow-lg"
-                          >
-                            <ShoppingCart className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <div className="p-4">
-                          <h3 className="font-semibold text-slate-800 mb-2 line-clamp-1">
-                            {servicio.Nombre}
-                          </h3>
-                          <p className="text-sm text-slate-600 mb-3 line-clamp-2">
-                            {servicio.Descripcion}
-                          </p>
-                          <div className="flex items-center justify-between">
-                            <div className="flex flex-col">
-                              <span className="text-sm text-slate-500 line-through">
-                                {formatPrice(servicio.Precio)}
-                              </span>
-                              <span className="text-lg font-bold text-green-600">
-                                {formatPrice(calcularPrecioConDescuento(servicio.Precio, servicio.Descuento))}
-                              </span>
+            {/* Contenido del Modal - Scrollable */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-6">
+                {serviciosOferta.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500">
+                    <Tag className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+                    <p className="text-lg">No hay ofertas disponibles en este momento</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid md:grid-cols-3 gap-6 mb-8">
+                      {serviciosOferta.map((servicio) => (
+                        <div
+                          key={servicio.ServicioId}
+                          className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200"
+                        >
+                          <div className="relative h-48">
+                            <img
+                              src={servicio.Imagen || "/multimedia/placeholder.jpg"}
+                              alt={servicio.Nombre}
+                              className="w-full h-full object-cover"
+                              onError={(e) => (e.currentTarget.src = "/multimedia/placeholder.jpg")}
+                            />
+                            <div className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded-md font-bold text-sm">
+                              -{servicio.Descuento}%
                             </div>
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewDetails(servicio.ServicioId, e);
                                 setShowOfertasModal(false);
-                                navigate(`/servicios/${servicio.ServicioId}`);
                               }}
-                              className="text-green-600 hover:text-green-700 text-sm font-medium"
+                              className="absolute bottom-3 right-3 bg-green-600 text-white rounded-full p-2 hover:bg-green-700 shadow-lg"
                             >
-                              Ver detalles →
+                              <ShoppingCart className="h-4 w-4" />
                             </button>
                           </div>
+                          <div className="p-4">
+                            <h3 className="font-semibold text-slate-800 mb-2 line-clamp-1">
+                              {servicio.Nombre}
+                            </h3>
+                            <p className="text-sm text-slate-600 mb-3 line-clamp-2">
+                              {servicio.Descripcion}
+                            </p>
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-col">
+                                <span className="text-sm text-slate-500 line-through">
+                                  {formatPrice(servicio.Precio)}
+                                </span>
+                                <span className="text-lg font-bold text-green-600">
+                                  {formatPrice(calcularPrecioConDescuento(servicio.Precio, servicio.Descuento))}
+                                </span>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowOfertasModal(false);
+                                  handleViewDetails(servicio.ServicioId, e);
+                                }}
+                                className="text-green-600 hover:text-green-700 text-sm font-medium"
+                              >
+                                Ver detalles →
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Información adicional */}
+                    <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-xl p-6 border border-green-100 mb-6">
+                      <div className="flex items-start gap-4">
+                        <div className="bg-green-100 p-3 rounded-lg">
+                          <Tag className="h-6 w-6 text-green-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-slate-800 mb-2">¿Cómo funciona la oferta?</h3>
+                          <ul className="text-sm text-slate-600 space-y-1">
+                            <li>• Aplica para servicios personalizados</li>
+                            <li>• El descuento se aplica automáticamente al contratar</li>
+                          </ul>
                         </div>
                       </div>
-                    ))}
-                  </div>
-
-                  {/* Información adicional */}
-                  <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-xl p-6 border border-green-100">
-                    <div className="flex items-start gap-4">
-                      <div className="bg-green-100 p-3 rounded-lg">
-                        <Tag className="h-6 w-6 text-green-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-800 mb-2">¿Cómo funciona la oferta?</h3>
-                        <ul className="text-sm text-slate-600 space-y-1">
-                          <li>• Aplica para servicios personalizados</li>
-                          <li>• El descuento se aplica automáticamente al contratar</li>
-                          <li>• Válido solo para la primera contratación de cada cliente</li>
-                          <li>• Puedes combinar con otros servicios</li>
-                        </ul>
-                      </div>
                     </div>
-                  </div>
-                </>
-              )}
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* Pie del Modal */}
-            <div className="border-t border-slate-200 p-4 bg-slate-50">
+            {/* Pie del Modal - Siempre visible */}
+            <div className="shrink-0 border-t border-slate-200 p-4 bg-slate-50">
               <div className="flex justify-between items-center">
-                <button
-                  onClick={() => {
-                    setShowOfertasModal(false);
-                    navigate('/servicios');
-                  }}
-                  className="text-green-600 hover:text-green-700 font-medium"
-                >
-                  Ver todos los servicios →
-                </button>
                 <button
                   onClick={() => setShowOfertasModal(false)}
                   className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition"

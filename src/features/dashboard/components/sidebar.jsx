@@ -4,8 +4,9 @@ import {
   BarChart3,
   Users,
   UserCheck,
-  Wrench,
   Package,
+  Printer,
+  Boxes,
   Palette,
   ShoppingCart,
   ChevronDown,
@@ -41,19 +42,19 @@ const menuItems = [
     requiredPermission: "ver_categorias"
   },
   {
-    icon: Wrench,
+    icon: Package,
     label: "Productos",
     to: "/dashboard/producto",
     requiredPermission: "ver_productos"
   },
   {
-    icon: Wrench,
+    icon: Printer ,
     label: "Servicios",
     to: "/dashboard/servicio",
     requiredPermission: "ver_servicios"
   },
   {
-    icon: Package,
+    icon: Boxes,
     label: "Control Insumos",
     hasSubmenu: true,
     submenu: [
