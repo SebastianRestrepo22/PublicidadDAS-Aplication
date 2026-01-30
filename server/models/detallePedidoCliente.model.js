@@ -16,7 +16,6 @@ export const getDetallePedidoByPedidoIdModel = async (PedidoClienteId) => {
     throw error;
   }
 };
-// En createDetallePedidoModel, generar UUID para DetallePedidoClienteId
 
 export const createDetallePedidoModel = async ({
   PedidoClienteId,

@@ -394,9 +394,7 @@ export const PedidosClientes = () => {
       // Mostrar mensaje según el estado
       if (nuevoEstado === 'aprobado') {
         toast.success("Pedido aprobado exitosamente");
-      } else if (nuevoEstado === 'entregado') {
-        toast.success("Pedido entregado exitosamente");
-      } else if (nuevoEstado === 'cancelado') {
+      }  else if (nuevoEstado === 'cancelado') {
         toast.success("Pedido cancelado exitosamente");
       } else {
         toast.success("Estado actualizado correctamente");
@@ -576,12 +574,10 @@ img, embed {
                       <td className="py-4 px-6">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${pedido.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
                           pedido.Estado === 'aprobado' ? 'bg-blue-100 text-blue-800' :
-                            pedido.Estado === 'entregado' ? 'bg-green-100 text-green-800' :
                               'bg-green-100 text-green-800'
                           }`}>
                           {pedido.Estado === 'pendiente' ? 'Pendiente' :
-                            pedido.Estado === 'aprobado' ? 'Aprobado' :
-                              pedido.Estado === 'entregado' ? 'Entregado' : 'Cancelado'}
+                            pedido.Estado === 'aprobado' ? 'Aprobado' : 'Cancelado'}
                         </span>
                       </td>
                       <td className="py-4 px-6">
@@ -952,12 +948,10 @@ img, embed {
                   <div className="text-sm text-gray-500">Estado Actual</div>
                   <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
                     pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'aprobado' ? 'bg-blue-100 text-blue-800' :
-                      pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'entregado' ? 'bg-green-100 text-green-800' :
                         'bg-green-100 text-green-800'
                     }`}>
                     {pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'pendiente' ? 'Pendiente' :
-                      pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'aprobado' ? 'Aprobado' :
-                        pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'entregado' ? 'Entregado' : 'Cancelado'}
+                      pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'aprobado' ? 'Aprobado' : 'Cancelado'}
                   </div>
                 </div>
               </div>
@@ -1039,7 +1033,6 @@ img, embed {
                 >
                   <option value="pendiente">Pendiente</option>
                   <option value="aprobado">Aprobado</option>
-                  <option value="entregado">Entregado</option>
                   <option value="cancelado">Cancelado</option>
                 </select>
                 <button
