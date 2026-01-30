@@ -17,25 +17,50 @@ export const getDetallesByPedido = async (req, res) => {
 // ← NUEVO CONTROLADOR
 export const createDetalle = async (req, res) => {
   try {
-    const { PedidoClienteId, ProductoServicioId, Cantidad, Alto, Ancho, Descripcion, UrlImagen } = req.body;
+    const { 
+      PedidoClienteId, 
+      ProductoId, 
+      ServicioId, 
+      Cantidad, 
+      Tamaño, 
+      Descripcion, 
+      UrlImagen, 
+      Precio, 
+      ColorId 
+    } = req.body;
+
+    console.log("🎨 [BACKEND] createDetalle recibido:", {
+      PedidoClienteId,
+      ProductoId,
+      ColorId,  // ✅ Verificar si llega aquí
+      body: req.body
+    });
 
     if (!PedidoClienteId) {
       return res.status(400).json({ error: "PedidoClienteId es obligatorio" });
     }
 
+    if (!ProductoId && !ServicioId) {
+      return res.status(400).json({ error: "Se requiere ProductoId o ServicioId" });
+    }
+
     const nuevoDetalle = await createDetallePedidoModel({
       PedidoClienteId,
-      ProductoServicioId: ProductoServicioId?.toString().trim(),
+      ProductoId,
+      ServicioId,
       Cantidad,
-      Alto,
-      Ancho,
-      Descripcion,
-      UrlImagen
+      Tamaño: Tamaño || null,
+      Descripcion: Descripcion || "",
+      UrlImagen: UrlImagen || null,
+      Precio: Precio,       
+      ColorId: ColorId || null  // ✅ Pasar el ColorId
     });
+
+    console.log("✅ [BACKEND] Detalle creado:", nuevoDetalle);
 
     res.status(201).json(nuevoDetalle);
   } catch (error) {
-    console.error("Error al crear detalle:", error);
+    console.error("❌ [BACKEND] Error al crear detalle:", error);
     res.status(500).json({ error: "Error al crear detalle" });
   }
 };

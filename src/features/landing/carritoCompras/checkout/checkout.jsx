@@ -1,4 +1,3 @@
-// src/components/checkout/Checkout.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../../../../context/CartContext";
@@ -45,6 +44,7 @@ export const Checkout = () => {
   };
 
   // ====== ENVIAR PEDIDO ======
+  // ====== ENVIAR PEDIDO ======
   const enviarPedido = async () => {
     if (!user) {
       setError("Debes iniciar sesión");
@@ -64,14 +64,55 @@ export const Checkout = () => {
       FechaRegistro: new Date().toISOString().split("T")[0],
       Total: getTotal(),
       Estado: "pendiente",
-      detalle: cart.map(item => ({
-        ProductoServicioId: item.ProductoServicioId,
-        Cantidad: item.quantity,
-        Alto: item.options?.alto,
-        Ancho: item.options?.ancho,
-        Descripcion: item.options?.descripcion,
-        UrlImagen: item.options?.urlImagen || item.UrlImagen
-      }))
+      detalle: cart.map(item => {
+        const ProductoId = item.ProductoId || null;
+        const ServicioId = item.ServicioId || null;
+
+        if (!ProductoId && !ServicioId) {
+          throw new Error(`El ítem ${item.Nombre || item.id} no tiene ProductoId ni ServicioId válido`);
+        }
+
+        // ✅ CORRECCIÓN: Extraer ColorId correctamente
+        let ColorId = null;
+
+        // Opción 1: Si color es un objeto con ColorId
+        if (item.customization?.color?.ColorId) {
+          ColorId = item.customization.color.ColorId;
+        }
+        // Opción 2: Si color es directamente el ID (string/number)
+        else if (item.customization?.color && typeof item.customization.color !== 'object') {
+          ColorId = item.customization.color;
+        }
+        // Opción 3: Si hay un campo colorId directo
+        else if (item.customization?.colorId) {
+          ColorId = item.customization.colorId;
+        }
+
+        console.log("🔍 [CHECKOUT] Extracción de color:", {
+          nombre: item.Nombre,
+          customization: item.customization,
+          color: item.customization?.color,
+          ColorIdExtraido: ColorId
+        });
+
+        // ✅ Tamaño solo para servicios
+        let Tamaño = null;
+        if (ServicioId) {
+          const t = (item.Tamaño || item.customization?.Tamaño)?.trim();
+          Tamaño = t && ['Pequeña', 'Mediana', 'Grande'].includes(t) ? t : "Mediana";
+        }
+
+        return {
+          ProductoId,
+          ServicioId,
+          Cantidad: item.quantity || 1,
+          Precio: item.Precio || 0,
+          Tamaño,
+          Descripcion: item.options?.descripcion || item.Descripcion || item.customization?.Descripcion || "",
+          UrlImagen: item.options?.urlImagen || item.UrlImagen || null,
+          ColorId: ColorId  // ✅ Ahora sí extraído correctamente
+        };
+      })
     };
 
     if (metodoPago === "entrega") {
@@ -96,8 +137,7 @@ export const Checkout = () => {
       }
 
       const data = await res.json();
-      const pedidoId = data.PedidoClienteId;
-
+      const pedidoId = String(data.PedidoClienteId).trim();
       clearCart();
 
       if (metodoPago === "qr" || metodoPago === "transferencia") {
@@ -152,7 +192,6 @@ export const Checkout = () => {
 
       setUploading(true);
       try {
-        // ⬇️ NUEVA RUTA: /api/voucher
         const res = await fetch("http://localhost:3000/api/voucher", {
           method: "POST",
           body: formData
@@ -161,12 +200,12 @@ export const Checkout = () => {
         if (res.ok) {
           setSuccess(true);
           setTimeout(() => {
-            navigate("/pedido-exitoso", { 
-              state: { 
+            navigate("/pedido-exitoso", {
+              state: {
                 metodo,
                 id: pedidoId,
                 referencia: `PED${pedidoId.toString().padStart(6, '0')}`
-              } 
+              }
             });
           }, 2000);
         } else {
@@ -266,7 +305,7 @@ export const Checkout = () => {
               {voucher.metodo === "qr" ? "Paga con QR Bancolombia" : "Transferencia Bancaria"}
             </h1>
           </div>
-          
+
           <div className="inline-flex items-center gap-4 bg-blue-50 px-4 py-2 rounded-full">
             <span className="text-sm font-medium text-blue-700">
               Pedido: <span className="font-bold">#{voucher.id}</span>
@@ -333,7 +372,7 @@ export const Checkout = () => {
                 </div>
                 <p className="text-gray-300 mt-1">Después de pagar, adjunta aquí tu comprobante para confirmar tu pedido</p>
               </div>
-              
+
               <div className="p-6">
                 <SubirComprobanteBanco pedidoId={voucher.id} metodo={voucher.metodo} />
               </div>
@@ -461,11 +500,11 @@ export const Checkout = () => {
                     </div>
                     <div className="flex items-center gap-4 mt-1">
                       <span className="text-sm text-gray-600">Cantidad: {item.quantity}</span>
-                      {item.options?.alto && (
-                        <span className="text-xs bg-gray-200 px-2 py-1 rounded">Alto: {item.options.alto}</span>
+                      {item.Tamaño && (
+                        <span className="text-xs bg-gray-200 px-2 py-1 rounded">Tamaño: {item.Tamaño}</span>
                       )}
-                      {item.options?.ancho && (
-                        <span className="text-xs bg-gray-200 px-2 py-1 rounded">Ancho: {item.options.ancho}</span>
+                      {item.ColorId && (
+                        <span className="text-xs bg-gray-200 px-2 py-1 rounded">Color ID</span>
                       )}
                     </div>
                   </div>
@@ -499,7 +538,7 @@ export const Checkout = () => {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                  d="M3 10h18M7 15h10l4-8H5.4L7 13zm1 6a2 2 0 100 4 2 2 0 000-4zm6 0a2 2 0 100 4 2 2 0 000-4z"
                 />
               </svg>
               Método de pago
@@ -507,17 +546,15 @@ export const Checkout = () => {
 
             {/* Opción 1: QR */}
             <div
-              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                metodoPago === "qr" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-              }`}
+              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "qr" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+                }`}
               onClick={() => setMetodoPago("qr")}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                      metodoPago === "qr" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                    }`}
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "qr" ? "border-blue-500 bg-blue-500" : "border-gray-300"
+                      }`}
                   >
                     {metodoPago === "qr" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                   </div>
@@ -550,16 +587,14 @@ export const Checkout = () => {
 
             {/* Opción 2: Transferencia */}
             <div
-              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                metodoPago === "transferencia" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-              }`}
+              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+                }`}
               onClick={() => setMetodoPago("transferencia")}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                    metodoPago === "transferencia" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                  }`}
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-500" : "border-gray-300"
+                    }`}
                 >
                   {metodoPago === "transferencia" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                 </div>
@@ -590,16 +625,14 @@ export const Checkout = () => {
 
             {/* Opción 3: Contra entrega */}
             <div
-              className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                metodoPago === "entrega" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-              }`}
+              className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "entrega" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+                }`}
               onClick={() => setMetodoPago("entrega")}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                    metodoPago === "entrega" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                  }`}
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "entrega" ? "border-blue-500 bg-blue-500" : "border-gray-300"
+                    }`}
                 >
                   {metodoPago === "entrega" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                 </div>
@@ -618,9 +651,8 @@ export const Checkout = () => {
                         placeholder="Nombre completo *"
                         value={datosEntrega.nombreRecibe}
                         onChange={(e) => setDatosEntrega({ ...datosEntrega, nombreRecibe: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${
-                          erroresEntrega.nombreRecibe ? "border-red-500" : "border-gray-300"
-                        }`}
+                        className={`w-full p-3 rounded-lg border ${erroresEntrega.nombreRecibe ? "border-red-500" : "border-gray-300"
+                          }`}
                       />
                       {erroresEntrega.nombreRecibe && (
                         <p className="text-red-500 text-sm mt-1">{erroresEntrega.nombreRecibe}</p>
@@ -632,9 +664,8 @@ export const Checkout = () => {
                         placeholder="Teléfono *"
                         value={datosEntrega.telefono}
                         onChange={(e) => setDatosEntrega({ ...datosEntrega, telefono: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${
-                          erroresEntrega.telefono ? "border-red-500" : "border-gray-300"
-                        }`}
+                        className={`w-full p-3 rounded-lg border ${erroresEntrega.telefono ? "border-red-500" : "border-gray-300"
+                          }`}
                       />
                       {erroresEntrega.telefono && (
                         <p className="text-red-500 text-sm mt-1">{erroresEntrega.telefono}</p>
@@ -645,9 +676,8 @@ export const Checkout = () => {
                         placeholder="Dirección completa *"
                         value={datosEntrega.direccion}
                         onChange={(e) => setDatosEntrega({ ...datosEntrega, direccion: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${
-                          erroresEntrega.direccion ? "border-red-500" : "border-gray-300"
-                        }`}
+                        className={`w-full p-3 rounded-lg border ${erroresEntrega.direccion ? "border-red-500" : "border-gray-300"
+                          }`}
                         rows="2"
                       />
                       {erroresEntrega.direccion && (
@@ -664,9 +694,8 @@ export const Checkout = () => {
           <button
             onClick={enviarPedido}
             disabled={loading}
-            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${
-              loading ? "bg-gray-400" : "bg-black hover:bg-gray-800 hover:shadow-xl"
-            }`}
+            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${loading ? "bg-gray-400" : "bg-black hover:bg-gray-800 hover:shadow-xl"
+              }`}
           >
             {loading ? (
               <div className="flex items-center justify-center gap-2">

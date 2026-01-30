@@ -1,66 +1,84 @@
+// server/models/detallePedidoCliente.model.js
 import { v4 as uuidv4 } from "uuid";
-import connectDB from "../lib/db.js";
+import { dbPool } from "../lib/db.js";
 
-const sanitize = (v) => (v === undefined ? null : v);
 
-// ✔ TABLA REAL: detallepedidosclientes
 export const getDetallePedidoByPedidoIdModel = async (PedidoClienteId) => {
-    const connection = await connectDB();
-    const [rows] = await connection.execute(
-        "SELECT * FROM detallepedidosclientes WHERE PedidoClienteId = ?",
-        [PedidoClienteId]
+  try {
+    // ✅ Usar el nombre exacto: detallePedidosClientes
+    const [rows] = await dbPool.execute(
+      "SELECT * FROM detallePedidosClientes WHERE PedidoClienteId = ?",
+      [PedidoClienteId]
     );
     return rows;
+  } catch (error) {
+    console.error("❌ Error en getDetallePedidoByPedidoIdModel:", error);
+    throw error;
+  }
 };
+// En createDetallePedidoModel, generar UUID para DetallePedidoClienteId
 
 export const createDetallePedidoModel = async ({
-    PedidoClienteId,
-    ProductoServicioId,
-    Cantidad,
-    Alto,
-    Ancho,
-    Descripcion,
-    UrlImagen,
+  PedidoClienteId,
+  ProductoId,
+  ServicioId,
+  Cantidad,
+  Tamaño,
+  Descripcion,
+  UrlImagen,
+  Precio,
+  ColorId
 }) => {
-    const connection = await connectDB();
-
-    const DetallePedidoClienteId = uuidv4();
-
-    await connection.execute(
-        `
-        INSERT INTO detallepedidosclientes
-        (DetallePedidoClienteId, PedidoClienteId, ProductoServicioId, Cantidad, Alto, Ancho, Descripcion, UrlImagen)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        [
-            DetallePedidoClienteId,
-            PedidoClienteId,
-            sanitize(ProductoServicioId),
-            sanitize(Cantidad),
-            sanitize(Alto),
-            sanitize(Ancho),
-            sanitize(Descripcion),
-            sanitize(UrlImagen),
-        ]
-    );
-
-    return {
-        DetallePedidoClienteId,
-        PedidoClienteId,
-        ProductoServicioId,
-        Cantidad,
-        Alto,
-        Ancho,
-        Descripcion,
-        UrlImagen,
-    };
+  try {
+    const DetallePedidoClienteId = uuidv4(); // ← Generar UUID
+    
+    const query = `
+      INSERT INTO detallePedidosClientes 
+      (DetallePedidoClienteId, PedidoClienteId, ProductoId, ServicioId, Cantidad, Tamaño, Descripcion, UrlImagen, Precio, ColorId)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    const values = [
+      DetallePedidoClienteId, // ← Incluir el ID generado
+      PedidoClienteId,
+      ProductoId || null,
+      ServicioId || null,
+      Cantidad,
+      Tamaño,
+      Descripcion,
+      UrlImagen,
+      Precio,
+      ColorId || null
+    ];
+    
+    console.log("📝 [MODEL] Insertando detalle:", {
+      DetallePedidoClienteId,
+      ProductoId,
+      ColorId,
+      valores: values
+    });
+    
+    const [result] = await dbPool.execute(query, values);
+    
+    console.log("✅ [MODEL] Detalle creado con ID:", DetallePedidoClienteId);
+    return { DetallePedidoClienteId: DetallePedidoClienteId };
+    
+  } catch (error) {
+    console.error("❌ Error en createDetallePedidoModel:", error);
+    throw error;
+  }
 };
 
 export const deleteDetallePedidoModel = async (id) => {
-    const connection = await connectDB();
-    const [result] = await connection.execute(
-        "DELETE FROM detallepedidosclientes WHERE DetallePedidoClienteId = ?",
-        [id]
+  try {
+    // ✅ Usar el nombre exacto: detallePedidosClientes
+    const [result] = await dbPool.execute(
+      "DELETE FROM detallePedidosClientes WHERE DetallePedidoClienteId = ?",
+      [id]
     );
     return result;
+  } catch (error) {
+    console.error("❌ Error en deleteDetallePedidoModel:", error);
+    throw error;
+  }
 };

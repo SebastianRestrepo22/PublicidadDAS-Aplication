@@ -1,9 +1,5 @@
-// src/services/pedidoClientesService.js
 
 import axios from "axios";
-
-const API_BASE = 'http://localhost:3000/api';
-
 /**
  * Obtiene todos los pedidos de clientes con sus detalles
  */
@@ -53,9 +49,28 @@ export const getDetallesByPedidoId = async (pedidoId) => {
 };
 
 /**
- * Obtiene productos/servicios (catálogo externo)
+ * Obtiene productos
+ * ✅ Ruta CORRECTA: /producto (singular, sin /api)
  */
 export const getAllProductos = async () => {
-  const response = await axios.get("http://localhost:3000/service");
+  const response = await axios.get(`${'http://localhost:3000'}/producto`);
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+/**
+ * Obtiene servicios
+ * ✅ Ruta CORRECTA: /servicio (singular, sin /api)
+ */
+export const getAllServicios = async () => {
+  const response = await axios.get(`${'http://localhost:3000'}/servicio`);
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+/**
+ * Obtiene todos los colores
+ *  Ruta CORRECTA: /colores (plural, sin /api)
+ */
+export const getAllColores = async () => {
+  const response = await axios.get(`${'http://localhost:3000'}/colores`);
   return Array.isArray(response.data) ? response.data : [];
 };

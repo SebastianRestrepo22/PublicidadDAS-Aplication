@@ -1,29 +1,33 @@
 // backend/utils/email.js
 import nodemailer from "nodemailer";
 
+// ✅ CONFIGURACIÓN ÚNICA Y ESTABLE PARA GMAIL (PUERTO 465)
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com", // si usas Gmail
+  host: "smtp.gmail.com",
   port: 465,
-  secure: true,
+  secure: true, // true para puerto 465
   auth: {
-    user: process.env.EMAIL_USER, // de .env
-    pass: process.env.EMAIL_PASS  // contraseña de aplicación
+    user: process.env.EMAIL_USER,  // tuemail@gmail.com
+    pass: process.env.EMAIL_PASS,  // ¡CONTRASEÑA DE APLICACIÓN DE 16 DÍGITOS!
+  },
+  pool: true,      // ✅ Reutiliza conexiones (evita "socket close")
+  maxConnections: 5,
+  rateLimit: true, // ✅ Evita bloqueos por exceso de envíos
+  rateDelta: 1000,
+  rateLimit: 10,
+});
+
+// ✅ Verificar conexión al iniciar la app (opcional pero recomendado)
+transporter.verify(function (error, success) {
+  if (error) {
+    console.error("⚠️ Error de conexión SMTP:", error);
+  } else {
+    console.log("✅ Servidor SMTP listo para enviar correos");
   }
 });
 
 export const sendResetPasswordEmail = async (correo, token) => {
   try {
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    // Link apuntando al frontend (React)
     const resetUrl = `http://localhost:5173/reset-password/${token}`;
 
     const info = await transporter.sendMail({
@@ -38,105 +42,22 @@ export const sendResetPasswordEmail = async (correo, token) => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Establecer Contraseña</title>
           <style>
-            body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              margin: 0;
-              padding: 0;
-              background-color: #f5f7fa;
-            }
-            .container {
-              max-width: 600px;
-              margin: 0 auto;
-              background-color: #ffffff;
-              border-radius: 12px;
-              overflow: hidden;
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            }
-            .header {
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              padding: 30px 20px;
-              text-align: center;
-              color: white;
-            }
-            .logo {
-              font-size: 28px;
-              font-weight: bold;
-              margin-bottom: 10px;
-            }
-            .content {
-              padding: 40px 30px;
-            }
-            .welcome-text {
-              font-size: 18px;
-              margin-bottom: 20px;
-              color: #2d3748;
-            }
-            .highlight {
-              background-color: #f7fafc;
-              border-left: 4px solid #4299e1;
-              padding: 15px;
-              margin: 25px 0;
-              border-radius: 4px;
-            }
-            .button-container {
-              text-align: center;
-              margin: 35px 0;
-            }
-            .reset-button {
-              display: inline-block;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              color: white;
-              text-decoration: none;
-              padding: 16px 32px;
-              border-radius: 8px;
-              font-weight: bold;
-              font-size: 16px;
-              transition: transform 0.2s, box-shadow 0.2s;
-              box-shadow: 0 4px 6px rgba(102, 126, 234, 0.4);
-            }
-            .reset-button:hover {
-              transform: translateY(-2px);
-              box-shadow: 0 6px 12px rgba(102, 126, 234, 0.5);
-            }
-            .link-alternative {
-              font-size: 14px;
-              color: #718096;
-              margin-top: 15px;
-              word-break: break-all;
-            }
-            .expiry-note {
-              background-color: #fffaf0;
-              border: 1px solid #fed7d7;
-              border-radius: 8px;
-              padding: 15px;
-              margin-top: 30px;
-              text-align: center;
-              color: #c53030;
-            }
-            .steps {
-              margin: 30px 0;
-              padding-left: 20px;
-            }
-            .steps li {
-              margin-bottom: 12px;
-              color: #4a5568;
-            }
-            .footer {
-              background-color: #f7fafc;
-              padding: 20px;
-              text-align: center;
-              color: #718096;
-              font-size: 14px;
-              border-top: 1px solid #e2e8f0;
-            }
-            .security-note {
-              font-size: 12px;
-              color: #a0aec0;
-              margin-top: 15px;
-              font-style: italic;
-            }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f7fa; }
+            .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px; text-align: center; color: white; }
+            .logo { font-size: 28px; font-weight: bold; margin-bottom: 10px; }
+            .content { padding: 40px 30px; }
+            .welcome-text { font-size: 18px; margin-bottom: 20px; color: #2d3748; }
+            .highlight { background-color: #f7fafc; border-left: 4px solid #4299e1; padding: 15px; margin: 25px 0; border-radius: 4px; }
+            .button-container { text-align: center; margin: 35px 0; }
+            .reset-button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: bold; font-size: 16px; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.4); }
+            .reset-button:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(102, 126, 234, 0.5); }
+            .link-alternative { font-size: 14px; color: #718096; margin-top: 15px; word-break: break-all; }
+            .expiry-note { background-color: #fffaf0; border: 1px solid #fed7d7; border-radius: 8px; padding: 15px; margin-top: 30px; text-align: center; color: #c53030; }
+            .steps { margin: 30px 0; padding-left: 20px; }
+            .steps li { margin-bottom: 12px; color: #4a5568; }
+            .footer { background-color: #f7fafc; padding: 20px; text-align: center; color: #718096; font-size: 14px; border-top: 1px solid #e2e8f0; }
+            .security-note { font-size: 12px; color: #a0aec0; margin-top: 15px; font-style: italic; }
           </style>
         </head>
         <body>
@@ -199,7 +120,6 @@ export const sendResetPasswordEmail = async (correo, token) => {
         </body>
         </html>
       `,
-      // También incluimos una versión en texto plano para clientes de correo que no soportan HTML
       text: `
 ¡BIENVENIDO/A A GESTIÓN DE USUARIOS!
 
@@ -233,10 +153,11 @@ Si no solicitaste crear una cuenta, puedes ignorar este mensaje con seguridad.
       `,
     });
 
-    console.log(" Correo de bienvenida enviado a: %s", correo);
+    console.log("✅ Correo de bienvenida enviado a:", correo);
     return true;
   } catch (error) {
-    console.error(" Error enviando correo de bienvenida:", error);
+    console.error("❌ Error enviando correo de bienvenida:", error.message);
+    // No lances error para no bloquear el flujo principal
     return false;
   }
 };
@@ -263,51 +184,50 @@ export const sendPedidoEstadoEmail = async (to, nombreCliente, pedidoId, nuevoEs
         <p>Ahora pasará a producción.</p>
       `;
       break;
-    case "en_produccion":
-      subject = `🏭 Pedido #${pedidoId} en producción`;
-      html = `
-        <p>¡Hola ${nombreCliente}!</p>
-        <p>Tu pedido <strong>#${pedidoId}</strong> ha sido aprobado y ya está en producción.</p>
-        <p>Pronto recibirás más actualizaciones.</p>
-      `;
-      break;
-    case "terminado":
-      subject = `🎨 Pedido #${pedidoId} terminado`;
-      html = `
-        <p>¡Tu diseño está listo!</p>
-        <p>El pedido <strong>#${pedidoId}</strong> ha sido terminado y está listo para entrega.</p>
-      `;
-      break;
     case "entregado":
       subject = `📦 Pedido #${pedidoId} entregado`;
       html = `
-        <p>¡Gracias por tu confianza!</p>
+        <p>¡Gracias por tu confianza, ${nombreCliente}!</p>
         <p>Tu pedido <strong>#${pedidoId}</strong> ha sido entregado satisfactoriamente.</p>
+        <p>Esperamos verte pronto nuevamente.</p>
       `;
       break;
-    case "requiere_correccion":
-      subject = `⚠️ Corrección necesaria en pedido #${pedidoId}`;
+    case "cancelado":
+      subject = `❌ Pedido #${pedidoId} cancelado`;
       html = `
         <p>Hola ${nombreCliente},</p>
-        <p>Revisamos tu pedido <strong>#${pedidoId}</strong>, pero necesitamos una corrección:</p>
-        <p><em>"${motivo}"</em></p>
-        <p>Por favor, actualiza tu boceto y reenvíalo desde tu panel de cliente.</p>
+        <p>Informamos que tu pedido <strong>#${pedidoId}</strong> ha sido cancelado.</p>
+        ${motivo ? `<p><strong>Motivo:</strong> ${motivo}</p>` : ""}
+        <p>Si tienes dudas, contáctanos.</p>
       `;
       break;
     default:
-      return; // No enviar correo para estados desconocidos
+      return; // No enviar para estados no manejados
   }
 
   try {
     await transporter.sendMail({
-      from: '"Tu Empresa" <no-reply@tuempresa.com>',
+      from: `"Tu Empresa" <${process.env.EMAIL_USER}>`,
       to,
       subject,
-      html,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
+          <div style="text-align: center; padding: 20px 0; border-bottom: 2px solid #e2e8f0;">
+            <h1 style="color: #2d3748; margin: 0;">Tu Empresa</h1>
+          </div>
+          <div style="padding: 30px; background: white; border-radius: 10px; margin-top: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+            ${html}
+          </div>
+          <div style="text-align: center; margin-top: 30px; color: #718096; font-size: 14px;">
+            <p>Este es un mensaje automático. No respondas a este correo.</p>
+            <p>© ${new Date().getFullYear()} Tu Empresa. Todos los derechos reservados.</p>
+          </div>
+        </div>
+      `,
     });
-    console.log(`Correo de estado enviado a ${to} para pedido ${pedidoId}`);
+    console.log(`✅ Correo de estado '${nuevoEstado}' enviado a ${to} para pedido ${pedidoId}`);
   } catch (error) {
-    console.error("Error al enviar correo de estado:", error);
+    console.error(`❌ Error al enviar correo de estado '${nuevoEstado}':`, error.message);
     // No detener la app si falla el correo
   }
 };
@@ -322,35 +242,41 @@ export const sendVoucherEmail = async (to, nombreCliente, pedidoId, total) => {
 
   const subject = `📄 Voucher de pago - Pedido #${pedidoId}`;
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="text-align: center; margin-bottom: 30px;">
-        <h2 style="color: #333;">¡Gracias por tu pedido!</h2>
-        <p style="color: #666;">Aquí tienes tu orden de pago</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
+      <div style="text-align: center; padding: 20px 0; border-bottom: 2px solid #e2e8f0;">
+        <h1 style="color: #2d3748; margin: 0;">Tu Empresa</h1>
+      </div>
+      
+      <div style="padding: 30px; background: white; border-radius: 10px; margin-top: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 25px;">
+          <h2 style="color: #333;">¡Gracias por tu pedido!</h2>
+          <p style="color: #666;">Aquí tienes tu orden de pago</p>
+        </div>
+
+        <div style="background-color: #f9f9f9; padding: 20px; border-radius: 10px; margin-bottom: 25px;">
+          <h3 style="margin-top: 0; color: #222;">Detalles del pedido</h3>
+          <p><strong>Pedido:</strong> ${pedidoId}</p>
+          <p><strong>Monto a pagar:</strong> ${totalFormateado}</p>
+          <p><strong>Fecha:</strong> ${new Date().toLocaleDateString("es-CO")}</p>
+          <p><strong>Cliente:</strong> ${nombreCliente}</p>
+        </div>
+
+        <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; border-left: 4px solid #2196f3;">
+          <h3 style="margin-top: 0; color: #0d47a1;">Instrucciones de pago</h3>
+          <ol style="padding-left: 20px;">
+            <li>Realiza una transferencia por el monto exacto: <strong>${totalFormateado}</strong>.</li>
+            <li>En el <strong>concepto o referencia</strong> de la transferencia, escribe: 
+              <span style="background-color: #bbdefb; padding: 2px 6px; border-radius: 4px; font-weight: bold;">
+                ${pedidoId}
+              </span>
+            </li>
+            <li>Adjunta el comprobante bancario en tu panel de cliente para que podamos verificarlo.</li>
+          </ol>
+        </div>
       </div>
 
-      <div style="background-color: #f9f9f9; padding: 20px; border-radius: 10px; margin-bottom: 25px;">
-        <h3 style="margin-top: 0; color: #222;">Detalles del pedido</h3>
-        <p><strong>Pedido:</strong> ${pedidoId}</p>
-        <p><strong>Monto a pagar:</strong> ${totalFormateado}</p>
-        <p><strong>Fecha:</strong> ${new Date().toLocaleDateString("es-CO")}</p>
-        <p><strong>Cliente:</strong> ${nombreCliente}</p>
-      </div>
-
-      <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; border-left: 4px solid #2196f3;">
-        <h3 style="margin-top: 0; color: #0d47a1;">Instrucciones de pago</h3>
-        <ol style="padding-left: 20px;">
-          <li>Realiza una transferencia por el monto exacto: <strong>${totalFormateado}</strong>.</li>
-          <li>En el <strong>concepto o referencia</strong> de la transferencia, escribe: 
-            <span style="background-color: #bbdefb; padding: 2px 6px; border-radius: 4px; font-weight: bold;">
-              ${pedidoId}
-            </span>
-          </li>
-          <li>Adjunta el comprobante bancario en tu panel de cliente para que podamos verificarlo.</li>
-        </ol>
-      </div>
-
-      <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee; color: #888; font-size: 14px;">
-        <p>Este es un mensaje automático. Por favor, no respondas a este correo.</p>
+      <div style="text-align: center; margin-top: 30px; color: #718096; font-size: 14px;">
+        <p>Este es un mensaje automático. No respondas a este correo.</p>
         <p>© ${new Date().getFullYear()} Tu Empresa. Todos los derechos reservados.</p>
       </div>
     </div>
@@ -358,13 +284,13 @@ export const sendVoucherEmail = async (to, nombreCliente, pedidoId, total) => {
 
   try {
     await transporter.sendMail({
-      from: '"Tu Empresa" <no-reply@tuempresa.com>',
+      from: `"Tu Empresa" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       html,
     });
-    console.log(`Voucher de pago enviado a ${to} para pedido ${pedidoId}`);
+    console.log(`✅ Voucher de pago enviado a ${to} para pedido ${pedidoId}`);
   } catch (error) {
-    console.error("Error al enviar voucher por correo:", error);
+    console.error("❌ Error al enviar voucher por correo:", error.message);
   }
 };

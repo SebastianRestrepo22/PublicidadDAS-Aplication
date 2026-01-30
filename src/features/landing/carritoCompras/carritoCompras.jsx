@@ -6,11 +6,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { 
-  Edit2, 
-  Trash2, 
-  Plus, 
-  Minus, 
+import {
+  Edit2,
+  Trash2,
+  Plus,
+  Minus,
   Palette,
   ChevronLeft,
   X
@@ -39,21 +39,21 @@ export const CarritoCompras = () => {
       const productIds = cart
         .filter(item => item.ProductoId && !productColors[item.ProductoId])
         .map(item => item.ProductoId);
-      
+
       for (const productId of productIds) {
         if (!loadingColors[productId]) {
           setLoadingColors(prev => ({ ...prev, [productId]: true }));
           try {
             const colors = await getColoresProducto(productId);
-            setProductColors(prev => ({ 
-              ...prev, 
-              [productId]: colors 
+            setProductColors(prev => ({
+              ...prev,
+              [productId]: colors
             }));
           } catch (error) {
             console.error(`Error cargando colores para producto ${productId}:`, error);
-            setProductColors(prev => ({ 
-              ...prev, 
-              [productId]: [] 
+            setProductColors(prev => ({
+              ...prev,
+              [productId]: []
             }));
           } finally {
             setLoadingColors(prev => ({ ...prev, [productId]: false }));
@@ -67,7 +67,32 @@ export const CarritoCompras = () => {
     }
   }, [cart, productColors, loadingColors]);
 
+  useEffect(() => {
+  console.log("🛒 [CARRITO] Estado actual del carrito:", cart);
+  cart.forEach(item => {
+    console.log(`  - ${item.Nombre}:`, {
+      customization: item.customization,
+      color: item.customization?.color,
+      colorId: item.customization?.color?.ColorId
+    });
+  });
+}, [cart]);
+
+
+const verificarDatosCarrito = () => {
+  console.log("=== VERIFICACIÓN DE DATOS DEL CARRITO ===");
+  cart.forEach((item, index) => {
+    console.log(`Item ${index + 1}: ${item.Nombre}`);
+    console.log("  - ProductoId:", item.ProductoId);
+    console.log("  - Customization:", item.customization);
+    console.log("  - Color Object:", item.customization?.color);
+    console.log("  - ColorId:", item.customization?.color?.ColorId);
+    console.log("  - Tiene ColorId?:", !!item.customization?.color?.ColorId);
+  });
+};
+
   const handleCheckout = () => {
+    verificarDatosCarrito(); // ← Agrega esto
     const total = getTotal();
     if (total === 0) {
       toast.error("No puedes finalizar una compra con valor $0");
@@ -105,17 +130,17 @@ export const CarritoCompras = () => {
   const saveStockEdit = (itemId) => {
     const item = cart.find(item => item.id === itemId);
     const stock = item?.Stock ?? item?.stock ?? null;
-    
+
     if (stock !== null && newQuantity > stock) {
       toast.error(`Solo hay ${stock} unidades disponibles`);
       return;
     }
-    
+
     if (newQuantity < 1) {
       toast.error("La cantidad debe ser al menos 1");
       return;
     }
-    
+
     updateQuantity(itemId, newQuantity);
     setEditingStock(null);
     toast.success("Cantidad actualizada");
@@ -130,13 +155,27 @@ export const CarritoCompras = () => {
     setEditingColorItem(item);
   };
 
-  const handleSelectColor = (color) => {
-    if (!editingColorItem) return;
-    
-    updateItemColor(editingColorItem.id, color.Nombre);
-    setEditingColorItem(null);
-    toast.success(`Color cambiado a ${color.Nombre}`);
-  };
+  // En CarritoCompras.js, después de updateItemColor
+  // Modifica la función handleSelectColor:
+const handleSelectColor = (color) => {
+  if (!editingColorItem) return;
+  
+  console.log("🎨 [CARRITO] Color seleccionado para guardar:", {
+    ColorId: color.ColorId,
+    Nombre: color.Nombre,
+    esUUID: color.ColorId?.includes('-')
+  });
+  
+  // ✅ Enviar el objeto COMPLETO del color
+  updateItemColor(editingColorItem.id, {
+    Nombre: color.Nombre,
+    ColorId: color.ColorId, // ← Este es el UUID importante
+    Hex: color.Hex
+  });
+  
+  setEditingColorItem(null);
+  toast.success(`Color cambiado a ${color.Nombre}`);
+};
 
   const getItemType = (item) => {
     if (item.ProductoId) return "producto";
@@ -195,7 +234,7 @@ export const CarritoCompras = () => {
                   {productos.map((item) => {
                     const colors = productColors[item.ProductoId] || [];
                     const currentColor = getColorName(item);
-                    
+
                     return (
                       <div key={item.id} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors">
                         <div className="flex gap-4">
@@ -215,7 +254,7 @@ export const CarritoCompras = () => {
                           <div className="flex-1">
                             <h3 className="font-bold text-slate-800">{item.Nombre}</h3>
                             <p className="text-sm text-slate-600 line-clamp-2">{item.Descripcion}</p>
-                            
+
                             {/* Color si tiene */}
                             <div className="mt-2">
                               {currentColor ? (
@@ -223,9 +262,9 @@ export const CarritoCompras = () => {
                                   <div className="flex items-center gap-2">
                                     <Palette className="h-4 w-4 text-slate-500" />
                                     <div className="flex items-center gap-2">
-                                      <div 
+                                      <div
                                         className="w-4 h-4 rounded-full border border-slate-300"
-                                        style={{ 
+                                        style={{
                                           backgroundColor: colors.find(c => c.Nombre === currentColor)?.Hex || '#ccc'
                                         }}
                                       />
@@ -258,7 +297,7 @@ export const CarritoCompras = () => {
                               <div className="text-sm text-slate-600">
                                 Stock disponible: <span className="font-semibold">{item.Stock || item.stock || "∞"}</span>
                               </div>
-                              
+
                               {/* Contador de cantidad */}
                               <div className="flex items-center gap-2">
                                 <button
@@ -268,7 +307,7 @@ export const CarritoCompras = () => {
                                 >
                                   <Minus className="h-4 w-4" />
                                 </button>
-                                
+
                                 {editingStock === item.id ? (
                                   <div className="flex items-center gap-2">
                                     <input
@@ -303,7 +342,7 @@ export const CarritoCompras = () => {
                                     </button>
                                   </>
                                 )}
-                                
+
                                 <button
                                   onClick={() => handleIncrease(item)}
                                   className="w-8 h-8 flex items-center justify-center border border-slate-300 rounded-full hover:bg-slate-100"
@@ -330,7 +369,7 @@ export const CarritoCompras = () => {
                                 </div>
                               )}
                             </div>
-                            
+
                             <button
                               onClick={() => setConfirmDelete(item.id)}
                               className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm font-medium transition"
@@ -372,7 +411,7 @@ export const CarritoCompras = () => {
                         <div className="flex-1">
                           <h3 className="font-bold text-slate-800">{item.Nombre}</h3>
                           <p className="text-sm text-slate-600 line-clamp-2">{item.Descripcion}</p>
-                          
+
                           {/* Detalles de personalización */}
                           {item.customization && (
                             <div className="mt-3 space-y-1">
@@ -413,7 +452,7 @@ export const CarritoCompras = () => {
                               </div>
                             )}
                           </div>
-                          
+
                           <div className="flex gap-2">
                             <button
                               onClick={() => navigate("/editarcarritoservicio", { state: { item } })}
@@ -513,15 +552,14 @@ export const CarritoCompras = () => {
                 <button
                   onClick={handleCheckout}
                   disabled={total === 0}
-                  className={`w-full py-3 rounded-xl font-bold text-lg transition-all ${
-                    total === 0
+                  className={`w-full py-3 rounded-xl font-bold text-lg transition-all ${total === 0
                       ? "bg-gray-400 cursor-not-allowed"
                       : "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl"
-                  }`}
+                    }`}
                 >
                   Proceder al Pago
                 </button>
-                
+
                 <button
                   onClick={() => setShowModalVaciar(true)}
                   className="w-full py-2 border-2 border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition"
@@ -670,7 +708,7 @@ export const CarritoCompras = () => {
                   Color actual: {getColorName(editingColorItem) || "No seleccionado"}
                 </span>
               </div>
-              
+
               <p className="text-sm text-slate-600 mb-4">
                 Selecciona un nuevo color para este producto:
               </p>
@@ -689,13 +727,12 @@ export const CarritoCompras = () => {
                       <button
                         key={color.ColorId}
                         onClick={() => handleSelectColor(color)}
-                        className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all ${
-                          getColorName(editingColorItem) === color.Nombre
+                        className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all ${getColorName(editingColorItem) === color.Nombre
                             ? "border-blue-600 bg-blue-50"
                             : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
-                        <div 
+                        <div
                           className="w-12 h-12 rounded-full border border-slate-300 mb-2"
                           style={{ backgroundColor: color.Hex || '#ccc' }}
                         />
@@ -738,7 +775,7 @@ export const CarritoCompras = () => {
       )}
 
       <Footer />
-      <ToastContainer 
+      <ToastContainer
         position="bottom-right"
         autoClose={3000}
         hideProgressBar={false}

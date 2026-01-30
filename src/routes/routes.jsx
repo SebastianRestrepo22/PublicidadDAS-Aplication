@@ -25,11 +25,11 @@ import { Compras } from "../features/dashboard/constrolinsumos/compras/compras";
 import { Proveedores } from "../features/dashboard/constrolinsumos/proveedores/proveedores";
 import { Servicios } from "../features/landing/nuestrosservicios/servicios";
 import { ServicioDetalle } from "../features/landing/nuestrosservicios/servicioDetalle";
-import { Diseño } from "../features/dashboard/categoriadediseño/diseño";
 import { ProductosDashboard } from "../features/dashboard/productos/producto";
 import { ServiciosDashboard } from "../features/dashboard/servicios/servicio";
 import { ProductoDetalle } from "../features/landing/nuestrosproductos/productoDetalle";
 import { EditarCarritoServicio } from "../features/landing/carritoCompras/CarritoProductos/editarCarritoServicio";
+import { Categorias } from "../features/dashboard/categoriadediseño/categorias";
 
 export const Routers = () => {
   return (
@@ -103,7 +103,7 @@ export const Routers = () => {
           }
         >
           <Route path="graficosEstadisticos" element={<GraficosEstadisticos />} />
-          <Route path="diseño" element={<Diseño/>} />
+          <Route path="categorias" element={<Categorias/>} />
           <Route path="usuarios" element={<Usuarios />} />
           <Route path="roles" element={<Roles />} />
           <Route path="insumos" element={<Insumos />} />

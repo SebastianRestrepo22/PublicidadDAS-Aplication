@@ -7,7 +7,7 @@ import Modal from "../components/modals/modal";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-export const Diseño = () => {
+export const Categorias = () => {
   const [categorias, setCategorias] = useState([]);
   const [selectedCategoria, setSelectedCategoria] = useState(null);
   const [campoFiltro, setCampoFiltro] = useState("");
@@ -139,7 +139,7 @@ export const Diseño = () => {
       <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-6">
-            Gestión diseño
+            Gestión categoria
           </h1>
 
           {/* botón crear */}
@@ -149,7 +149,7 @@ export const Diseño = () => {
                 onClick={() => setOpenCreate(true)}
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all"
               >
-                <Plus size={18} /> Nuevo diseño
+                <Plus size={18} /> Nueva categoria
               </button>
 
               <select
@@ -166,7 +166,7 @@ export const Diseño = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Buscar diseño"
+                  placeholder="Buscar categoria"
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
                   className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white text-slate-700"
@@ -184,7 +184,7 @@ export const Diseño = () => {
                     ID
                   </th>
                   <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
-                    Nombre diseño
+                    Nombre categoria
                   </th>
                   <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">
                     Descripción
@@ -247,15 +247,15 @@ export const Diseño = () => {
           <Modal open={openCreate} onClose={() => setOpenCreate(false)}>
             <div className="w-[450px] p-6 mx-auto text-center">
               <h3 className="text-lg font-black text-gray-800 mb-6">
-                Nuevo diseño
+                Nueva categoria
               </h3>
               <form className="grid grid-cols-1 gap-6 text-left">
                 <div className="flex flex-col">
                   <label className="mb-1 text-sm font-medium text-gray-700">
-                    Nombre diseño
+                    Nombre categoria
                   </label>
                   <input
-                    placeholder="Ingrese el nombre del diseño"
+                    placeholder="Ingrese el nombre de la categoria"
                     value={formCrear.nombreCategoria}
                     className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) => {
@@ -322,15 +322,15 @@ export const Diseño = () => {
           <Modal open={openEditar} onClose={() => setOpenEditar(false)}>
             <div className="w-[450px] p-6 mx-auto text-center">
               <h3 className="text-lg font-black text-gray-800 mb-6">
-                Editar diseño
+                Editar categoria
               </h3>
               <form className="grid grid-cols-1 gap-6 text-left">
                 <div className="flex flex-col">
                   <label className="mb-1 text-sm font-medium text-gray-700">
-                    Nombre diseño
+                    Nombre categoria
                   </label>
                   <input
-                    placeholder="Ingrese el nombre del diseño"
+                    placeholder="Ingrese el nombre de la categoria"
                     value={formEditar.nombreCategoria}
                     className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onChange={(e) =>
@@ -381,7 +381,7 @@ export const Diseño = () => {
           <Modal open={openVer} onClose={() => setOpenVer(false)}>
             <div className="w-[450px] p-6 mx-auto text-center">
               <h3 className="text-lg font-black text-gray-800 mb-6">
-                Ver diseño
+                Ver categoria
               </h3>
               {selectedCategoria && (
                 <div className="text-left space-y-2">
@@ -403,9 +403,9 @@ export const Diseño = () => {
           <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
             <div className="w-[400px] p-6 mx-auto text-center">
               <h3 className="text-lg font-black text-gray-800 mb-4">
-                Eliminar diseño
+                Eliminar categoria
               </h3>
-              <p className="mb-6">¿Estás seguro de eliminar este diseño?</p>
+              <p className="mb-6">¿Estás seguro de eliminar esta categoria?</p>
               <div className="flex gap-4">
                 <button
                   onClick={handleDelete}

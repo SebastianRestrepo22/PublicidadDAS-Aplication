@@ -37,8 +37,8 @@ const menuItems = [
   },
   {
     icon: Palette,
-    label: "Diseño",
-    to: "/dashboard/diseño",
+    label: "Categorias",
+    to: "/dashboard/categorias",
     requiredPermission: "ver_categorias"
   },
   {

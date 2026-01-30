@@ -187,22 +187,42 @@ export const CartProvider = ({ children }) => {
   };
 
   // Función especial para actualizar color
-  const updateItemColor = (lineId, color) => {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.id === lineId
-          ? {
-              ...item,
-              customization: { 
-                ...item.customization, 
-                color: color 
-              }
-            }
-          : item
-      )
-    );
-  };
-
+  // En CartContext.js, modifica updateItemColor:
+// En tu CartContext.js, modifica la función updateItemColor:
+const updateItemColor = (lineId, colorData) => {
+  console.log("🎨 [CART CONTEXT] updateItemColor llamado:", {
+    lineId,
+    colorData,
+    tieneColorId: colorData?.ColorId
+  });
+  
+  const updatedCart = cart.map((item) => {
+    if (item.id === lineId) {
+      // ✅ Guardar el objeto completo del color
+      const newItem = {
+        ...item,
+        customization: { 
+          ...item.customization,
+          // Asegúrate de que colorData sea el objeto completo con ColorId
+          color: colorData,
+          colorName: colorData?.Nombre || colorData,
+          colorId: colorData?.ColorId || null,
+          colorHex: colorData?.Hex || null
+        }
+      };
+      
+      console.log("✅ [CART CONTEXT] Item actualizado:", {
+        ...newItem.customization
+      });
+      
+      return newItem;
+    }
+    return item;
+  });
+  
+  setCart(updatedCart);
+  console.log("📦 [CART CONTEXT] Carrito actualizado:", updatedCart);
+};
   const clearCart = () => setCart([]);
 
   const getTotal = () =>

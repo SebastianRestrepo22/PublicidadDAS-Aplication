@@ -12,10 +12,16 @@ import {
   deletePedidoCliente,
   getDetallesByPedidoId,
   getAllProductos,
+  getAllServicios,
+  getAllColores,
 } from "./services/services.pedidosClientes";
-import { Pagination } from "../../components/paginacion/pagination"; // 👈 Importado
+import { Pagination } from "../../components/paginacion/pagination";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { toast } from "react-toastify";
+
 // ⚙️ CONFIGURACIÓN
-const BACKEND_URL = "http://localhost:3000"; // ← AJUSTA SI TU BACKEND USA OTRO PUERTO
+const BACKEND_URL = "http://localhost:3000";
 
 export const PedidosClientes = () => {
   const navigate = useNavigate();
@@ -28,17 +34,39 @@ export const PedidosClientes = () => {
     return "list";
   }, [location.pathname, id]);
 
+  // Cargar colores
+  useEffect(() => {
+    const fetchColores = async () => {
+      try {
+        const data = await getAllColores();
+        setColores(data);
+      } catch (err) {
+        console.error("Error cargando colores:", err);
+        toast.error("Error cargando colores");
+      }
+    };
+    fetchColores();
+  }, []);
+
+  const getColorName = (colorId) => {
+    if (!colorId) return "—";
+    const color = colores.find(c => c.ColorId === colorId);
+    return color ? color.Nombre : "—";
+  };
+
   const [pedidos, setPedidos] = useState([]);
   const [filtroCampo, setFiltroCampo] = useState("");
   const [filtroText, setFiltroText] = useState("");
   const [productoSearch, setProductoSearch] = useState("");
   const [productoFilter, setProductoFilter] = useState("todos");
+  const [servicios, setServicios] = useState([]);
+  const [colores, setColores] = useState([]);
 
   // 👇 Estados para PAGINACIÓN PRINCIPAL
   const [allData, setAllData] = useState([]);
   const [paginatedData, setPaginatedData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5); // Puedes ajustar a 4 si prefieres
+  const [itemsPerPage, setItemsPerPage] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -47,34 +75,46 @@ export const PedidosClientes = () => {
     FechaRegistro: "",
     Total: 0,
     Estado: "pendiente",
-    metodo_pago: "transferencia",
-    nombre_recibe: "",
-    telefono_entrega: "",
-    direccion_entrega: "",
-    voucher: "",
+    MetodoPago: "transferencia",
+    NombreRecibe: "",
+    TelefonoEntrega: "",
+    DireccionEntrega: "",
+    Voucher: "",
   });
+
   const [detallesCrear, setDetallesCrear] = useState([
-    { _tempId: crypto.randomUUID(), ProductoServicioId: "", Cantidad: 1, Alto: "", Ancho: "", Descripcion: "", UrlImagen: "" },
+    {
+      _tempId: crypto.randomUUID(),
+      ProductoId: "",
+      ServicioId: "",
+      Cantidad: 1,
+      Tamaño: "Mediana",
+      Descripcion: "",
+      UrlImagen: "",
+      Precio: 0,
+      ColorId: ""
+    },
   ]);
+
   const [productos, setProductos] = useState([]);
   const [selectedProductIndex, setSelectedProductIndex] = useState(null);
-  const [alert, setAlert] = useState({ show: false, message: "", type: "info" });
 
   // === Formatear fecha en español ===
   const formatDate = (dateString) => {
     if (!dateString) return "—";
+
     const date = new Date(dateString);
+
+    if (isNaN(date.getTime())) {
+      console.warn("⚠️ Fecha inválida:", dateString);
+      return "—";
+    }
+
     return new Intl.DateTimeFormat('es-ES', {
       day: 'numeric',
       month: 'long',
       year: 'numeric'
     }).format(date);
-  };
-
-  // === Alertas ===
-  const showAlert = (message, type = "info") => {
-    setAlert({ show: true, message, type });
-    setTimeout(() => setAlert({ show: false, message: "", type: "info" }), 3000);
   };
 
   // Cargar productos
@@ -85,9 +125,23 @@ export const PedidosClientes = () => {
         setProductos(data);
       } catch (err) {
         console.error("Error cargando productos/servicios:", err);
+        toast.error("Error cargando productos");
       }
     };
     fetchProductos();
+  }, []);
+
+  useEffect(() => {
+    const fetchServicios = async () => {
+      try {
+        const data = await getAllServicios();
+        setServicios(data);
+      } catch (err) {
+        console.error("Error cargando servicios:", err);
+        toast.error("Error al cargar servicios");
+      }
+    };
+    fetchServicios();
   }, []);
 
   // Cargar pedidos
@@ -113,6 +167,7 @@ export const PedidosClientes = () => {
       setPedidos(pedidosConDetalles);
     } catch (err) {
       console.error("Error al cargar pedidos:", err);
+      toast.error("Error al cargar pedidos");
     }
   };
 
@@ -137,6 +192,7 @@ export const PedidosClientes = () => {
           setPedidos(prev => prev.map(p => p.PedidoClienteId === id ? pedidoCompleto : p));
         } catch {
           navigate("/dashboard/pedidosClientes");
+          toast.error("Error cargando pedido");
         }
       };
       cargarPedido();
@@ -178,7 +234,7 @@ export const PedidosClientes = () => {
   const productosFiltrados = useMemo(() => {
     return productos.filter(p => {
       const matchesSearch = p.Nombre.toLowerCase().includes(productoSearch.toLowerCase());
-      const matchesType = productoFilter === "todos" || 
+      const matchesType = productoFilter === "todos" ||
         (productoFilter === "producto" && p.Tipo?.toLowerCase() === "producto") ||
         (productoFilter === "insumo" && p.Tipo?.toLowerCase() === "insumo");
       return matchesSearch && matchesType;
@@ -189,7 +245,7 @@ export const PedidosClientes = () => {
   const productosConPadding = useMemo(() => {
     const results = [...productosFiltrados];
     while (results.length < 4) {
-      results.push({ ProductoServicioId: `placeholder-${results.length}`, Nombre: "", SKU: "", Precio: 0, Stock: 0, placeholder: true });
+      results.push({ ProductoId: `placeholder-${results.length}`, Nombre: "", SKU: "", Precio: 0, Stock: 0, placeholder: true });
     }
     return results;
   }, [productosFiltrados]);
@@ -214,12 +270,14 @@ export const PedidosClientes = () => {
   const añadirDetalleCrear = () => {
     setDetallesCrear(prev => [...prev, {
       _tempId: crypto.randomUUID(),
-      ProductoServicioId: "",
+      ProductoId: "",
+      ServicioId: "",
       Cantidad: 1,
-      Alto: "",
-      Ancho: "",
+      Tamaño: "Mediana",
       Descripcion: "",
-      UrlImagen: ""
+      UrlImagen: "",
+      Precio: 0,
+      ColorId: ""
     }]);
   };
 
@@ -240,32 +298,65 @@ export const PedidosClientes = () => {
   // Guardar pedido
   const handleCreate = async () => {
     try {
-      const detallesLimpios = detallesCrear.map(d => ({
-        ProductoServicioId: String(d.ProductoServicioId).trim(),
-        Cantidad: Number(d.Cantidad) || 1,
-        Alto: d.Alto || (productos.find(p => p.ProductoServicioId === d.ProductoServicioId)?.Alto || ""),
-        Ancho: d.Ancho || (productos.find(p => p.ProductoServicioId === d.ProductoServicioId)?.Ancho || ""),
-        Descripcion: d.Descripcion || (productos.find(p => p.ProductoServicioId === d.ProductoServicioId)?.Descripcion || productos.find(p => p.ProductoServicioId === d.ProductoServicioId)?.Nombre || ""),
-        UrlImagen: d.UrlImagen || (productos.find(p => p.ProductoServicioId === d.ProductoServicioId)?.UrlImagen || ""),
-      }));
+      const detallesLimpios = detallesCrear.map(d => {
+        const ProductoId = d.ProductoId?.trim() ? String(d.ProductoId).trim() : null;
+        const ServicioId = d.ServicioId?.trim() ? String(d.ServicioId).trim() : null;
+
+        // ✅ Tamaño solo para servicios
+        let Tamaño = null;
+        if (ServicioId) {
+          Tamaño = d.Tamaño || "Mediana";
+        }
+
+        let colorIdFinal = null;
+
+        // Si viene del carrito, podría estar en customization.color.ColorId
+        if (d.customization?.color?.ColorId) {
+          colorIdFinal = d.customization.color.ColorId;
+        }
+        // O directamente en ColorId
+        else if (d.ColorId) {
+          // Si es un string como 'Amarillo', necesitas buscar el UUID real
+          if (typeof d.ColorId === 'string' && !d.ColorId.includes('-')) {
+            // Buscar en la lista de colores
+            const colorObj = colores.find(c => c.Nombre === d.ColorId);
+            colorIdFinal = colorObj ? colorObj.ColorId : null;
+          } else {
+            colorIdFinal = d.ColorId;
+          }
+        }
+
+        return {
+          ProductoId,
+          ServicioId,
+          Cantidad: Number(d.Cantidad) || 1,
+          Tamaño,
+          Descripcion: d.Descripcion || "",
+          UrlImagen: d.UrlImagen || "",
+          Precio: Number(d.Precio) || 0,
+          ColorId: colorIdFinal,
+        };
+      });
+
       await createPedidoCliente({
         ClienteId: formCrear.ClienteId.trim(),
         FechaRegistro: formCrear.FechaRegistro,
         Total: Number(formCrear.Total) || 0,
         Estado: formCrear.Estado,
-        metodo_pago: formCrear.metodo_pago,
-        nombre_recibe: formCrear.metodo_pago === "contra_entrega" ? formCrear.nombre_recibe : null,
-        telefono_entrega: formCrear.metodo_pago === "contra_entrega" ? formCrear.telefono_entrega : null,
-        direccion_entrega: formCrear.metodo_pago === "contra_entrega" ? formCrear.direccion_entrega : null,
-        voucher: formCrear.metodo_pago === "transferencia" ? formCrear.voucher : null,
+        MetodoPago: formCrear.MetodoPago,
+        NombreRecibe: formCrear.MetodoPago === "contra_entrega" ? formCrear.NombreRecibe : null,
+        TelefonoEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.TelefonoEntrega : null,
+        DireccionEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.DireccionEntrega : null,
+        Voucher: formCrear.MetodoPago === "transferencia" ? formCrear.Voucher : null,
         detalle: detallesLimpios,
       });
-      showAlert("Pedido creado exitosamente", "success");
+
+      toast.success("Pedido creado exitosamente");
       goToBackToList();
       fetchPedidos();
     } catch (err) {
       console.error("Error al crear pedido:", err);
-      showAlert("Error al crear el pedido", "error");
+      toast.error("Error al crear el pedido");
     }
   };
 
@@ -273,28 +364,51 @@ export const PedidosClientes = () => {
   const actualizarEstadoPedido = async (pedidoId, nuevoEstado) => {
     try {
       const pedidoActual = pedidos.find(p => p.PedidoClienteId === pedidoId);
-      if (!pedidoActual) return;
+      if (!pedidoActual) {
+        console.error("Pedido no encontrado:", pedidoId);
+        toast.error("Pedido no encontrado");
+        return;
+      }
+
+      // Actualizar en la base de datos
       await updatePedidoCliente(pedidoId, {
         ClienteId: pedidoActual.ClienteId,
         FechaRegistro: pedidoActual.FechaRegistro,
         Total: pedidoActual.Total,
         Estado: nuevoEstado,
-        metodo_pago: pedidoActual.metodo_pago,
-        nombre_recibe: pedidoActual.nombre_recibe,
-        telefono_entrega: pedidoActual.telefono_entrega,
-        direccion_entrega: pedidoActual.direccion_entrega,
-        voucher: pedidoActual.voucher,
+        MetodoPago: pedidoActual.MetodoPago,
+        NombreRecibe: pedidoActual.NombreRecibe,
+        TelefonoEntrega: pedidoActual.TelefonoEntrega,
+        DireccionEntrega: pedidoActual.DireccionEntrega,
+        Voucher: pedidoActual.Voucher,
       });
-      setPedidos(prev =>
-        prev.map(p =>
+
+      // Actualizar estado local INMEDIATAMENTE
+      setPedidos(prev => {
+        const nuevosPedidos = prev.map(p =>
           p.PedidoClienteId === pedidoId ? { ...p, Estado: nuevoEstado } : p
-        )
-      );
-      showAlert("Estado actualizado correctamente", "success");
-      goToBackToList();
+        );
+        return nuevosPedidos;
+      });
+
+      // Mostrar mensaje según el estado
+      if (nuevoEstado === 'aprobado') {
+        toast.success("Pedido aprobado exitosamente");
+      } else if (nuevoEstado === 'entregado') {
+        toast.success("Pedido entregado exitosamente");
+      } else if (nuevoEstado === 'cancelado') {
+        toast.success("Pedido cancelado exitosamente");
+      } else {
+        toast.success("Estado actualizado correctamente");
+      }
+
+      // Esperar un momento para que React actualice el estado antes de navegar
+      setTimeout(() => {
+        goToBackToList();
+      }, 300);
     } catch (err) {
       console.error("Error al actualizar estado:", err);
-      showAlert("Error al actualizar el estado", "error");
+      toast.error("Error al actualizar el estado");
     }
   };
 
@@ -304,10 +418,10 @@ export const PedidosClientes = () => {
       try {
         await deletePedidoCliente(pedidoId);
         fetchPedidos();
-        showAlert("Pedido eliminado correctamente", "success");
+        toast.success("Pedido eliminado correctamente");
       } catch (err) {
-        console.error("Error al eliminar pedido:", err);
-        showAlert("Error al eliminar el pedido", "error");
+        console.log("Error al eliminar pedido:", err);
+        toast.error("Error al eliminar el pedido");
       }
     }
   };
@@ -316,62 +430,62 @@ export const PedidosClientes = () => {
   const openVoucherWithClose = (fullUrl) => {
     const voucherWindow = window.open();
     voucherWindow.document.write(`
-      <html>
-        <head>
-          <title>Voucher</title>
-          <style>
-            body {
-              margin: 0;
-              padding: 20px;
-              background: #f9fafb;
-              font-family: system-ui, sans-serif;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              min-height: 100vh;
-            }
-            .content {
-              max-width: 90vw;
-              max-height: 90vh;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-            }
-            img, embed {
-              max-width: 100%;
-              max-height: 80vh;
-              object-fit: contain;
-              border: 1px solid #e5e7eb;
-              border-radius: 8px;
-            }
-            .close-btn {
-              margin-top: 20px;
-              padding: 8px 16px;
-              background: #3b82f6;
-              color: white;
-              border: none;
-              border-radius: 6px;
-              cursor: pointer;
-              font-weight: 500;
-            }
-            .close-btn:hover {
-              background: #2563eb;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="content">
-            <div>
-              ${fullUrl.endsWith('.pdf') 
-                ? `<embed src="${fullUrl}" type="application/pdf" width="100%" height="80vh" />`
-                : `<img src="${fullUrl}" alt="Voucher" />`
-              }
-            </div>
-            <button class="close-btn" onclick="window.close()">Cerrar</button>
-          </div>
-        </body>
-      </html>
+<html>
+<head>
+<title>Voucher</title>
+<style>
+body {
+  margin: 0;
+  padding: 20px;
+  background: #f9fafb;
+  font-family: system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+.content {
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+img, embed {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+.close-btn {
+  margin-top: 20px;
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.close-btn:hover {
+  background: #2563eb;
+}
+</style>
+</head>
+<body>
+<div class="content">
+  <div>
+    ${fullUrl.endsWith('.pdf')
+        ? `<embed src="${fullUrl}" type="application/pdf" width="100%" height="80vh" />`
+        : `<img src="${fullUrl}" alt="Voucher" />`
+      }
+  </div>
+  <button class="close-btn" onclick="window.close()">Cerrar</button>
+</div>
+</body>
+</html>
     `);
     voucherWindow.document.close();
   };
@@ -389,20 +503,9 @@ export const PedidosClientes = () => {
   // ===== RENDER =====
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
-      {/* Alertas */}
-      {alert.show && (
-        <div
-          className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 ${
-            alert.type === "success" ? "bg-green-600" :
-            alert.type === "error" ? "bg-red-600" :
-            "bg-blue-600"
-          }`}
-        >
-          {alert.message}
-        </div>
-      )}
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Pedidos</h1>
+
         {/* LISTA */}
         {mode === "list" && (
           <>
@@ -439,11 +542,12 @@ export const PedidosClientes = () => {
                   <option value="PedidoClienteId">Pedido ID</option>
                   <option value="NombreCliente">Cliente</option>
                   <option value="FechaRegistro">Fecha</option>
-                  <option value="metodo_pago">Método Pago</option>
+                  <option value="MetodoPago">Método Pago</option>
                   <option value="Estado">Estado</option>
                 </select>
               </div>
             </div>
+
             <div className="bg-white rounded-xl shadow-sm border overflow-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-800 sticky top-0">
@@ -466,19 +570,18 @@ export const PedidosClientes = () => {
                       <td className="py-4 px-6">$ {Number(pedido.Total || 0).toFixed(2)}</td>
                       <td className="py-4 px-6">
                         <span className="text-sm font-medium">
-                          {pedido.metodo_pago === 'contra_entrega' ? 'Contra Entrega' : 'Transferencia'}
+                          {pedido.MetodoPago === 'contra_entrega' ? 'Contra Entrega' : 'Transferencia'}
                         </span>
                       </td>
                       <td className="py-4 px-6">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          pedido.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                          pedido.Estado === 'en_produccion' ? 'bg-blue-100 text-blue-800' :
-                          pedido.Estado === 'terminado' ? 'bg-green-100 text-green-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${pedido.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                          pedido.Estado === 'aprobado' ? 'bg-blue-100 text-blue-800' :
+                            pedido.Estado === 'entregado' ? 'bg-green-100 text-green-800' :
+                              'bg-green-100 text-green-800'
+                          }`}>
                           {pedido.Estado === 'pendiente' ? 'Pendiente' :
-                           pedido.Estado === 'en_produccion' ? 'En Producción' :
-                           pedido.Estado === 'terminado' ? 'Terminado' : 'Cancelado'}
+                            pedido.Estado === 'aprobado' ? 'Aprobado' :
+                              pedido.Estado === 'entregado' ? 'Entregado' : 'Cancelado'}
                         </span>
                       </td>
                       <td className="py-4 px-6">
@@ -513,7 +616,6 @@ export const PedidosClientes = () => {
           </>
         )}
 
-        {/* === Resto de vistas sin cambios (crear, ver, select-product) === */}
         {/* CREAR */}
         {mode === "create" && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -523,6 +625,7 @@ export const PedidosClientes = () => {
               </button>
               <h3 className="text-lg font-bold">Nuevo pedido</h3>
             </div>
+
             <div className="flex flex-col gap-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="flex flex-col gap-2">
@@ -553,21 +656,23 @@ export const PedidosClientes = () => {
                   />
                 </div>
               </div>
+
               {/* Método de pago */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-2">
                   <label className="font-medium">Método de Pago</label>
                   <select
-                    value={formCrear.metodo_pago}
-                    onChange={(e) => setFormCrear({ ...formCrear, metodo_pago: e.target.value })}
+                    value={formCrear.MetodoPago}
+                    onChange={(e) => setFormCrear({ ...formCrear, MetodoPago: e.target.value })}
                     className="w-full h-11 px-3 border rounded"
                   >
                     <option value="transferencia">Transferencia</option>
                     <option value="contra_entrega">Contra Entrega</option>
                   </select>
                 </div>
+
                 {/* Comprobante solo si es transferencia */}
-                {formCrear.metodo_pago === "transferencia" && (
+                {formCrear.MetodoPago === "transferencia" && (
                   <div className="flex flex-col gap-2">
                     <label className="font-medium">Comprobante de pago (imagen o PDF)</label>
                     <input
@@ -576,25 +681,25 @@ export const PedidosClientes = () => {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (!file) {
-                          setFormCrear(prev => ({ ...prev, voucher: "" }));
+                          setFormCrear(prev => ({ ...prev, Voucher: "" }));
                           return;
                         }
                         if (file.size > 10 * 1024 * 1024) {
-                          alert("El archivo debe ser menor a 10MB");
+                          toast.error("El archivo debe ser menor a 10MB");
                           return;
                         }
                         const reader = new FileReader();
                         reader.onload = () => {
-                          setFormCrear(prev => ({ ...prev, voucher: reader.result }));
+                          setFormCrear(prev => ({ ...prev, Voucher: reader.result }));
                         };
                         reader.readAsDataURL(file);
                       }}
                       className="w-full h-11 px-3 border rounded"
                     />
-                    {formCrear.voucher && (
+                    {formCrear.Voucher && (
                       <div className="mt-2">
-                        {formCrear.voucher.startsWith("image") ? (
-                          <img src={formCrear.voucher} alt="Voucher preview" className="max-w-32 max-h-32 rounded" />
+                        {formCrear.Voucher.startsWith("image") ? (
+                          <img src={formCrear.Voucher} alt="Voucher preview" className="max-w-32 max-h-32 rounded" />
                         ) : (
                           <p className="text-sm text-green-600">Archivo PDF adjuntado</p>
                         )}
@@ -603,15 +708,16 @@ export const PedidosClientes = () => {
                   </div>
                 )}
               </div>
+
               {/* Campos de entrega (solo contra entrega) */}
-              {formCrear.metodo_pago === "contra_entrega" && (
+              {formCrear.MetodoPago === "contra_entrega" && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
                   <div className="flex flex-col gap-2">
                     <label className="font-medium">Nombre quien recibe</label>
                     <input
                       type="text"
-                      value={formCrear.nombre_recibe}
-                      onChange={(e) => setFormCrear({ ...formCrear, nombre_recibe: e.target.value })}
+                      value={formCrear.NombreRecibe}
+                      onChange={(e) => setFormCrear({ ...formCrear, NombreRecibe: e.target.value })}
                       className="w-full h-11 px-3 border rounded"
                     />
                   </div>
@@ -619,46 +725,48 @@ export const PedidosClientes = () => {
                     <label className="font-medium">Teléfono de entrega</label>
                     <input
                       type="text"
-                      value={formCrear.telefono_entrega}
-                      onChange={(e) => setFormCrear({ ...formCrear, telefono_entrega: e.target.value })}
+                      value={formCrear.TelefonoEntrega}
+                      onChange={(e) => setFormCrear({ ...formCrear, TelefonoEntrega: e.target.value })}
                       className="w-full h-11 px-3 border rounded"
                     />
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="font-medium">Dirección de entrega</label>
                     <textarea
-                      value={formCrear.direccion_entrega}
-                      onChange={(e) => setFormCrear({ ...formCrear, direccion_entrega: e.target.value })}
+                      value={formCrear.DireccionEntrega}
+                      onChange={(e) => setFormCrear({ ...formCrear, DireccionEntrega: e.target.value })}
                       className="w-full h-11 px-3 border rounded"
                       rows="2"
                     />
                   </div>
                 </div>
               )}
+
               <div className="flex justify-end">
                 <button type="button" onClick={añadirDetalleCrear} className="bg-blue-500 text-white px-6 py-2 rounded-lg flex items-center gap-2">
                   <Plus size={15} /> Añadir detalle
                 </button>
               </div>
+
               <div className="grid grid-cols-1 gap-4">
                 {detallesCrear.map((d, index) => (
-                  <div key={d._tempId} className="grid grid-cols-1 md:grid-cols-7 gap-3 border p-3 rounded">
+                  <div key={d._tempId} className="grid grid-cols-1 md:grid-cols-8 gap-3 border p-3 rounded">
                     <div className="flex flex-col gap-2">
                       <label>Producto / Servicio</label>
                       <select
-                        value={d.ProductoServicioId || ""}
+                        value={d.ProductoId || ""}
                         onChange={(e) => {
                           const value = e.target.value;
                           if (value === "open-modal") {
                             goToSelectProduct(index);
                           } else {
-                            actualizarDetalleCrear(index, "ProductoServicioId", value);
-                            const producto = productos.find(p => p.ProductoServicioId === value);
+                            actualizarDetalleCrear(index, "ProductoId", value);
+                            const producto = productos.find(p => p.ProductoId === value);
                             if (producto) {
                               actualizarDetalleCrear(index, "Descripcion", producto.Descripcion || producto.Nombre || "");
-                              actualizarDetalleCrear(index, "Alto", producto.Alto || "");
-                              actualizarDetalleCrear(index, "Ancho", producto.Ancho || "");
+                              actualizarDetalleCrear(index, "Tamaño", producto.Tamaño || "Mediana");
                               actualizarDetalleCrear(index, "UrlImagen", producto.UrlImagen || "");
+                              actualizarDetalleCrear(index, "Precio", producto.Precio || 0);
                             }
                           }
                         }}
@@ -667,12 +775,13 @@ export const PedidosClientes = () => {
                         <option value="">Seleccione</option>
                         <option value="open-modal">Seleccionar desde lista...</option>
                         {productos.map((p) => (
-                          <option key={p.ProductoServicioId} value={p.ProductoServicioId}>
+                          <option key={p.ProductoId} value={p.ProductoId}>
                             {p.Nombre}
                           </option>
                         ))}
                       </select>
                     </div>
+
                     <div className="flex flex-col gap-2">
                       <label>Cantidad</label>
                       <input
@@ -682,24 +791,47 @@ export const PedidosClientes = () => {
                         className="h-10 px-2 border rounded"
                       />
                     </div>
+
                     <div className="flex flex-col gap-2">
-                      <label>Alto</label>
+                      <label>Tamaño</label>
+                      <select
+                        value={d.Tamaño || "Mediana"}
+                        onChange={(e) => actualizarDetalleCrear(index, "Tamaño", e.target.value)}
+                        className="h-10 px-2 border rounded"
+                      >
+                        <option value="Pequeña">Pequeña</option>
+                        <option value="Mediana">Mediana</option>
+                        <option value="Grande">Grande</option>
+                      </select>
+                    </div>
+
+                    {/* 👇 CAMBIO: Input de texto → Select con colores */}
+                    <div className="flex flex-col gap-2">
+                      <label>Color</label>
+                      <select
+                        value={d.ColorId || ""}
+                        onChange={(e) => actualizarDetalleCrear(index, "ColorId", e.target.value)}
+                        className="h-10 px-2 border rounded bg-white"
+                      >
+                        <option value="">Seleccione un color</option>
+                        {colores.map((color) => (
+                          <option key={color.ColorId} value={color.ColorId}>
+                            {color.Nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <label>Precio Unitario</label>
                       <input
-                        type="text"
-                        value={d.Alto || ""}
-                        onChange={(e) => actualizarDetalleCrear(index, "Alto", e.target.value)}
+                        type="number"
+                        value={d.Precio ?? ""}
+                        onChange={(e) => actualizarDetalleCrear(index, "Precio", Number(e.target.value))}
                         className="h-10 px-2 border rounded"
                       />
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <label>Ancho</label>
-                      <input
-                        type="text"
-                        value={d.Ancho || ""}
-                        onChange={(e) => actualizarDetalleCrear(index, "Ancho", e.target.value)}
-                        className="h-10 px-2 border rounded"
-                      />
-                    </div>
+
                     <div className="flex flex-col gap-2">
                       <label>Descripción</label>
                       <input
@@ -709,6 +841,7 @@ export const PedidosClientes = () => {
                         className="h-10 px-2 border rounded"
                       />
                     </div>
+
                     <div className="flex flex-col gap-2">
                       <label>Url Imagen</label>
                       <input
@@ -721,12 +854,14 @@ export const PedidosClientes = () => {
                         <img src={d.UrlImagen} alt="preview" className="w-20 h-20 object-cover rounded mt-1" />
                       )}
                     </div>
-                    <div className="md:col-span-7 flex justify-end">
+
+                    <div className="md:col-span-8 flex justify-end">
                       <Trash2 size={18} className="text-red-600 cursor-pointer" onClick={() => eliminarDetalleCrear(index)} />
                     </div>
                   </div>
                 ))}
               </div>
+
               <div className="flex gap-4 mt-6">
                 <button type="button" onClick={handleCreate} className="flex-1 bg-green-500 text-white h-11 rounded">Crear</button>
                 <button type="button" onClick={goToBackToList} className="flex-1 bg-gray-200 text-gray-700 h-11 rounded">Cancelar</button>
@@ -746,6 +881,7 @@ export const PedidosClientes = () => {
                 Pedido #{shortenId(pedidos.find(p => p.PedidoClienteId === id)?.PedidoClienteId || id)}
               </h3>
             </div>
+
             <div className="bg-gray-50 p-6 rounded-xl mb-6">
               <h4 className="font-semibold mb-4">Información del Pedido</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -765,31 +901,32 @@ export const PedidosClientes = () => {
                   <div className="text-sm text-gray-500">Total</div>
                   <div className="font-bold">$ {Number(pedidos.find(p => p.PedidoClienteId === id)?.Total || 0).toFixed(2)}</div>
                 </div>
+
                 {/* Mostrar voucher o datos de entrega */}
                 {(() => {
                   const pedido = pedidos.find(p => p.PedidoClienteId === id);
                   if (!pedido) return null;
-                  if (pedido.metodo_pago === "contra_entrega") {
+                  if (pedido.MetodoPago === "contra_entrega") {
                     return (
                       <>
                         <div className="bg-white p-4 rounded-lg">
                           <div className="text-sm text-gray-500">Nombre Recibe</div>
-                          <div className="font-bold">{pedido.nombre_recibe || "—"}</div>
+                          <div className="font-bold">{pedido.NombreRecibe || "—"}</div>
                         </div>
                         <div className="bg-white p-4 rounded-lg">
                           <div className="text-sm text-gray-500">Teléfono Entrega</div>
-                          <div className="font-bold">{pedido.telefono_entrega || "—"}</div>
+                          <div className="font-bold">{pedido.TelefonoEntrega || "—"}</div>
                         </div>
                         <div className="bg-white p-4 rounded-lg">
                           <div className="text-sm text-gray-500">Dirección Entrega</div>
-                          <div className="font-bold">{pedido.direccion_entrega || "—"}</div>
+                          <div className="font-bold">{pedido.DireccionEntrega || "—"}</div>
                         </div>
                       </>
                     );
-                  } else if (pedido.voucher) {
-                    const fullVoucherUrl = pedido.voucher.startsWith("http")
-                      ? pedido.voucher
-                      : `${BACKEND_URL}${pedido.voucher}`;
+                  } else if (pedido.Voucher) {
+                    const fullVoucherUrl = pedido.Voucher.startsWith("http")
+                      ? pedido.Voucher
+                      : `${BACKEND_URL}${pedido.Voucher}`;
                     return (
                       <div className="bg-white p-4 rounded-lg">
                         <div className="text-sm text-gray-500">Comprobante de pago</div>
@@ -810,21 +947,22 @@ export const PedidosClientes = () => {
                     );
                   }
                 })()}
+
                 <div className="bg-white p-4 rounded-lg">
                   <div className="text-sm text-gray-500">Estado Actual</div>
-                  <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                    pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'en_produccion' ? 'bg-blue-100 text-blue-800' :
-                    pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'terminado' ? 'bg-green-100 text-green-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
+                  <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                    pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'aprobado' ? 'bg-blue-100 text-blue-800' :
+                      pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'entregado' ? 'bg-green-100 text-green-800' :
+                        'bg-green-100 text-green-800'
+                    }`}>
                     {pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'pendiente' ? 'Pendiente' :
-                     pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'en_produccion' ? 'En Producción' :
-                     pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'terminado' ? 'Terminado' : 'Cancelado'}
+                      pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'aprobado' ? 'Aprobado' :
+                        pedidos.find(p => p.PedidoClienteId === id)?.Estado === 'entregado' ? 'Entregado' : 'Cancelado'}
                   </div>
                 </div>
               </div>
             </div>
+
             <div className="bg-gray-50 p-6 rounded-xl mb-6">
               <h4 className="font-semibold mb-4">Resumen de Productos</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -846,16 +984,19 @@ export const PedidosClientes = () => {
                 </div>
               </div>
             </div>
+
             <div className="bg-gray-50 p-6 rounded-xl mb-6">
               <h4 className="font-semibold mb-4">Productos Solicitados</h4>
               <div className="overflow-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-200">
                     <tr>
-                      <th className="py-2 px-4">Producto/Servicio</th>
+                      <th className="py-2 px-4">Producto</th>
                       <th className="py-2 px-4">Cantidad</th>
-                      <th className="py-2 px-4">Alto</th>
-                      <th className="py-2 px-4">Ancho</th>
+                      <th className="py-2 px-4">Tamaño</th>
+                      <th className="py-2 px-4">Color</th>
+                      <th className="py-2 px-4">Precio Unit.</th>
+                      <th className="py-2 px-4">Subtotal</th>
                       <th className="py-2 px-4">Descripción</th>
                       <th className="py-2 px-4">Imagen</th>
                     </tr>
@@ -865,23 +1006,26 @@ export const PedidosClientes = () => {
                       const pedido = pedidos.find(p => p.PedidoClienteId === id);
                       return pedido?.detalle?.map((d, idx) => (
                         <tr key={idx} className="border-t">
-                          <td className="py-2 px-4">{d.ProductoServicioId}</td>
+                          <td className="py-2 px-4">{d.ProductoId || d.ServicioId || "—"}</td>
                           <td className="py-2 px-4">{d.Cantidad}</td>
-                          <td className="py-2 px-4">{d.Alto || "—"}</td>
-                          <td className="py-2 px-4">{d.Ancho || "—"}</td>
+                          <td className="py-2 px-4">{d.Tamaño || "—"}</td>
+                          <td className="py-2 px-4">{getColorName(d.ColorId)}</td>
+                          <td className="py-2 px-4">$ {Number(d.Precio || 0).toFixed(2)}</td>
+                          <td className="py-2 px-4">$ {(d.Cantidad * d.Precio).toFixed(2)}</td>
                           <td className="py-2 px-4">{d.Descripcion || "—"}</td>
                           <td className="py-2 px-4">
                             {d.UrlImagen ? <img src={d.UrlImagen} className="w-14 h-14 object-cover rounded" /> : "—"}
                           </td>
                         </tr>
                       )) || (
-                        <tr><td colSpan="6" className="py-4 text-center">Cargando detalles...</td></tr>
-                      );
+                          <tr><td colSpan="8" className="py-4 text-center">Cargando detalles...</td></tr>
+                        );
                     })()}
                   </tbody>
                 </table>
               </div>
             </div>
+
             <div className="bg-yellow-50 p-6 rounded-xl border border-yellow-200">
               <h4 className="font-semibold mb-2">Cambiar Estado del Pedido</h4>
               <p className="text-sm text-gray-600 mb-4">
@@ -894,9 +1038,8 @@ export const PedidosClientes = () => {
                   defaultValue={pedidos.find(p => p.PedidoClienteId === id)?.Estado || "pendiente"}
                 >
                   <option value="pendiente">Pendiente</option>
-                  <option value="en_produccion">En Producción</option>
-                  <option value="terminado">Terminado</option>
-                  {/* ❌ Estado "entregado" eliminado */}
+                  <option value="aprobado">Aprobado</option>
+                  <option value="entregado">Entregado</option>
                   <option value="cancelado">Cancelado</option>
                 </select>
                 <button
@@ -916,6 +1059,7 @@ export const PedidosClientes = () => {
                 </button>
               </div>
             </div>
+
             <div className="mt-6">
               <button onClick={goToBackToList} className="w-full h-11 bg-gray-200 text-gray-700 rounded">Cerrar</button>
             </div>
@@ -938,6 +1082,7 @@ export const PedidosClientes = () => {
                 </div>
                 <p className="text-gray-600 mt-1">Busca y selecciona el producto que deseas agregar.</p>
               </div>
+
               <div className="p-6 border-b">
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="relative flex-1">
@@ -955,11 +1100,10 @@ export const PedidosClientes = () => {
                       <button
                         key={tipo}
                         onClick={() => setProductoFilter(tipo)}
-                        className={`px-4 py-2 rounded-lg font-medium ${
-                          productoFilter === tipo
-                            ? 'bg-black text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
+                        className={`px-4 py-2 rounded-lg font-medium ${productoFilter === tipo
+                          ? 'bg-black text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
                       >
                         {tipo === 'todos' ? 'Todos' : tipo.charAt(0).toUpperCase() + tipo.slice(1)}
                       </button>
@@ -967,6 +1111,7 @@ export const PedidosClientes = () => {
                   </div>
                 </div>
               </div>
+
               <div className="overflow-auto flex-1">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-100 sticky top-0">
@@ -980,7 +1125,7 @@ export const PedidosClientes = () => {
                   </thead>
                   <tbody>
                     {productosConPadding.map((producto) => (
-                      <tr key={producto.ProductoServicioId} className={producto.placeholder ? "opacity-0" : "hover:bg-gray-50"}>
+                      <tr key={producto.ProductoId} className={producto.placeholder ? "opacity-0" : "hover:bg-gray-50"}>
                         <td className="p-3">{producto.Nombre || "—"}</td>
                         <td className="p-3">{producto.SKU || "—"}</td>
                         <td className="p-3">$ {Number(producto.Precio || 0).toFixed(2)}</td>
@@ -990,11 +1135,11 @@ export const PedidosClientes = () => {
                             <button
                               onClick={() => {
                                 if (selectedProductIndex !== null) {
-                                  actualizarDetalleCrear(selectedProductIndex, "ProductoServicioId", producto.ProductoServicioId);
+                                  actualizarDetalleCrear(selectedProductIndex, "ProductoId", producto.ProductoId);
                                   actualizarDetalleCrear(selectedProductIndex, "Descripcion", producto.Descripcion || producto.Nombre || "");
-                                  actualizarDetalleCrear(selectedProductIndex, "Alto", producto.Alto || "");
-                                  actualizarDetalleCrear(selectedProductIndex, "Ancho", producto.Ancho || "");
+                                  actualizarDetalleCrear(selectedProductIndex, "Tamaño", producto.Tamaño || "Mediana");
                                   actualizarDetalleCrear(selectedProductIndex, "UrlImagen", producto.UrlImagen || "");
+                                  actualizarDetalleCrear(selectedProductIndex, "Precio", producto.Precio || 0);
                                 }
                                 goToCreate();
                               }}
@@ -1014,6 +1159,7 @@ export const PedidosClientes = () => {
                   </div>
                 )}
               </div>
+
               <div className="p-6 border-t flex justify-end">
                 <button
                   onClick={goToCreate}
@@ -1026,6 +1172,20 @@ export const PedidosClientes = () => {
           </div>
         )}
       </div>
+
+      {/* ToastContainer al final del componente */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
     </div>
   );
 };
