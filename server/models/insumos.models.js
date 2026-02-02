@@ -1,23 +1,19 @@
-// src/models/insumos.model.js
 import { v4 as uuidv4 } from 'uuid';
-import connectDB from '../lib/db.js'; // ← .js obligatorio en ES Modules
+import { dbPool } from '../lib/db.js';
 
 export const getAllInsumos = async () => {
-  const connection = await connectDB();
-  const [rows] = await connection.execute('SELECT * FROM Insumos');
+  const [rows] = await dbPool.query('SELECT * FROM Insumos');
   return rows;
 };
 
 export const getInsumoById = async (id) => {
-  const connection = await connectDB();
-  const [rows] = await connection.execute('SELECT * FROM Insumos WHERE InsumoId = ?', [id]);
+  const [rows] = await dbPool.query('SELECT * FROM Insumos WHERE InsumoId = ?', [id]);
   return rows[0] || null;
 };
 
 export const createInsumo = async ({ nombreInsumo, stock }) => {
-  const connection = await connectDB();
   const insumoId = uuidv4();
-  await connection.execute(
+  await dbPool.query(
     'INSERT INTO Insumos (InsumoId, Nombre, Stock) VALUES (?, ?, ?)',
     [insumoId, nombreInsumo, stock]
   );
@@ -25,14 +21,12 @@ export const createInsumo = async ({ nombreInsumo, stock }) => {
 };
 
 export const deleteInsumo = async (id) => {
-  const connection = await connectDB();
-  const [result] = await connection.execute('DELETE FROM Insumos WHERE InsumoId = ?', [id]);
+  const [result] = await dbPool.query('DELETE FROM Insumos WHERE InsumoId = ?', [id]);
   return result;
 };
 
 export const updateInsumo = async (id, { nombreInsumo, stock }) => {
-  const connection = await connectDB();
-  const [result] = await connection.execute(
+  const [result] = await dbPool.query(
     'UPDATE Insumos SET Nombre = ?, Stock = ? WHERE InsumoId = ?',
     [nombreInsumo, stock, id]
   );

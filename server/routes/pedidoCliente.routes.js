@@ -1,3 +1,4 @@
+// routes/pedidoCliente.routes.js
 import { Router } from "express";
 import {
   getMisPedidos,
@@ -8,20 +9,19 @@ import {
   deletePedidoCliente
 } from "../controllers/pedidoCliente.controller.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
+import { uploadVoucher } from "../lib/upload.js"; // ← Importa Multer
 
 const router = Router();
 
-// ✅ Rutas estáticas PRIMERO
-router.get("/mis-pedidos", authMiddleware, getMisPedidos);
+// ✅ Aplicar Multer a las rutas que reciben archivos
+router.post("/", uploadVoucher.single('voucher'), createPedidoCliente);
+router.put("/:id", uploadVoucher.single('voucher'), updatePedidoCliente);
 
-// ✅ Luego rutas con parámetros
-router.get("/:id", getPedidoClienteById); // ← pero ¡espera! Esto también necesita auth
-
-// Rutas restantes
+// ✅ Rutas sin Multer
 router.get("/", getPedidosClientes);
-router.post("/", createPedidoCliente);
-router.put("/:id", updatePedidoCliente);
+router.get("/:id", getPedidoClienteById);
 router.delete("/:id", deletePedidoCliente);
+router.get("/mis-pedidos", authMiddleware, getMisPedidos);
 
 console.log("✅ Rutas de pedidos registradas");
 export default router;

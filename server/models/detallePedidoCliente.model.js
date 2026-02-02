@@ -1,18 +1,41 @@
-// server/models/detallePedidoCliente.model.js
 import { v4 as uuidv4 } from "uuid";
 import { dbPool } from "../lib/db.js";
 
 
 export const getDetallePedidoByPedidoIdModel = async (PedidoClienteId) => {
   try {
-    // ✅ Usar el nombre exacto: detallePedidosClientes
+    console.log(`🔍 [MODEL] Buscando detalles con colores para pedido: ${PedidoClienteId}`);
+    
+    // 🔥 REMOVIDO: d.Subtotal (no existe en la tabla)
     const [rows] = await dbPool.execute(
-      "SELECT * FROM detallePedidosClientes WHERE PedidoClienteId = ?",
+      `SELECT 
+        d.DetallePedidoClienteId,
+        d.PedidoClienteId,
+        d.ProductoId,
+        d.ServicioId,
+        d.Cantidad,
+        d.Tamaño,
+        d.Descripcion,
+        d.UrlImagen,
+        d.Precio,
+        d.ColorId,
+        c.Nombre AS ColorNombre
+       FROM detallePedidosClientes d
+       LEFT JOIN colores c ON d.ColorId = c.ColorId
+       WHERE d.PedidoClienteId = ?`,
       [PedidoClienteId]
     );
-    return rows;
+    
+    // 🔥 Calcula Subtotal en JS (no en DB)
+    const detallesConSubtotal = rows.map(row => ({
+      ...row,
+      Subtotal: (row.Cantidad || 0) * (row.Precio || 0)
+    }));
+    
+    console.log(`✅ [MODEL] Detalles con colores cargados: ${detallesConSubtotal.length}`);
+    return detallesConSubtotal;
   } catch (error) {
-    console.error("❌ Error en getDetallePedidoByPedidoIdModel:", error);
+    console.error("❌ [MODEL] Error en getDetallePedidoByPedidoIdModel:", error);
     throw error;
   }
 };

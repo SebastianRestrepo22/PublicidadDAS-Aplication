@@ -6,14 +6,37 @@ import {
 
 export const getDetallesByPedido = async (req, res) => {
   try {
-    const detalles = await getDetallePedidoByPedidoIdModel(req.params.id);
+    const pedidoId = req.params.id;
+    console.log(`🔍 [BACKEND] Buscando detalles para pedido: ${pedidoId}`);
+    
+    const detalles = await getDetallePedidoByPedidoIdModel(pedidoId);
+    
+    console.log(`✅ [BACKEND] Detalles encontrados:`, {
+      cantidad: detalles.length,
+      detalles: detalles.map(d => ({
+        id: d.DetallePedidoClienteId,
+        producto: d.ProductoId,
+        color: d.ColorId,
+        cantidad: d.Cantidad
+      }))
+    });
+    
+    // 🔴 Asegurar que siempre sea un array
+    if (!Array.isArray(detalles)) {
+      console.warn(`⚠️ [BACKEND] Detalles no es array, convirtiendo:`, detalles);
+      res.status(200).json([]);
+      return;
+    }
+    
     res.status(200).json(detalles);
   } catch (error) {
-    console.error("Error al obtener detalles:", error);
-    res.status(500).json({ error: "Error al obtener detalles" });
+    console.error("❌ [BACKEND] Error al obtener detalles:", error);
+    res.status(500).json({ 
+      error: "Error al obtener detalles",
+      details: error.message 
+    });
   }
 };
-
 // ← NUEVO CONTROLADOR
 export const createDetalle = async (req, res) => {
   try {

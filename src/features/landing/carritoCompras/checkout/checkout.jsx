@@ -2,6 +2,37 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../../../../context/CartContext";
 import { useAuth } from "../../../../context/AuthContext";
+import { toast } from "react-toastify";
+
+// ✅ VALIDADOR DE UUID
+const isValidUUID = (str) => {
+  if (typeof str !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+};
+
+// ✅ FUNCIÓN PARA EXTRAER COLORID SEGURO
+const extractValidColorId = (item) => {
+  if (!item?.customization?.color) return null;
+
+  // Caso 1: UUID válido en customization.color
+  if (typeof item.customization.color === 'string' && isValidUUID(item.customization.color)) {
+    return item.customization.color;
+  }
+
+  // Caso 2: Objeto con ColorId UUID
+  if (item.customization.color?.ColorId && isValidUUID(item.customization.color.ColorId)) {
+    return item.customization.color.ColorId;
+  }
+
+  // Caso 3: Objeto con id UUID
+  if (item.customization.color?.id && isValidUUID(item.customization.color.id)) {
+    return item.customization.color.id;
+  }
+
+  // Cualquier otro caso → null (evita error FK constraint)
+  console.warn(`⚠️ Color no válido para "${item.Nombre}":`, item.customization.color);
+  return null;
+};
 
 export const Checkout = () => {
   const { cart, getTotal, clearCart } = useCart();
@@ -11,9 +42,9 @@ export const Checkout = () => {
   const [error, setError] = useState("");
   const [voucher, setVoucher] = useState(null);
 
-  // ====== DATOS BANCARIOS CON TU QR REAL ======
+  // ====== DATOS BANCARIOS ======
   const DATOS_BANCARIOS_REALES = {
-    nombreTitular: "Luis Marino Moreno ",
+    nombreTitular: "Luis Marino Moreno",
     numeroCuenta: "24079288086",
     tipoCuenta: "Ahorro",
     banco: "Bancolombia",
@@ -44,62 +75,54 @@ export const Checkout = () => {
   };
 
   // ====== ENVIAR PEDIDO ======
-  // ====== ENVIAR PEDIDO ======
   const enviarPedido = async () => {
     if (!user) {
       setError("Debes iniciar sesión");
+      toast.error("Debes iniciar sesión para continuar");
       return;
     }
 
     if (metodoPago === "entrega" && !validarEntrega()) {
       setError("Completa todos los campos de entrega");
+      toast.error("Completa todos los campos de entrega");
       return;
     }
 
     setLoading(true);
     setError("");
 
-    const payload = {
-      ClienteId: user.CedulaId,
-      FechaRegistro: new Date().toISOString().split("T")[0],
-      Total: getTotal(),
-      Estado: "pendiente",
-      detalle: cart.map(item => {
+    try {
+      // ✅ CONSTRUIR DETALLES CON VALIDACIÓN SEGURA
+      const detallesValidados = cart.map(item => {
         const ProductoId = item.ProductoId || null;
         const ServicioId = item.ServicioId || null;
 
         if (!ProductoId && !ServicioId) {
-          throw new Error(`El ítem ${item.Nombre || item.id} no tiene ProductoId ni ServicioId válido`);
+          throw new Error(`El ítem "${item.Nombre || item.id}" no tiene ProductoId ni ServicioId válido`);
         }
 
-        // ✅ CORRECCIÓN: Extraer ColorId correctamente
-        let ColorId = null;
+        // ✅ EXTRAER COLORID SEGURO
+        const ColorId = extractValidColorId(item);
 
-        // Opción 1: Si color es un objeto con ColorId
-        if (item.customization?.color?.ColorId) {
-          ColorId = item.customization.color.ColorId;
-        }
-        // Opción 2: Si color es directamente el ID (string/number)
-        else if (item.customization?.color && typeof item.customization.color !== 'object') {
-          ColorId = item.customization.color;
-        }
-        // Opción 3: Si hay un campo colorId directo
-        else if (item.customization?.colorId) {
-          ColorId = item.customization.colorId;
-        }
-
-        console.log("🔍 [CHECKOUT] Extracción de color:", {
-          nombre: item.Nombre,
-          customization: item.customization,
-          color: item.customization?.color,
-          ColorIdExtraido: ColorId
-        });
-
-        // ✅ Tamaño solo para servicios
+        // ✅ TAMAÑO SOLO PARA SERVICIOS
         let Tamaño = null;
         if (ServicioId) {
           const t = (item.Tamaño || item.customization?.Tamaño)?.trim();
           Tamaño = t && ['Pequeña', 'Mediana', 'Grande'].includes(t) ? t : "Mediana";
+        }
+
+        // ✅ DESCRIPCIÓN CON COLOR SI NO ES UUID
+        let descripcion = item.options?.descripcion || item.Descripcion || item.customization?.Descripcion || "";
+
+        // Agregar nombre del color a la descripción si no es UUID
+        if (item.customization?.color && !ColorId) {
+          const colorName = typeof item.customization.color === 'string'
+            ? item.customization.color
+            : item.customization.color?.Nombre || item.customization.color?.nombre;
+
+          if (colorName) {
+            descripcion += (descripcion ? " | " : "") + `Color: ${colorName}`;
+          }
         }
 
         return {
@@ -108,23 +131,42 @@ export const Checkout = () => {
           Cantidad: item.quantity || 1,
           Precio: item.Precio || 0,
           Tamaño,
-          Descripcion: item.options?.descripcion || item.Descripcion || item.customization?.Descripcion || "",
+          Descripcion: descripcion,
           UrlImagen: item.options?.urlImagen || item.UrlImagen || null,
-          ColorId: ColorId  // ✅ Ahora sí extraído correctamente
+          ColorId // ✅ UUID válido o null
         };
-      })
-    };
+      });
 
-    if (metodoPago === "entrega") {
-      payload.metodoPago = "contra_entrega";
-      payload.nombre_recibe = datosEntrega.nombreRecibe;
-      payload.telefono_entrega = datosEntrega.telefono;
-      payload.direccion_entrega = datosEntrega.direccion;
-    } else {
-      payload.metodoPago = metodoPago;
-    }
+      // ✅ VALIDACIÓN FINAL
+      const detallesFinales = detallesValidados.filter(detalle => {
+        if (!detalle.ProductoId && !detalle.ServicioId) {
+          console.error(`❌ Item sin ProductoId/ServicioId omitido:`, detalle);
+          return false;
+        }
+        return true;
+      });
 
-    try {
+      if (detallesFinales.length === 0) {
+        throw new Error("No hay items válidos para procesar el pedido");
+      }
+
+      const payload = {
+        ClienteId: user.CedulaId,
+        FechaRegistro: new Date().toISOString().split("T")[0],
+        Total: getTotal(),
+        Estado: "pendiente",
+        metodoPago: metodoPago === "entrega" ? "contra_entrega" : metodoPago,
+        detalle: detallesFinales
+      };
+
+      // ✅ AGREGAR DATOS DE ENTREGA SI ES CONTRA ENTREGA
+      if (metodoPago === "entrega") {
+        payload.nombre_recibe = datosEntrega.nombreRecibe;
+        payload.telefono_entrega = datosEntrega.telefono;
+        payload.direccion_entrega = datosEntrega.direccion;
+      }
+
+      // ✅ ENVIAR AL BACKEND
       const res = await fetch("http://localhost:3000/api/pedidos-clientes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -133,13 +175,15 @@ export const Checkout = () => {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Error al crear el pedido");
+        const errorMsg = errorData.error || errorData.message || `Error ${res.status}: ${res.statusText}`;
+        throw new Error(errorMsg);
       }
 
       const data = await res.json();
       const pedidoId = String(data.PedidoClienteId).trim();
       clearCart();
 
+      // ✅ GENERAR VOUCHER PARA PAGOS ELECTRÓNICOS
       if (metodoPago === "qr" || metodoPago === "transferencia") {
         setVoucher({
           id: pedidoId,
@@ -161,19 +205,29 @@ export const Checkout = () => {
           referencia: `PED${pedidoId.toString().padStart(6, '0')}`,
           fechaLimite: new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleDateString("es-CO")
         });
+        toast.success("¡Pedido creado! Adjunta tu comprobante para confirmar");
       } else {
-        navigate("/pedido-exitoso", { state: { metodo: "entrega", id: pedidoId } });
+        navigate("/pedido-exitoso", {
+          state: {
+            metodo: "entrega",
+            id: pedidoId,
+            total: getTotal()
+          }
+        });
+        toast.success("¡Pedido creado! Se procesará al recibir tu entrega");
       }
 
     } catch (e) {
-      console.error(e);
-      setError(e.message || "Ocurrió un error al enviar el pedido");
+      console.error("❌ Error completo al crear pedido:", e);
+      const errorMsg = e.message || "Ocurrió un error al procesar tu pedido. Verifica los datos e intenta nuevamente.";
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  // ====== COMPONENTE: Subir comprobante ======
+  // ====== COMPONENTE: Subir comprobante - CORREGIDO ======
   const SubirComprobanteBanco = ({ pedidoId, metodo }) => {
     const [file, setFile] = useState(null);
     const [uploading, setUploading] = useState(false);
@@ -182,38 +236,66 @@ export const Checkout = () => {
     const handleSubmit = async (e) => {
       e.preventDefault();
       if (!file) {
-        setError("Por favor adjunta el comprobante");
+        toast.error("Por favor adjunta el comprobante de pago");
+        return;
+      }
+
+      // Validar tamaño (máx 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("El archivo debe ser menor a 10MB");
+        return;
+      }
+
+      // Validar tipo
+      if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+        toast.error("Solo se permiten imágenes o PDFs");
         return;
       }
 
       const formData = new FormData();
-      formData.append("comprobante", file);
+      formData.append("voucher", file);  // 🔴 CORREGIDO: "voucher" en lugar de "comprobante"
       formData.append("pedidoId", pedidoId);
 
       setUploading(true);
       try {
+        console.log('📤 Subiendo comprobante desde checkout...');
+        console.log('📄 Archivo:', file.name);
+        console.log('🎫 Pedido ID:', pedidoId);
+
         const res = await fetch("http://localhost:3000/api/voucher", {
           method: "POST",
           body: formData
+          // ⚠️ NO agregues headers Content-Type
         });
 
         if (res.ok) {
+          const data = await res.json();
+          console.log('✅ Comprobante subido:', data);
+
           setSuccess(true);
+          toast.success("¡Comprobante enviado! Revisaremos tu pago en 24-48 horas");
+
           setTimeout(() => {
             navigate("/pedido-exitoso", {
               state: {
                 metodo,
                 id: pedidoId,
-                referencia: `PED${pedidoId.toString().padStart(6, '0')}`
+                referencia: `PED${pedidoId.toString().padStart(6, '0')}`,
+                total: voucher?.total,
+                voucherUrl: data.url // Agregar URL del voucher
               }
             });
           }, 2000);
+
         } else {
-          const err = await res.json().catch(() => ({}));
-          setError(err.error || "Error al subir el comprobante");
+          const errorText = await res.text();
+          console.error('❌ Error del servidor:', errorText);
+          const errorMsg = "Error al subir el comprobante. Intenta nuevamente";
+          toast.error(errorMsg);
         }
       } catch (err) {
-        setError("No se pudo conectar al servidor");
+        console.error("Error subiendo comprobante:", err);
+        toast.error("No se pudo conectar al servidor. Verifica tu conexión");
       } finally {
         setUploading(false);
       }
@@ -228,7 +310,7 @@ export const Checkout = () => {
             </svg>
           </div>
           <div className="text-green-700 font-bold">¡Comprobante enviado exitosamente!</div>
-          <p className="text-gray-600 text-sm mt-1">Revisaremos tu pago y te notificaremos.</p>
+          <p className="text-gray-600 text-sm mt-1">Revisaremos tu pago y te notificaremos por correo.</p>
         </div>
       );
     }
@@ -264,6 +346,9 @@ export const Checkout = () => {
               {file && (
                 <p className="text-sm text-green-600 font-medium mt-1">
                   ✓ Archivo seleccionado: {file.name}
+                  <span className="text-gray-500 ml-2">
+                    ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                  </span>
                 </p>
               )}
             </div>
@@ -503,8 +588,12 @@ export const Checkout = () => {
                       {item.Tamaño && (
                         <span className="text-xs bg-gray-200 px-2 py-1 rounded">Tamaño: {item.Tamaño}</span>
                       )}
-                      {item.ColorId && (
-                        <span className="text-xs bg-gray-200 px-2 py-1 rounded">Color ID</span>
+                      {item.customization?.color && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          Color: {typeof item.customization.color === 'string'
+                            ? item.customization.color
+                            : item.customization.color?.Nombre || item.customization.color?.nombre || 'N/A'}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -523,7 +612,7 @@ export const Checkout = () => {
           </div>
         </div>
 
-        {/* Métodos de pago - más ancho */}
+        {/* Métodos de pago */}
         <div className="lg:col-span-7 space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-5 flex items-center gap-2">
@@ -693,8 +782,10 @@ export const Checkout = () => {
           {/* Botón de confirmar */}
           <button
             onClick={enviarPedido}
-            disabled={loading}
-            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${loading ? "bg-gray-400" : "bg-black hover:bg-gray-800 hover:shadow-xl"
+            disabled={loading || cart.length === 0}
+            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${loading || cart.length === 0
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-black hover:bg-gray-800 hover:shadow-xl"
               }`}
           >
             {loading ? (
@@ -705,7 +796,7 @@ export const Checkout = () => {
                 </svg>
                 Procesando...
               </div>
-            ) : "Confirmar pedido"}
+            ) : cart.length === 0 ? "Carrito vacío" : "Confirmar pedido"}
           </button>
         </div>
       </div>

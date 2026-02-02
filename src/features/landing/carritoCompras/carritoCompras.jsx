@@ -68,31 +68,30 @@ export const CarritoCompras = () => {
   }, [cart, productColors, loadingColors]);
 
   useEffect(() => {
-  console.log("🛒 [CARRITO] Estado actual del carrito:", cart);
-  cart.forEach(item => {
-    console.log(`  - ${item.Nombre}:`, {
-      customization: item.customization,
-      color: item.customization?.color,
-      colorId: item.customization?.color?.ColorId
+    console.log("🛒 [CARRITO] Estado actual del carrito:", cart);
+    cart.forEach(item => {
+      console.log(`  - ${item.Nombre}:`, {
+        customization: item.customization,
+        color: item.customization?.color,
+        colorId: item.customization?.color?.ColorId
+      });
     });
-  });
-}, [cart]);
+  }, [cart]);
 
-
-const verificarDatosCarrito = () => {
-  console.log("=== VERIFICACIÓN DE DATOS DEL CARRITO ===");
-  cart.forEach((item, index) => {
-    console.log(`Item ${index + 1}: ${item.Nombre}`);
-    console.log("  - ProductoId:", item.ProductoId);
-    console.log("  - Customization:", item.customization);
-    console.log("  - Color Object:", item.customization?.color);
-    console.log("  - ColorId:", item.customization?.color?.ColorId);
-    console.log("  - Tiene ColorId?:", !!item.customization?.color?.ColorId);
-  });
-};
+  const verificarDatosCarrito = () => {
+    console.log("=== VERIFICACIÓN DE DATOS DEL CARRITO ===");
+    cart.forEach((item, index) => {
+      console.log(`Item ${index + 1}: ${item.Nombre}`);
+      console.log("  - ProductoId:", item.ProductoId);
+      console.log("  - Customization:", item.customization);
+      console.log("  - Color Object:", item.customization?.color);
+      console.log("  - ColorId:", item.customization?.color?.ColorId);
+      console.log("  - Tiene ColorId?:", !!item.customization?.color?.ColorId);
+    });
+  };
 
   const handleCheckout = () => {
-    verificarDatosCarrito(); // ← Agrega esto
+    verificarDatosCarrito();
     const total = getTotal();
     if (total === 0) {
       toast.error("No puedes finalizar una compra con valor $0");
@@ -155,39 +154,38 @@ const verificarDatosCarrito = () => {
     setEditingColorItem(item);
   };
 
-  // En CarritoCompras.js, después de updateItemColor
-  // Modifica la función handleSelectColor:
-const handleSelectColor = (color) => {
-  if (!editingColorItem) return;
-  
-  console.log("🎨 [CARRITO] Color seleccionado para guardar:", {
-    ColorId: color.ColorId,
-    Nombre: color.Nombre,
-    esUUID: color.ColorId?.includes('-')
-  });
-  
-  // ✅ Enviar el objeto COMPLETO del color
-  updateItemColor(editingColorItem.id, {
-    Nombre: color.Nombre,
-    ColorId: color.ColorId, // ← Este es el UUID importante
-    Hex: color.Hex
-  });
-  
-  setEditingColorItem(null);
-  toast.success(`Color cambiado a ${color.Nombre}`);
-};
+  const handleSelectColor = (color) => {
+    if (!editingColorItem) return;
+
+    console.log("🎨 [CARRITO] Guardando ColorId UUID:", color.ColorId);
+
+    // ✅ CORREGIDO: Guardar SOLO el UUID, no el objeto completo
+    updateItemColor(editingColorItem.id, color.ColorId);
+
+    setEditingColorItem(null);
+    toast.success(`Color cambiado a ${color.Nombre}`);
+  };
+
+  // ✅ FUNCIÓN CORREGIDA: Obtiene el NOMBRE del color desde el catálogo
+  const getColorDisplay = (item, productColors) => {
+    if (!item?.ProductoId || !item?.customization?.color) return null;
+
+    // Si el color ya es un string UUID, buscar el nombre
+    if (typeof item.customization.color === 'string') {
+      const colors = productColors[item.ProductoId] || [];
+      const colorObj = colors.find(c => c.ColorId === item.customization.color);
+      return colorObj?.Nombre || null;
+    }
+
+    // Si es un objeto, extraer el nombre
+    return item.customization.color?.Nombre || null;
+  };
 
   const getItemType = (item) => {
     if (item.ProductoId) return "producto";
     if (item.ServicioId) return "servicio";
     if (item.EsPersonalizado) return "servicio personalizado";
     return "item";
-  };
-
-  const getColorName = (item) => {
-    if (item.customization?.color) return item.customization.color;
-    if (item.color) return item.color;
-    return null;
   };
 
   const formatPrice = (precio) => {
@@ -233,7 +231,8 @@ const handleSelectColor = (color) => {
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                   {productos.map((item) => {
                     const colors = productColors[item.ProductoId] || [];
-                    const currentColor = getColorName(item);
+                    const currentColorName = getColorDisplay(item, productColors);
+                    const currentColorObj = colors.find(col => col.ColorId === item.customization?.color);
 
                     return (
                       <div key={item.id} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors">
@@ -257,7 +256,7 @@ const handleSelectColor = (color) => {
 
                             {/* Color si tiene */}
                             <div className="mt-2">
-                              {currentColor ? (
+                              {currentColorName ? (
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <Palette className="h-4 w-4 text-slate-500" />
@@ -265,11 +264,11 @@ const handleSelectColor = (color) => {
                                       <div
                                         className="w-4 h-4 rounded-full border border-slate-300"
                                         style={{
-                                          backgroundColor: colors.find(c => c.Nombre === currentColor)?.Hex || '#ccc'
+                                          backgroundColor: currentColorObj?.Hex || '#ccc'
                                         }}
                                       />
                                       <span className="text-sm font-medium text-slate-700">
-                                        Color: {currentColor}
+                                        Color: {currentColorName}
                                       </span>
                                     </div>
                                   </div>
@@ -514,8 +513,8 @@ const handleSelectColor = (color) => {
                   <div key={item.id} className="flex justify-between items-center text-sm">
                     <div className="truncate">
                       <span className="font-medium">{item.quantity}x</span> {item.Nombre}
-                      {getColorName(item) && (
-                        <span className="text-slate-500 ml-1">({getColorName(item)})</span>
+                      {getColorDisplay(item, productColors) && (
+                        <span className="text-slate-500 ml-1">({getColorDisplay(item, productColors)})</span>
                       )}
                     </div>
                     <span className="font-medium">
@@ -553,8 +552,8 @@ const handleSelectColor = (color) => {
                   onClick={handleCheckout}
                   disabled={total === 0}
                   className={`w-full py-3 rounded-xl font-bold text-lg transition-all ${total === 0
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl"
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl"
                     }`}
                 >
                   Proceder al Pago
@@ -705,7 +704,7 @@ const handleSelectColor = (color) => {
               <div className="flex items-center gap-2 mb-3">
                 <Palette className="h-5 w-5 text-slate-500" />
                 <span className="font-medium text-slate-700">
-                  Color actual: {getColorName(editingColorItem) || "No seleccionado"}
+                  Color actual: {getColorDisplay(editingColorItem, productColors) || "No seleccionado"}
                 </span>
               </div>
 
@@ -727,10 +726,11 @@ const handleSelectColor = (color) => {
                       <button
                         key={color.ColorId}
                         onClick={() => handleSelectColor(color)}
-                        className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all ${getColorName(editingColorItem) === color.Nombre
+                        className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all ${
+                          getColorDisplay(editingColorItem, productColors) === color.Nombre
                             ? "border-blue-600 bg-blue-50"
                             : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                          }`}
+                        }`}
                       >
                         <div
                           className="w-12 h-12 rounded-full border border-slate-300 mb-2"
@@ -759,7 +759,7 @@ const handleSelectColor = (color) => {
                   toast.success("Color eliminado");
                 }}
                 className="flex-1 py-2 border-2 border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition"
-                disabled={!getColorName(editingColorItem)}
+                disabled={!getColorDisplay(editingColorItem, productColors)}
               >
                 Eliminar color
               </button>

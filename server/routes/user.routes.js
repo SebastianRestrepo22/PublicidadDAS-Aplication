@@ -10,35 +10,38 @@ import {
   validarTelefono,
   buscarUsuarios,
   resetPassword,
-  showResetForm 
+  showResetForm,
+  searchUsuarios, 
+  getAllUsuariosSimple,
+  searchUsuariosForPedidos
 } from '../controllers/user.controller.js';
 
 const router = express.Router();
 
-// Rutas de validación y búsqueda
+// RUTAS ESTÁTICAS (deben ir PRIMERO)
+
+// Rutas para autocompletado y búsqueda
+router.get('/search', searchUsuarios);           // GET /user/search?search=&page=1&limit=5
+router.get('/all', getAllUsuariosSimple);        // GET /user/all
+router.get('/for-pedidos', searchUsuariosForPedidos); // GET /user/for-pedidos?search=term
+
+// Rutas de validación y búsqueda existente
 router.get('/validar-correo', validarCorreo);
 router.get('/validar-cedula', validarCedula);
 router.get('/validar-telefono', validarTelefono);
 router.get('/buscar', buscarUsuarios);
 
-// Crear usuario
-router.post('/', createUser);
+// RUTAS GENERALES
+router.post('/', createUser);                     // POST /user
+router.get('/', getAllUsers);                     // GET /user (todos los usuarios)
 
-// Obtener todos los usuarios
-router.get('/', getAllUsers);
+// RUTAS DE RESET PASSWORD
+router.get('/restablecer/:token', showResetForm); // GET /user/restablecer/:token
+router.post('/auth/reset-password/:token', resetPassword); // POST /user/auth/reset-password/:token
 
-// Mostrar formulario de restablecimiento
-router.get('/restablecer/:token', showResetForm);
-
-// Obtener usuario por ID
-router.get('/:id', getUserById);
-
-// Actualizar usuario
-router.put('/:id', updateUser);
-router.delete('/:id', deleteUser);
-
-// Actualizar contraseña
-router.post('/auth/reset-password/:token', resetPassword);
-
+// RUTAS CON PARÁMETROS (deben ir ÚLTIMAS)
+router.get('/:id', getUserById);                  // GET /user/:id
+router.put('/:id', updateUser);                   // PUT /user/:id
+router.delete('/:id', deleteUser);                // DELETE /user/:id
 
 export default router;

@@ -2,12 +2,20 @@
 import { v4 as uuidv4 } from "uuid";
 import { dbPool } from "../lib/db.js";
 
+export const getClienteByIdModel = async (cedulaId) => {
+  const [rows] = await dbPool.execute(
+    `SELECT CedulaId, NombreCompleto, CorreoElectronico FROM usuarios WHERE CedulaId = ?`,
+    [cedulaId]
+  );
+  return rows[0];
+};
+
 export const getAllPedidosClientesModel = async (clienteId = null) => {
   let query = `
     SELECT
       p.PedidoClienteId,
       p.ClienteId,
-      u.NombreCompleto AS NombreCliente,  
+      COALESCE(u.NombreCompleto, p.ClienteNombre) AS NombreCliente,
       p.FechaRegistro,
       p.Total,
       p.Estado,
@@ -15,9 +23,13 @@ export const getAllPedidosClientesModel = async (clienteId = null) => {
       p.Voucher,
       p.NombreRecibe,
       p.TelefonoEntrega,
-      p.DireccionEntrega
+      p.DireccionEntrega,
+      p.TipoCliente,
+      p.ClienteNombre,
+      p.ClienteTelefono,
+      p.ClienteCorreo
     FROM pedidosclientes p
-    JOIN usuarios u ON p.ClienteId = u.CedulaId
+    LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
   `;
 
   const params = [];
@@ -27,16 +39,11 @@ export const getAllPedidosClientesModel = async (clienteId = null) => {
     params.push(clienteId);
   }
 
+  // 🔴 Si necesitas ordenar, usa una columna que SÍ exista
+  query += " ORDER BY p.FechaRegistro DESC";
+
   const [rows] = await dbPool.execute(query, params);
   return rows;
-};
-
-export const getClienteByIdModel = async (cedulaId) => {
-  const [rows] = await dbPool.execute(
-    `SELECT CedulaId, NombreCompleto, CorreoElectronico FROM usuarios WHERE CedulaId = ?`,
-    [cedulaId]
-  );
-  return rows[0];
 };
 
 export const getPedidoClienteByIdModel = async (pedidoId) => {
@@ -45,7 +52,7 @@ export const getPedidoClienteByIdModel = async (pedidoId) => {
     SELECT
       p.PedidoClienteId,
       p.ClienteId,
-      u.NombreCompleto AS NombreCliente,
+      COALESCE(u.NombreCompleto, p.ClienteNombre) AS NombreCliente,
       p.FechaRegistro,
       p.Total,
       p.Estado,
@@ -53,9 +60,13 @@ export const getPedidoClienteByIdModel = async (pedidoId) => {
       p.Voucher,
       p.NombreRecibe,
       p.TelefonoEntrega,
-      p.DireccionEntrega
+      p.DireccionEntrega,
+      p.TipoCliente,
+      p.ClienteNombre,
+      p.ClienteTelefono,
+      p.ClienteCorreo
     FROM pedidosclientes p
-    JOIN usuarios u ON p.ClienteId = u.CedulaId
+    LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
     WHERE p.PedidoClienteId = ?
     `,
     [pedidoId]
@@ -63,35 +74,60 @@ export const getPedidoClienteByIdModel = async (pedidoId) => {
   return rows[0];
 };
 
+// ✅ ¡ESTA ES LA FUNCIÓN QUE FALTA EN TU ARCHIVO ACTUAL!
 export const createPedidoClienteModel = async ({
   ClienteId,
   FechaRegistro,
   Total,
-  metodo_pago = "transferencia",
-  voucher = null,
-  nombre_recibe = null,
-  telefono_entrega = null,
-  direccion_entrega = null,
+  MetodoPago = "transferencia",
+  Voucher = null,
+  NombreRecibe = null,
+  TelefonoEntrega = null,
+  DireccionEntrega = null,
+  Estado = "pendiente",
+  TipoCliente = "registrado",
+  ClienteNombre = null,
+  ClienteTelefono = null,
+  ClienteCorreo = null
 }) => {
   const PedidoClienteId = uuidv4();
 
   await dbPool.execute(
     `
     INSERT INTO pedidosclientes 
-    (PedidoClienteId, ClienteId, FechaRegistro, Total, Estado, MetodoPago, Voucher, NombreRecibe, TelefonoEntrega, DireccionEntrega)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (
+      PedidoClienteId, 
+      ClienteId, 
+      FechaRegistro, 
+      Total, 
+      Estado, 
+      MetodoPago, 
+      Voucher, 
+      NombreRecibe, 
+      TelefonoEntrega, 
+      DireccionEntrega,
+      TipoCliente,
+      ClienteNombre,
+      ClienteTelefono,
+      ClienteCorreo
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       PedidoClienteId,
-      ClienteId,
+      ClienteId ?? null,
       FechaRegistro,
       Total,
-      "pendiente",
-      metodo_pago,
-      voucher,
-      nombre_recibe,
-      telefono_entrega,
-      direccion_entrega
+      Estado,
+      MetodoPago,
+      Voucher ?? null,
+      NombreRecibe ?? null,
+      TelefonoEntrega ?? null,
+      DireccionEntrega ?? null,
+      TipoCliente,
+      ClienteNombre ?? null,
+      ClienteTelefono ?? null,
+      ClienteCorreo ?? null
     ]
   );
 
@@ -100,7 +136,7 @@ export const createPedidoClienteModel = async ({
     SELECT
       p.PedidoClienteId,
       p.ClienteId,
-      u.NombreCompleto AS NombreCliente,
+      COALESCE(u.NombreCompleto, p.ClienteNombre) AS NombreCliente,
       p.FechaRegistro,
       p.Total,
       p.Estado,
@@ -108,9 +144,13 @@ export const createPedidoClienteModel = async ({
       p.Voucher,
       p.NombreRecibe,
       p.TelefonoEntrega,
-      p.DireccionEntrega
+      p.DireccionEntrega,
+      p.TipoCliente,
+      p.ClienteNombre,
+      p.ClienteTelefono,
+      p.ClienteCorreo
     FROM pedidosclientes p
-    JOIN usuarios u ON p.ClienteId = u.CedulaId
+    LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
     WHERE p.PedidoClienteId = ?
     `,
     [PedidoClienteId]

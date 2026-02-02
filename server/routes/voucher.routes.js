@@ -1,10 +1,9 @@
-// server/routes/voucher.routes.js
 import { Router } from 'express';
-import { uploadVoucherForPedido } from '../controllers/voucher.controller.js';
+import { upload, uploadVoucher } from '../controllers/voucher.controller.js';
 
 const router = Router();
 
-// Ruta para subir el comprobante de pago vinculado a un pedido
-router.post('/', uploadVoucherForPedido);
+// 🔴 RUTA CORREGIDA: Multer espera campo 'voucher'
+router.post('/', upload.single('voucher'), uploadVoucher);
 
 export default router;
