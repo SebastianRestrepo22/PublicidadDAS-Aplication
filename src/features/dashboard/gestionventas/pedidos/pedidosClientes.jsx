@@ -3,7 +3,7 @@ import {
   Plus, Eye, Trash2, ArrowLeft, Search, ChevronRight, ChevronLeft,
   User, Calendar, DollarSign, Package, Palette, Check, X, CreditCard,
   Truck, FileText, Image, File, Upload, UserPlus, Store, UserCheck,
-  Users, AlertCircle, Edit
+  Users, AlertCircle, Edit, ExternalLink
 } from "lucide-react";
 import {
   getAllPedidosClientes,
@@ -395,7 +395,6 @@ export const PedidosClientes = () => {
 
   // Funciones de navegación
   const goToList = () => setViewMode("list");
-
   const goToCreate = () => {
     resetForm();
     setViewMode("create");
@@ -576,6 +575,7 @@ export const PedidosClientes = () => {
         (s.Nombre?.toLowerCase() || "").includes(search.toLowerCase()) ||
         (s.Descripcion?.toLowerCase() || "").includes(search.toLowerCase())
       ) : [];
+
       let combinedData = [];
       if (type === "todos") {
         const productosMapped = productosFiltrados.map(p => ({
@@ -600,6 +600,7 @@ export const PedidosClientes = () => {
           ProductoId: s.ServicioId || s.id
         }));
       }
+
       const total = combinedData.length;
       const startIndex = (page - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
@@ -624,6 +625,7 @@ export const PedidosClientes = () => {
         (color.Nombre?.toLowerCase() || "").includes(search.toLowerCase()) ||
         (color.CodigoHex?.toLowerCase() || "").includes(search.toLowerCase())
       ) : [];
+
       const total = coloresFiltrados.length;
       const startIndex = (page - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
@@ -822,17 +824,14 @@ export const PedidosClientes = () => {
       }
 
       console.log('📤 Enviando pedido con voucher:', voucherFile ? voucherFile.name : 'sin voucher');
-
       const response = await fetch('http://localhost:3000/api/pedidos-clientes', {
         method: 'POST',
         body: formData,
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`);
       }
-
       const result = await response.json();
       console.log('✅ Pedido creado:', result);
       toast.success("Pedido creado exitosamente");
@@ -893,17 +892,14 @@ export const PedidosClientes = () => {
       }
 
       console.log('📤 Enviando pedido editado con voucher:', voucherFile ? voucherFile.name : 'sin voucher');
-
       const response = await fetch(`http://localhost:3000/api/pedidos/${selectedPedido.PedidoClienteId}`, {
         method: 'PUT',
         body: formData,
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`);
       }
-
       const result = await response.json();
       console.log('✅ Pedido actualizado:', result);
       toast.success("Pedido actualizado exitosamente");
@@ -934,6 +930,42 @@ export const PedidosClientes = () => {
     }
   };
 
+  // Handler para actualizar estado del pedido
+  const handleUpdateEstado = async (estado) => {
+    if (!selectedPedido) return;
+    try {
+      const response = await fetch(`http://localhost:3000/api/pedidos/${selectedPedido.PedidoClienteId}/estado`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ Estado: estado }),
+      });
+      if (!response.ok) {
+        throw new Error('Error al actualizar el estado');
+      }
+      toast.success("Estado actualizado correctamente");
+      goToList();
+      fetchPedidos();
+    } catch (err) {
+      console.error("Error al actualizar estado:", err);
+      toast.error("No se pudo actualizar el estado");
+    }
+  };
+
+  // Handler para abrir comprobante en nueva pestaña
+  const abrirComprobante = (voucherUrl) => {
+    if (!voucherUrl) {
+      toast.error("No hay comprobante disponible");
+      return;
+    }
+    const urlCompleta = voucherUrl.startsWith('http') 
+      ? voucherUrl 
+      : `http://localhost:3000${voucherUrl}`;
+    
+    window.open(urlCompleta, '_blank', 'noopener,noreferrer');
+  };
+
   // Handlers de paginación
   const handlePageChange = (page) => setCurrentPage(page);
   const handleItemsPerPageChange = (newItemsPerPage) => {
@@ -946,7 +978,7 @@ export const PedidosClientes = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Pedidos</h1>
-
+        
         {/* LISTA DE PEDIDOS */}
         {viewMode === "list" && (
           <>
@@ -1002,7 +1034,7 @@ export const PedidosClientes = () => {
                         <td className="px-6 py-4 text-sm text-slate-700">{shortenId(pedido.PedidoClienteId)}</td>
                         <td className="px-6 py-4 text-sm font-medium">
                           {pedido.ClienteNombre || pedido.NombreCliente ||
-                            (pedido.TipoCliente === 'walkin' ? 'Cliente Walk-in' : '—')}
+                          (pedido.TipoCliente === 'walkin' ? 'Cliente Walk-in' : '—')}
                         </td>
                         <td className="px-6 py-4 text-sm">{formatDate(pedido.FechaRegistro)}</td>
                         <td className="px-6 py-4 text-sm font-medium">{formatPrice(pedido.Total)}</td>
@@ -1012,12 +1044,13 @@ export const PedidosClientes = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${pedido.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            pedido.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
                             pedido.Estado === 'aprobado' ? 'bg-blue-100 text-blue-800' :
-                              'bg-green-100 text-green-800'
-                            }`}>
+                            'bg-green-100 text-green-800'
+                          }`}>
                             {pedido.Estado === 'pendiente' ? 'Pendiente' :
-                              pedido.Estado === 'aprobado' ? 'Aprobado' : 'Cancelado'}
+                            pedido.Estado === 'aprobado' ? 'Aprobado' : 'Cancelado'}
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -1103,10 +1136,11 @@ export const PedidosClientes = () => {
                         setFormPedido({ ...formPedido, ClienteId: "", NombreCliente: "" });
                         setClienteWalkin({ Nombre: "", Telefono: "", Correo: "" });
                       }}
-                      className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${tipoCliente === 'registrado'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                        }`}
+                      className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${
+                        tipoCliente === 'registrado'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
                     >
                       <UserCheck size={24} className="mb-2" />
                       <div className="font-medium">Cliente Registrado</div>
@@ -1119,10 +1153,11 @@ export const PedidosClientes = () => {
                         setFormPedido({ ...formPedido, ClienteId: "", NombreCliente: "" });
                         setClienteWalkin({ Nombre: "", Telefono: "", Correo: "" });
                       }}
-                      className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${tipoCliente === 'walkin'
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                        }`}
+                      className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${
+                        tipoCliente === 'walkin'
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
                     >
                       <Store size={24} className="mb-2" />
                       <div className="font-medium">Cliente Walk-in</div>
@@ -1223,10 +1258,11 @@ export const PedidosClientes = () => {
                           ...clienteWalkin,
                           Telefono: formatearTelefono(e.target.value)
                         })}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${clienteWalkin.Telefono && !validarTelefono(clienteWalkin.Telefono)
-                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-                          : 'border-slate-300 focus:border-emerald-500 focus:ring-emerald-500'
-                          }`}
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${
+                          clienteWalkin.Telefono && !validarTelefono(clienteWalkin.Telefono)
+                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            : 'border-slate-300 focus:border-emerald-500 focus:ring-emerald-500'
+                        }`}
                         placeholder="10 dígitos"
                         maxLength="10"
                       />
@@ -1374,10 +1410,11 @@ export const PedidosClientes = () => {
                           ...formPedido,
                           TelefonoEntrega: formatearTelefono(e.target.value)
                         })}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${formPedido.TelefonoEntrega && !validarTelefono(formPedido.TelefonoEntrega)
-                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-                          : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500'
-                          }`}
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${
+                          formPedido.TelefonoEntrega && !validarTelefono(formPedido.TelefonoEntrega)
+                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500'
+                        }`}
                         placeholder="10 dígitos"
                         maxLength="10"
                       />
@@ -1622,7 +1659,7 @@ export const PedidosClientes = () => {
                 </div>
               </div>
               <div className="flex gap-2">
-                {/* Botón de editar solo para pedidos walk-in — se mantiene arriba */}
+                {/* Botón de editar solo para pedidos walk-in */}
                 {selectedPedido.TipoCliente === 'walkin' && (
                   <button
                     onClick={() => goToEdit(selectedPedido)}
@@ -1639,7 +1676,6 @@ export const PedidosClientes = () => {
                 </button>
               </div>
             </div>
-
             <div className="space-y-8">
               {/* INFORMACIÓN GENERAL */}
               <div className="bg-slate-50 p-6 rounded-xl">
@@ -1656,11 +1692,11 @@ export const PedidosClientes = () => {
                     <div className="text-sm text-slate-600 mb-1">Estado</div>
                     <div className={`font-medium ${
                       selectedPedido.Estado === 'pendiente' ? 'text-yellow-600' :
-                        selectedPedido.Estado === 'aprobado' ? 'text-blue-600' :
-                          'text-red-600'
-                      }`}>
+                      selectedPedido.Estado === 'aprobado' ? 'text-blue-600' :
+                      'text-red-600'
+                    }`}>
                       {selectedPedido.Estado === 'pendiente' ? 'Pendiente' :
-                        selectedPedido.Estado === 'aprobado' ? 'Aprobado' : 'Cancelado'}
+                      selectedPedido.Estado === 'aprobado' ? 'Aprobado' : 'Cancelado'}
                     </div>
                   </div>
                   <div className="bg-white p-4 rounded-lg border border-slate-200">
@@ -1709,42 +1745,45 @@ export const PedidosClientes = () => {
                         <File className="text-red-500" size={32} />
                         <div>
                           <div className="font-medium">Comprobante PDF</div>
-                          <a
-                            href={selectedPedido.Voucher.startsWith('http')
-                              ? selectedPedido.Voucher
-                              : `http://localhost:3000${selectedPedido.Voucher}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 text-sm"
+                          <button
+                            onClick={() => abrirComprobante(selectedPedido.Voucher)}
+                            className="text-blue-600 hover:text-blue-800 text-sm mt-2 inline-flex items-center gap-1"
                           >
-                            Ver comprobante
-                          </a>
+                            <ExternalLink size={14} />
+                            Ver comprobante en nueva pestaña
+                          </button>
                         </div>
                       </div>
                     ) : (
                       <div>
                         <div className="font-medium mb-2">Imagen del comprobante</div>
-                        <img
-                          src={selectedPedido.Voucher.startsWith('http')
-                            ? selectedPedido.Voucher
-                            : `http://localhost:3000${selectedPedido.Voucher}`}
-                          alt="Comprobante"
-                          className="max-w-md rounded-lg border"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = '/placeholder-image.png';
-                          }}
-                        />
-                        <a
-                          href={selectedPedido.Voucher.startsWith('http')
-                            ? selectedPedido.Voucher
-                            : `http://localhost:3000${selectedPedido.Voucher}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 text-sm mt-2 inline-block"
+                        <div className="relative inline-block">
+                          <img
+                            src={selectedPedido.Voucher.startsWith('http')
+                              ? selectedPedido.Voucher
+                              : `http://localhost:3000${selectedPedido.Voucher}`}
+                            alt="Comprobante"
+                            className="max-w-md rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => abrirComprobante(selectedPedido.Voucher)}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = '/placeholder-image.png';
+                            }}
+                          />
+                          <div className="absolute top-2 right-2 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors cursor-pointer" title="Abrir en nueva pestaña">
+                            <ExternalLink size={16} onClick={(e) => {
+                              e.stopPropagation();
+                              abrirComprobante(selectedPedido.Voucher);
+                            }} />
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => abrirComprobante(selectedPedido.Voucher)}
+                          className="text-blue-600 hover:text-blue-800 text-sm mt-2 inline-flex items-center gap-1"
                         >
-                          Ver imagen completa
-                        </a>
+                          <ExternalLink size={14} />
+                          Ver imagen completa en nueva pestaña
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1776,9 +1815,10 @@ export const PedidosClientes = () => {
                         </div>
                         <div>
                           <div className="text-sm text-slate-600 mb-1">Color</div>
-<div className="font-medium">
-  {d.ColorNombre || getColorName(d.ColorId, colores) || "—"}
-</div>                        </div>
+                          <div className="font-medium">
+                            {d.ColorNombre || getColorName(d.ColorId, colores) || "—"}
+                          </div>
+                        </div>
                         <div>
                           <div className="text-sm text-slate-600 mb-1">Tamaño</div>
                           <div className="font-medium">{d.Tamaño || "Mediana"}</div>
@@ -1802,7 +1842,6 @@ export const PedidosClientes = () => {
                     </div>
                   ))}
                 </div>
-
                 {/* TOTAL */}
                 <div className="mt-6 pt-6 border-t border-slate-200">
                   <div className="flex justify-between items-center">
@@ -1853,65 +1892,39 @@ export const PedidosClientes = () => {
                 </div>
               </div>
 
-              {/* 👇 SECCIÓN DE ACTUALIZACIÓN DE ESTADO — AHORA AL FINAL, EN UNA SOLA HILERA */}
-              {selectedPedido.TipoCliente === 'walkin' && (
-                <div className="bg-slate-50 p-6 rounded-xl">
-                  <h4 className="text-lg font-semibold mb-4 text-slate-700">Actualizar Estado del Pedido</h4>
-                  <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
-                    {/* Selector de estado */}
-                    <div className="flex-1 min-w-[200px]">
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Estado *</label>
-                      <select
-                        value={selectedPedido.Estado}
-                        onChange={(e) => setSelectedPedido({ ...selectedPedido, Estado: e.target.value })}
-                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="pendiente">Pendiente</option>
-                        <option value="aprobado">Aprobado</option>
-                        <option value="cancelado">Cancelado</option>
-                      </select>
-                    </div>
-
-                    {/* Botón Guardar */}
-                    <button
-                      onClick={async () => {
-                        try {
-                          await updatePedidoCliente(selectedPedido.PedidoClienteId, { Estado: selectedPedido.Estado });
-                          toast.success("Estado actualizado correctamente");
-                          goToList(); // ✅ REDIRECCIÓN A LA TABLA PRINCIPAL
-                          fetchPedidos();
-                        } catch (err) {
-                          console.error("Error al actualizar estado:", err);
-                          toast.error("No se pudo actualizar el estado");
-                        }
-                      }}
-                      className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 whitespace-nowrap"
+              {/* SECCIÓN DE ACTUALIZACIÓN DE ESTADO — PARA TODOS LOS TIPOS DE CLIENTE */}
+              <div className="bg-slate-50 p-6 rounded-xl">
+                <h4 className="text-lg font-semibold mb-4 text-slate-700">Actualizar Estado del Pedido</h4>
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+                  {/* Selector de estado */}
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Estado *</label>
+                    <select
+                      value={selectedPedido.Estado}
+                      onChange={(e) => setSelectedPedido({ ...selectedPedido, Estado: e.target.value })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      <Check size={18} /> Guardar Estado
-                    </button>
-
-                    {/* Botón Cerrar */}
-                    <button
-                      onClick={goToList}
-                      className="bg-slate-200 text-slate-700 px-6 py-3 rounded-lg hover:bg-slate-300 font-medium whitespace-nowrap"
-                    >
-                      Cerrar
-                    </button>
+                      <option value="pendiente">Pendiente</option>
+                      <option value="aprobado">Aprobado</option>
+                      <option value="cancelado">Cancelado</option>
+                    </select>
                   </div>
-                </div>
-              )}
-
-              {/* 👇 Botón Cerrar adicional SOLO si NO es walk-in (para mantener consistencia) */}
-              {selectedPedido.TipoCliente !== 'walkin' && (
-                <div className="pt-4">
+                  {/* Botón Guardar */}
+                  <button
+                    onClick={() => handleUpdateEstado(selectedPedido.Estado)}
+                    className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <Check size={18} /> Guardar Estado
+                  </button>
+                  {/* Botón Cerrar */}
                   <button
                     onClick={goToList}
-                    className="bg-slate-200 text-slate-700 px-6 py-3.5 rounded-lg hover:bg-slate-300 font-medium w-full"
+                    className="bg-slate-200 text-slate-700 px-6 py-3 rounded-lg hover:bg-slate-300 font-medium whitespace-nowrap"
                   >
                     Cerrar
                   </button>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         )}
@@ -2066,10 +2079,11 @@ export const PedidosClientes = () => {
                           ...selectedPedido,
                           TelefonoEntrega: formatearTelefono(e.target.value)
                         })}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${selectedPedido.TelefonoEntrega && !validarTelefono(selectedPedido.TelefonoEntrega)
-                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-                          : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500'
-                          }`}
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${
+                          selectedPedido.TelefonoEntrega && !validarTelefono(selectedPedido.TelefonoEntrega)
+                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500'
+                        }`}
                         placeholder="10 dígitos"
                         maxLength="10"
                       />
@@ -2244,12 +2258,13 @@ export const PedidosClientes = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">Estado actual:</span>
-                        <span className={`font-medium ${selectedPedido.Estado === 'pendiente' ? 'text-yellow-600' :
+                        <span className={`font-medium ${
+                          selectedPedido.Estado === 'pendiente' ? 'text-yellow-600' :
                           selectedPedido.Estado === 'aprobado' ? 'text-blue-600' :
-                            'text-red-600'
-                          }`}>
+                          'text-red-600'
+                        }`}>
                           {selectedPedido.Estado === 'pendiente' ? 'Pendiente' :
-                            selectedPedido.Estado === 'aprobado' ? 'Aprobado' : 'Cancelado'}
+                          selectedPedido.Estado === 'aprobado' ? 'Aprobado' : 'Cancelado'}
                         </span>
                       </div>
                       <div className="flex justify-between pt-2 border-t border-slate-200">
@@ -2432,10 +2447,11 @@ export const PedidosClientes = () => {
                     setFilterTypeProductos("todos");
                     loadProductosPaginados(1, searchTermProductos, "todos");
                   }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium ${filterTypeProductos === "todos"
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    }`}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                    filterTypeProductos === "todos"
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
                 >
                   Todos
                 </button>
@@ -2444,10 +2460,11 @@ export const PedidosClientes = () => {
                     setFilterTypeProductos("producto");
                     loadProductosPaginados(1, searchTermProductos, "producto");
                   }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium ${filterTypeProductos === "producto"
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    }`}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                    filterTypeProductos === "producto"
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
                 >
                   Productos
                 </button>
@@ -2456,10 +2473,11 @@ export const PedidosClientes = () => {
                     setFilterTypeProductos("servicio");
                     loadProductosPaginados(1, searchTermProductos, "servicio");
                   }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium ${filterTypeProductos === "servicio"
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    }`}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                    filterTypeProductos === "servicio"
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
                 >
                   Servicios
                 </button>
@@ -2499,8 +2517,9 @@ export const PedidosClientes = () => {
                             <div className="font-medium">{item.Nombre || item.nombre || "Sin nombre"}</div>
                             <div className="text-sm text-slate-600 mt-1">{item.Descripcion || item.descripcion || ""}</div>
                           </div>
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${item.tipo === 'producto' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
-                            }`}>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            item.tipo === 'producto' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                          }`}>
                             {item.tipo === 'producto' ? 'Producto' : 'Servicio'}
                           </span>
                         </div>
