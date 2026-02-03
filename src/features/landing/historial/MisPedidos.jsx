@@ -9,27 +9,32 @@ const MisPedidos = () => {
   const [clienteId, setClienteId] = useState(null);
 
   useEffect(() => {
-    const usuarioLocal = JSON.parse(localStorage.getItem("usuario"));
-    if (usuarioLocal?.CedulaId) {
-      // Opcional: validar contra el backend (mejor seguridad)
-      const loadUser = async () => {
-        try {
-          const response = await axios.get(
-            `http://localhost:3000/user/${usuarioLocal.CedulaId}`,
-            {
-              headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-            }
-          );
-          setClienteId(String(response.data.CedulaId));
-        } catch (err) {
-          console.error("Error al cargar usuario:", err);
-          // Si falla la validación, podrías redirigir al login
-        }
-      };
-      loadUser();
-    }
-  }, []);
-
+  const usuarioLocal = JSON.parse(localStorage.getItem("usuario"));
+  console.log('Usuario local:', usuarioLocal);
+  
+  if (usuarioLocal?.CedulaId) {
+    console.log('CedulaId:', usuarioLocal.CedulaId);
+    const loadUser = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        console.log('Token:', token);
+        
+        const response = await axios.get(
+          `http://localhost:3000/user/${usuarioLocal.CedulaId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+        console.log('Respuesta usuario:', response.data);
+        setClienteId(String(response.data.CedulaId));
+      } catch (err) {
+        console.error("Error al cargar usuario:", err);
+        console.error("Error details:", err.response?.data);
+      }
+    };
+    loadUser();
+  }
+}, []);
   const { pedidos, loading } = useMisPedidos(clienteId);
 
   // Estados válidos según tu backend
