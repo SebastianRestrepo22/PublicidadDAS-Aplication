@@ -2,9 +2,13 @@ import bcrypt from 'bcrypt';
 import { sendResetPasswordEmail } from '../utils/email.js';
 import dayjs from "dayjs"; // para manejar expiraciones
 import crypto from "crypto";
-import { buscarUsuarioData, correoExiste, creatByAdmin, deleteDataUser, getAllDataUsers, getUsuarioById, hashPassword, obtenerUsuarioActualizado, pedidosUsuarios, resetTokenModel, rolCliente, telefonoExistente, traerDatosActuales, updateDataUser, validarDataCedula, searchUsuariosModel, 
-  getAllUsuariosSimpleModel,
-  searchUsuariosForPedidosModel } from '../models/user.model.js';
+import {
+    buscarUsuarioData, correoExiste, creatByAdmin, deleteDataUser, getAllDataUsers, getUsuarioById, hashPassword, obtenerUsuarioActualizado, pedidosUsuarios, resetTokenModel, rolCliente, telefonoExistente, traerDatosActuales, updateDataUser, validarDataCedula, searchUsuariosModel,
+    getAllUsuariosSimpleModel,
+    searchUsuariosForPedidosModel,
+    getUserSystem,
+    contarAdmins
+} from '../models/user.model.js';
 
 
 // Crear usuario
@@ -23,7 +27,7 @@ export const createUser = async (req, res) => {
     try {
 
         const existente = await correoExiste(CorreoElectronico);
-        
+
         if (existente) {
             return res.status(409).json({ message: 'Usuario ya existe' });
         }
@@ -33,7 +37,7 @@ export const createUser = async (req, res) => {
             const resetToken = crypto.randomBytes(32).toString("hex");
             const resetTokenExpire = dayjs().add(1, "hour").toDate();
 
-            await creatByAdmin({CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, RoleId, resetToken, resetTokenExpire});
+            await creatByAdmin({ CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, RoleId, resetToken, resetTokenExpire });
             // Enviar correo con link al frontend   
             await sendResetPasswordEmail(CorreoElectronico, resetToken);
 
@@ -57,6 +61,7 @@ export const getAllUsers = async (req, res) => {
         res.status(500).json({ message: 'Error al obtener usuarios' });
     }
 };
+
 
 // Obtener usuario por ID // corregi esta funcion porque generaba error 
 export const getUserById = async (req, res) => {
@@ -93,11 +98,11 @@ export const updateUser = async (req, res) => {
             Telefono: req.body.Telefono ?? currentUser.Telefono,
             CorreoElectronico: req.body.CorreoElectronico ?? currentUser.CorreoElectronico,
             Direccion: req.body.Direccion ?? currentUser.Direccion,
-            RoleId: req.body.RoleId ?? currentUser.RoleId 
+            RoleId: req.body.RoleId ?? currentUser.RoleId
         };
 
-        await updateDataUser({id, updatedUser});
-        
+        await updateDataUser({ id, updatedUser });
+
         // Obtener el usuario actualizado con información del rol
         const users = await obtenerUsuarioActualizado(id)
 
@@ -117,38 +122,63 @@ export const updateUser = async (req, res) => {
 // Eliminar usuario
 export const deleteUser = async (req, res) => {
     const { id } = req.params;
-    try {
-        const pedidos = await pedidosUsuarios(id);
 
+    try {
+        const users = await getUserSystem(id);
+
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+
+        const user = users[0];
+
+        // Usuario del sistema
+        if (user.IsSystem) {
+            return res.status(403).json({
+                message: 'Este usuario es crítico del sistema y no puede eliminarse'
+            });
+        }
+
+        // Último administrador
+        if (user.RolNombre === 'Administrador') {
+            const totalAdmins = await contarAdmins();
+
+            if (totalAdmins <= 1) {
+                return res.status(409).json({
+                    message: 'No se puede eliminar el último administrador del sistema'
+                });
+            }
+        }
+
+        // Pedidos asociados
+        const pedidos = await pedidosUsuarios(id);
         if (pedidos.length > 0) {
             return res.status(409).json({
                 message: 'No se puede eliminar el usuario porque tiene pedidos asociados'
             });
         }
 
-        const result = await deleteDataUser(id);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'Usuario no encontrado' });
-        }
+        await deleteDataUser(id);
 
         res.status(200).json({ message: 'Usuario eliminado correctamente' });
+
     } catch (error) {
         console.error('Error al eliminar usuario:', error);
         res.status(500).json({ message: 'Error interno del servidor' });
     }
 };
 
+
 // Validar si correo ya existe
 export const validarCorreo = async (req, res) => {
-  const { correo } = req.query;
-  try {
-    const existe = await correoExiste(correo);
-    res.status(200).json({ exists: existe });
-  } catch (error) {
-    console.error('Error al validar correo:', error);
-    res.status(500).json({ message: 'Error interno del servidor' });
-  }
+    const { correo } = req.query;
+    try {
+        const existe = await correoExiste(correo);
+        res.status(200).json({ exists: existe });
+    } catch (error) {
+        console.error('Error al validar correo:', error);
+        res.status(500).json({ message: 'Error interno del servidor' });
+    }
 };
 
 // Validar si la cedula ya existe
@@ -258,30 +288,30 @@ export const showResetForm = async (req, res) => {
 //
 
 export const searchUsuarios = async (req, res) => {
-  try {
-    const { search = "", page = 1, limit = 10 } = req.query;
-    
-    console.log(` Buscando usuarios: "${search}", página ${page}, límite ${limit}`);
-    
-    const result = await searchUsuariosModel(search, parseInt(page), parseInt(limit));
-    
-    console.log(`✅ Encontrados ${result.total} usuarios`);
-    
-    res.status(200).json({
-      success: true,
-      clientes: result.usuarios,
-      total: result.total,
-      pages: result.pages,
-      currentPage: result.currentPage
-    });
-  } catch (error) {
-    console.error('❌ Error al buscar usuarios:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Error al buscar usuarios',
-      message: error.message 
-    });
-  }
+    try {
+        const { search = "", page = 1, limit = 10 } = req.query;
+
+        console.log(` Buscando usuarios: "${search}", página ${page}, límite ${limit}`);
+
+        const result = await searchUsuariosModel(search, parseInt(page), parseInt(limit));
+
+        console.log(`✅ Encontrados ${result.total} usuarios`);
+
+        res.status(200).json({
+            success: true,
+            clientes: result.usuarios,
+            total: result.total,
+            pages: result.pages,
+            currentPage: result.currentPage
+        });
+    } catch (error) {
+        console.error('❌ Error al buscar usuarios:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error al buscar usuarios',
+            message: error.message
+        });
+    }
 };
 
 /**
@@ -289,47 +319,47 @@ export const searchUsuarios = async (req, res) => {
  * GET /user/all
  */
 export const getAllUsuariosSimple = async (req, res) => {
-  try {
-    const usuarios = await getAllUsuariosSimpleModel();
-    
-    res.status(200).json({
-      success: true,
-      clientes: usuarios  // Asegúrate de que esto sea "clientes" no "usuarios"
-    });
-  } catch (error) {
-    console.error('❌ Error al obtener usuarios:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Error al obtener usuarios',
-      message: error.message 
-    });
-  }
+    try {
+        const usuarios = await getAllUsuariosSimpleModel();
+
+        res.status(200).json({
+            success: true,
+            clientes: usuarios  // Asegúrate de que esto sea "clientes" no "usuarios"
+        });
+    } catch (error) {
+        console.error('❌ Error al obtener usuarios:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error al obtener usuarios',
+            message: error.message
+        });
+    }
 };
 /**
  * Búsqueda rápida para pedidos
  * GET /user/for-pedidos?search=term
  */
 export const searchUsuariosForPedidos = async (req, res) => {
-  try {
-    const { search = "" } = req.query;
-    
-    console.log(`Búsqueda rápida para pedidos: "${search}"`);
-    
-    const usuarios = await searchUsuariosForPedidosModel(search);
-    
-    res.status(200).json({
-      success: true,
-      clientes: usuarios,
-      total: usuarios.length
-    });
-  } catch (error) {
-    console.error('❌ Error en búsqueda rápida:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Error en búsqueda de usuarios',
-      message: error.message 
-    });
-  }
+    try {
+        const { search = "" } = req.query;
+
+        console.log(`Búsqueda rápida para pedidos: "${search}"`);
+
+        const usuarios = await searchUsuariosForPedidosModel(search);
+
+        res.status(200).json({
+            success: true,
+            clientes: usuarios,
+            total: usuarios.length
+        });
+    } catch (error) {
+        console.error('❌ Error en búsqueda rápida:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error en búsqueda de usuarios',
+            message: error.message
+        });
+    }
 };
 
 /**
@@ -337,33 +367,33 @@ export const searchUsuariosForPedidos = async (req, res) => {
  * GET /user/cedula/:cedula
  */
 export const getUsuarioByCedula = async (req, res) => {
-  try {
-    const { cedula } = req.params;
-    
-    const usuario = await getUsuarioById(cedula); // Esta función ya existe en tu modelo
-    
-    if (!usuario) {
-      return res.status(404).json({
-        success: false,
-        error: 'Usuario no encontrado'
-      });
+    try {
+        const { cedula } = req.params;
+
+        const usuario = await getUsuarioById(cedula); // Esta función ya existe en tu modelo
+
+        if (!usuario) {
+            return res.status(404).json({
+                success: false,
+                error: 'Usuario no encontrado'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            cliente: {
+                CedulaId: usuario.CedulaId,
+                NombreCompleto: usuario.NombreCompleto,
+                Telefono: usuario.Telefono,
+                CorreoElectronico: usuario.CorreoElectronico
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error al obtener usuario por cédula:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error al obtener usuario',
+            message: error.message
+        });
     }
-    
-    res.status(200).json({
-      success: true,
-      cliente: {
-        CedulaId: usuario.CedulaId,
-        NombreCompleto: usuario.NombreCompleto,
-        Telefono: usuario.Telefono,
-        CorreoElectronico: usuario.CorreoElectronico
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error al obtener usuario por cédula:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Error al obtener usuario',
-      message: error.message 
-    });
-  }
 };

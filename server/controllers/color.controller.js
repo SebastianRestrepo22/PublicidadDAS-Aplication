@@ -28,20 +28,42 @@ export const getColoresProducto = async (req, res) => {
 
 export const updateColoresProducto = async (req, res) => {
   const { id } = req.params;
-  const { colores } = req.body;
+  const { colores } = req.body; // [{ ColorId, Stock }, ...]
+
+  console.log('DEBUG - Recibiendo colores para producto:', id);
+  console.log('DEBUG - Colores recibidos:', colores);
 
   if (!Array.isArray(colores)) {
     return res.status(400).json({ message: 'colores debe ser un array' });
   }
 
+  // Validar formato
+  const coloresValidados = colores.map((c, index) => {
+    if (!c || typeof c !== 'object') {
+      throw new Error(`Color en posición ${index} no es un objeto válido`);
+    }
+    
+    if (!c.ColorId || typeof c.ColorId !== 'string') {
+      throw new Error(`ColorId en posición ${index} debe ser un string: ${c.ColorId}`);
+    }
+    
+    return {
+      ColorId: c.ColorId,
+      Stock: c.Stock || 0
+    };
+  });
+
   try {
-    await setColoresProducto(id, colores);
-    res.status(200).json({ message: 'Colores actualizados' });
+    await setColoresProducto(id, coloresValidados);
+    res.status(200).json({ 
+      message: 'Colores actualizados correctamente',
+      coloresActualizados: coloresValidados.length
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error interno' });
+    console.error('Error al actualizar colores:', error);
+    res.status(500).json({ 
+      message: 'Error interno',
+      error: error.message
+    });
   }
 };
-
-
-

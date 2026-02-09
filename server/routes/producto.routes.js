@@ -6,9 +6,11 @@ import {
     updateProducto,
     deleteProducto,
     validarNombre,
-    buscarProducto
+    buscarProducto,
+    cambiarEstadoProducto
 } from '../controllers/productos.controller.js';
-import { getColoresProducto, updateColoresProducto  } from '../controllers/color.controller.js';
+// IMPORTANTE: Importa desde color.controller.js, NO desde productos.controller
+import { getColoresProducto, updateColoresProducto } from '../controllers/color.controller.js';
 
 const router = express.Router();
 
@@ -24,11 +26,12 @@ router.post('/', postProducto);
 // Obtener todos los productos
 router.get('/', getAllProducto);
 
-// RELACIÓN PRODUCTO ↔ COLORES
+// Ruta para cambiar estado del producto
+router.put('/:id/estado', cambiarEstadoProducto);
 
-router.get('/:id/colores', getColoresProducto);
-
-router.post('/:id/colores', updateColoresProducto );
+// RELACIÓN PRODUCTO <-> COLORES 
+router.get('/:id/colores', getColoresProducto);  
+router.post('/:id/colores', updateColoresProducto); 
 
 // Obtener producto/servicio por ID
 router.get('/:id', getProductoById);

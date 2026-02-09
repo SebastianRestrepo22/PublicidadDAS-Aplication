@@ -2,39 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useMisPedidos } from '../hooks/useMisPedidos';
 import { Navbar } from '../components/Navbar';
 import axios from 'axios';
+import { useAuth } from '../../../context/AuthContext';
 
 const MisPedidos = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Todos');
-  const [clienteId, setClienteId] = useState(null);
+  const { user: authUser, loading: authLoading } = useAuth();
 
-  useEffect(() => {
-  const usuarioLocal = JSON.parse(localStorage.getItem("usuario"));
-  console.log('Usuario local:', usuarioLocal);
-  
-  if (usuarioLocal?.CedulaId) {
-    console.log('CedulaId:', usuarioLocal.CedulaId);
-    const loadUser = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        console.log('Token:', token);
-        
-        const response = await axios.get(
-          `http://localhost:3000/user/${usuarioLocal.CedulaId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        );
-        console.log('Respuesta usuario:', response.data);
-        setClienteId(String(response.data.CedulaId));
-      } catch (err) {
-        console.error("Error al cargar usuario:", err);
-        console.error("Error details:", err.response?.data);
-      }
-    };
-    loadUser();
-  }
-}, []);
+  const clienteId = authUser?.CedulaId
+    ? String(authUser.CedulaId)
+    : null;
+
   const { pedidos, loading } = useMisPedidos(clienteId);
 
   // Estados válidos según tu backend
@@ -77,14 +55,23 @@ const MisPedidos = () => {
     o.Estado !== 'entregado' && o.Estado !== 'cancelado'
   );
 
-  if (!clienteId) {
+  if (authLoading) {
     return (
-      <div className="w-full p-4 sm:p-6 bg-gray-50">
+      <>
         <Navbar />
-        <div className="text-center mt-20 text-gray-600">
+        <div className="text-center mt-20">Cargando sesión...</div>
+      </>
+    );
+  }
+
+  if (!authUser) {
+    return (
+      <>
+        <Navbar />
+        <div className="text-center mt-20">
           Inicia sesión para ver tus pedidos
         </div>
-      </div>
+      </>
     );
   }
 
@@ -135,11 +122,10 @@ const MisPedidos = () => {
             <button
               key={status}
               onClick={() => setFilterStatus(status)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-full transition ${
-                filterStatus === status
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-              }`}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition ${filterStatus === status
+                ? 'bg-blue-600 text-white'
+                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
             >
               {status === 'Todos' ? 'Todos' : getEstadoLabel(status)} ({count})
             </button>

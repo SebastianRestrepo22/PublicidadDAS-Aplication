@@ -19,13 +19,39 @@ router.post('/register', async (req, res) => {
     try {
         const connection = await connectDB();
 
+        // Objeto para acumular errores
+        const errors = {};
+
         // Verifica si el correo ya existe
         const [existente] = await connection.execute(
             'SELECT * FROM usuarios WHERE CorreoElectronico = ?',
             [CorreoElectronico]
         );
         if (existente.length > 0) {
-            return res.status(409).json({ message: 'Usuario ya existe' });
+            errors.CorreoElectronico = 'Este correo ya está registrado';
+        }
+
+        // Verifica si la cédula ya existe
+        const [cedulaExistente] = await connection.execute(
+            'SELECT * FROM usuarios WHERE CedulaId = ?',
+            [CedulaId]
+        );
+        if (cedulaExistente.length > 0) {
+            errors.CedulaId = 'Esta cédula ya está registrada';
+        }
+
+        // Verifica si el teléfono ya existe
+        const [telefonoExistente] = await connection.execute(
+            'SELECT * FROM usuarios WHERE Telefono = ?',
+            [Telefono]
+        );
+        if (telefonoExistente.length > 0) {
+            errors.Telefono = 'Este teléfono ya está registrado';
+        }
+
+        // Si hay errores, devolverlos
+        if (Object.keys(errors).length > 0) {
+            return res.status(409).json({ errors });
         }
 
         // Busca el rol cliente
@@ -91,7 +117,7 @@ router.post('/login', async (req, res) => {
             `SELECT p.Nombre FROM permisos p
    JOIN rol_permisos rp ON p.PermisoId = rp.PermisoId
    WHERE rp.RoleId = ?`,
-            [user.RoleId]   
+            [user.RoleId]
         );
 
         const permisosArray = permisos.map(p => p.Nombre);
@@ -483,7 +509,5 @@ router.post('/reset-password/:token', async (req, res) => {
         res.status(500).json({ message: 'Error interno del servidor' });
     }
 });
-
-
 
 export default router;

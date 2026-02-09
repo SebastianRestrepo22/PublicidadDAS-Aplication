@@ -80,9 +80,9 @@ export const ServicioDetalle = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (isSubmitting) return;
-    
+
     setIsSubmitting(true);
 
     try {
@@ -137,7 +137,7 @@ export const ServicioDetalle = () => {
       }, 1);
 
       toast.success(`"${servicio.Nombre}" agregado al carrito`);
-      
+
       // Redirigir al carrito de compras
       setTimeout(() => {
         navigate("/carritodecompras");
@@ -182,13 +182,13 @@ export const ServicioDetalle = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-[80px]">
         <button
-          onClick={() => navigate("/servicios")}
+          onClick={() => navigate(-1)}
           className="flex items-center text-blue-600 hover:text-blue-800 mb-6 font-medium"
         >
           <ArrowLeft className="h-6 w-6 mr-2" />
-          Volver a Servicios
+          Volver a servicios
         </button>
 
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
@@ -383,11 +383,10 @@ export const ServicioDetalle = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting || !descripcion.trim()}
-                  className={`w-full mt-6 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl ${
-                    isSubmitting || !descripcion.trim()
-                      ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed" 
+                  className={`w-full mt-6 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl ${isSubmitting || !descripcion.trim()
+                      ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed"
                       : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                  }`}
+                    }`}
                 >
                   {isSubmitting ? (
                     <>

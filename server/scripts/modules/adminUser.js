@@ -32,8 +32,8 @@ export const initializeAdminUser = async (connection, roles) => {
         // Crear usuario administrador
         await connection.execute(
             `INSERT INTO usuarios 
-             (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+   (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId, IsSystem)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
             [
                 adminConfig.cedula,
                 tipoDocumentoId,
@@ -46,6 +46,7 @@ export const initializeAdminUser = async (connection, roles) => {
             ]
         );
 
+
         console.log('    Usuario administrador creado exitosamente.');
         console.log('   ============================================');
         console.log('    Credenciales de acceso:');
@@ -53,7 +54,7 @@ export const initializeAdminUser = async (connection, roles) => {
         console.log(`    Contraseña: ${adminConfig.password}`);
         console.log('   ============================================');
         console.log('    IMPORTANTE: Cambia la contraseña después del primer inicio de sesión.');
-        
+
     } else {
         console.log('    Usuario administrador ya existe en el sistema.');
         console.log(`    Total de administradores: ${admins.length}`);
