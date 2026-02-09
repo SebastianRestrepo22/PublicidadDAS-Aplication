@@ -3,7 +3,7 @@ import {
   Plus, Eye, Trash2, ArrowLeft, Search, ChevronRight, ChevronLeft,
   User, Calendar, DollarSign, Package, Palette, Check, X, CreditCard,
   Truck, FileText, Image, File, Upload, UserPlus, Store, UserCheck,
-  Users, AlertCircle, Edit, ExternalLink
+  Users, AlertCircle, Edit, ExternalLink, Link
 } from "lucide-react";
 import {
   getAllPedidosClientes,
@@ -43,11 +43,11 @@ const formatDateForInput = (dateString) => {
   return `${year}-${month}-${day}`;
 };
 
-// Función para acortar IDs
+// Función para acortar IDs - AHORA 3 CARACTERES
 const shortenId = (id) => {
   if (!id) return "—";
   const strId = String(id);
-  return strId.length > 6 ? strId.slice(-6) : strId;
+  return strId.length > 3 ? strId.slice(-3) : strId.padStart(3, '0');
 };
 
 // Formatear precio
@@ -61,6 +61,12 @@ const getColorName = (colorId, colores) => {
   if (!colorId || !colores || !Array.isArray(colores)) return "—";
   const color = colores.find(c => c.ColorId === colorId);
   return color ? color.Nombre : "—";
+};
+
+// Función para obtener color por ID
+const getColorById = (colorId, colores) => {
+  if (!colorId || !colores || !Array.isArray(colores)) return null;
+  return colores.find(c => c.ColorId === colorId);
 };
 
 // Función para obtener nombre de producto/servicio
@@ -90,7 +96,7 @@ const calcularTotalDetalles = (detalles) => {
 
 // Validación de teléfono - 10 dígitos sin guiones
 const validarTelefono = (telefono) => {
-  if (!telefono) return false;
+  if (!telefono) return true; // Opcional
   const regex = /^\d{10}$/;
   return regex.test(telefono);
 };
@@ -395,6 +401,7 @@ export const PedidosClientes = () => {
 
   // Funciones de navegación
   const goToList = () => setViewMode("list");
+
   const goToCreate = () => {
     resetForm();
     setViewMode("create");
@@ -725,44 +732,53 @@ export const PedidosClientes = () => {
     }
   };
 
-  // Validaciones
-  const validarFormulario = (form, detalles) => {
+  // Validaciones MEJORADAS - AHORA PERMITE EDICIÓN PARCIAL Y CORRIGE VALIDACIÓN DE WALK-IN
+  const validarFormulario = (form, detalles, mode = "create") => {
     const errores = [];
-    if (tipoCliente === 'registrado') {
-      if (!form.ClienteId || !form.ClienteId.trim()) {
-        errores.push("La cédula del cliente es obligatoria para clientes registrados.");
-      }
-    } else if (tipoCliente === 'walkin') {
-      if (!clienteWalkin.Nombre.trim()) {
-        errores.push("El nombre del cliente walk-in es obligatorio.");
-      }
-      if (clienteWalkin.Telefono && !validarTelefono(clienteWalkin.Telefono)) {
-        errores.push("El teléfono debe tener 10 dígitos.");
+
+    // Solo validar cliente si es creación o si se está cambiando el tipo
+    if (mode === "create") {
+      if (tipoCliente === 'registrado') {
+        if (!form.ClienteId || !form.ClienteId.trim()) {
+          errores.push("La cédula del cliente es obligatoria para clientes registrados.");
+        }
+      } else if (tipoCliente === 'walkin') {
+        if (!clienteWalkin.Nombre.trim()) {
+          errores.push("El nombre del cliente walk-in es obligatorio.");
+        }
+        if (clienteWalkin.Telefono && !validarTelefono(clienteWalkin.Telefono)) {
+          errores.push("El teléfono debe tener 10 dígitos.");
+        }
       }
     }
+
     if (!form.FechaRegistro) {
       errores.push("La fecha de registro es obligatoria.");
     }
+
     if (form.MetodoPago === "contra_entrega") {
-      if (!form.NombreRecibe.trim()) {
+      if (!form.NombreRecibe?.trim()) {
         errores.push("El nombre de quien recibe es obligatorio para contra entrega.");
       }
-      if (!form.TelefonoEntrega.trim()) {
+      if (!form.TelefonoEntrega?.trim()) {
         errores.push("El teléfono de entrega es obligatorio para contra entrega.");
       }
-      if (!validarTelefono(form.TelefonoEntrega)) {
+      if (form.TelefonoEntrega && !validarTelefono(form.TelefonoEntrega)) {
         errores.push("El teléfono de entrega debe tener 10 dígitos.");
       }
-      if (!form.DireccionEntrega.trim()) {
+      if (!form.DireccionEntrega?.trim()) {
         errores.push("La dirección de entrega es obligatoria para contra entrega.");
       }
     }
-    if (form.MetodoPago === "transferencia" && !voucherFile && !form.Voucher) {
+
+    if (form.MetodoPago === "transferencia" && mode === "create" && !voucherFile && !form.Voucher) {
       errores.push("Debe adjuntar un comprobante de pago para transferencia.");
     }
+
     if (!detalles || detalles.length === 0) {
       errores.push("Debe agregar al menos un producto/servicio.");
     }
+
     for (let i = 0; i < detalles.length; i++) {
       const d = detalles[i];
       if (!d.ProductoId && !d.ServicioId) {
@@ -775,20 +791,23 @@ export const PedidosClientes = () => {
         errores.push(`Artículo ${i + 1}: el precio debe ser válido.`);
       }
     }
+
     return errores;
   };
 
-  // Función para crear pedido - VOUCHER SE SUBE JUNTO CON EL PEDIDO
+  // Función para crear pedido - VOUCHER SE SUBE JUNTO CON EL PEDIDO - CORREGIDO
   const handleCreate = async () => {
-    const erroresValidacion = validarFormulario(formPedido, detallesPedido);
+    const erroresValidacion = validarFormulario(formPedido, detallesPedido, "create");
     if (erroresValidacion.length > 0) {
       setErrores(erroresValidacion);
       toast.error("Por favor corrija los errores en el formulario");
       return;
     }
+
     try {
       setUploading(true);
       console.log('🔍 DEPURACIÓN: Creando pedido...');
+
       const detallesLimpios = detallesPedido.map(d => ({
         ProductoId: d.ProductoId?.trim() || null,
         ServicioId: d.ServicioId?.trim() || null,
@@ -802,36 +821,44 @@ export const PedidosClientes = () => {
 
       // Crear FormData para enviar archivo junto con el pedido
       const formData = new FormData();
-      formData.append('pedido', JSON.stringify({
-        ClienteId: tipoCliente === 'registrado' ? formPedido.ClienteId.trim() : null,
+      
+      // ✅ CORREGIDO: Incluir todos los campos necesarios
+      const pedidoData = {
+        ClienteId: tipoCliente === 'registrado' ? (formPedido.ClienteId?.trim() || null) : null,
         FechaRegistro: formPedido.FechaRegistro,
         Total: Number(formPedido.Total) || 0,
         Estado: formPedido.Estado,
         MetodoPago: formPedido.MetodoPago,
-        NombreRecibe: formPedido.MetodoPago === "contra_entrega" ? formPedido.NombreRecibe : null,
-        TelefonoEntrega: formPedido.MetodoPago === "contra_entrega" ? formPedido.TelefonoEntrega : null,
-        DireccionEntrega: formPedido.MetodoPago === "contra_entrega" ? formPedido.DireccionEntrega : null,
+        NombreRecibe: formPedido.MetodoPago === "contra_entrega" ? (formPedido.NombreRecibe || null) : null,
+        TelefonoEntrega: formPedido.MetodoPago === "contra_entrega" ? (formPedido.TelefonoEntrega || null) : null,
+        DireccionEntrega: formPedido.MetodoPago === "contra_entrega" ? (formPedido.DireccionEntrega || null) : null,
         Voucher: null,
         TipoCliente: tipoCliente,
-        ClienteNombre: tipoCliente === 'walkin' ? clienteWalkin.Nombre : null,
-        ClienteTelefono: tipoCliente === 'walkin' ? clienteWalkin.Telefono : null,
-        ClienteCorreo: tipoCliente === 'walkin' ? clienteWalkin.Correo : null,
+        ClienteNombre: tipoCliente === 'walkin' ? (clienteWalkin.Nombre || null) : null,
+        ClienteTelefono: tipoCliente === 'walkin' ? (clienteWalkin.Telefono || null) : null,
+        ClienteCorreo: tipoCliente === 'walkin' ? (clienteWalkin.Correo || null) : null,
         detalle: detallesLimpios
-      }));
+      };
+
+      formData.append('pedido', JSON.stringify(pedidoData));
 
       if (formPedido.MetodoPago === "transferencia" && voucherFile) {
         formData.append('voucher', voucherFile);
       }
 
-      console.log('📤 Enviando pedido con voucher:', voucherFile ? voucherFile.name : 'sin voucher');
+      console.log('📤 Enviando pedido con datos:', pedidoData);
+      console.log('📤 Voucher incluido:', voucherFile ? voucherFile.name : 'no');
+
       const response = await fetch('http://localhost:3000/api/pedidos-clientes', {
         method: 'POST',
         body: formData,
       });
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`);
       }
+
       const result = await response.json();
       console.log('✅ Pedido creado:', result);
       toast.success("Pedido creado exitosamente");
@@ -842,25 +869,29 @@ export const PedidosClientes = () => {
       const errorMessage = err.response?.data?.error ||
         err.response?.data?.details ||
         err.message ||
-        "Error al crear el pedido";
+        "Error al crear el pedido. Verifique la consola para más detalles.";
       toast.error(`Error: ${errorMessage}`);
     } finally {
       setUploading(false);
     }
   };
 
-  // Función para editar pedido - VOUCHER SE SUBE JUNTO CON EL PEDIDO
+  // Función para editar pedido - CORREGIDO
   const handleEdit = async () => {
     if (!selectedPedido) return;
-    const erroresValidacion = validarFormulario(selectedPedido, selectedPedido.detalle);
+    
+    // ✅ VALIDACIÓN MEJORADA: No obliga a editar todos los campos
+    const erroresValidacion = validarFormulario(selectedPedido, selectedPedido.detalle, "edit");
     if (erroresValidacion.length > 0) {
       setErrores(erroresValidacion);
       toast.error("Por favor corrija los errores en el formulario");
       return;
     }
+
     try {
       setUploading(true);
       console.log('🔍 DEPURACIÓN: Editando pedido...');
+
       const detallesLimpios = selectedPedido.detalle.map(d => ({
         ProductoId: d.ProductoId?.trim() || null,
         ServicioId: d.ServicioId?.trim() || null,
@@ -873,7 +904,9 @@ export const PedidosClientes = () => {
       }));
 
       const formData = new FormData();
-      formData.append('pedido', JSON.stringify({
+      
+      // ✅ CORREGIDO: Mantener el tipo de cliente original
+      const pedidoData = {
         ClienteId: selectedPedido.ClienteId?.trim() || null,
         FechaRegistro: selectedPedido.FechaRegistro,
         Total: Number(selectedPedido.Total) || 0,
@@ -884,22 +917,30 @@ export const PedidosClientes = () => {
         DireccionEntrega: selectedPedido.MetodoPago === "contra_entrega" ? selectedPedido.DireccionEntrega : null,
         Voucher: selectedPedido.Voucher || null,
         TipoCliente: selectedPedido.TipoCliente || 'registrado',
+        ClienteNombre: selectedPedido.ClienteNombre || null,
+        ClienteTelefono: selectedPedido.ClienteTelefono || null,
+        ClienteCorreo: selectedPedido.ClienteCorreo || null,
         detalle: detallesLimpios,
-      }));
+      };
+
+      formData.append('pedido', JSON.stringify(pedidoData));
 
       if (selectedPedido.MetodoPago === "transferencia" && voucherFile) {
         formData.append('voucher', voucherFile);
       }
 
-      console.log('📤 Enviando pedido editado con voucher:', voucherFile ? voucherFile.name : 'sin voucher');
-      const response = await fetch(`http://localhost:3000/api/pedidos/${selectedPedido.PedidoClienteId}`, {
+      console.log('📤 Enviando pedido editado con datos:', pedidoData);
+
+      const response = await fetch(`http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`, {
         method: 'PUT',
         body: formData,
       });
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`);
       }
+
       const result = await response.json();
       console.log('✅ Pedido actualizado:', result);
       toast.success("Pedido actualizado exitosamente");
@@ -934,7 +975,7 @@ export const PedidosClientes = () => {
   const handleUpdateEstado = async (estado) => {
     if (!selectedPedido) return;
     try {
-      const response = await fetch(`http://localhost:3000/api/pedidos/${selectedPedido.PedidoClienteId}/estado`, {
+      const response = await fetch(`http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -942,14 +983,15 @@ export const PedidosClientes = () => {
         body: JSON.stringify({ Estado: estado }),
       });
       if (!response.ok) {
-        throw new Error('Error al actualizar el estado');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al actualizar el estado');
       }
       toast.success("Estado actualizado correctamente");
       goToList();
       fetchPedidos();
     } catch (err) {
       console.error("Error al actualizar estado:", err);
-      toast.error("No se pudo actualizar el estado");
+      toast.error(err.message || "No se pudo actualizar el estado");
     }
   };
 
@@ -959,10 +1001,9 @@ export const PedidosClientes = () => {
       toast.error("No hay comprobante disponible");
       return;
     }
-    const urlCompleta = voucherUrl.startsWith('http') 
-      ? voucherUrl 
+    const urlCompleta = voucherUrl.startsWith('http')
+      ? voucherUrl
       : `http://localhost:3000${voucherUrl}`;
-    
     window.open(urlCompleta, '_blank', 'noopener,noreferrer');
   };
 
@@ -978,7 +1019,7 @@ export const PedidosClientes = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Pedidos</h1>
-        
+
         {/* LISTA DE PEDIDOS */}
         {viewMode === "list" && (
           <>
@@ -1014,6 +1055,7 @@ export const PedidosClientes = () => {
                 </select>
               </div>
             </div>
+
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
               <table className="min-w-full">
                 <thead className="bg-slate-800">
@@ -1031,7 +1073,7 @@ export const PedidosClientes = () => {
                   {Array.isArray(paginatedData) && paginatedData.length > 0 ? (
                     paginatedData.map((pedido) => (
                       <tr key={pedido.PedidoClienteId} className="hover:bg-slate-50">
-                        <td className="px-6 py-4 text-sm text-slate-700">{shortenId(pedido.PedidoClienteId)}</td>
+                        <td className="px-6 py-4 text-sm text-slate-700 font-mono font-bold">{shortenId(pedido.PedidoClienteId)}</td>
                         <td className="px-6 py-4 text-sm font-medium">
                           {pedido.ClienteNombre || pedido.NombreCliente ||
                           (pedido.TipoCliente === 'walkin' ? 'Cliente Walk-in' : '—')}
@@ -1082,6 +1124,7 @@ export const PedidosClientes = () => {
                   )}
                 </tbody>
               </table>
+
               {paginatedData.length > 0 && (
                 <div className="px-6 py-4 border-t">
                   <Pagination
@@ -1098,8 +1141,9 @@ export const PedidosClientes = () => {
           </>
         )}
 
-        {/* CREAR PEDIDO */}
+        {/* CREAR PEDIDO - SIN CAMBIOS VISUALES NECESARIOS */}
         {viewMode === "create" && (
+          // ... (código existente sin cambios)
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
               <button
@@ -1110,6 +1154,7 @@ export const PedidosClientes = () => {
               </button>
               <h3 className="text-lg font-bold">Nuevo Pedido</h3>
             </div>
+
             {errores.length > 0 && (
               <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
                 <ul className="list-disc pl-5">
@@ -1117,12 +1162,14 @@ export const PedidosClientes = () => {
                 </ul>
               </div>
             )}
+
             <div className="space-y-8">
               {/* INFORMACIÓN DEL CLIENTE */}
               <div className="bg-slate-50 p-6 rounded-xl">
                 <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
                   <User size={20} /> Información del Cliente
                 </h4>
+
                 {/* Selector de tipo de cliente */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-slate-700 mb-3">
@@ -1165,6 +1212,7 @@ export const PedidosClientes = () => {
                     </button>
                   </div>
                 </div>
+
                 {/* Formulario según tipo de cliente */}
                 {tipoCliente === 'registrado' ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1480,7 +1528,7 @@ export const PedidosClientes = () => {
                             <ChevronRight size={16} className="text-slate-400" />
                           </button>
                         </div>
-                        {/* Selección de Color - SOLO NOMBRE */}
+                        {/* Selección de Color - CON PREVISUALIZACIÓN VISUAL */}
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-slate-700 flex items-center gap-2">
                             <Palette size={16} /> Color
@@ -1489,7 +1537,17 @@ export const PedidosClientes = () => {
                             onClick={() => goToSelectColor("create", index)}
                             className="w-full px-4 py-3 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-left flex items-center justify-between"
                           >
-                            <span>{d.ColorId ? getColorName(d.ColorId, colores) : "Seleccionar color"}</span>
+                            <div className="flex items-center gap-2">
+                              {d.ColorId && (
+                                <div 
+                                  className="w-6 h-6 rounded-full border border-slate-300"
+                                  style={{ 
+                                    backgroundColor: getColorById(d.ColorId, colores)?.CodigoHex || '#e5e7eb'
+                                  }}
+                                ></div>
+                              )}
+                              <span>{d.ColorId ? getColorName(d.ColorId, colores) : "Seleccionar color"}</span>
+                            </div>
                             <ChevronRight size={16} className="text-slate-400" />
                           </button>
                         </div>
@@ -1548,7 +1606,7 @@ export const PedidosClientes = () => {
                 </div>
               </div>
 
-              {/* RESUMEN FINAL - MOVIDO AL FINAL */}
+              {/* RESUMEN FINAL */}
               <div className="bg-blue-50 p-6 rounded-xl border border-blue-200" ref={resumenRef}>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="md:col-span-2">
@@ -1642,7 +1700,7 @@ export const PedidosClientes = () => {
           </div>
         )}
 
-        {/* VER DETALLES DEL PEDIDO */}
+        {/* VER DETALLES DEL PEDIDO - CON URL DEL COMPROBANTE */}
         {viewMode === "view" && selectedPedido && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center justify-between mb-6">
@@ -1659,11 +1717,11 @@ export const PedidosClientes = () => {
                 </div>
               </div>
               <div className="flex gap-2">
-                {/* Botón de editar solo para pedidos walk-in */}
+                {/* Botón de editar en AZUL MEDIO */}
                 {selectedPedido.TipoCliente === 'walkin' && (
                   <button
                     onClick={() => goToEdit(selectedPedido)}
-                    className="bg-yellow-600 text-white px-5 py-2 rounded-lg hover:bg-yellow-700 flex items-center gap-2"
+                    className="bg-blue-500 text-white px-5 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2"
                   >
                     <Edit size={18} /> Editar Pedido
                   </button>
@@ -1676,6 +1734,7 @@ export const PedidosClientes = () => {
                 </button>
               </div>
             </div>
+
             <div className="space-y-8">
               {/* INFORMACIÓN GENERAL */}
               <div className="bg-slate-50 p-6 rounded-xl">
@@ -1683,7 +1742,7 @@ export const PedidosClientes = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div className="bg-white p-4 rounded-lg border border-slate-200">
                     <div className="text-sm text-slate-600 mb-1">Cliente</div>
-                    <div className="font-medium">{selectedPedido.NombreCliente || "Cliente Walk-in"}</div>
+                    <div className="font-medium">{selectedPedido.NombreCliente || selectedPedido.ClienteNombre || "Cliente Walk-in"}</div>
                     {selectedPedido.ClienteId && (
                       <div className="text-xs text-slate-500 mt-1">Cédula: {selectedPedido.ClienteId}</div>
                     )}
@@ -1733,7 +1792,7 @@ export const PedidosClientes = () => {
                 </div>
               )}
 
-              {/* COMPROBANTE */}
+              {/* COMPROBANTE - CON URL VISIBLE */}
               {selectedPedido.MetodoPago === "transferencia" && selectedPedido.Voucher && (
                 <div className="bg-slate-50 p-6 rounded-xl">
                   <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
@@ -1744,7 +1803,20 @@ export const PedidosClientes = () => {
                       <div className="flex items-center gap-3">
                         <File className="text-red-500" size={32} />
                         <div>
-                          <div className="font-medium">Comprobante PDF</div>
+                          <div className="font-medium mb-2">Comprobante PDF</div>
+                          <div className="text-xs text-slate-600 mb-2 flex items-center gap-1">
+                            <Link size={14} />
+                            <a
+                              href={selectedPedido.Voucher.startsWith('http')
+                                ? selectedPedido.Voucher
+                                : `http://localhost:3000${selectedPedido.Voucher}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 break-all"
+                            >
+                              {selectedPedido.Voucher}
+                            </a>
+                          </div>
                           <button
                             onClick={() => abrirComprobante(selectedPedido.Voucher)}
                             className="text-blue-600 hover:text-blue-800 text-sm mt-2 inline-flex items-center gap-1"
@@ -1757,7 +1829,7 @@ export const PedidosClientes = () => {
                     ) : (
                       <div>
                         <div className="font-medium mb-2">Imagen del comprobante</div>
-                        <div className="relative inline-block">
+                        <div className="relative inline-block mb-3">
                           <img
                             src={selectedPedido.Voucher.startsWith('http')
                               ? selectedPedido.Voucher
@@ -1770,12 +1842,29 @@ export const PedidosClientes = () => {
                               e.target.src = '/placeholder-image.png';
                             }}
                           />
-                          <div className="absolute top-2 right-2 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors cursor-pointer" title="Abrir en nueva pestaña">
-                            <ExternalLink size={16} onClick={(e) => {
+                          <div 
+                            className="absolute top-2 right-2 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors cursor-pointer" 
+                            title="Abrir en nueva pestaña"
+                            onClick={(e) => {
                               e.stopPropagation();
                               abrirComprobante(selectedPedido.Voucher);
-                            }} />
+                            }}
+                          >
+                            <ExternalLink size={16} />
                           </div>
+                        </div>
+                        <div className="text-xs text-slate-600 mb-2 flex items-center gap-1">
+                          <Link size={14} />
+                          <a
+                            href={selectedPedido.Voucher.startsWith('http')
+                              ? selectedPedido.Voucher
+                              : `http://localhost:3000${selectedPedido.Voucher}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 break-all"
+                          >
+                            {selectedPedido.Voucher}
+                          </a>
                         </div>
                         <button
                           onClick={() => abrirComprobante(selectedPedido.Voucher)}
@@ -1815,7 +1904,15 @@ export const PedidosClientes = () => {
                         </div>
                         <div>
                           <div className="text-sm text-slate-600 mb-1">Color</div>
-                          <div className="font-medium">
+                          <div className="font-medium flex items-center gap-2">
+                            {d.ColorId && (
+                              <div 
+                                className="w-5 h-5 rounded-full border border-slate-300"
+                                style={{ 
+                                  backgroundColor: getColorById(d.ColorId, colores)?.CodigoHex || '#e5e7eb'
+                                }}
+                              ></div>
+                            )}
                             {d.ColorNombre || getColorName(d.ColorId, colores) || "—"}
                           </div>
                         </div>
@@ -1830,9 +1927,9 @@ export const PedidosClientes = () => {
                               href={d.UrlImagen}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 text-sm"
+                              className="text-blue-600 hover:text-blue-800 text-sm break-all"
                             >
-                              Ver imagen
+                              {d.UrlImagen}
                             </a>
                           ) : (
                             <div className="text-slate-400 text-sm">No disponible</div>
@@ -1883,7 +1980,7 @@ export const PedidosClientes = () => {
                   </div>
                   <div>
                     <h5 className="text-sm font-medium text-slate-600 mb-1">ID del Pedido</h5>
-                    <p className="text-slate-700">{selectedPedido.PedidoClienteId}</p>
+                    <p className="text-slate-700 font-mono font-bold">{selectedPedido.PedidoClienteId}</p>
                   </div>
                   <div>
                     <h5 className="text-sm font-medium text-slate-600 mb-1">ID del Cliente</h5>
@@ -1892,11 +1989,10 @@ export const PedidosClientes = () => {
                 </div>
               </div>
 
-              {/* SECCIÓN DE ACTUALIZACIÓN DE ESTADO — PARA TODOS LOS TIPOS DE CLIENTE */}
+              {/* SECCIÓN DE ACTUALIZACIÓN DE ESTADO */}
               <div className="bg-slate-50 p-6 rounded-xl">
                 <h4 className="text-lg font-semibold mb-4 text-slate-700">Actualizar Estado del Pedido</h4>
                 <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
-                  {/* Selector de estado */}
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-medium text-slate-700 mb-2">Estado *</label>
                     <select
@@ -1909,14 +2005,12 @@ export const PedidosClientes = () => {
                       <option value="cancelado">Cancelado</option>
                     </select>
                   </div>
-                  {/* Botón Guardar */}
                   <button
                     onClick={() => handleUpdateEstado(selectedPedido.Estado)}
                     className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 whitespace-nowrap"
                   >
                     <Check size={18} /> Guardar Estado
                   </button>
-                  {/* Botón Cerrar */}
                   <button
                     onClick={goToList}
                     className="bg-slate-200 text-slate-700 px-6 py-3 rounded-lg hover:bg-slate-300 font-medium whitespace-nowrap"
@@ -1929,7 +2023,7 @@ export const PedidosClientes = () => {
           </div>
         )}
 
-        {/* EDITAR PEDIDO */}
+        {/* EDITAR PEDIDO - BOTÓN AZUL Y VALIDACIÓN MEJORADA */}
         {viewMode === "edit" && selectedPedido && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
@@ -1941,6 +2035,7 @@ export const PedidosClientes = () => {
               </button>
               <h3 className="text-lg font-bold">Editar Pedido #{shortenId(selectedPedido.PedidoClienteId)}</h3>
             </div>
+
             {errores.length > 0 && (
               <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
                 <ul className="list-disc pl-5">
@@ -1948,6 +2043,7 @@ export const PedidosClientes = () => {
                 </ul>
               </div>
             )}
+
             <div className="space-y-8">
               {/* FECHA Y TOTAL */}
               <div className="bg-slate-50 p-6 rounded-xl">
@@ -2149,7 +2245,7 @@ export const PedidosClientes = () => {
                             <ChevronRight size={16} className="text-slate-400" />
                           </button>
                         </div>
-                        {/* Selección de Color - SOLO NOMBRE */}
+                        {/* Selección de Color - CON PREVISUALIZACIÓN VISUAL */}
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-slate-700 flex items-center gap-2">
                             <Palette size={16} /> Color
@@ -2158,7 +2254,17 @@ export const PedidosClientes = () => {
                             onClick={() => goToSelectColor("edit", index)}
                             className="w-full px-4 py-3 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-left flex items-center justify-between"
                           >
-                            <span>{d.ColorId ? getColorName(d.ColorId, colores) : "Seleccionar color"}</span>
+                            <div className="flex items-center gap-2">
+                              {d.ColorId && (
+                                <div 
+                                  className="w-6 h-6 rounded-full border border-slate-300"
+                                  style={{ 
+                                    backgroundColor: getColorById(d.ColorId, colores)?.CodigoHex || '#e5e7eb'
+                                  }}
+                                ></div>
+                              )}
+                              <span>{d.ColorId ? getColorName(d.ColorId, colores) : "Seleccionar color"}</span>
+                            </div>
                             <ChevronRight size={16} className="text-slate-400" />
                           </button>
                         </div>
@@ -2244,7 +2350,7 @@ export const PedidosClientes = () => {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-slate-600">Cliente:</span>
-                        <span className="font-medium">{selectedPedido.NombreCliente || "Sin seleccionar"}</span>
+                        <span className="font-medium">{selectedPedido.NombreCliente || selectedPedido.ClienteNombre || "Sin seleccionar"}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">Método de pago:</span>
@@ -2314,8 +2420,9 @@ export const PedidosClientes = () => {
           </div>
         )}
 
-        {/* SELECCIONAR CLIENTE (RUTA INTERNA) */}
+        {/* SELECCIONAR CLIENTE, PRODUCTO, COLOR - SIN CAMBIOS NECESARIOS */}
         {viewMode === "select-cliente" && (
+          // ... código existente
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
               <button
@@ -2329,7 +2436,6 @@ export const PedidosClientes = () => {
                 <p className="text-slate-600 text-sm">Busque y seleccione un cliente del sistema</p>
               </div>
             </div>
-            {/* BARRA DE BÚSQUEDA */}
             <div className="mb-6">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -2348,7 +2454,6 @@ export const PedidosClientes = () => {
                 Mostrando {clientesPaginados.length} de {totalClientes} clientes
               </div>
             </div>
-            {/* LISTA DE CLIENTES */}
             {loadingClientes ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -2395,7 +2500,6 @@ export const PedidosClientes = () => {
                 </p>
               </div>
             )}
-            {/* PAGINACIÓN */}
             {totalPagesClientes > 1 && (
               <div className="mt-6">
                 <Pagination
@@ -2411,8 +2515,8 @@ export const PedidosClientes = () => {
           </div>
         )}
 
-        {/* SELECCIONAR PRODUCTO/SERVICIO */}
         {viewMode === "select-producto" && (
+          // ... código existente
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
               <button
@@ -2426,7 +2530,6 @@ export const PedidosClientes = () => {
                 <p className="text-slate-600 text-sm">Busque y seleccione un producto o servicio</p>
               </div>
             </div>
-            {/* BARRA DE BÚSQUEDA Y FILTROS */}
             <div className="mb-6 space-y-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -2483,7 +2586,6 @@ export const PedidosClientes = () => {
                 </button>
               </div>
             </div>
-            {/* LISTA DE PRODUCTOS/SERVICIOS */}
             {loadingProductos ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -2543,7 +2645,6 @@ export const PedidosClientes = () => {
                 </p>
               </div>
             )}
-            {/* PAGINACIÓN */}
             {totalPagesProductos > 1 && (
               <div className="mt-6">
                 <Pagination
@@ -2559,8 +2660,8 @@ export const PedidosClientes = () => {
           </div>
         )}
 
-        {/* SELECCIONAR COLOR */}
         {viewMode === "select-color" && (
+          // ... código existente
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
               <button
@@ -2574,7 +2675,6 @@ export const PedidosClientes = () => {
                 <p className="text-slate-600 text-sm">Busque y seleccione un color disponible</p>
               </div>
             </div>
-            {/* BARRA DE BÚSQUEDA */}
             <div className="mb-6">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -2590,7 +2690,6 @@ export const PedidosClientes = () => {
                 />
               </div>
             </div>
-            {/* LISTA DE COLORES - SOLO NOMBRE */}
             {loadingColores ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -2630,7 +2729,6 @@ export const PedidosClientes = () => {
                 </p>
               </div>
             )}
-            {/* PAGINACIÓN */}
             {totalPagesColores > 1 && (
               <div className="mt-6">
                 <Pagination
@@ -2646,6 +2744,7 @@ export const PedidosClientes = () => {
           </div>
         )}
       </div>
+
       <ToastContainer
         position="top-right"
         autoClose={3000}

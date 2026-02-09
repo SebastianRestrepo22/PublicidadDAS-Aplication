@@ -18,7 +18,7 @@
     "dayjs": "^1.11.19",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "framer-motion": "^12.23.26",
+    "framer-motion": "^12.33.0",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.542.0",
