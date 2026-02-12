@@ -44,7 +44,7 @@ export const getDataProductoById = async (ProductoId) => {
 };
 
 // Obtener todos los productos - Optimizada para el nuevo esquema
-export const getDataAllProductos = async () => {
+export const getDataAllProductos = async (soloActivos = false) => {
   const [rows] = await dbPool.query(`
     SELECT
       p.ProductoId,
@@ -54,7 +54,7 @@ export const getDataAllProductos = async () => {
       p.Precio,
       p.Descuento,
       p.CategoriaId,
-      p.UsaColores,
+      p.UsaColores,  -- ← Esto es un número 0 o 1
       p.Estado,
       p.Stock AS StockGeneral,
       c.ColorId,
@@ -65,7 +65,7 @@ export const getDataAllProductos = async () => {
     LEFT JOIN ProductoColores pc ON pc.ProductoId = p.ProductoId
     LEFT JOIN Colores c ON c.ColorId = pc.ColorId
     LEFT JOIN ProductoColores_Stock pcs ON pcs.ProductoId = p.ProductoId AND pcs.ColorId = c.ColorId
-    WHERE p.Estado = 'Activo'  -- Filtro opcional
+    ${soloActivos ? "WHERE p.Estado = 'Activo'" : ""}
     ORDER BY p.Nombre
   `);
   return rows;
@@ -84,6 +84,11 @@ export const updateDataProducto = async ({
   Stock = null,
   Estado  
 }) => {
+
+    console.log('💾 MODELO - updateDataProducto:');
+  console.log('ProductoId:', ProductoId);
+  console.log('UsaColores:', UsaColores, 'Tipo:', typeof UsaColores);
+  console.log('Stock:', Stock, 'Tipo:', typeof Stock);
   const campos = [];
   const valores = [];
 
@@ -133,7 +138,15 @@ export const updateDataProducto = async ({
 
   const query = `UPDATE Productos SET ${campos.join(', ')} WHERE ProductoId = ?`;
   
+  console.log('📝 Query:', query);
+  console.log('📊 Valores:', valores);
+
+
   const [rows] = await dbPool.query(query, valores);
+
+   console.log('✅ Filas afectadas:', rows.affectedRows);
+  console.log('========================================');
+  
   return rows.affectedRows;
 };
 
@@ -146,33 +159,80 @@ export const findDuplicateName = async ({ ProductoId, Nombre }) => {
 };
 
 // Eliminar producto
-// Eliminar producto (solo si está inactivo y sin relaciones)
 export const deleteDataProducto = async (ProductoId) => {
-  // Primero verificar que el producto esté inactivo
-  const [producto] = await dbPool.query(
-    `SELECT Estado FROM Productos WHERE ProductoId = ?`,
-    [ProductoId]
-  );
+  const connection = await dbPool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
 
-  if (producto.length === 0) {
-    throw new Error('Producto no encontrado');
+    // Primero verificar que el producto esté inactivo
+    const [producto] = await connection.query(
+      `SELECT Estado FROM Productos WHERE ProductoId = ?`,
+      [ProductoId]
+    );
+
+    if (producto.length === 0) {
+      throw new Error('Producto no encontrado');
+    }
+
+    if (producto[0].Estado !== 'Inactivo') {
+      throw new Error('Solo se pueden eliminar productos inactivos');
+    }
+
+    // Verificar que no tenga colores asociados
+    const [colores] = await connection.query(
+      `SELECT COUNT(*) as count FROM ProductoColores WHERE ProductoId = ?`,
+      [ProductoId]
+    );
+
+    if (colores[0].count > 0) {
+      // EN LUGAR DE LANZAR ERROR, ELIMINAR PRIMERO LAS RELACIONES
+      await connection.query(
+        `DELETE FROM ProductoColores_Stock WHERE ProductoId = ?`,
+        [ProductoId]
+      );
+      
+      await connection.query(
+        `DELETE FROM ProductoColores WHERE ProductoId = ?`,
+        [ProductoId]
+      );
+    }
+
+    // Verificar otras relaciones (detallecompras, detallepedidosclientes, detalleventas)
+    const [detalleCompras] = await connection.query(
+      `SELECT COUNT(*) as count FROM detallecompras WHERE ProductoId = ?`,
+      [ProductoId]
+    );
+    
+    const [detallePedidos] = await connection.query(
+      `SELECT COUNT(*) as count FROM detallepedidosclientes WHERE ProductoId = ?`,
+      [ProductoId]
+    );
+    
+    const [detalleVentas] = await connection.query(
+      `SELECT COUNT(*) as count FROM detalleventas WHERE ProductoId = ?`,
+      [ProductoId]
+    );
+
+    if (detalleCompras[0].count > 0 || detallePedidos[0].count > 0 || detalleVentas[0].count > 0) {
+      throw new Error('No se puede eliminar producto con transacciones asociadas');
+    }
+
+    // Finalmente eliminar el producto
+    await connection.query(
+      `DELETE FROM Productos WHERE ProductoId = ?`, 
+      [ProductoId]
+    );
+
+    await connection.commit();
+    return { affectedRows: 1 };
+    
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
   }
-
-  if (producto[0].Estado !== 'Inactivo') {
-    throw new Error('Solo se pueden eliminar productos inactivos');
-  }
-
-  // Verificar que no tenga colores asociados
-  const [colores] = await dbPool.query(
-    `SELECT COUNT(*) as count FROM ProductoColores WHERE ProductoId = ?`,
-    [ProductoId]
-  );
-
-  if (colores[0].count > 0) {
-    throw new Error('No se puede eliminar producto con colores asociados');
-  }
-
-  await dbPool.query(`DELETE FROM Productos WHERE ProductoId = ?`, [ProductoId]);
 };
 
 // Verificar si nombre de producto ya existe

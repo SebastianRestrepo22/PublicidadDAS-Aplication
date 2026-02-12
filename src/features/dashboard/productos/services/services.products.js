@@ -12,11 +12,15 @@ export const cambiarEstadoProducto = async (id, Estado) => {
 };
 
 // Listar todos los datos con filtro de estado
-export const GetDataproductos = async (soloActivos = true) => {
+export const GetDataproductos = async (soloActivos = false) => {
   try {
-    const response = await axios.get(`${url}producto${soloActivos ? '?estado=Activo' : ''}`);
+    // Enviar parámetro de estado a la API
+    const response = await axios.get(`${url}producto`, {
+      params: soloActivos ? { estado: 'Activo' } : {}
+    });
     return response;
   } catch (error) {
+    console.error('Error en GetDataproductos:', error);
     return { status: false, message: "No está la api : ", error };
   }
 };
@@ -29,7 +33,6 @@ export const postDataproductos = async (data) => {
   console.log('=====================================');
   
   try {
-    // ¡NO ELIMINES STOCK! El backend lo necesita
     const response = await axios.post(url + 'producto', data);
     return response;
   } catch (error) {
@@ -40,19 +43,26 @@ export const postDataproductos = async (data) => {
 
 // Actualizar un registro - NO elimines Stock
 export const updateDataproductos = async (id, data) => {
-  console.log('=== SERVICES UPDATE - DATOS A ENVIAR ===');
+   console.log('========================================');
+  console.log('📡 SERVICIO - updateDataproductos:');
   console.log('ID:', id);
-  console.log('Datos completos:', JSON.stringify(data, null, 2));
+  console.log('Data recibida:', data);
+  console.log('UsaColores:', data.UsaColores, 'Tipo:', typeof data.UsaColores);
   console.log('Stock:', data.Stock, 'Tipo:', typeof data.Stock);
-  console.log('======================================');
+  console.log('========================================');
   
   try {
     // ¡NO ELIMINES STOCK! El backend lo necesita
     const response = await axios.put(url + `producto/${id}`, data);
+
+
+       console.log('📡 Respuesta del backend:', response.status);
+    console.log('Data:', response.data);
+    console.log('========================================');
     return response;
   } catch (error) {
     console.error('Error en updateDataproductos:', error.response?.data);
-    return { status: false, message: "No se puede actualizar el usuario : ", error };
+    return { status: false, message: "No se puede actualizar el producto : ", error };
   }
 };
 
@@ -62,7 +72,8 @@ export const deleteDataproducto = async (id) => {
         const response = await axios.delete(url + `producto/${id}`);
         return response;
     } catch (error) {
-        return { status: false, message: "No se puede eliminar el usuario : ", error };
+        // Lanzar la excepción para que el frontend pueda acceder a error.response
+        throw error;
     }
 }
 

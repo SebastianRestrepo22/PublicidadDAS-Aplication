@@ -1,13 +1,14 @@
 import { v4 as uuidv4 } from 'uuid';
-import { 
-  buscarProductoDB, 
-  createProducto, 
-  deleteDataProducto, 
-  findDuplicateName, 
-  getDataAllProductos, 
-  getDataProductoById, 
-  nombreProductoExiste, 
-  updateDataProducto 
+import { dbPool } from '../lib/db.js';
+import {
+  buscarProductoDB,
+  createProducto,
+  deleteDataProducto,
+  findDuplicateName,
+  getDataAllProductos,
+  getDataProductoById,
+  nombreProductoExiste,
+  updateDataProducto
 } from '../models/producto.model.js';
 
 // Crear producto - Ahora incluye UsaColores y Stock
@@ -39,15 +40,15 @@ export const postProducto = async (req, res) => {
 
     // Si no usa colores, Stock es obligatorio
     if (UsaColores === 0 && (Stock === null || Stock === undefined || Stock < 0)) {
-      return res.status(400).json({ 
-        message: 'Para productos sin colores, el stock es obligatorio y debe ser mayor o igual a 0' 
+      return res.status(400).json({
+        message: 'Para productos sin colores, el stock es obligatorio y debe ser mayor o igual a 0'
       });
     }
 
     // Si usa colores, Stock debe ser null
     if (UsaColores === 1 && Stock !== null) {
-      return res.status(400).json({ 
-        message: 'Para productos con colores, el stock debe ser null (se maneja por color)' 
+      return res.status(400).json({
+        message: 'Para productos con colores, el stock debe ser null (se maneja por color)'
       });
     }
 
@@ -72,11 +73,11 @@ export const postProducto = async (req, res) => {
       Stock
     });
 
-    res.status(201).json({ 
-      message: 'Producto creado exitosamente', 
+    res.status(201).json({
+      message: 'Producto creado exitosamente',
       ProductoId,
       UsaColores,
-      Stock 
+      Stock
     });
   } catch (error) {
     console.error('Error al crear producto:', error);
@@ -85,28 +86,56 @@ export const postProducto = async (req, res) => {
 };
 
 // Cambiar estado del producto
+// Cambiar estado del producto - PRESERVANDO EL STOCK
 export const cambiarEstadoProducto = async (req, res) => {
   const { id } = req.params;
   const { Estado } = req.body;
 
   try {
     if (!Estado || (Estado !== 'Activo' && Estado !== 'Inactivo')) {
-      return res.status(400).json({ 
-        message: 'Estado no válido. Debe ser "Activo" o "Inactivo"' 
+      return res.status(400).json({
+        message: 'Estado no válido. Debe ser "Activo" o "Inactivo"'
       });
     }
 
-    const result = await updateDataProducto({ 
-      ProductoId: id, 
-      Estado 
-    });
+    // PRIMERO: Obtener el producto actual para preservar su stock
+    const productoActual = await getDataProductoById(id);
+
+    if (productoActual.length === 0) {
+      return res.status(404).json({ message: 'Producto no encontrado' });
+    }
+
+    const producto = productoActual[0];
+
+    // Preparar datos para actualizar, incluyendo el stock actual
+    const datosActualizacion = {
+      ProductoId: id,
+      Estado
+    };
+
+    // PRESERVAR EL STOCK: solo si el producto no usa colores
+    if (producto.UsaColores === 0) {
+      datosActualizacion.Stock = producto.Stock;
+    }
+
+    // También preservar UsaColores para evitar que se pierda
+    datosActualizacion.UsaColores = producto.UsaColores;
+
+    // Actualizar con todos los datos necesarios
+    const result = await updateDataProducto(datosActualizacion);
 
     if (result === 0) {
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
 
     res.status(200).json({
-      message: `Producto ${Estado === 'Activo' ? 'activado' : 'desactivado'} correctamente`
+      message: `Producto ${Estado === 'Activo' ? 'activado' : 'desactivado'} correctamente`,
+      producto: {
+        ProductoId: id,
+        Estado,
+        Stock: producto.Stock,
+        UsaColores: producto.UsaColores
+      }
     });
   } catch (error) {
     console.error('Error al cambiar estado:', error);
@@ -117,7 +146,10 @@ export const cambiarEstadoProducto = async (req, res) => {
 // Obtener todos los productos - Adaptada para nuevo esquema
 export const getAllProducto = async (req, res) => {
   try {
-    const rows = await getDataAllProductos();
+    const { estado } = req.query;
+    const soloActivos = estado === 'Activo';
+    
+    const rows = await getDataAllProductos(soloActivos);
 
     const productosMap = {};
 
@@ -131,8 +163,8 @@ export const getAllProducto = async (req, res) => {
           Precio: row.Precio,
           Descuento: row.Descuento,
           CategoriaId: row.CategoriaId,
-          UsaColores: row.UsaColores,
-          // StockGeneral solo para productos que NO usan colores
+          UsaColores: parseInt(row.UsaColores),  // ← FORZAR CONVERSIÓN A NÚMERO
+          Estado: row.Estado || 'Activo',
           Stock: row.UsaColores === 0 ? row.StockGeneral : null,
           Colores: []
         };
@@ -174,7 +206,7 @@ export const getProductoById = async (req, res) => {
 
 // Actualizar producto - Ahora incluye UsaColores y Stock
 export const updateProducto = async (req, res) => {
-  const { ProductoId } = req.params;
+  const { id } = req.params;
   const {
     Nombre,
     Descripcion,
@@ -186,7 +218,23 @@ export const updateProducto = async (req, res) => {
     Stock = null
   } = req.body;
 
+  console.log('========================================');
+  console.log('📥 BACKEND - updateProducto:');
+  console.log('ID:', id);
+  console.log('UsaColores recibido:', UsaColores, 'Tipo:', typeof UsaColores);
+  console.log('Stock recibido:', Stock, 'Tipo:', typeof Stock);
+  console.log('Body completo:', req.body);
+  console.log('========================================');
+
   try {
+
+    // Al inicio de updateProducto
+const UsaColores = parseInt(req.body.UsaColores) || 0;
+const Stock = req.body.Stock !== null && req.body.Stock !== undefined 
+  ? parseInt(req.body.Stock) 
+  : null;
+
+console.log('UsaColores convertido:', UsaColores, 'Tipo:', typeof UsaColores);
     if (!Nombre) {
       return res.status(400).json({
         message: 'El nombre es obligatorio'
@@ -198,50 +246,61 @@ export const updateProducto = async (req, res) => {
       return res.status(400).json({ message: 'UsaColores debe ser 0 o 1' });
     }
 
-    // Si no usa colores, Stock es obligatorio
-    if (UsaColores === 0 && (Stock === null || Stock === undefined || Stock < 0)) {
-      return res.status(400).json({ 
-        message: 'Para productos sin colores, el stock es obligatorio y debe ser mayor o igual a 0' 
-      });
+    // Si no usa colores, Stock debe ser un número >= 0
+    if (UsaColores === 0) {
+      if (Stock === null || Stock === undefined) {
+        return res.status(400).json({
+          message: 'Para productos sin colores, el stock es obligatorio'
+        });
+      }
+
+      const stockNumber = Number(Stock);
+      if (isNaN(stockNumber) || stockNumber < 0) {
+        return res.status(400).json({
+          message: 'El stock debe ser un número mayor o igual a 0'
+        });
+      }
     }
 
-    // Si usa colores, Stock debe ser null
-    if (UsaColores === 1 && Stock !== null) {
-      return res.status(400).json({ 
-        message: 'Para productos con colores, el stock debe ser null (se maneja por color)' 
-      });
+    // Si usa colores, Stock debe ser null o undefined
+    if (UsaColores === 1) {
+      if (Stock !== null && Stock !== undefined) {
+        return res.status(400).json({
+          message: 'Para productos con colores, el stock debe ser null (se maneja por color)'
+        });
+      }
     }
 
-    const duplicates = await findDuplicateName({ ProductoId, Nombre });
+    const duplicates = await findDuplicateName({ ProductoId: id, Nombre });
     if (duplicates.length > 0) {
       return res.status(409).json({
         message: 'El nombre ya existe.'
       });
     };
 
-    const result = await updateDataProducto({ 
-      ProductoId, 
-      Nombre, 
-      Descripcion, 
-      Imagen, 
-      Precio, 
-      Descuento, 
+    const result = await updateDataProducto({
+      ProductoId: id,
+      Nombre,
+      Descripcion,
+      Imagen,
+      Precio,
+      Descuento,
       CategoriaId,
       UsaColores,
       Stock
     });
-    
+
     if (result === 0) {
       return res.status(409).json({ message: 'Producto no encontrado o sin cambios' });
     }
 
     res.status(200).json({
       message: 'Producto actualizado correctamente',
-      producto: { 
-        ProductoId, 
+      producto: {
+        ProductoId: id,
         Nombre,
         UsaColores,
-        Stock 
+        Stock
       }
     });
   } catch (error) {
@@ -250,75 +309,96 @@ export const updateProducto = async (req, res) => {
   }
 };
 
-// Eliminar producto
 // Eliminar producto - Modificado para verificar estado y relaciones
 export const deleteProducto = async (req, res) => {
   const { id } = req.params;
+  const connection = await dbPool.getConnection();
+
   try {
-    // Primero verificar si el producto existe
-    const [producto] = await buscarProductoDB({
-      columna: 'ProductoId',
-      operador: '=',
-      parametro: id
-    });
+    await connection.beginTransaction();
 
-    if (producto.length === 0) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
-    }
-
-    // Verificar si el producto tiene colores asociados
-    const [coloresAsociados] = await dbPool.query(
-      `SELECT COUNT(*) as count FROM ProductoColores WHERE ProductoId = ?`,
+    // Verificar si el producto existe
+    const [producto] = await connection.query(
+      `SELECT * FROM Productos WHERE ProductoId = ?`,
       [id]
     );
 
-    if (coloresAsociados[0].count > 0) {
-      // Si tiene colores asociados, no se puede eliminar, solo desactivar
-      return res.status(400).json({ 
-        message: 'Este producto no puede eliminarse porque tiene información asociada. Puedes desactivarlo para que no aparezca en el sistema.'
+    if (producto.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ message: 'Producto no encontrado' });
+    }
+
+    // Verificar si tiene relaciones con ventas/pedidos (NO eliminar)
+    const [detalleVentas] = await connection.query(
+      `SELECT COUNT(*) as count FROM detalleventas WHERE ProductoId = ?`,
+      [id]
+    );
+
+    const [detallePedidos] = await connection.query(
+      `SELECT COUNT(*) as count FROM detallepedidosclientes WHERE ProductoId = ?`,
+      [id]
+    );
+
+    if (detalleVentas[0].count > 0 || detallePedidos[0].count > 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        message: 'Este producto no puede eliminarse porque tiene ventas o pedidos asociados.'
       });
     }
 
-    // Verificar si el producto está inactivo
-    if (producto[0].Estado === 'Inactivo') {
-      // Si ya está inactivo, proceder con la eliminación
-      await deleteDataProducto(id);
-      return res.status(200).json({ message: 'Producto eliminado correctamente' });
-    }
+    // ELIMINAR PRIMERO LAS RELACIONES CON COLORES
+    await connection.query(
+      `DELETE FROM ProductoColores_Stock WHERE ProductoId = ?`,
+      [id]
+    );
 
-    // Si está activo y no tiene colores asociados, desactivarlo primero
-    await updateEstadoProducto(id, 'Inactivo');
-    
-    res.status(200).json({ 
-      message: 'Producto desactivado correctamente. Para eliminarlo permanentemente, primero debe estar inactivo.' 
-    });
+    await connection.query(
+      `DELETE FROM ProductoColores WHERE ProductoId = ?`,
+      [id]
+    );
+
+    // Luego eliminar el producto
+    await connection.query(
+      `DELETE FROM Productos WHERE ProductoId = ?`,
+      [id]
+    );
+
+    await connection.commit();
+    res.status(200).json({ message: 'Producto eliminado correctamente' });
+
   } catch (error) {
+    await connection.rollback();
     console.error('Error al eliminar producto:', error);
-    
-    // Si hay error de clave foránea (producto tiene ventas/pedidos asociados)
-    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-      return res.status(400).json({ 
-        message: 'Este producto no puede eliminarse porque tiene información asociada en ventas o pedidos. Puedes desactivarlo para que no aparezca en el sistema.'
-      });
-    }
-    
     res.status(500).json({ message: 'Error interno del servidor' });
+  } finally {
+    connection.release();
   }
 };
 
-// Cambiar estado del producto (Activo/Inactivo)
+// Cambiar estado del producto (Activo/Inactivo) - Versión mejorada
 export const updateEstadoProducto = async (ProductoId, Estado) => {
   const estadosPermitidos = ['Activo', 'Inactivo'];
-  
+
   if (!estadosPermitidos.includes(Estado)) {
     throw new Error('Estado no válido');
   }
 
-  const [rows] = await dbPool.query(
-    `UPDATE Productos SET Estado = ? WHERE ProductoId = ?`,
-    [Estado, ProductoId]
+  // Primero obtener el producto actual para preservar sus datos
+  const [producto] = await dbPool.query(
+    `SELECT * FROM Productos WHERE ProductoId = ?`,
+    [ProductoId]
   );
-  
+
+  if (producto.length === 0) {
+    throw new Error('Producto no encontrado');
+  }
+
+  // Actualizar estado manteniendo otros campos
+  const [rows] = await dbPool.query(
+    `UPDATE Productos SET Estado = ?, Stock = ?, UsaColores = ? WHERE ProductoId = ?`,
+    [Estado, producto[0].Stock, producto[0].UsaColores, ProductoId]
+  );
+
   return rows.affectedRows;
 };
 

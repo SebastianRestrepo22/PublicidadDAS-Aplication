@@ -25,24 +25,28 @@ export const getColoresByProductoId = async (ProductoId) => {
 
 export const setColoresProducto = async (ProductoId, coloresConStock) => {
   const connection = await dbPool.getConnection();
-  
+
   try {
     await connection.beginTransaction();
 
-    // Primero, actualizar el producto para que use colores
-    await connection.query(
-      `UPDATE Productos 
-       SET UsaColores = 1, Stock = NULL 
-       WHERE ProductoId = ?`,
-      [ProductoId]
-    );
+    // Solo actualizar UsaColores si hay colores
+    if (coloresConStock.length > 0) {
+      // Si hay colores, activar UsaColores = 1
+      await connection.query(
+        `UPDATE Productos 
+         SET UsaColores = 1, Stock = NULL 
+         WHERE ProductoId = ?`,
+        [ProductoId]
+      );
+    }
+    // Si el array está vacío, NO modificar UsaColores (se mantiene como estaba)
 
     // Eliminar registros existentes
     await connection.query(
       "DELETE FROM ProductoColores WHERE ProductoId = ?",
       [ProductoId]
     );
-    
+
     await connection.query(
       "DELETE FROM ProductoColores_Stock WHERE ProductoId = ?",
       [ProductoId]
@@ -77,7 +81,7 @@ export const setColoresProducto = async (ProductoId, coloresConStock) => {
 // Nueva función para quitar colores a un producto (convertir a producto sin colores)
 export const quitarColoresProducto = async (ProductoId, nuevoStockGeneral) => {
   const connection = await dbPool.getConnection();
-  
+
   try {
     await connection.beginTransaction();
 
@@ -86,7 +90,7 @@ export const quitarColoresProducto = async (ProductoId, nuevoStockGeneral) => {
       "DELETE FROM ProductoColores WHERE ProductoId = ?",
       [ProductoId]
     );
-    
+
     await connection.query(
       "DELETE FROM ProductoColores_Stock WHERE ProductoId = ?",
       [ProductoId]

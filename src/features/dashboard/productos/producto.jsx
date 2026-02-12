@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Search, Plus, ArrowLeft } from "lucide-react";
-import { deleteDataproducto, GetDataproductos, postDataproductos, updateDataproductos, buscarProductos, getColores, updateColoresProducto, getColoresProducto } from "./services/services.products.js";
+import { deleteDataproducto, GetDataproductos, postDataproductos, updateDataproductos, buscarProductos, getColores, updateColoresProducto, getColoresProducto, cambiarEstadoProducto } from "./services/services.products.js";
 import { getAllCategorias } from "../categoriadediseño/services/services.categoria.js";
 import axios from "axios";
 
@@ -42,6 +42,7 @@ export const ProductosDashboard = () => {
     Stock: 0
   });
 
+  const [filtroEstado, setFiltroEstado] = useState('');
   const [colores, setColores] = useState([]);
   const [coloresConStock, setColoresConStock] = useState([]);
   const [openColores, setOpenColores] = useState(false);
@@ -97,10 +98,12 @@ export const ProductosDashboard = () => {
 
   useEffect(() => {
     if (values.UsaColores === "0") {
+      // Limpia colores y resetea Stock a 0
       setColoresConStock([]);
     }
 
     if (values.UsaColores === "1") {
+      // Cuando activa colores, resetea Stock general
       setValues(prev => ({
         ...prev,
         Stock: 0
@@ -142,8 +145,13 @@ export const ProductosDashboard = () => {
           const res = await buscarProductos(filtroCampo, filtroValor);
           resultados = Array.isArray(res) ? res : [];
         } else {
-          const todos = await GetDataproductos();
+          const todos = await GetDataproductos(false); // false para traer todos
           resultados = Array.isArray(todos?.data) ? todos.data : [];
+        }
+
+        // Aplicar filtro de estado si existe
+        if (filtroEstado) {
+          resultados = resultados.filter(p => p.Estado === filtroEstado);
         }
 
         setAllData(Array.isArray(resultados) ? resultados : []);
@@ -166,7 +174,7 @@ export const ProductosDashboard = () => {
       }
     };
     cargarProducto();
-  }, [filtroCampo, filtroValor, currentPage, itemsPerPage, mode]);
+  }, [filtroCampo, filtroValor, filtroEstado, currentPage, itemsPerPage, mode]);
 
   useEffect(() => {
     if (filtroCampo && filtroValor) {
@@ -192,7 +200,6 @@ export const ProductosDashboard = () => {
     if (mode === "view" || mode === "edit") {
       const cargarProducto = async () => {
         try {
-          // Usa GetDataproductos y filtra por ID
           const todos = await GetDataproductos();
           const resultados = todos?.data || [];
           const producto = resultados.find(p => p.ProductoId === id);
@@ -201,7 +208,6 @@ export const ProductosDashboard = () => {
             console.log('Producto cargado para edición:', producto);
             setEditData(producto);
 
-            // Asegura los tipos correctos
             const valoresIniciales = {
               ProductoId: producto.ProductoId,
               Nombre: producto.Nombre || "",
@@ -213,7 +219,6 @@ export const ProductosDashboard = () => {
                 : "",
               CategoriaId: producto.CategoriaId || "",
               UsaColores: String(producto.UsaColores || "0"),
-              // Stock solo si no usa colores
               Stock: producto.UsaColores === 0 ? (producto.Stock || 0) : 0
             };
 
@@ -221,7 +226,10 @@ export const ProductosDashboard = () => {
             setOriginalNombre(producto.Nombre);
             setNombreError('');
 
-            // Carga los colores si existen
+            // Limpia colores primero
+            setColoresConStock([]);
+
+            // Luego carga SOLO si UsaColores === 1
             if (producto.UsaColores === 1) {
               try {
                 const coloresData = await getColoresProducto(id);
@@ -233,11 +241,8 @@ export const ProductosDashboard = () => {
                 })));
               } catch (error) {
                 console.error('Error cargando colores:', error);
-                setColoresConStock([]);
+                // No seteamos error, solo dejamos vacío
               }
-            } else {
-              // Si no usa colores, limpia coloresConStock
-              setColoresConStock([]);
             }
           } else {
             toast.error('Producto no encontrado');
@@ -251,21 +256,6 @@ export const ProductosDashboard = () => {
       };
 
       cargarProducto();
-    }
-  }, [mode, id]);
-
-  useEffect(() => {
-    if (mode === "edit" || mode === "view") {
-      getColoresProducto(id)
-        .then(colores => {
-          setColoresConStock(colores.map(c => ({
-            ColorId: c.ColorId,
-            Stock: c.Stock || 0,
-            Nombre: c.Nombre,
-            Hex: c.Hex
-          })));
-        })
-        .catch(console.error);
     }
   }, [mode, id]);
 
@@ -356,6 +346,39 @@ export const ProductosDashboard = () => {
     }
   };
 
+  const handleToggleEstado = async (productoId, nuevoEstado) => {
+    try {
+      const response = await cambiarEstadoProducto(productoId, nuevoEstado);
+
+      if (response.status === 200) {
+        toast.success(`Producto ${nuevoEstado === 'Activo' ? 'activado' : 'desactivado'} correctamente`);
+
+        // Actualizar la lista localmente
+        setAllData(prevData =>
+          prevData.map(producto =>
+            producto.ProductoId === productoId
+              ? { ...producto, Estado: nuevoEstado }
+              : producto
+          )
+        );
+
+      } else if (response.status === 400 && response.data?.message) {
+        // Mostrar mensaje específico del backend
+        toast.error(response.data.message);
+      } else {
+        toast.error("No se pudo cambiar el estado");
+      }
+    } catch (error) {
+      console.error('Error al cambiar estado:', error);
+
+      if (error.response?.status === 400 && error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error("Error al cambiar el estado");
+      }
+    }
+  };
+
   const resetForm = () => {
     setValues({
       ProductoId: "",
@@ -405,6 +428,28 @@ export const ProductosDashboard = () => {
     const currentValues = { ...values };
     const currentUsaColores = parseInt(currentValues.UsaColores);
 
+    console.log('========================================');
+  console.log('🚀 DEBUG - handleSubmit:');
+  console.log('values.UsaColores (string):', values.UsaColores);
+  console.log('currentUsaColores (number):', currentUsaColores);
+  console.log('values.Stock:', values.Stock);
+  console.log('coloresConStock:', coloresConStock);
+  console.log('========================================');
+
+    // Si usa colores, debe tener al menos un color asignado
+    if (currentUsaColores === 1 && coloresConStock.length === 0) {
+      toast.error("Debes asignar al menos un color con stock");
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Si no usa colores, no debe tener colores asignados
+    if (currentUsaColores === 0 && coloresConStock.length > 0) {
+      toast.error("Este producto no usa sistema de colores. Elimina los colores asignados");
+      setIsSubmitting(false);
+      return;
+    }
+
     // Prepara los datos CORRECTAMENTE
     const datosParaEnviar = {
       Nombre: currentValues.Nombre.trim(),
@@ -416,7 +461,7 @@ export const ProductosDashboard = () => {
       CategoriaId: currentValues.CategoriaId,
       UsaColores: currentUsaColores,
       Stock: currentUsaColores === 0 ?
-        parseInt(currentValues.Stock) || 0 :
+        (parseInt(currentValues.Stock) || 0) :
         null
     };
 
@@ -460,27 +505,40 @@ export const ProductosDashboard = () => {
 
     try {
       if (mode === "edit" && editData) {
-        const response = await updateDataproductos(editData.ProductoId, datosParaEnviar);
-        if (response.status === 200) {
-          if (coloresConStock.length > 0) {
-            await updateColoresProducto(editData.ProductoId, coloresConStock);
-          }
-          toast.success("Producto actualizado correctamente");
-          goToBackToList();
+    const response = await updateDataproductos(editData.ProductoId, datosParaEnviar);
+    if (response.status === 200) {
+      // Si UsaColores = 0, eliminar TODOS los colores del producto
+      if (currentUsaColores === 0) {
+        try {
+          // Eliminar colores de la BD - pasar array vacío o null
+          await updateColoresProducto(editData.ProductoId, []);
+        } catch (error) {
+          console.error('Error eliminando colores:', error);
+          // No detener el flujo, solo loggear
         }
-      } else if (mode === "create") {
-        const response = await postDataproductos(datosParaEnviar);
-        if (response.status === 201) {
-          const nuevoProductoId = response.data.ProductoId;
-
-          if (coloresConStock.length > 0) {
-            await updateColoresProducto(nuevoProductoId, coloresConStock);
-          }
-
-          toast.success("Producto creado correctamente");
-          goToBackToList();
-        }
+      } 
+      // Si UsaColores = 1, actualizar colores
+      else if (currentUsaColores === 1 && coloresConStock.length > 0) {
+        await updateColoresProducto(editData.ProductoId, coloresConStock);
       }
+      
+      toast.success("Producto actualizado correctamente");
+      goToBackToList();
+    }
+  } else if (mode === "create") {
+    const response = await postDataproductos(datosParaEnviar);
+    if (response.status === 201) {
+      const nuevoProductoId = response.data.ProductoId;
+
+      // Solo guardar colores si UsaColores = 1
+      if (currentUsaColores === 1 && coloresConStock.length > 0) {
+        await updateColoresProducto(nuevoProductoId, coloresConStock);
+      }
+
+      toast.success("Producto creado correctamente");
+      goToBackToList();
+    }
+  }
     } catch (error) {
       console.error("Error al procesar la solicitud:", error);
 
@@ -505,6 +563,7 @@ export const ProductosDashboard = () => {
   const handleDelete = async (id) => {
     try {
       const response = await deleteDataproducto(id);
+
       if (response.status === 200 || response.status === 201) {
         toast.success(response.data.message);
         const updatedList = await GetDataproductos();
@@ -514,10 +573,18 @@ export const ProductosDashboard = () => {
         }
         setOpenEliminar(false);
       } else {
-        toast.error(response.message || "No se pudo eliminar el producto");
+        // Mostrar mensaje del backend si existe
+        toast.error(response.data?.message || "No se pudo eliminar el producto");
       }
     } catch (error) {
-      toast.error(error.message || "Error al eliminar el producto");
+      // Acceder al mensaje específico del backend
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else if (error.response?.status === 404) {
+        toast.error("Producto no encontrado");
+      } else {
+        toast.error("Error al eliminar el producto");
+      }
     }
   };
 
@@ -573,6 +640,17 @@ export const ProductosDashboard = () => {
                 <Plus size={18} /> Nuevo producto
               </button>
 
+              {/* Filtro de estado */}
+              <select
+                value={filtroEstado}
+                onChange={(e) => setFiltroEstado(e.target.value)}
+                className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[150px]"
+              >
+                <option value="">Todos los estados</option>
+                <option value="Activo">Activos</option>
+                <option value="Inactivo">Inactivos</option>
+              </select>
+
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
@@ -606,16 +684,14 @@ export const ProductosDashboard = () => {
                 {editData && (
                   <div className="mb-4 text-left bg-gray-50 p-3 rounded-lg">
                     <p className="font-medium">Producto: {editData.Nombre}</p>
-                    {editData.UsaColores === 1 && editData.Colores && editData.Colores.length > 0 && (
-                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                        <p className="text-yellow-700 text-sm font-medium flex items-center gap-1">
-                          ⚠️ Este producto tiene {editData.Colores.length} color(es) asignado(s)
-                        </p>
-                        <p className="text-yellow-600 text-xs mt-1">
-                          Al eliminar el producto, también se eliminarán todos sus colores y stock asociado.
-                        </p>
-                      </div>
-                    )}
+                    <p className="text-sm text-gray-600">ID: {editData.ProductoId}</p>
+                    <p className="text-sm text-gray-600 mt-2">
+                      Estado:
+                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${editData.Estado === 'Activo' ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'
+                        }`}>
+                        {editData.Estado}
+                      </span>
+                    </p>
                   </div>
                 )}
 
@@ -624,15 +700,7 @@ export const ProductosDashboard = () => {
                 <div className="flex gap-4">
                   <button
                     className="flex-1 bg-red-500 text-white py-2.5 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2 font-medium"
-                    onClick={() => {
-                      if (editData?.UsaColores === 1 && editData?.Colores?.length > 0) {
-                        if (window.confirm(`⚠️ ADVERTENCIA: Este producto tiene ${editData.Colores.length} color(es) asignado(s). ¿Continuar con la eliminación?`)) {
-                          handleDelete(editData.ProductoId);
-                        }
-                      } else {
-                        handleDelete(editData.ProductoId);
-                      }
-                    }}
+                    onClick={() => handleDelete(editData.ProductoId)}
                   >
                     Eliminar
                   </button>
@@ -654,6 +722,7 @@ export const ProductosDashboard = () => {
                   onEdit={handleEditClick}
                   onView={handleViewClick}
                   onDelete={handleDeleteClick}
+                  onToggleEstado={handleToggleEstado}
                 />
               </div>
 

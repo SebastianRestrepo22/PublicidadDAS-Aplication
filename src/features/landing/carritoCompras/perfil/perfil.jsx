@@ -329,19 +329,7 @@ export const Perfil = () => {
             <Navbar />
             
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 pt-24 pb-16">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header con estilo mejorado */}
-                    <div className="text-center mb-12">
-                        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-lg mb-6">
-                            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                        </div>
-                        <h1 className="text-4xl font-bold text-slate-800 mb-3">Mi Perfil</h1>
-                        <p className="text-slate-600 max-w-md mx-auto text-lg">
-                            Gestiona y actualiza tu información personal de manera segura
-                        </p>
-                    </div>
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">                 
 
                     {/* Tarjeta principal */}
                     <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
@@ -350,7 +338,7 @@ export const Perfil = () => {
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                 </svg>
-                                Información Personal
+                                Mi Perfil: Información Personal
                             </h2>
                             <p className="text-blue-100 mt-2">Completa o modifica los datos de tu perfil</p>
                         </div>

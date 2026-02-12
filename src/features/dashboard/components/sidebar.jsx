@@ -19,15 +19,27 @@ import { useAuth } from "../../../context/AuthContext";
 const menuItems = [
   {
     icon: BarChart3,
-    label: "Dashboard",
-    to: "/dashboard/graficosEstadisticos",
-    requiredPermission: "ver_dashboard"
+    label: "Medición y Desempeño",
+    hasSubmenu: true,
+    submenu: [
+      {
+        label: "Dashboard",
+        to: "/dashboard/graficosEstadisticos",
+        requiredPermission: "ver_dashboard"
+      }
+    ]
   },
   {
     icon: UserCheck,
-    label: "Roles",
-    to: "/dashboard/roles",
-    requiredPermission: "ver_roles"
+    label: "Configuración",
+    hasSubmenu: true,
+    submenu: [
+      {
+        label: "Roles",
+        to: "/dashboard/roles",
+        requiredPermission: "ver_roles"
+      }
+    ]
   },
   {
     icon: Users,
@@ -36,50 +48,15 @@ const menuItems = [
     requiredPermission: "ver_usuarios"
   },
   {
-    icon: Palette,
-    label: "Categorías",
-    to: "/dashboard/categorias",
-    requiredPermission: "ver_categorias"
-  },
-  {
-    icon: Package,
-    label: "Productos",
-    to: "/dashboard/producto",
-    requiredPermission: "ver_productos"
-  },
-  {
-    icon: Printer,
-    label: "Servicios",
-    to: "/dashboard/servicio",
-    requiredPermission: "ver_servicios"
-  },
-  {
-    icon: Boxes,
-    label: "Control Insumos",
-    hasSubmenu: true,
-    submenu: [
-      {
-        label: "Insumos",
-        to: "/dashboard/insumos",
-        requiredPermission: "ver_insumos"
-      },
-      {
-        label: "Proveedores",
-        to: "/dashboard/proveedores",
-        requiredPermission: "ver_proveedores"
-      },
-      {
-        label: "Compras",
-        to: "/dashboard/compras",
-        requiredPermission: "ver_compras"
-      }
-    ]
-  },
-  {
     icon: ShoppingCart,
     label: "Ventas",
     hasSubmenu: true,
     submenu: [
+      {
+        label: "Servicios",
+        to: "/dashboard/servicio",
+        requiredPermission: "ver_servicios"
+      },
       {
         label: "Pedidos",
         to: "/dashboard/pedidosClientes",
@@ -91,8 +68,113 @@ const menuItems = [
         requiredPermission: "ver_ventas"
       }
     ]
+  },
+  {
+    icon: Boxes,
+    label: "Compras",
+    hasSubmenu: true,
+    submenu: [
+      {
+        label: "Categorías",
+        to: "/dashboard/categorias",
+        requiredPermission: "ver_categorias"
+      },
+      {
+        label: "Productos",
+        to: "/dashboard/producto",
+        requiredPermission: "ver_productos"
+      },
+      {
+        label: "Proveedores",
+        to: "/dashboard/proveedores",
+        requiredPermission: "ver_proveedores"
+      },
+      {
+        label: "Compras",
+        to: "/dashboard/compras",
+        requiredPermission: "ver_compras"
+      },
+    ]
   }
 ];
+
+// const menuItems = [
+//   {
+//     icon: BarChart3,
+//     label: "Dashboard",
+//     to: "/dashboard/graficosEstadisticos",
+//     requiredPermission: "ver_dashboard"
+//   },
+//   {
+//     icon: UserCheck,
+//     label: "Roles",
+//     to: "/dashboard/roles",
+//     requiredPermission: "ver_roles"
+//   },
+//   {
+//     icon: Users,
+//     label: "Usuarios",
+//     to: "/dashboard/usuarios",
+//     requiredPermission: "ver_usuarios"
+//   },
+//   {
+//     icon: Palette,
+//     label: "Categorías",
+//     to: "/dashboard/categorias",
+//     requiredPermission: "ver_categorias"
+//   },
+//   {
+//     icon: Package,
+//     label: "Productos",
+//     to: "/dashboard/producto",
+//     requiredPermission: "ver_productos"
+//   },
+//   {
+//     icon: Printer,
+//     label: "Servicios",
+//     to: "/dashboard/servicio",
+//     requiredPermission: "ver_servicios"
+//   },
+//   {
+//     icon: Boxes,
+//     label: "Control Insumos",
+//     hasSubmenu: true,
+//     submenu: [
+//       {
+//         label: "Proveedores",
+//         to: "/dashboard/proveedores",
+//         requiredPermission: "ver_proveedores"
+//       },
+//       {
+//         label: "Compras",
+//         to: "/dashboard/compras",
+//         requiredPermission: "ver_compras"
+//       },
+//       {
+//         label: "Insumos",
+//         to: "/dashboard/insumos",
+//         requiredPermission: "ver_insumos"
+//       }
+//     ]
+//   },
+//   {
+//     icon: ShoppingCart,
+//     label: "Ventas",
+//     hasSubmenu: true,
+//     submenu: [
+//       {
+//         label: "Pedidos",
+//         to: "/dashboard/pedidosClientes",
+//         requiredPermission: "ver_pedidos"
+//       },
+//       {
+//         label: "Ventas",
+//         to: "/dashboard/ventas",
+//         requiredPermission: "ver_ventas"
+//       }
+//     ]
+//   }
+// ];
 
 const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
   const [isAnimating, setIsAnimating] = useState(false);

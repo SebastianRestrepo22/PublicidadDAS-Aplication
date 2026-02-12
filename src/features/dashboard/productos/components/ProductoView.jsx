@@ -11,6 +11,7 @@ export const ProductoView = ({
   if (!editData) return <div>Cargando...</div>;
 
   const stockTotal = coloresConStock.reduce((sum, c) => sum + (c.Stock || 0), 0);
+  const estado = editData.Estado || 'Activo';
 
   return (
     <div className="text-left space-y-4 p-4 bg-white rounded-lg shadow-md">
@@ -23,6 +24,14 @@ export const ProductoView = ({
         {editData.Descuento > 0 && (
           <div><strong>Descuento:</strong> {editData.Descuento}%</div>
         )}
+        <div>
+          <strong>Estado:</strong>
+          <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
+            estado === 'Activo' ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'
+          }`}>
+            {estado}
+          </span>
+        </div>
         <div><strong>Stock total:</strong> {stockTotal} unidades</div>
         <div>
           <strong>Colores con stock:</strong>
@@ -82,10 +91,15 @@ export const ProductoView = ({
       )}
       <div className="mt-6 flex gap-3">
         <button
-          className="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors"
+          className={`flex-1 py-2 rounded-lg transition-colors ${
+            estado === 'Activo' 
+              ? 'bg-blue-500 text-white hover:bg-blue-600' 
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
           onClick={goToEdit}
+          disabled={estado === 'Inactivo'}
         >
-          Editar Producto
+          {estado === 'Activo' ? 'Editar Producto' : 'Solo activos se pueden editar'}
         </button>
         <button
           className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
