@@ -1,6 +1,6 @@
 import connectDB from '../lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
-import { createDataRole, getDataAllRoles, getDataRolesById, updateDataRoles, rolesAsociados, deleteDataRole, changeDataStatus, validarDataRol, buscarRolesModel, getdataPermisos, getDataRolePermissions, existenPermisos, deletePermissos, actualizarPermisos, getDataRolUser, getDataPermissonRol } from '../models/role.model.js';
+import { createDataRole, getDataAllRoles, getDataRolesById, updateDataRoles, rolesAsociados, deleteDataRole, changeDataStatus, validarDataRol, buscarRolesModel, getdataPermisos, getDataRolePermissions, existenPermisos, deletePermissos, actualizarPermisos, getDataRolUser, getDataPermissonRol, systemRole } from '../models/role.model.js';
 
 // Crear rol
 export const createRole = async (req, res) => {
@@ -17,7 +17,8 @@ export const createRole = async (req, res) => {
     await createDataRole({
       RoleId,
       Nombre,
-      Estado
+      Estado,
+      IsSystem: false
     });
 
 
@@ -95,24 +96,45 @@ export const updateRole = async (req, res) => {
 // Eliminar rol
 export const deleteRole = async (req, res) => {
   const { id } = req.params;
-  try {
-    const users = await rolesAsociados(id);
 
+  try {
+    // Verificar si es rol del sistema
+    const roles = await systemRole(id)
+
+    if (roles.length === 0) {
+      return res.status(404).json({
+        message: 'El rol no existe'
+      });
+    }
+
+    if (roles[0].IsSystem) {
+      return res.status(403).json({
+        message: `El rol "${roles[0].Nombre}" es un rol del sistema y no puede eliminarse`
+      });
+    }
+
+    // 2. Verificar usuarios asociados
+    const users = await rolesAsociados(id);
     if (users.length > 0) {
       return res.status(400).json({
         message: 'No se puede eliminar el rol porque tiene usuarios asociados'
       });
     }
 
-    // Si no hay usuarios, elimina el rol
+    // 3. Eliminar
     await deleteDataRole(id);
-    res.status(200).json({ message: 'Rol eliminado correctamente' });
+    return res.status(200).json({
+      message: 'Rol eliminado correctamente'
+    });
 
   } catch (error) {
     console.error('Error al eliminar rol:', error);
-    res.status(500).json({ message: 'Error al eliminar rol' });
+    return res.status(500).json({
+      message: 'Error interno al eliminar el rol'
+    });
   }
 };
+
 
 // Cambiar estado de un rol
 export const changeState = async (req, res) => {

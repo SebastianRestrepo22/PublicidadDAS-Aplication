@@ -10,11 +10,19 @@ export const getRoleByName = async (nombre) => {
   return roles[0]; // Devuelve el primer resultado
 };
 
+export const systemRole = async (id) => {
+  const [roles] = await dbPool.query(
+      'SELECT IsSystem, Nombre FROM roles WHERE RoleId = ?',
+      [id]
+    );
+    return roles;
+}
+
 // Crear rol
-export const createDataRole = async ({ RoleId, Nombre, Estado = 'Activo' }) => {
+export const createDataRole = async ({ RoleId, Nombre, Estado = 'Activo', IsSystem = false }) => {
   await dbPool.query(
-    'INSERT INTO roles (RoleId, Nombre, Estado) VALUES (?, ?, ?)',
-    [RoleId, Nombre, Estado]
+    'INSERT INTO roles (RoleId, Nombre, Estado, IsSystem) VALUES (?, ?, ?, ?)',
+    [RoleId, Nombre, Estado, IsSystem]
   );
 };
 
@@ -32,10 +40,11 @@ export const getDataRolesById = async (id) => {
 }
 
 export const updateDataRoles = async ({ Nombre, Estado, id }) => {
-  await dbPool.query('UPDATE roles SET Nombre = ?, Estado = ? WHERE RoleId = ?',
+  const [result] = await dbPool.query(
+    'UPDATE roles SET Nombre = ?, Estado = ? WHERE RoleId = ?',
     [Nombre, Estado, id]
   );
-  return Nombre, Estado, id;
+  return result;
 };
 
 export const rolesAsociados = async (id) => {
@@ -52,10 +61,11 @@ export const deleteDataRole = async (id) => {
 };
 
 export const changeDataStatus = async (estado, id) => {
-  await dbPool.query('UPDATE roles SET Estado = ? WHERE RoleId = ?',
+  const [result] = await dbPool.query(
+    'UPDATE roles SET Estado = ? WHERE RoleId = ?',
     [estado, id]
   );
-  return estado, id;
+  return result;
 };
 
 export const validarDataRol = async (rol) => {

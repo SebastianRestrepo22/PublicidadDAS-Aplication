@@ -20,13 +20,36 @@ export const createUsuario = async ({
 };
 
 export const getAllDataUsers = async () => {
-  const [rows] = await dbPool.query(
-    `SELECT u.*, r.Nombre AS RolNombre 
-        FROM usuarios u 
-        JOIN roles r ON u.RoleId = r.RoleId`
-  );
+  const [rows] = await dbPool.query(`
+    SELECT 
+      u.CedulaId,
+      u.TipoDocumentoId,
+      td.Nombre AS TipoDocumentoNombre,
+      u.NombreCompleto,
+      u.Telefono,
+      u.CorreoElectronico,
+      u.Direccion,
+      u.RoleId,
+      u.IsSystem,
+      r.Nombre AS RolNombre
+    FROM usuarios u
+    JOIN roles r ON u.RoleId = r.RoleId
+    JOIN TipoDocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
+    ORDER BY u.NombreCompleto ASC
+  `);
   return rows;
-}
+};
+
+export const contarAdmins = async () => {
+  const [[result]] = await dbPool.query(`
+    SELECT COUNT(*) AS total
+    FROM usuarios u
+    JOIN roles r ON u.RoleId = r.RoleId
+    WHERE r.Nombre = 'Administrador'
+  `);
+
+  return result.total; // número, no array
+};
 
 // Buscar usuario por correo
 export const getUsuarioByCorreo = async (CorreoElectronico) => {
@@ -42,14 +65,37 @@ export const getUsuarioByCorreo = async (CorreoElectronico) => {
 
 // Buscar usuario por ID
 export const getUsuarioById = async (id) => {
-  const [rows] = await dbPool.query(
-    `SELECT u.*, r.Nombre AS RoleNombre 
-     FROM usuarios u 
-     JOIN roles r ON u.RoleId = r.RoleId 
-     WHERE u.CedulaId = ?`,
-    [id]
-  );
+  const [rows] = await dbPool.query(`
+    SELECT 
+      u.CedulaId,
+      u.NombreCompleto,
+      u.Telefono,
+      u.CorreoElectronico,
+      u.Direccion,
+      u.RoleId,
+      u.IsSystem,
+      r.Nombre AS RolNombre
+    FROM usuarios u
+    JOIN roles r ON u.RoleId = r.RoleId
+    WHERE u.CedulaId = ?
+  `, [id]);
+
   return rows[0];
+};
+
+export const getUserSystem = async (id) => {
+  const [rows] = await dbPool.query(`
+    SELECT 
+      u.CedulaId,
+      u.RoleId,
+      u.IsSystem,
+      r.Nombre AS RolNombre
+    FROM usuarios u
+    JOIN roles r ON u.RoleId = r.RoleId
+    WHERE u.CedulaId = ?
+  `, [id]);
+
+  return rows;
 };
 
 export const traerDatosActuales = async (id) => {

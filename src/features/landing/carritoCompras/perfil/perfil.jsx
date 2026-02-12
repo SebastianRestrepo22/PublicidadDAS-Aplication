@@ -329,6 +329,7 @@ export const Perfil = () => {
             <Navbar />
             
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 pt-24 pb-16">
+
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header con estilo mejorado */}
 

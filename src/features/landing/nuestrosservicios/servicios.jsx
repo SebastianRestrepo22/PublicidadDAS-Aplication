@@ -202,12 +202,6 @@ export const Servicios = () => {
                                   <ShoppingCart className="h-4 w-4 mr-1 inline" />
                                   Ver Detalles
                                 </button>
-                                <button
-                                  onClick={(e) => handleViewDetails(servicio.ServicioId, e)}
-                                  className="bg-transparent border border-white text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10"
-                                >
-                                  Más Información
-                                </button>
                               </div>
                             </div>
                           </div>

@@ -101,6 +101,7 @@ export const Productos = () => {
     return matchesCategory && matchesSearch;
   });
 
+  // Reemplaza las funciones que calculan stock:
   const handleAddClick = useCallback((producto) => {
     if (producto.EsPersonalizado) {
       navigate("/carritoproducto", {
@@ -109,26 +110,43 @@ export const Productos = () => {
       return;
     }
 
-    const tieneColores = productosConColores[producto.ProductoId] || 
-                        (producto.Colores && Array.isArray(producto.Colores) && producto.Colores.length > 0);
+    const tieneColores = productosConColores[producto.ProductoId] ||
+      (producto.Colores && Array.isArray(producto.Colores) && producto.Colores.length > 0);
+
+    // Calcular stock total sumando stock de todos los colores
+    const stockTotal = tieneColores && producto.Colores
+      ? producto.Colores.reduce((sum, color) => sum + (color.Stock || 0), 0)
+      : 0;
 
     if (tieneColores) {
-      navigate(`/productos/${producto.ProductoId}`, { 
-        state: { producto } 
+      // Si tiene colores pero NO tiene stock total
+      if (stockTotal === 0) {
+        toast.error(`Producto ${producto.Nombre} sin stock disponible`);
+        return;
+      }
+
+      navigate(`/productos/${producto.ProductoId}`, {
+        state: { producto }
       });
       toast.info(`Por favor selecciona un color para ${producto.Nombre}`);
       return;
     }
 
-    const stock = producto.Stock ?? producto.stock ?? null;
+    // Si no tiene colores, verificar stock (en este caso debería ser 0)
+    if (stockTotal === 0) {
+      toast.error(`Producto ${producto.Nombre} sin stock disponible`);
+      return;
+    }
+
     const existing = cart.find(
       (item) => item.ProductoId === producto.ProductoId
     );
     const currentQuantity = existing ? existing.quantity : 0;
     const newQuantity = currentQuantity + 1;
 
-    if (stock !== null && newQuantity > stock) {
-      toast.error(`Solo hay ${stock} unidades disponibles`);
+    // Verificar stock
+    if (newQuantity > stockTotal) {
+      toast.error(`Solo hay ${stockTotal} unidades disponibles`);
       return;
     }
 
@@ -137,27 +155,44 @@ export const Productos = () => {
   }, [productosConColores, cart, addToCart, navigate]);
 
   const handleAddFromModal = useCallback((producto) => {
-    const tieneColores = productosConColores[producto.ProductoId] || 
-                        (producto.Colores && Array.isArray(producto.Colores) && producto.Colores.length > 0);
+    const tieneColores = productosConColores[producto.ProductoId] ||
+      (producto.Colores && Array.isArray(producto.Colores) && producto.Colores.length > 0);
+
+    // Calcular stock total
+    const stockTotal = tieneColores && producto.Colores
+      ? producto.Colores.reduce((sum, color) => sum + (color.Stock || 0), 0)
+      : 0;
 
     if (tieneColores) {
+      // Si tiene colores pero NO tiene stock total
+      if (stockTotal === 0) {
+        toast.error(`Producto ${producto.Nombre} sin stock disponible`);
+        return;
+      }
+
       setShowOfertasModal(false);
-      navigate(`/productos/${producto.ProductoId}`, { 
-        state: { producto } 
+      navigate(`/productos/${producto.ProductoId}`, {
+        state: { producto }
       });
       toast.info(`Por favor selecciona un color para ${producto.Nombre}`);
       return;
     }
 
-    const stock = producto.Stock ?? producto.stock ?? null;
+    // Si no tiene colores, verificar stock
+    if (stockTotal === 0) {
+      toast.error(`Producto ${producto.Nombre} sin stock disponible`);
+      return;
+    }
+
     const existing = cart.find(
       (item) => item.ProductoId === producto.ProductoId
     );
     const currentQuantity = existing ? existing.quantity : 0;
     const newQuantity = currentQuantity + 1;
 
-    if (stock !== null && newQuantity > stock) {
-      toast.error(`Solo hay ${stock} unidades disponibles`);
+    // Verificar stock
+    if (newQuantity > stockTotal) {
+      toast.error(`Solo hay ${stockTotal} unidades disponibles`);
       return;
     }
 
@@ -371,6 +406,20 @@ export const Productos = () => {
                         <p className="text-sm text-slate-600 line-clamp-2 mb-3">
                           {producto.Descripcion}
                         </p>
+
+                        {/* Mostrar stock total si tiene colores */}
+                        {producto.Colores && producto.Colores.length > 0 && (
+                          <div className="mb-2">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${producto.Colores.reduce((sum, c) => sum + (c.Stock || 0), 0) > 10
+                              ? 'bg-green-100 text-green-800'
+                              : producto.Colores.reduce((sum, c) => sum + (c.Stock || 0), 0) > 0
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                              }`}>
+                              Stock: {producto.Colores.reduce((sum, c) => sum + (c.Stock || 0), 0)} unidades
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between">
                           {producto.Descuento > 0 && (
                             <span className="text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded">
@@ -442,7 +491,7 @@ export const Productos = () => {
                 <p className="text-sm opacity-90 mb-4">
                   Obtén descuentos en los productos que ofrecemos
                 </p>
-                <button 
+                <button
                   onClick={() => setShowOfertasModal(true)}
                   className="w-full bg-white text-blue-600 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
                 >
@@ -532,8 +581,8 @@ export const Productos = () => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setShowOfertasModal(false);
-                                  navigate(`/productos/${producto.ProductoId}`, { 
-                                    state: { producto } 
+                                  navigate(`/productos/${producto.ProductoId}`, {
+                                    state: { producto }
                                   });
                                 }}
                                 className="text-blue-600 hover:text-blue-700 text-sm font-medium"

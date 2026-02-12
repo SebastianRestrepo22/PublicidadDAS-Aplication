@@ -60,9 +60,10 @@ export const initializeRolesAndPermissions = async (connection) => {
         if (existingRole.length === 0) {
             const roleId = uuidv4();
             await connection.execute(
-                'INSERT INTO roles (RoleId, Nombre, Estado) VALUES (?, ?, ?)',
-                [roleId, role.Nombre, role.Estado]
+                'INSERT INTO roles (RoleId, Nombre, Estado, IsSystem) VALUES (?, ?, ?, ?)',
+                [roleId, role.Nombre, role.Estado, true]
             );
+
             console.log(`     ✓ Rol '${role.Nombre}' creado.`);
             createdRoles[role.Nombre] = roleId;
         } else {
@@ -94,7 +95,7 @@ export const initializeRolesAndPermissions = async (connection) => {
     // 3. Asignar TODOS los permisos al Administrador
     console.log('Asignando permisos al Administrador...');
     const [allPermisos] = await connection.execute('SELECT PermisoId FROM permisos');
-    
+
     for (const permiso of allPermisos) {
         const [existingAssignment] = await connection.execute(
             'SELECT * FROM rol_permisos WHERE RoleId = ? AND PermisoId = ?',

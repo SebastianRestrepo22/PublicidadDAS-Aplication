@@ -884,7 +884,7 @@ export const ServiciosDashboard = () => {
                                             paginatedData.map((p) => (
                                                 <tr key={p.ServicioId} className="hover:bg-slate-50 transition-colors duration-150">
                                                     <td className="py-3 px-4 text-sm text-gray-700 truncate max-w-[100px]" title={p.ServicioId}>
-                                                        {p.ServicioId.slice(0, 3)}...
+                                                        {p.ServicioId.slice(0, 3)}
                                                     </td>
                                                     <td className="py-3 px-4 text-sm font-medium text-gray-900 truncate max-w-[150px]" title={p.Nombre}>
                                                         {p.Nombre}

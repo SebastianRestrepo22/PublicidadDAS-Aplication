@@ -20,6 +20,8 @@ import {
 import { getColoresProducto } from "../../dashboard/productos/services/services.products";
 
 export const CarritoCompras = () => {
+  const [editingQuantities, setEditingQuantities] = useState({});
+
   const navigate = useNavigate();
   const { user } = useAuth();
   const { cart, removeFromCart, updateQuantity, getTotal, clearCart, updateItemColor } = useCart();
@@ -159,25 +161,25 @@ export const CarritoCompras = () => {
 
     console.log("🎨 [CARRITO] Guardando ColorId UUID:", color.ColorId);
 
-    // ✅ CORREGIDO: Guardar SOLO el UUID, no el objeto completo
+    // CORREGIDO: Guardar SOLO el UUID, no el objeto completo
     updateItemColor(editingColorItem.id, color.ColorId);
 
     setEditingColorItem(null);
     toast.success(`Color cambiado a ${color.Nombre}`);
   };
 
-  // ✅ FUNCIÓN CORREGIDA: Obtiene el NOMBRE del color desde el catálogo
-  const getColorDisplay = (item, productColors) => {
-    if (!item?.ProductoId || !item?.customization?.color) return null;
+  // Obtiene el NOMBRE del color
+  const getColorDisplay = (item) => {
+    if (!item?.customization?.color) return null;
 
-    // Si el color ya es un string UUID, buscar el nombre
+    // Si color es un string UUID o nombre
     if (typeof item.customization.color === 'string') {
       const colors = productColors[item.ProductoId] || [];
       const colorObj = colors.find(c => c.ColorId === item.customization.color);
-      return colorObj?.Nombre || null;
+      return colorObj?.Nombre || item.customization.color;
     }
 
-    // Si es un objeto, extraer el nombre
+    // Si color es un objeto
     return item.customization.color?.Nombre || null;
   };
 
@@ -313,19 +315,45 @@ export const CarritoCompras = () => {
                                       type="number"
                                       min="1"
                                       max={item.Stock || item.stock || 999}
-                                      value={newQuantity}
-                                      onChange={(e) => setNewQuantity(parseInt(e.target.value) || 1)}
-                                      className="w-16 px-2 py-1 border border-slate-300 rounded text-center"
+                                      value={editingQuantities[item.id] ?? item.quantity} // toma valor temporal o real
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        if (/^\d*$/.test(value)) {
+                                          setEditingQuantities(prev => ({
+                                            ...prev,
+                                            [item.id]: value === "" ? "" : parseInt(value)
+                                          }));
+                                        }
+                                      }}
+                                      className="w-16 border rounded px-2 py-1 text-center"
                                     />
+
                                     <button
-                                      onClick={() => saveStockEdit(item.id)}
-                                      className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                                      onClick={() => {
+                                        const qty = editingQuantities[item.id] ?? item.quantity;
+
+                                        if (!qty || qty < 1 || (item.Stock || item.stock) < qty) {
+                                          toast.error(`Cantidad inválida (máx ${item.Stock || item.stock})`);
+                                          setEditingQuantities(prev => ({ ...prev, [item.id]: item.quantity })); // restaurar
+                                          return;
+                                        }
+
+                                        updateQuantity(item.id, qty);
+                                        setEditingStock(null); // cerrar input
+                                        setEditingQuantities(prev => ({ ...prev, [item.id]: undefined })); // limpiar temporal
+                                        toast.success("Cantidad actualizada");
+                                      }}
+                                      className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
                                     >
                                       ✓
                                     </button>
+
                                     <button
-                                      onClick={cancelStockEdit}
-                                      className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                                      onClick={() => {
+                                        setEditingStock(null); // cerrar input sin guardar
+                                        setEditingQuantities(prev => ({ ...prev, [item.id]: undefined })); // limpiar temporal
+                                      }}
+                                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
                                     >
                                       ✗
                                     </button>
@@ -334,7 +362,7 @@ export const CarritoCompras = () => {
                                   <>
                                     <span className="font-bold text-lg w-8 text-center">{item.quantity}</span>
                                     <button
-                                      onClick={() => handleEditStock(item)}
+                                      onClick={() => setEditingStock(item.id)}
                                       className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
                                     >
                                       <Edit2 className="h-3 w-3" /> Editar
@@ -726,11 +754,10 @@ export const CarritoCompras = () => {
                       <button
                         key={color.ColorId}
                         onClick={() => handleSelectColor(color)}
-                        className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all ${
-                          getColorDisplay(editingColorItem, productColors) === color.Nombre
-                            ? "border-blue-600 bg-blue-50"
-                            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                        }`}
+                        className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all ${getColorDisplay(editingColorItem, productColors) === color.Nombre
+                          ? "border-blue-600 bg-blue-50"
+                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                          }`}
                       >
                         <div
                           className="w-12 h-12 rounded-full border border-slate-300 mb-2"

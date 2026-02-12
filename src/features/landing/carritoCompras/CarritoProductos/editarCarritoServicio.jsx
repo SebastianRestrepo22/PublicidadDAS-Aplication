@@ -175,7 +175,7 @@ export const EditarCarritoServicio = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-[80px]">
         <button
           onClick={() => navigate("/carritodecompras")}
           className="flex items-center text-blue-600 hover:text-blue-800 mb-6 font-medium"

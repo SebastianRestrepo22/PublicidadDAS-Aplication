@@ -25,56 +25,81 @@ export const CartProvider = ({ children }) => {
   const addToCart = (product, customization = {}, quantity = 1) => {
     const stock = product.Stock ?? product.stock ?? null;
     const productId = product.ProductoId || product.ServicioId || product.id;
-    
-    // 🔴 CORREGIDO: Manejo correcto de UUID de color
-    let colorId = null;
+
+    // 🔴 CORREGIDO: Manejo consistente del color
+    let colorData = null;
+
     if (customization.color) {
-      // Si el color es un objeto, extraer el UUID
-      if (typeof customization.color === 'object' && customization.color.ColorId) {
-        colorId = customization.color.ColorId;
-      } 
-      // Si es un string, verificar si es UUID
-      else if (typeof customization.color === 'string') {
-        // Verificar si es un UUID válido
+      // Si es un string UUID
+      if (typeof customization.color === 'string') {
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (uuidRegex.test(customization.color)) {
-          colorId = customization.color;
+          colorData = {
+            ColorId: customization.color,
+            Nombre: customization.colorName || "Color no definido"
+          };
+        } else {
+          // Si es solo un nombre de color
+          colorData = {
+            ColorId: null,
+            Nombre: customization.color
+          };
         }
+      }
+      // Si es un objeto color completo
+      else if (typeof customization.color === 'object') {
+        colorData = {
+          ColorId: customization.color.ColorId || null,
+          Nombre: customization.color.Nombre || "Color no definido",
+          Hex: customization.color.Hex || "#ccc"
+        };
       }
     }
 
-    // Crear fingerprint considerando el UUID del color
+    // Crear fingerprint usando ColorId si existe
     const itemFingerprint = JSON.stringify({
       productId,
-      colorId, // 🔴 Usar el UUID en lugar del objeto completo
+      colorId: colorData?.ColorId || null,
+      colorName: colorData?.Nombre || null,
       size: customization.size,
       personalizacion: customization,
     });
 
     const existingLineIndex = cart.findIndex((l) => {
-      if (l.ProductoId !== product.ProductoId && 
-          l.ServicioId !== product.ServicioId) {
+      if (l.ProductoId !== product.ProductoId &&
+        l.ServicioId !== product.ServicioId) {
         return false;
       }
-      
-      // Comparar UUIDs de color
-      const existingColorId = l.customization?.colorId || 
-                              (typeof l.customization?.color === 'object' ? l.customization.color.ColorId : l.customization?.color);
-      
-      if (colorId && existingColorId !== colorId) {
+
+      // Extraer color del item existente
+      const existingColor = l.customization?.color;
+      const existingColorId = existingColor?.ColorId;
+      const existingColorName = existingColor?.Nombre;
+
+      // Comparar colores
+      if (colorData) {
+        if (colorData.ColorId && existingColorId !== colorData.ColorId) {
+          return false;
+        }
+        if (!colorData.ColorId && colorData.Nombre && existingColorName !== colorData.Nombre) {
+          return false;
+        }
+      } else if (existingColor) {
         return false;
       }
-      
+
+      // Para productos personalizados, comparar toda la customización
       if (product.EsPersonalizado || customization.Nombre) {
         const existingFingerprint = JSON.stringify({
           productId: l.ProductoId || l.ServicioId,
           colorId: existingColorId,
+          colorName: existingColorName,
           size: l.customization?.size,
           personalizacion: l.customization
         });
         return existingFingerprint === itemFingerprint;
       }
-      
+
       return true;
     });
 
@@ -93,7 +118,7 @@ export const CartProvider = ({ children }) => {
         quantity: newQuantity
       };
       setCart(updatedCart);
-      
+
       toast.success(`${product.Nombre} actualizado en el carrito`);
       return;
     }
@@ -118,11 +143,9 @@ export const CartProvider = ({ children }) => {
       quantity: Math.max(1, parseInt(quantity, 10) || 1),
       Tipo: itemType,
       EsPersonalizado: product.EsPersonalizado || false,
-      // 🔴 CORREGIDO: Guardar el UUID del color en lugar del objeto completo
+      // 🔴 CORREGIDO: Guardar color como objeto consistente
       customization: {
-        colorId: colorId, // UUID del color
-        colorName: customization.color?.Nombre || 
-                   (typeof customization.color === 'string' && !colorId ? customization.color : null),
+        color: colorData, // Guardar objeto color completo
         size: customization.size || null,
         ...customization
       },
@@ -136,6 +159,11 @@ export const CartProvider = ({ children }) => {
     }
 
     setCart((prev) => [...prev, cartLine]);
+    console.log("🛒 [CART] Producto agregado:", {
+      nombre: product.Nombre,
+      colorData: colorData,
+      customization: cartLine.customization
+    });
     toast.success(`${product.Nombre} agregado al carrito`);
   };
 
@@ -147,7 +175,7 @@ export const CartProvider = ({ children }) => {
     setCart((prev) =>
       prev.map((l) => {
         if (l.id !== lineId) return l;
-        
+
         const stock = l.Stock ?? null;
         const validatedQuantity = Math.max(1, newQuantity);
 
@@ -161,49 +189,59 @@ export const CartProvider = ({ children }) => {
     );
   };
 
-  // 🔴 FUNCIÓN CORREGIDA PARA ACTUALIZAR COLOR
   const updateItemColor = (lineId, colorData) => {
     console.log("🎨 [CART CONTEXT] updateItemColor llamado:", {
       lineId,
       colorData
     });
-    
-    const updatedCart = cart.map((item) => {
+
+    setCart(prev => prev.map(item => {
       if (item.id === lineId) {
-        // Extraer UUID del color
-        let colorId = null;
-        let colorName = null;
-        
+        let newColorObj = null;
+
+        // Procesar colorData para crear objeto consistente
         if (colorData) {
           if (typeof colorData === 'object' && colorData.ColorId) {
-            colorId = colorData.ColorId;
-            colorName = colorData.Nombre;
+            newColorObj = {
+              ColorId: colorData.ColorId,
+              Nombre: colorData.Nombre || "Color no definido",
+              Hex: colorData.Hex || "#ccc"
+            };
           } else if (typeof colorData === 'string') {
             // Verificar si es UUID
             const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
             if (uuidRegex.test(colorData)) {
-              colorId = colorData;
+              // Es un UUID, buscar el nombre en el catálogo
+              const existingColors = productColors[item.ProductoId] || [];
+              const foundColor = existingColors.find(c => c.ColorId === colorData);
+              newColorObj = {
+                ColorId: colorData,
+                Nombre: foundColor?.Nombre || "Color no definido",
+                Hex: foundColor?.Hex || "#ccc"
+              };
             } else {
-              colorName = colorData;
+              // Es solo un nombre de color
+              newColorObj = {
+                ColorId: null,
+                Nombre: colorData,
+                Hex: "#ccc"
+              };
             }
           }
         }
-        
+
+        console.log("🎨 [CART CONTEXT] Color actualizado a:", newColorObj);
+
         return {
           ...item,
           customization: {
             ...item.customization,
-            colorId: colorId, // Guardar UUID
-            colorName: colorName, // Guardar nombre para display
-            color: colorId || colorName // Mantener compatibilidad
+            color: newColorObj // Guardar objeto completo
           }
         };
       }
       return item;
-    });
-    
-    setCart(updatedCart);
-    console.log("📦 [CART CONTEXT] Carrito actualizado:", updatedCart);
+    }));
   };
 
   const clearCart = () => setCart([]);

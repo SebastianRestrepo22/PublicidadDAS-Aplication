@@ -712,7 +712,7 @@ export const Roles = () => {
                   {paginatedData.length > 0 ? (
                     paginatedData.map((rol) => (
                       <tr key={rol.RoleId} className="hover:bg-slate-50 transition-colors duration-150">
-                        <td className="py-4 px-6 text-sm text-slate-900 font-mono">{String(rol.RoleId).slice(0, 8)}...</td>
+                        <td className="py-4 px-6 text-sm text-slate-900 font-mono">{String(rol.RoleId).slice(0, 3)}</td>
                         <td className="py-4 px-6 text-sm text-slate-900 font-medium">{rol.Nombre}</td>
                         <td className="py-4 px-6">
                           <div className="flex justify-center">

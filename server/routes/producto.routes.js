@@ -6,37 +6,28 @@ import {
     updateProducto,
     deleteProducto,
     validarNombre,
-    buscarProducto
+    buscarProducto,
+    cambiarEstadoProducto
 } from '../controllers/productos.controller.js';
-import { getColoresProducto, updateColoresProducto  } from '../controllers/color.controller.js';
+// IMPORTANTE: Importa desde color.controller.js, NO desde productos.controller
+import { getColoresProducto, updateColoresProducto } from '../controllers/color.controller.js';
 
 const router = express.Router();
 
-// Validar si el nombre ya existe
+// Rutas específicas primero
 router.get('/validar-nombre', validarNombre);
-
-// Buscar productos
 router.get('/buscar', buscarProducto);
 
-// Crear producto
+// Rutas con parámetros específicos
+router.put('/:id/estado', cambiarEstadoProducto);
+router.get('/:id/colores', getColoresProducto);  
+router.post('/:id/colores', updateColoresProducto); 
+
+// Rutas CRUD básicas (más genéricas, al final)
 router.post('/', postProducto);
-
-// Obtener todos los productos
 router.get('/', getAllProducto);
-
-// RELACIÓN PRODUCTO ↔ COLORES
-
-router.get('/:id/colores', getColoresProducto);
-
-router.post('/:id/colores', updateColoresProducto );
-
-// Obtener producto/servicio por ID
 router.get('/:id', getProductoById);
-
-// Actualizar producto
-router.put('/:ProductoId', updateProducto);
-
-// Eliminar producto
+router.put('/:id', updateProducto);  
 router.delete('/:id', deleteProducto);
 
 export default router;

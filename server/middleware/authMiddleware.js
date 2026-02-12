@@ -1,8 +1,6 @@
-// src/middleware/authMiddleware.js
 import jwt from "jsonwebtoken";
 import connectDB from "../lib/db.js";
 
-// Asegúrate de tener esta variable en tu .env
 const JWT_KEY = process.env.JWT_KEY || "-secret-token";
 export const authMiddleware = async (req, res, next) => {
   const authHeader = req.headers["authorization"];
@@ -17,7 +15,6 @@ export const authMiddleware = async (req, res, next) => {
     const decoded = jwt.verify(token, JWT_KEY);
     req.user = decoded; // Ahora req.user contiene el payload (incluyendo CedulaId)
 
-    // ✅ Opcional: validar que el usuario exista en la base de datos
     const connection = await connectDB();
     const [rows] = await connection.execute(
       "SELECT CedulaId FROM usuarios WHERE CedulaId = ?",
