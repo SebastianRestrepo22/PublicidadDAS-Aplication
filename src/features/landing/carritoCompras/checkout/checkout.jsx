@@ -1,8 +1,38 @@
-// src/components/checkout/Checkout.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../../../../context/CartContext";
 import { useAuth } from "../../../../context/AuthContext";
+import { toast } from "react-toastify";
+
+// ✅ VALIDADOR DE UUID
+const isValidUUID = (str) => {
+  if (typeof str !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+};
+
+// ✅ FUNCIÓN PARA EXTRAER COLORID SEGURO
+const extractValidColorId = (item) => {
+  if (!item?.customization?.color) return null;
+
+  // Caso 1: UUID válido en customization.color
+  if (typeof item.customization.color === 'string' && isValidUUID(item.customization.color)) {
+    return item.customization.color;
+  }
+
+  // Caso 2: Objeto con ColorId UUID
+  if (item.customization.color?.ColorId && isValidUUID(item.customization.color.ColorId)) {
+    return item.customization.color.ColorId;
+  }
+
+  // Caso 3: Objeto con id UUID
+  if (item.customization.color?.id && isValidUUID(item.customization.color.id)) {
+    return item.customization.color.id;
+  }
+
+  // Cualquier otro caso → null (evita error FK constraint)
+  console.warn(`⚠️ Color no válido para "${item.Nombre}":`, item.customization.color);
+  return null;
+};
 
 export const Checkout = () => {
   const { cart, getTotal, clearCart } = useCart();
@@ -12,9 +42,9 @@ export const Checkout = () => {
   const [error, setError] = useState("");
   const [voucher, setVoucher] = useState(null);
 
-  // ====== DATOS BANCARIOS CON TU QR REAL ======
+  // ====== DATOS BANCARIOS ======
   const DATOS_BANCARIOS_REALES = {
-    nombreTitular: "Luis Marino Moreno ",
+    nombreTitular: "Luis Marino Moreno",
     numeroCuenta: "24079288086",
     tipoCuenta: "Ahorro",
     banco: "Bancolombia",
@@ -48,42 +78,95 @@ export const Checkout = () => {
   const enviarPedido = async () => {
     if (!user) {
       setError("Debes iniciar sesión");
+      toast.error("Debes iniciar sesión para continuar");
       return;
     }
 
     if (metodoPago === "entrega" && !validarEntrega()) {
       setError("Completa todos los campos de entrega");
+      toast.error("Completa todos los campos de entrega");
       return;
     }
 
     setLoading(true);
     setError("");
 
-    const payload = {
-      ClienteId: user.CedulaId,
-      FechaRegistro: new Date().toISOString().split("T")[0],
-      Total: getTotal(),
-      Estado: "pendiente",
-      detalle: cart.map(item => ({
-        ProductoServicioId: item.ProductoServicioId,
-        Cantidad: item.quantity,
-        Alto: item.options?.alto,
-        Ancho: item.options?.ancho,
-        Descripcion: item.options?.descripcion,
-        UrlImagen: item.options?.urlImagen || item.UrlImagen
-      }))
-    };
-
-    if (metodoPago === "entrega") {
-      payload.metodoPago = "contra_entrega";
-      payload.nombre_recibe = datosEntrega.nombreRecibe;
-      payload.telefono_entrega = datosEntrega.telefono;
-      payload.direccion_entrega = datosEntrega.direccion;
-    } else {
-      payload.metodoPago = metodoPago;
-    }
-
     try {
+      // ✅ CONSTRUIR DETALLES CON VALIDACIÓN SEGURA
+      const detallesValidados = cart.map(item => {
+        const ProductoId = item.ProductoId || null;
+        const ServicioId = item.ServicioId || null;
+
+        if (!ProductoId && !ServicioId) {
+          throw new Error(`El ítem "${item.Nombre || item.id}" no tiene ProductoId ni ServicioId válido`);
+        }
+
+        // ✅ EXTRAER COLORID SEGURO
+        const ColorId = extractValidColorId(item);
+
+        // ✅ TAMAÑO SOLO PARA SERVICIOS
+        let Tamaño = null;
+        if (ServicioId) {
+          const t = (item.Tamaño || item.customization?.Tamaño)?.trim();
+          Tamaño = t && ['Pequeña', 'Mediana', 'Grande'].includes(t) ? t : "Mediana";
+        }
+
+        // ✅ DESCRIPCIÓN CON COLOR SI NO ES UUID
+        let descripcion = item.options?.descripcion || item.Descripcion || item.customization?.Descripcion || "";
+
+        // Agregar nombre del color a la descripción si no es UUID
+        if (item.customization?.color && !ColorId) {
+          const colorName = typeof item.customization.color === 'string'
+            ? item.customization.color
+            : item.customization.color?.Nombre || item.customization.color?.nombre;
+
+          if (colorName) {
+            descripcion += (descripcion ? " | " : "") + `Color: ${colorName}`;
+          }
+        }
+
+        return {
+          ProductoId,
+          ServicioId,
+          Cantidad: item.quantity || 1,
+          Precio: item.Precio || 0,
+          Tamaño,
+          Descripcion: descripcion,
+          UrlImagen: item.options?.urlImagen || item.UrlImagen || null,
+          ColorId // ✅ UUID válido o null
+        };
+      });
+
+      // ✅ VALIDACIÓN FINAL
+      const detallesFinales = detallesValidados.filter(detalle => {
+        if (!detalle.ProductoId && !detalle.ServicioId) {
+          console.error(`❌ Item sin ProductoId/ServicioId omitido:`, detalle);
+          return false;
+        }
+        return true;
+      });
+
+      if (detallesFinales.length === 0) {
+        throw new Error("No hay items válidos para procesar el pedido");
+      }
+
+      const payload = {
+        ClienteId: user.CedulaId,
+        FechaRegistro: new Date().toISOString().split("T")[0],
+        Total: getTotal(),
+        Estado: "pendiente",
+        metodoPago: metodoPago === "entrega" ? "contra_entrega" : metodoPago,
+        detalle: detallesFinales
+      };
+
+      // ✅ AGREGAR DATOS DE ENTREGA SI ES CONTRA ENTREGA
+      if (metodoPago === "entrega") {
+        payload.nombre_recibe = datosEntrega.nombreRecibe;
+        payload.telefono_entrega = datosEntrega.telefono;
+        payload.direccion_entrega = datosEntrega.direccion;
+      }
+
+      // ✅ ENVIAR AL BACKEND
       const res = await fetch("http://localhost:3000/api/pedidos-clientes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -92,14 +175,15 @@ export const Checkout = () => {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Error al crear el pedido");
+        const errorMsg = errorData.error || errorData.message || `Error ${res.status}: ${res.statusText}`;
+        throw new Error(errorMsg);
       }
 
       const data = await res.json();
-      const pedidoId = data.PedidoClienteId;
-
+      const pedidoId = String(data.PedidoClienteId).trim();
       clearCart();
 
+      // ✅ GENERAR VOUCHER PARA PAGOS ELECTRÓNICOS
       if (metodoPago === "qr" || metodoPago === "transferencia") {
         setVoucher({
           id: pedidoId,
@@ -121,19 +205,29 @@ export const Checkout = () => {
           referencia: `PED${pedidoId.toString().padStart(6, '0')}`,
           fechaLimite: new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleDateString("es-CO")
         });
+        toast.success("¡Pedido creado! Adjunta tu comprobante para confirmar");
       } else {
-        navigate("/pedido-exitoso", { state: { metodo: "entrega", id: pedidoId } });
+        navigate("/pedido-exitoso", {
+          state: {
+            metodo: "entrega",
+            id: pedidoId,
+            total: getTotal()
+          }
+        });
+        toast.success("¡Pedido creado! Se procesará al recibir tu entrega");
       }
 
     } catch (e) {
-      console.error(e);
-      setError(e.message || "Ocurrió un error al enviar el pedido");
+      console.error("❌ Error completo al crear pedido:", e);
+      const errorMsg = e.message || "Ocurrió un error al procesar tu pedido. Verifica los datos e intenta nuevamente.";
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  // ====== COMPONENTE: Subir comprobante ======
+  // ====== COMPONENTE: Subir comprobante - CORREGIDO ======
   const SubirComprobanteBanco = ({ pedidoId, metodo }) => {
     const [file, setFile] = useState(null);
     const [uploading, setUploading] = useState(false);
@@ -142,39 +236,66 @@ export const Checkout = () => {
     const handleSubmit = async (e) => {
       e.preventDefault();
       if (!file) {
-        setError("Por favor adjunta el comprobante");
+        toast.error("Por favor adjunta el comprobante de pago");
+        return;
+      }
+
+      // Validar tamaño (máx 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("El archivo debe ser menor a 10MB");
+        return;
+      }
+
+      // Validar tipo
+      if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+        toast.error("Solo se permiten imágenes o PDFs");
         return;
       }
 
       const formData = new FormData();
-      formData.append("comprobante", file);
+      formData.append("voucher", file);  // 🔴 CORREGIDO: "voucher" en lugar de "comprobante"
       formData.append("pedidoId", pedidoId);
 
       setUploading(true);
       try {
-        // ⬇️ NUEVA RUTA: /api/voucher
+        console.log('📤 Subiendo comprobante desde checkout...');
+        console.log('📄 Archivo:', file.name);
+        console.log('🎫 Pedido ID:', pedidoId);
+
         const res = await fetch("http://localhost:3000/api/voucher", {
           method: "POST",
           body: formData
+          // ⚠️ NO agregues headers Content-Type
         });
 
         if (res.ok) {
+          const data = await res.json();
+          console.log('✅ Comprobante subido:', data);
+
           setSuccess(true);
+          toast.success("¡Comprobante enviado! Revisaremos tu pago en 24-48 horas");
+
           setTimeout(() => {
-            navigate("/pedido-exitoso", { 
-              state: { 
+            navigate("/pedido-exitoso", {
+              state: {
                 metodo,
                 id: pedidoId,
-                referencia: `PED${pedidoId.toString().padStart(6, '0')}`
-              } 
+                referencia: `PED${pedidoId.toString().padStart(6, '0')}`,
+                total: voucher?.total,
+                voucherUrl: data.url // Agregar URL del voucher
+              }
             });
           }, 2000);
+
         } else {
-          const err = await res.json().catch(() => ({}));
-          setError(err.error || "Error al subir el comprobante");
+          const errorText = await res.text();
+          console.error('❌ Error del servidor:', errorText);
+          const errorMsg = "Error al subir el comprobante. Intenta nuevamente";
+          toast.error(errorMsg);
         }
       } catch (err) {
-        setError("No se pudo conectar al servidor");
+        console.error("Error subiendo comprobante:", err);
+        toast.error("No se pudo conectar al servidor. Verifica tu conexión");
       } finally {
         setUploading(false);
       }
@@ -189,7 +310,7 @@ export const Checkout = () => {
             </svg>
           </div>
           <div className="text-green-700 font-bold">¡Comprobante enviado exitosamente!</div>
-          <p className="text-gray-600 text-sm mt-1">Revisaremos tu pago y te notificaremos.</p>
+          <p className="text-gray-600 text-sm mt-1">Revisaremos tu pago y te notificaremos por correo.</p>
         </div>
       );
     }
@@ -225,6 +346,9 @@ export const Checkout = () => {
               {file && (
                 <p className="text-sm text-green-600 font-medium mt-1">
                   ✓ Archivo seleccionado: {file.name}
+                  <span className="text-gray-500 ml-2">
+                    ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                  </span>
                 </p>
               )}
             </div>
@@ -266,7 +390,7 @@ export const Checkout = () => {
               {voucher.metodo === "qr" ? "Paga con QR Bancolombia" : "Transferencia Bancaria"}
             </h1>
           </div>
-          
+
           <div className="inline-flex items-center gap-4 bg-blue-50 px-4 py-2 rounded-full">
             <span className="text-sm font-medium text-blue-700">
               Pedido: <span className="font-bold">#{voucher.id}</span>
@@ -333,7 +457,7 @@ export const Checkout = () => {
                 </div>
                 <p className="text-gray-300 mt-1">Después de pagar, adjunta aquí tu comprobante para confirmar tu pedido</p>
               </div>
-              
+
               <div className="p-6">
                 <SubirComprobanteBanco pedidoId={voucher.id} metodo={voucher.metodo} />
               </div>
@@ -461,11 +585,15 @@ export const Checkout = () => {
                     </div>
                     <div className="flex items-center gap-4 mt-1">
                       <span className="text-sm text-gray-600">Cantidad: {item.quantity}</span>
-                      {item.options?.alto && (
-                        <span className="text-xs bg-gray-200 px-2 py-1 rounded">Alto: {item.options.alto}</span>
+                      {item.Tamaño && (
+                        <span className="text-xs bg-gray-200 px-2 py-1 rounded">Tamaño: {item.Tamaño}</span>
                       )}
-                      {item.options?.ancho && (
-                        <span className="text-xs bg-gray-200 px-2 py-1 rounded">Ancho: {item.options.ancho}</span>
+                      {item.customization?.color && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          Color: {typeof item.customization.color === 'string'
+                            ? item.customization.color
+                            : item.customization.color?.Nombre || item.customization.color?.nombre || 'N/A'}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -484,7 +612,7 @@ export const Checkout = () => {
           </div>
         </div>
 
-        {/* Métodos de pago - más ancho */}
+        {/* Métodos de pago */}
         <div className="lg:col-span-7 space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-5 flex items-center gap-2">
@@ -499,7 +627,7 @@ export const Checkout = () => {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                  d="M3 10h18M7 15h10l4-8H5.4L7 13zm1 6a2 2 0 100 4 2 2 0 000-4zm6 0a2 2 0 100 4 2 2 0 000-4z"
                 />
               </svg>
               Método de pago
@@ -507,17 +635,15 @@ export const Checkout = () => {
 
             {/* Opción 1: QR */}
             <div
-              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                metodoPago === "qr" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-              }`}
+              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "qr" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+                }`}
               onClick={() => setMetodoPago("qr")}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                      metodoPago === "qr" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                    }`}
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "qr" ? "border-blue-500 bg-blue-500" : "border-gray-300"
+                      }`}
                   >
                     {metodoPago === "qr" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                   </div>
@@ -550,16 +676,14 @@ export const Checkout = () => {
 
             {/* Opción 2: Transferencia */}
             <div
-              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                metodoPago === "transferencia" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-              }`}
+              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+                }`}
               onClick={() => setMetodoPago("transferencia")}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                    metodoPago === "transferencia" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                  }`}
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-500" : "border-gray-300"
+                    }`}
                 >
                   {metodoPago === "transferencia" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                 </div>
@@ -590,16 +714,14 @@ export const Checkout = () => {
 
             {/* Opción 3: Contra entrega */}
             <div
-              className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                metodoPago === "entrega" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-              }`}
+              className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "entrega" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+                }`}
               onClick={() => setMetodoPago("entrega")}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                    metodoPago === "entrega" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                  }`}
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "entrega" ? "border-blue-500 bg-blue-500" : "border-gray-300"
+                    }`}
                 >
                   {metodoPago === "entrega" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                 </div>
@@ -618,9 +740,8 @@ export const Checkout = () => {
                         placeholder="Nombre completo *"
                         value={datosEntrega.nombreRecibe}
                         onChange={(e) => setDatosEntrega({ ...datosEntrega, nombreRecibe: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${
-                          erroresEntrega.nombreRecibe ? "border-red-500" : "border-gray-300"
-                        }`}
+                        className={`w-full p-3 rounded-lg border ${erroresEntrega.nombreRecibe ? "border-red-500" : "border-gray-300"
+                          }`}
                       />
                       {erroresEntrega.nombreRecibe && (
                         <p className="text-red-500 text-sm mt-1">{erroresEntrega.nombreRecibe}</p>
@@ -632,9 +753,8 @@ export const Checkout = () => {
                         placeholder="Teléfono *"
                         value={datosEntrega.telefono}
                         onChange={(e) => setDatosEntrega({ ...datosEntrega, telefono: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${
-                          erroresEntrega.telefono ? "border-red-500" : "border-gray-300"
-                        }`}
+                        className={`w-full p-3 rounded-lg border ${erroresEntrega.telefono ? "border-red-500" : "border-gray-300"
+                          }`}
                       />
                       {erroresEntrega.telefono && (
                         <p className="text-red-500 text-sm mt-1">{erroresEntrega.telefono}</p>
@@ -645,9 +765,8 @@ export const Checkout = () => {
                         placeholder="Dirección completa *"
                         value={datosEntrega.direccion}
                         onChange={(e) => setDatosEntrega({ ...datosEntrega, direccion: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${
-                          erroresEntrega.direccion ? "border-red-500" : "border-gray-300"
-                        }`}
+                        className={`w-full p-3 rounded-lg border ${erroresEntrega.direccion ? "border-red-500" : "border-gray-300"
+                          }`}
                         rows="2"
                       />
                       {erroresEntrega.direccion && (
@@ -663,10 +782,11 @@ export const Checkout = () => {
           {/* Botón de confirmar */}
           <button
             onClick={enviarPedido}
-            disabled={loading}
-            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${
-              loading ? "bg-gray-400" : "bg-black hover:bg-gray-800 hover:shadow-xl"
-            }`}
+            disabled={loading || cart.length === 0}
+            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${loading || cart.length === 0
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-black hover:bg-gray-800 hover:shadow-xl"
+              }`}
           >
             {loading ? (
               <div className="flex items-center justify-center gap-2">
@@ -676,7 +796,7 @@ export const Checkout = () => {
                 </svg>
                 Procesando...
               </div>
-            ) : "Confirmar pedido"}
+            ) : cart.length === 0 ? "Carrito vacío" : "Confirmar pedido"}
           </button>
         </div>
       </div>

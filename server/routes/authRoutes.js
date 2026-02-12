@@ -19,13 +19,39 @@ router.post('/register', async (req, res) => {
     try {
         const connection = await connectDB();
 
+        // Objeto para acumular errores
+        const errors = {};
+
         // Verifica si el correo ya existe
         const [existente] = await connection.execute(
             'SELECT * FROM usuarios WHERE CorreoElectronico = ?',
             [CorreoElectronico]
         );
         if (existente.length > 0) {
-            return res.status(409).json({ message: 'Usuario ya existe' });
+            errors.CorreoElectronico = 'Este correo ya está registrado';
+        }
+
+        // Verifica si la cédula ya existe
+        const [cedulaExistente] = await connection.execute(
+            'SELECT * FROM usuarios WHERE CedulaId = ?',
+            [CedulaId]
+        );
+        if (cedulaExistente.length > 0) {
+            errors.CedulaId = 'Esta cédula ya está registrada';
+        }
+
+        // Verifica si el teléfono ya existe
+        const [telefonoExistente] = await connection.execute(
+            'SELECT * FROM usuarios WHERE Telefono = ?',
+            [Telefono]
+        );
+        if (telefonoExistente.length > 0) {
+            errors.Telefono = 'Este teléfono ya está registrado';
+        }
+
+        // Si hay errores, devolverlos
+        if (Object.keys(errors).length > 0) {
+            return res.status(409).json({ errors });
         }
 
         // Busca el rol cliente
@@ -91,7 +117,7 @@ router.post('/login', async (req, res) => {
             `SELECT p.Nombre FROM permisos p
    JOIN rol_permisos rp ON p.PermisoId = rp.PermisoId
    WHERE rp.RoleId = ?`,
-            [user.RoleId]   
+            [user.RoleId]
         );
 
         const permisosArray = permisos.map(p => p.Nombre);
@@ -244,20 +270,207 @@ router.post('/forgot-password', async (req, res) => {
 
         // Enviar correo con enlace de recuperación
         const transporter = nodemailer.createTransport({
-            service: 'gmail', // o el que uses
+            service: 'gmail',
             auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
         });
 
         const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
 
         await transporter.sendMail({
-            from: process.env.EMAIL_USER,
+            from: `"Soporte Sistema" <${process.env.EMAIL_USER}>`,
             to: correo,
-            subject: 'Recuperar contraseña',
-            html: `<p>Haz click en este enlace para restablecer tu contraseña: <a href="${resetUrl}">Restablecer contraseña</a></p>`
+            subject: '🔐 Solicitud de recuperación de contraseña',
+            html: `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Recuperar Contraseña</title>
+                    <style>
+                        body {
+                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                            line-height: 1.6;
+                            color: #333;
+                            margin: 0;
+                            padding: 0;
+                            background-color: #f7fafc;
+                        }
+                        .container {
+                            max-width: 600px;
+                            margin: 0 auto;
+                            background: white;
+                            border-radius: 10px;
+                            overflow: hidden;
+                            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                            border: 1px solid #e2e8f0;
+                        }
+                        .header {
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            padding: 30px 20px;
+                            text-align: center;
+                            color: white;
+                        }
+                        .header h1 {
+                            margin: 0;
+                            font-size: 24px;
+                            font-weight: 600;
+                        }
+                        .content {
+                            padding: 40px 30px;
+                        }
+                        .message {
+                            font-size: 16px;
+                            color: #4a5568;
+                            margin-bottom: 25px;
+                        }
+                        .reset-box {
+                            background: #f8fafc;
+                            border: 2px dashed #cbd5e0;
+                            border-radius: 8px;
+                            padding: 25px;
+                            text-align: center;
+                            margin: 30px 0;
+                        }
+                        .reset-button {
+                            display: inline-block;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            color: white;
+                            text-decoration: none;
+                            padding: 14px 28px;
+                            border-radius: 8px;
+                            font-weight: 600;
+                            font-size: 16px;
+                            transition: all 0.3s ease;
+                        }
+                        .reset-button:hover {
+                            transform: translateY(-2px);
+                            box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+                        }
+                        .token-info {
+                            background: #fff5f5;
+                            border: 1px solid #fed7d7;
+                            border-radius: 6px;
+                            padding: 15px;
+                            margin-top: 20px;
+                            font-size: 14px;
+                            color: #c53030;
+                            text-align: center;
+                        }
+                        .help-text {
+                            font-size: 14px;
+                            color: #718096;
+                            margin-top: 20px;
+                            text-align: center;
+                        }
+                        .footer {
+                            background: #edf2f7;
+                            padding: 20px;
+                            text-align: center;
+                            color: #718096;
+                            font-size: 12px;
+                            border-top: 1px solid #e2e8f0;
+                        }
+                        .warning {
+                            background: #fffaf0;
+                            border: 1px solid #feebc8;
+                            border-radius: 6px;
+                            padding: 15px;
+                            margin: 20px 0;
+                            color: #c05621;
+                            font-size: 14px;
+                        }
+                        .link-alt {
+                            word-break: break-all;
+                            font-size: 12px;
+                            color: #4a5568;
+                            margin-top: 10px;
+                            padding: 10px;
+                            background: #f1f5f9;
+                            border-radius: 4px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>🔐 Recuperación de Contraseña</h1>
+                        </div>
+                        
+                        <div class="content">
+                            <p class="message">Hola,</p>
+                            
+                            <p class="message">
+                                Hemos recibido una solicitud para restablecer la contraseña de tu cuenta. 
+                                Si no realizaste esta solicitud, puedes ignorar este correo.
+                            </p>
+                            
+                            <div class="reset-box">
+                                <p style="margin-bottom: 20px; color: #2d3748; font-weight: 500;">
+                                    Para continuar con el proceso de recuperación, haz clic en el siguiente botón:
+                                </p>
+                                
+                                <a href="${resetUrl}" class="reset-button">
+                                    🚀 Restablecer mi contraseña
+                                </a>
+                                
+                                <div class="link-alt">
+                                    Si el botón no funciona, copia y pega este enlace en tu navegador:<br>
+                                    <a href="${resetUrl}" style="color: #4299e1;">${resetUrl}</a>
+                                </div>
+                            </div>
+                            
+                            <div class="warning">
+                                ⚠️ <strong>Importante:</strong> Este enlace tiene una validez de <strong>15 minutos</strong>. 
+                                Por seguridad, no lo compartas con nadie.
+                            </div>
+                            
+                            <p class="help-text">
+                                Si tienes problemas para acceder al enlace o necesitas ayuda adicional, 
+                                por favor contacta a nuestro equipo de soporte.
+                            </p>
+                        </div>
+                        
+                        <div class="footer">
+                            <p>Este es un correo automático, por favor no respondas a este mensaje.</p>
+                            <p>© ${new Date().getFullYear()} Sistema de Gestión. Todos los derechos reservados.</p>
+                            <p style="margin-top: 10px; font-size: 11px; color: #a0aec0;">
+                                🔒 Por tu seguridad, nunca te pediremos tu contraseña por correo electrónico.
+                            </p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `,
+            // Versión en texto plano
+            text: `
+RECUPERACIÓN DE CONTRASEÑA
+
+Hola,
+
+Hemos recibido una solicitud para restablecer la contraseña de tu cuenta. 
+Si no realizaste esta solicitud, puedes ignorar este correo.
+
+Para continuar con el proceso de recuperación, accede al siguiente enlace:
+${resetUrl}
+
+⚠️ IMPORTANTE:
+- Este enlace tiene una validez de 15 minutos
+- Por seguridad, no lo compartas con nadie
+- Si tienes problemas, contacta a nuestro equipo de soporte
+
+Si el botón no funciona, copia y pega este enlace en tu navegador:
+${resetUrl}
+
+---
+Este es un correo automático, por favor no respondas a este mensaje.
+© ${new Date().getFullYear()} Sistema de Gestión. Todos los derechos reservados.
+
+🔒 Por tu seguridad, nunca te pediremos tu contraseña por correo electrónico.
+            `
         });
 
-        res.status(200).json({ message: 'Correo enviado' });
+        res.status(200).json({ message: '📧 Correo de recuperación enviado exitosamente' });
     } catch (error) {
         console.error('Error en forgot-password:', error);
         res.status(500).json({ message: 'Error interno del servidor' });
@@ -296,7 +509,5 @@ router.post('/reset-password/:token', async (req, res) => {
         res.status(500).json({ message: 'Error interno del servidor' });
     }
 });
-
-
 
 export default router;

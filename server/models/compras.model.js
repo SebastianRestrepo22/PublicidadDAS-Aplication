@@ -1,29 +1,26 @@
 import { v4 as uuidv4 } from 'uuid';
-import connectDB from '../lib/db.js';
+import { dbPool } from '../lib/db.js';
 
 const sanitize = (v) => (v ===  undefined ? null : v) 
 
 // Obtener todos los proveedores
 export const getAllCompras = async () => {
-  const connection = await connectDB();
-  const [rows] = await connection.execute('SELECT * FROM Compras'); 
+  const [rows] = await dbPool.execute('SELECT * FROM Compras'); 
   return rows;
 };
 
 // Obtener compra por ID
 export const getCompraById = async (id) => {
-  const connection = await connectDB();
-  const [rows] = await connection.execute(
+  const [rows] = await dbPool.execute(
     'SELECT * FROM Compras WHERE CompraId = ?', 
     [id]);
   return rows[0];
 };
 
 export const createCompra = async ({ ProveedorId, Total, FechaRegistro, Estado }) => {
-  const connection = await connectDB();
   const CompraId = uuidv4();
 
-  await connection.execute(
+  await dbPool.execute(
     `INSERT INTO Compras 
     (CompraId, ProveedorId, Total, FechaRegistro, Estado) 
     VALUES (?, ?, ?, ?, ?)`,
@@ -34,8 +31,7 @@ export const createCompra = async ({ ProveedorId, Total, FechaRegistro, Estado }
 
 //
 export const deleteCompra = async (id) => {
-  const connection = await connectDB();
-  const [result] = await connection.execute(
+  const [result] = await dbPool.execute(
     'DELETE FROM Compras WHERE CompraId = ?', 
     [id]);
   return result;
@@ -43,11 +39,10 @@ export const deleteCompra = async (id) => {
 
 // Actualizar 
 export const updateCompra = async (id, data) => {
-  const connection = await connectDB();
 
   const { ProveedorId, Total, FechaRegistro, Estado} = data;
 
-  const [result] = await connection.execute(
+  const [result] = await dbPool.execute(
     `UPDATE Compras
     SET ProveedorId = ?, Total = ?, FechaRegistro = ?, Estado = ?
     WHERE CompraId = ?`,

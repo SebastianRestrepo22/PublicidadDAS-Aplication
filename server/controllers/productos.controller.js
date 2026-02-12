@@ -50,13 +50,38 @@ export const postProducto = async (req, res) => {
 // Obtener todos los productos
 export const getAllProducto = async (req, res) => {
   try {
-
     const rows = await getDataAllProductos();
 
-    res.status(200).json(rows);
+    const productosMap = {};
+
+    for (const row of rows) {
+      if (!productosMap[row.ProductoId]) {
+        productosMap[row.ProductoId] = {
+          ProductoId: row.ProductoId,
+          Nombre: row.Nombre,
+          Descripcion: row.Descripcion,
+          Imagen: row.Imagen,
+          Precio: row.Precio,
+          Descuento: row.Descuento,
+          Stock: row.Stock,
+          CategoriaId: row.CategoriaId,
+          Colores: []
+        };
+      }
+
+      if (row.ColorId) {
+        productosMap[row.ProductoId].Colores.push({
+          ColorId: row.ColorId,
+          Nombre: row.ColorNombre,
+          Hex: row.Hex
+        });
+      }
+    }
+
+    res.status(200).json(Object.values(productosMap));
   } catch (error) {
-    console.error('Error al obtener productos/servicios:', error);
-    res.status(500).json({ message: 'Error interno del servidor' });
+    console.error("Error al obtener productos:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 

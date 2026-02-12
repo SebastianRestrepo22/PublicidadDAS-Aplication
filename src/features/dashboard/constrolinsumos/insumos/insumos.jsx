@@ -14,8 +14,8 @@ import { Pagination } from "../../components/paginacion/pagination"; // 👈 Imp
 // Función para reducir el ID a 4 caracteres con puntos suspensivos
 const getShortId = (id) => {
   const str = String(id || "");
-  if (str.length <= 4) return str;
-  return str.substring(0, 4) + "...";
+  if (str.length <= 3) return str;
+  return str.substring(0, 3);
 };
 
 export const Insumos = () => {
@@ -543,9 +543,9 @@ export const Insumos = () => {
                 <div className="flex gap-3 mt-4">
                   <button
                     type="submit"
-                    className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors"
+                    className="flex-1 bg-green-500 text-white py-2.5 rounded-lg hover:bg-green-600 transition-colors"
                   >
-                    Guardar cambios
+                    Guardar 
                   </button>
                   <button
                     type="button"

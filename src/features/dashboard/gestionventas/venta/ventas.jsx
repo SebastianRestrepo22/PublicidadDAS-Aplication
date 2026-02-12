@@ -23,6 +23,27 @@ const DetallesProductosAcordeon = ({ detalles }) => {
   const indiceInicial = (paginaActual - 1) * productosPorPagina;
   const productosPagina = detalles.slice(indiceInicial, indiceInicial + productosPorPagina);
 
+  // En tu frontend (dashboard de ventas)
+  const getColorInfo = (detalle) => {
+    if (!detalle.ColorId) return null;
+    return {
+      nombre: detalle.ColorNombre || "Sin color",
+      hex: detalle.ColorHex || "#CCCCCC"
+    };
+  };
+
+  const getDescripcion = (detalle) => {
+    // Si es servicio y tiene descripción
+    if (detalle.ServicioId && detalle.Descripcion) {
+      return detalle.Descripcion;
+    }
+    // Si es producto, podría mostrar el color
+    if (detalle.ProductoId && detalle.ColorNombre) {
+      return `Color: ${detalle.ColorNombre}`;
+    }
+    return "—";
+  };
+
   return (
     <div className="space-y-4">
       {/* RESUMEN RÁPIDO */}
@@ -88,8 +109,8 @@ const DetallesProductosAcordeon = ({ detalles }) => {
                 <div className="grid grid-cols-12 items-center text-sm">
                   <div className="col-span-5">
                     <div className="font-medium">
-                      {producto.Nombre && producto.Nombre.trim() !== "" 
-                        ? producto.Nombre 
+                      {producto.Nombre && producto.Nombre.trim() !== ""
+                        ? producto.Nombre
                         : `Producto ${producto.ProductoServicioId}`}
                     </div>
                     <div className="text-xs text-gray-500">ID: {producto.ProductoServicioId}</div>
@@ -140,11 +161,10 @@ const DetallesProductosAcordeon = ({ detalles }) => {
                       <button
                         key={pagina}
                         onClick={() => setPaginaActual(pagina)}
-                        className={`px-3 py-1 text-sm border rounded ${
-                          pagina === paginaActual 
-                            ? 'bg-blue-500 text-white border-blue-500' 
+                        className={`px-3 py-1 text-sm border rounded ${pagina === paginaActual
+                            ? 'bg-blue-500 text-white border-blue-500'
                             : 'bg-white text-gray-700'
-                        }`}
+                          }`}
                       >
                         {pagina}
                       </button>
@@ -529,12 +549,11 @@ export const Ventas = () => {
                             </div>
                           </td>
                           <td className="py-4 px-6">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              venta.Estado === 'Entregada' ? 'bg-green-100 text-green-800' :
-                              venta.Estado === 'Cancelada' ? 'bg-red-100 text-red-800' :
-                              venta.Estado === 'Enviado' ? 'bg-blue-100 text-blue-800' :
-                              'bg-yellow-100 text-yellow-800'
-                            }`}>
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${venta.Estado === 'Entregada' ? 'bg-green-100 text-green-800' :
+                                venta.Estado === 'Cancelada' ? 'bg-red-100 text-red-800' :
+                                  venta.Estado === 'Enviado' ? 'bg-blue-100 text-blue-800' :
+                                    'bg-yellow-100 text-yellow-800'
+                              }`}>
                               {venta.Estado}
                             </span>
                           </td>
@@ -639,12 +658,11 @@ export const Ventas = () => {
                   </div>
                   <div className="bg-white p-3 rounded shadow-sm">
                     <div className="text-gray-600 text-sm">Estado actual</div>
-                    <div className={`px-2 py-1 rounded text-xs font-medium inline-block ${
-                      ventaSeleccionada.Estado === 'Entregada' ? 'bg-green-100 text-green-800' :
-                      ventaSeleccionada.Estado === 'Cancelada' ? 'bg-red-100 text-red-800' :
-                      ventaSeleccionada.Estado === 'Enviado' ? 'bg-blue-100 text-blue-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
+                    <div className={`px-2 py-1 rounded text-xs font-medium inline-block ${ventaSeleccionada.Estado === 'Entregada' ? 'bg-green-100 text-green-800' :
+                        ventaSeleccionada.Estado === 'Cancelada' ? 'bg-red-100 text-red-800' :
+                          ventaSeleccionada.Estado === 'Enviado' ? 'bg-blue-100 text-blue-800' :
+                            'bg-yellow-100 text-yellow-800'
+                      }`}>
                       {ventaSeleccionada.Estado}
                     </div>
                   </div>

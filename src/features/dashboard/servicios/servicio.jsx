@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
-import { Search, Plus, Edit, Eye, Trash2, ArrowLeft, X } from "lucide-react";
-import { deleteDataservicio, GetDataservicios, postDataservicios, updateDataservicios, buscarservicios } from "./services/services.servicios.js";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { Search, Plus, Edit, Eye, Trash2, ArrowLeft, X, ChevronDown, Check, ListFilter } from "lucide-react"; import { deleteDataservicio, GetDataservicios, postDataservicios, updateDataservicios, buscarservicios } from "./services/services.servicios.js";
 import { getAllCategorias } from "../categoriadediseño/services/services.categoria.js";
 import axios from "axios";
 
@@ -24,6 +23,9 @@ export const ServiciosDashboard = () => {
         if (id && location.pathname === `/dashboard/servicio/${id}`) return "view";
         return "list";
     }, [location.pathname, id]);
+
+    // Estado para controlar si estamos en proceso de envío
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [values, setValues] = useState({
         ServicioId: "",
@@ -50,6 +52,13 @@ export const ServiciosDashboard = () => {
     const [openEliminar, setOpenEliminar] = useState(false);
 
     // ======================================================
+    // ESTADOS PARA MODAL DE CATEGORÍAS
+    // ======================================================
+    const [openCategoriasModal, setOpenCategoriasModal] = useState(false);
+    const [categoriaBusqueda, setCategoriaBusqueda] = useState("");
+    const [categoriasFiltradas, setCategoriasFiltradas] = useState([]);
+
+    // ======================================================
     // ESTADOS DE PAGINACIÓN - COPIAR TAL CUAL
     // ======================================================
     const [allData, setAllData] = useState([]); // TODOS LOS DATOS
@@ -65,10 +74,28 @@ export const ServiciosDashboard = () => {
     useEffect(() => {
         const fetchCategoria = async () => {
             const data = await getAllCategorias();
-            if (data?.data) setCategorias(data.data);
+            if (data?.data) {
+                setCategorias(data.data);
+                setCategoriasFiltradas(data.data);
+            }
         };
         fetchCategoria();
     }, []);
+
+    // ======================================================
+    // FUNCIÓN PARA FILTRAR CATEGORÍAS EN MODAL
+    // ======================================================
+    useEffect(() => {
+        if (categoriaBusqueda.trim() === "") {
+            setCategoriasFiltradas(categorias);
+        } else {
+            const filtradas = categorias.filter(categoria =>
+                categoria.Nombre.toLowerCase().includes(categoriaBusqueda.toLowerCase()) ||
+                categoria.CategoriaId.toLowerCase().includes(categoriaBusqueda.toLowerCase())
+            );
+            setCategoriasFiltradas(filtradas);
+        }
+    }, [categoriaBusqueda, categorias]);
 
     // ======================================================
     // FUNCIÓN PARA PAGINAR - COPIAR TAL CUAL
@@ -202,14 +229,22 @@ export const ServiciosDashboard = () => {
     };
 
     const handleNombreBlur = async () => {
+        if (!values.Nombre.trim()) return;
         if (values.Nombre === originalNombre) return;
+
         try {
-            const response = await axios.get(`http://localhost:3000/servicio/validar-nombre?nombre=${values.Nombre}`);
-            setNombreError(response.data.exists ? 'Este nombre ya está registrado' : '');
-        } catch {
+            const res = await axios.get(
+                `http://localhost:3000/servicio/validar-nombre`,
+                { params: { Nombre: values.Nombre } }
+            );
+
+            setNombreError(res.data.exists ? 'Este nombre ya está registrado' : '');
+        } catch (error) {
+            console.error(error);
             setNombreError('No se pudo validar el nombre');
         }
     };
+
 
     const resetForm = () => {
         setValues({
@@ -225,23 +260,70 @@ export const ServiciosDashboard = () => {
         setEditData(null);
         setSubmitted(false);
         setNombreError('');
+        setIsSubmitting(false);
     };
 
     // ======================================================
-    // HANDLE SUBMIT
+    // FUNCIONES PARA MODAL DE CATEGORÍAS
     // ======================================================
+    const abrirModalCategorias = () => {
+        setOpenCategoriasModal(true);
+        setCategoriaBusqueda("");
+    };
+
+    const seleccionarCategoria = (categoria) => {
+        setValues({
+            ...values,
+            CategoriaId: categoria.CategoriaId
+        });
+        setOpenCategoriasModal(false);
+        setCategoriaBusqueda("");
+    };
+
+    const obtenerNombreCategoria = (categoriaId) => {
+        const categoria = categorias.find(c => c.CategoriaId === categoriaId);
+        return categoria ? categoria.Nombre : "Seleccione la categoría";
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Prevenir múltiples envíos
+        if (isSubmitting) return;
+
         setSubmitted(true);
+        setIsSubmitting(true);
+
+        // Validaciones básicas - SOLO marcar errores, NO mostrar toasts
+        let hasErrors = false;
+        if (!values.Nombre.trim()) {
+            setNombreError("El nombre es requerido");
+            hasErrors = true;
+        }
+        if (!values.Descripcion.trim()) hasErrors = true;
+        if (!values.Precio || parseFloat(values.Precio) <= 0) hasErrors = true;
+        if (!values.CategoriaId) hasErrors = true;
+        if (!values.Imagen.trim()) hasErrors = true;
+        if (!values.Tamano) hasErrors = true;
+
+        // Validación de descuento
+        if (values.Descuento && (parseFloat(values.Descuento) < 0 || parseFloat(values.Descuento) > 100)) {
+            hasErrors = true;
+        }
+
+        if (hasErrors) {
+            setIsSubmitting(false);
+            return; // Los errores se muestran debajo de los inputs
+        }
 
         try {
-            if (editData) {
+            if (mode === "edit" && editData) {
                 const response = await updateDataservicios(editData.ServicioId, values);
                 if (response.status === 200) {
                     toast.success("Servicio actualizado correctamente");
                     goToBackToList();
                 }
-            } else {
+            } else if (mode === "create") {
                 const response = await postDataservicios(values);
                 if (response.status === 201) {
                     toast.success("Servicio creado correctamente");
@@ -249,8 +331,24 @@ export const ServiciosDashboard = () => {
                 }
             }
         } catch (error) {
-            console.error(error);
-            toast.error("Error al procesar la solicitud");
+            console.error("Error al procesar la solicitud:", error);
+
+            // Manejo específico de errores del servidor SÍ pueden mostrar toasts
+            if (error.response) {
+                if (error.response.status === 400) {
+                    toast.error("Datos inválidos. Verifique la información");
+                } else if (error.response.status === 409) {
+                    toast.error("Ya existe un servicio con ese nombre");
+                } else {
+                    toast.error(`Error del servidor: ${error.response.status}`);
+                }
+            } else if (error.request) {
+                toast.error("No se pudo conectar con el servidor");
+            } else {
+                toast.error("Error al procesar la solicitud");
+            }
+
+            setIsSubmitting(false);
         }
     };
 
@@ -306,12 +404,25 @@ export const ServiciosDashboard = () => {
     // Función para renderizar el formulario
     const renderForm = () => {
         const buttonLabel = mode === "edit" ? "Editar" : "Crear";
+        const isEditing = mode === "edit";
 
         return (
             <form onSubmit={handleSubmit} className="flex flex-col gap-6 p-4 bg-white rounded-lg shadow-md">
+                {/* Indicador de modo */}
+                <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-bold text-gray-800">
+                        {isEditing ? "Editar Servicio" : "Crear Nuevo Servicio"}
+                    </h3>
+                    {isEditing && editData && (
+                        <span className="px-3 py-1 bg-purple-100 text-purple-800 text-sm font-medium rounded-full">
+                            ID: {editData.ServicioId}
+                        </span>
+                    )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium">Nombre</label>
+                        <label className="font-medium">Nombre *</label>
                         <input
                             type="text"
                             placeholder="Ingrese el nombre"
@@ -321,19 +432,24 @@ export const ServiciosDashboard = () => {
                             onBlur={handleNombreBlur}
                             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
       ${submitted && !values.Nombre.trim() || nombreError ? "border-red-500" : "border-gray-300"}`}
+                            disabled={isSubmitting}
                         />
-                        <div className="min-h-[16px] mt-0.5">
+                        <div className="min-h-[20px] mt-0.5">
                             {(!values.Nombre.trim() && submitted) && (
-                                <p className="text-red-500 text-[12px] leading-4">Ingrese el nombre</p>
+                                <p className="text-red-500 text-[12px] leading-4">
+                                    Ingrese el nombre
+                                </p>
                             )}
                             {nombreError && (
-                                <p className="text-red-500 text-[12px] leading-4">{nombreError}</p>
+                                <p className="text-red-500 text-[12px] leading-4">
+                                    {nombreError}
+                                </p>
                             )}
                         </div>
                     </div>
 
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium">Descripción</label>
+                        <label className="font-medium">Descripción *</label>
                         <input
                             type="text"
                             placeholder="Ingrese la descripción"
@@ -341,23 +457,28 @@ export const ServiciosDashboard = () => {
                             value={values.Descripcion}
                             onChange={handleChanges}
                             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${submitted && !values.Descripcion.trim() ? "border-red-500" : "border-gray-300"}`} />
-                        <div className="min-h-[16px] mt-0.5">
+      ${submitted && !values.Descripcion.trim() ? "border-red-500" : "border-gray-300"}`}
+                            disabled={isSubmitting}
+                        />
+                        <div className="min-h-[20px] mt-0.5">
                             {(!values.Descripcion.trim() && submitted) && (
-                                <p className="text-red-500 text-[12px] leading-4">Ingrese la descripcion</p>
+                                <p className="text-red-500 text-[12px] leading-4">
+                                    Ingrese la descripción
+                                </p>
                             )}
                         </div>
                     </div>
 
 
                     <div className="flex flex-col gap-1">
-                        <label>Tamaño</label>
+                        <label className="font-medium">Tamaño *</label>
                         <select
                             name="Tamano"
                             value={values.Tamano || ""}
                             onChange={handleChanges}
                             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
         ${submitted && !values.Tamano ? "border-red-500" : "border-gray-300"}`}
+                            disabled={isSubmitting}
                         >
                             <option value="">Seleccione un tamaño</option>
                             {tamanos.map((t) => (
@@ -366,9 +487,11 @@ export const ServiciosDashboard = () => {
                                 </option>
                             ))}
                         </select>
-                        <div className="min-h-[16px] mt-0.5">
+                        <div className="min-h-[20px] mt-0.5">
                             {submitted && !values.Tamano && (
-                                <p className="text-red-500 text-[12px] leading-4">Seleccione un tamaño</p>
+                                <p className="text-red-500 text-[12px] leading-4">
+                                    Seleccione un tamaño
+                                </p>
                             )}
                         </div>
                     </div>
@@ -376,7 +499,7 @@ export const ServiciosDashboard = () => {
 
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex-1 flex flex-col gap-1">
-                        <label className="font-medium">Imagen (URL o archivo)</label>
+                        <label className="font-medium">Imagen (URL o archivo) *</label>
 
                         <input
                             type="text"
@@ -385,7 +508,9 @@ export const ServiciosDashboard = () => {
                             value={values.Imagen}
                             onChange={handleChanges}
                             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-              ${submitted && !values.Imagen.trim() ? "border-red-500" : "border-gray-300"}`} />
+              ${submitted && !values.Imagen.trim() ? "border-red-500" : "border-gray-300"}`}
+                            disabled={isSubmitting}
+                        />
 
                         <input
                             type="file"
@@ -406,10 +531,13 @@ export const ServiciosDashboard = () => {
                                 }
                             }}
                             className="w-full h-10 px-3 border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            disabled={isSubmitting}
                         />
-                        <div className="min-h-[16px] mt-0.5">
+                        <div className="min-h-[20px] mt-0.5">
                             {(!values.Imagen.trim() && submitted) && (
-                                <p className="text-red-500 text-[12px] leading-4">Seleccione o ingrese una imagen</p>
+                                <p className="text-red-500 text-[12px] leading-4">
+                                    Seleccione o ingrese una imagen
+                                </p>
                             )}
                         </div>
                     </div>
@@ -428,21 +556,28 @@ export const ServiciosDashboard = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium">Precio</label>
+                        <label className="font-medium">Precio *</label>
                         <input
                             type="number"
                             placeholder="Ingrese el precio"
                             name="Precio"
                             value={values.Precio}
                             onChange={handleChanges}
+                            min="0"
+                            step="0.01"
                             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${submitted && !values.Precio.trim() ? "border-red-500" : "border-gray-300"}`} />
-                        <div className="min-h-[16px] mt-0.5">
-                            {(!values.Precio.trim() && submitted) && (
-                                <p className="text-red-500 text-[12px] leading-4">Ingrese el precio</p>
+      ${submitted && (!values.Precio || parseFloat(values.Precio) <= 0) ? "border-red-500" : "border-gray-300"}`}
+                            disabled={isSubmitting}
+                        />
+                        <div className="min-h-[20px] mt-0.5">
+                            {submitted && (!values.Precio || parseFloat(values.Precio) <= 0) && (
+                                <p className="text-red-500 text-[12px] leading-4">
+                                    Ingrese un precio válido (mayor a 0)
+                                </p>
                             )}
                         </div>
                     </div>
+
                     <div className="flex flex-col gap-1">
                         <label className="font-medium">Descuento</label>
                         <input
@@ -451,51 +586,165 @@ export const ServiciosDashboard = () => {
                             name="Descuento"
                             value={values.Descuento}
                             onChange={handleChanges}
+                            min="0"
+                            max="100"
                             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${submitted && !values.Descuento.trim() ? "border-red-500" : "border-gray-300"}`} />
-                        <div className="min-h-[16px] mt-0.5">
-                            {(!values.Descuento.trim() && submitted) && (
-                                <p className="text-red-500 text-[12px] leading-4">Ingrese el descuento</p>
+      ${submitted && values.Descuento && (parseFloat(values.Descuento) < 0 || parseFloat(values.Descuento) > 100) ? "border-red-500" : "border-gray-300"}`}
+                            disabled={isSubmitting}
+                        />
+                        <div className="min-h-[20px] mt-0.5">
+                            {submitted && values.Descuento && (parseFloat(values.Descuento) < 0 || parseFloat(values.Descuento) > 100) && (
+                                <p className="text-red-500 text-[12px] leading-4">
+                                    El descuento debe estar entre 0 y 100%
+                                </p>
+                            )}
+                            {values.Descuento && parseFloat(values.Descuento) > 0 && (
+                                <p className="text-green-600 text-[12px] leading-4">
+                                    Aplicará un {values.Descuento}% de descuento
+                                </p>
                             )}
                         </div>
                     </div>
 
-                     <div className="flex flex-col gap-1">
-                        <label>Categoría ID</label>
-                        <select
-                            name="CategoriaId"
-                            value={values.CategoriaId || ""}
-                            onChange={handleChanges}
-                            className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-              ${submitted && !values.CategoriaId.trim() ? "border-red-500" : "border-gray-300"}`}            >
-                            <option value="">Seleccione la categoria</option>
-                            {categorias.map((categoria) => (
-                                <option key={categoria.CategoriaId} value={categoria.CategoriaId}>
-                                    {categoria.Nombre}
-                                </option>
-                            ))}
-                        </select>
-                        <div className="min-h-[16px] mt-0.5">
-                            {(!values.CategoriaId.trim() && submitted) && (
-                                <p className="text-red-500 text-[12px] leading-4">Seleccione una categoría</p>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium">Categoría *</label>
+
+                        {/* Botón para abrir modal de categorías */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={abrirModalCategorias}
+                                className={`w-full h-10 px-3 border rounded-lg bg-white text-left flex items-center justify-between hover:bg-gray-50 transition-colors
+                  ${submitted && !values.CategoriaId.trim() ? "border-red-500" : "border-gray-300"}`}
+                                disabled={isSubmitting}
+                            >
+                                <span className={`${values.CategoriaId ? "text-gray-900" : "text-gray-500"}`}>
+                                    {values.CategoriaId ? obtenerNombreCategoria(values.CategoriaId) : "Seleccione la categoría"}
+                                </span>
+                                <ChevronDown className="h-4 w-4 text-gray-500" />
+                            </button>
+
+                            {/* Mostrar categoría seleccionada */}
+                            {values.CategoriaId && (
+                                <div className="mt-1 text-sm text-gray-600 flex items-center gap-2">
+                                    <Check className="h-3 w-3 text-green-500" />
+                                    <span>Seleccionada: {obtenerNombreCategoria(values.CategoriaId)}</span>
+                                </div>
                             )}
                         </div>
 
+                        <div className="min-h-[20px] mt-0.5">
+                            {(!values.CategoriaId.trim() && submitted) && (
+                                <p className="text-red-500 text-[12px] leading-4">
+                                    Seleccione una categoría
+                                </p>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex gap-4 mt-4">
-                    <button type="submit" className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors">
-                        {buttonLabel}
+                <div className="flex gap-4 mt-4 pt-4 border-t border-gray-200">
+                    <button
+                        type="submit"
+                        className={`flex-1 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${isSubmitting
+                            ? "bg-gray-400 text-white cursor-not-allowed"
+                            : "bg-green-500 text-white hover:bg-green-600"
+                            }`}
+                        disabled={isSubmitting}
+                    >
+                        {isSubmitting ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Procesando...
+                            </>
+                        ) : (
+                            buttonLabel
+                        )}
                     </button>
                     <button
                         type="button"
                         className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
                         onClick={goToBackToList}
+                        disabled={isSubmitting}
                     >
                         Cancelar
                     </button>
                 </div>
+
+                {/* MODAL DE CATEGORÍAS */}
+                <Modal open={openCategoriasModal} onClose={() => setOpenCategoriasModal(false)}>
+                    <div className="p-6 bg-white rounded-xl w-[500px] max-h-[80vh] overflow-hidden flex flex-col">
+                        <div className="mb-6">
+                            <h3 className="font-bold text-xl mb-2 flex items-center gap-2">
+                                <ListFilter className="h-5 w-5 text-purple-600" />
+                                Seleccionar Categoría para Servicio
+                            </h3>
+                            <p className="text-gray-600 text-sm mb-4">Busque y seleccione una categoría para el servicio</p>
+
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar categoría por nombre o ID..."
+                                    value={categoriaBusqueda}
+                                    onChange={(e) => setCategoriaBusqueda(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto pr-2">
+                            {categoriasFiltradas.length > 0 ? (
+                                <div className="grid grid-cols-1 gap-2">
+                                    {categoriasFiltradas.map((categoria) => (
+                                        <button
+                                            key={categoria.CategoriaId}
+                                            type="button"
+                                            onClick={() => seleccionarCategoria(categoria)}
+                                            className={`p-3 text-left rounded-lg border transition-all ${values.CategoriaId === categoria.CategoriaId
+                                                ? "bg-purple-50 border-purple-500"
+                                                : "border-gray-200 hover:border-purple-300 hover:bg-purple-50"
+                                                }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="font-medium text-gray-900">{categoria.Nombre}</div>
+                                                    <div className="text-sm text-gray-500 mt-1">ID: {categoria.CategoriaId}</div>
+                                                </div>
+                                                {values.CategoriaId === categoria.CategoriaId && (
+                                                    <Check className="h-5 w-5 text-purple-600" />
+                                                )}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8">
+                                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                                        <Search className="h-8 w-8 text-gray-400" />
+                                    </div>
+                                    <p className="text-gray-600 font-medium">No se encontraron categorías</p>
+                                    <p className="text-gray-500 text-sm mt-1">Intenta con otro término de búsqueda</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mt-6 pt-4 border-t border-gray-200">
+                            <div className="flex justify-between">
+                                <span className="text-sm text-gray-600">
+                                    {categoriasFiltradas.length} categoría(s) encontrada(s)
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenCategoriasModal(false)}
+                                    className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </Modal>
             </form>
         );
     };
@@ -510,11 +759,12 @@ export const ServiciosDashboard = () => {
                     <div><strong>ID:</strong> {editData.ServicioId}</div>
                     <div><strong>Nombre:</strong> {editData.Nombre}</div>
                     <div><strong>Descripción:</strong> {editData.Descripcion || "—"}</div>
-                    <div><strong>Precio:</strong> ${editData.Precio}</div>
-                    <div><strong>Descuento:</strong> {editData.Descuento}%</div>
+                    <div><strong>Precio:</strong> ${parseFloat(editData.Precio || 0).toFixed(2)}</div>
+                    {editData.Descuento > 0 && (
+                        <div><strong>Descuento:</strong> {editData.Descuento}%</div>
+                    )}
                     <div><strong>Categoría:</strong> {categorias.find(c => c.CategoriaId === editData.CategoriaId)?.Nombre || editData.CategoriaId}</div>
                     <div><strong>Tamaño:</strong> {editData.Tamano}</div>
-
                 </div>
                 {editData.Imagen && (
                     <div className="mt-4">
@@ -526,9 +776,15 @@ export const ServiciosDashboard = () => {
                         />
                     </div>
                 )}
-                <div className="mt-6">
+                <div className="mt-6 flex gap-3">
                     <button
-                        className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                        className="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors"
+                        onClick={() => goToEdit(editData.ServicioId)}
+                    >
+                        Editar Servicio
+                    </button>
+                    <button
+                        className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
                         onClick={goToBackToList}
                     >
                         Volver a la lista
@@ -563,7 +819,7 @@ export const ServiciosDashboard = () => {
                                     value={filtroValor}
                                     onChange={(e) => setFiltroValor(e.target.value)}
                                     type="text"
-                                    placeholder="Buscar producto"
+                                    placeholder="Buscar servicio"
                                     className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-700"
                                 />
                             </div>
@@ -580,9 +836,7 @@ export const ServiciosDashboard = () => {
                                 <option value="descuento">Descuento</option>
                                 <option value="categoria">CategoriaId</option>
                                 <option value="tamano">Tamano</option>
-
                             </select>
-
                         </div>
 
                         <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
@@ -701,7 +955,7 @@ export const ServiciosDashboard = () => {
                                                 <td colSpan={11} className="py-12 text-center">
                                                     <div className="flex flex-col items-center justify-center text-gray-400">
                                                         <Search size={48} className="mb-3 opacity-50" />
-                                                        <p className="text-lg font-medium">No hay servicio registrados</p>
+                                                        <p className="text-lg font-medium">No hay servicios registrados</p>
                                                         <p className="text-sm mt-1">Comienza creando un nuevo servicio</p>
                                                     </div>
                                                 </td>
@@ -733,7 +987,7 @@ export const ServiciosDashboard = () => {
                             <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
                                 <ArrowLeft size={18} />
                             </button>
-                            <h3 className="text-lg font-bold">Nuevo producto</h3>
+                            <h3 className="text-lg font-bold">Nuevo servicio</h3>
                         </div>
                         {renderForm()}
                     </div>
@@ -762,7 +1016,7 @@ export const ServiciosDashboard = () => {
                                 <ArrowLeft size={18} />
                             </button>
                             <h3 className="text-lg font-bold">
-                                Editar servico #{editData?.ServicioId || id}
+                                Editar servicio #{editData?.ServicioId || id}
                             </h3>
                         </div>
                         {renderForm()}

@@ -1,5 +1,4 @@
-
-import { Briefcase } from "lucide-react";
+import { Briefcase, Users, Award, MapPin, DollarSign } from "lucide-react";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer"
 import { History, Target, Eye } from "lucide-react";
@@ -7,153 +6,121 @@ import { History, Target, Eye } from "lucide-react";
 export const QuienesSomos = () => {
     return (
         <>
-
             <Navbar />
-            <section className="w-full">
-                <div className="relative w-full h-[220px] ">
-                    <img src="public/multimedia/quienessomos2.jpg" alt="" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40" />
 
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <h2 className="text-white text-3xl font-bold">Haz tangible lo que se te pase por tu mente </h2>
-                    </div>
-                </div>
-            </section>
-
-            <section className="bg-white py-16 px-8 lg:px-20 pb-40">
-
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+            {/* Hero Section - Fondo Blanco */}
+            <section className="bg-white py-20 px-8 lg:px-20">
+                <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
                     <div>
-                        <h3 className="text-6xl font-bold text-black-600 mb-4">
+                        <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
                             PublicidadDAS
-                        </h3>
-                        <p className="text-gray-800 mb-4">
-                            Somos una empresa experta en darte lo mejor para cada una de tus necesidades
-                            estamos dispuesto a que estes siempre agusto con nosotros y mejores la calidad
-                            y la experiencia al trabajar con nosotros .
+                        </h1>
+                        <div className="w-20 h-1 bg-blue-900 mb-6"></div>
+                        <p className="text-lg text-gray-700 mb-6 leading-relaxed">
+                            Somos una empresa experta en ofrecer soluciones publicitarias de alta calidad. 
+                            Nuestro compromiso es superar tus expectativas y brindarte una experiencia 
+                            excepcional en cada proyecto.
                         </p>
-                        <p className="text-gray-900 mb-4">
-                            Calidad es la que buscas ,siempre estamos disponibles para ti para que podamos
-                            complacer cada necesidad que te haga falta en todo lo necesario , haremos una realidad
-                            virtual , en realidad tangible .
+                        <p className="text-lg text-gray-600 leading-relaxed">
+                            La calidad es nuestra prioridad. Estamos disponibles para transformar tus ideas 
+                            en realidades tangibles, siempre con la excelencia que mereces.
                         </p>
                     </div>
 
-                    <div className="relative w-full h-[400px]">
+                    <div className="relative w-full h-[450px]">
                         <img
                             src="public/multimedia/image2.jpg"
                             alt="imagen2"
-                            className="absolute top-0 right-0 w-[80%] h-[500px] object-cover rounded-xl shadow-lg transform transition duration-300 hover:scale-105 hover:shadow-2xl "
+                            className="absolute top-0 right-0 w-[75%] h-[320px] object-cover rounded-2xl shadow-xl transform transition duration-500 hover:scale-105"
                         />
                         <img
                             src="public/multimedia/image3.jpg"
                             alt="imagen3"
-                            className="absolute bottom-0 left-0 w-[70%] h-[300px] object-cover   rounded-xl shadow-lg transform transition duration-300 hover:scale-105 hover:shadow-2xl"
+                            className="absolute bottom-0 left-0 w-[70%] h-[280px] object-cover rounded-2xl shadow-xl transform transition duration-500 hover:scale-105"
                         />
                     </div>
                 </div>
             </section>
 
-            <section className="w-full bg-white-50 py-12 px-6 lg:px-20">
-                <h2 className="text-2xl md:text-3xl font-bold text-center text-foreground mb-10">
-                    Estrategia Positiva
+            {/* Stats Section - Fondo Blanco */}
+            <section className="bg-white py-16 px-8 lg:px-20">
+                <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-12">
+                    Nuestra Fortaleza
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                    <div className="bg-card p-8 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-500 hover:-translate-y-4 text-center group">
-                        <div className="flex justify-center mb-6">
-                            <div className="p-4 bg-primary/10 rounded-full text-primary group-hover:bg-blue-900 group-hover:text-white transition-colors duration-300">
-                                <Briefcase className="w-6 h-6" />
+                <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <div className="bg-white p-8 rounded-2xl border-2 border-gray-200 hover:border-blue-900 hover:shadow-xl transition-all duration-300 hover:-translate-y-2 text-center group">
+                        <div className="flex justify-center mb-4">
+                            <div className="p-4 bg-blue-50 rounded-full text-blue-900 group-hover:bg-blue-900 group-hover:text-white transition-colors duration-300">
+                                <Users className="w-8 h-8" />
                             </div>
                         </div>
-                        <h3 className="text-xl font-semibold text-card-foreground mb-3">
-                            Clientes Satisfechos
-                        </h3>
-                        <p className="text-muted-foreground">
-                            Mas de 300 clientes satisfechos
-                        </p>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">+300</h3>
+                        <p className="text-gray-600 font-medium">Clientes Satisfechos</p>
                     </div>
 
-                    <div className="bg-card p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-4 text-center group">
-                        <div className="flex justify-center mb-6">
-                            <div className="p-4 bg-primary/10 rounded-full text-primary group-hover:bg-blue-900 group-hover:text-white transition-colors duration-300">
-                                <Briefcase className="w-6 h-6" />
+                    <div className="bg-white p-8 rounded-2xl border-2 border-gray-200 hover:border-blue-900 hover:shadow-xl transition-all duration-300 hover:-translate-y-2 text-center group">
+                        <div className="flex justify-center mb-4">
+                            <div className="p-4 bg-blue-50 rounded-full text-blue-900 group-hover:bg-blue-900 group-hover:text-white transition-colors duration-300">
+                                <Award className="w-8 h-8" />
                             </div>
                         </div>
-                        <h3 className="text-xl font-semibold text-card-foreground mb-3">
-                            Calidad de Servicio
-                        </h3>
-                        <p className="text-muted-foreground">
-                            Excelente servicio
-                        </p>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">100%</h3>
+                        <p className="text-gray-600 font-medium">Calidad Garantizada</p>
                     </div>
 
-                    <div className="bg-card p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-4 text-center group">
-                        <div className="flex justify-center mb-6">
-                            <div className="p-4 bg-primary/10 rounded-full text-primary group-hover:bg-blue-900 group-hover:text-primary-white transition-colors duration-300">
-                                <Briefcase className="w-6 h-6" />
+                    <div className="bg-white p-8 rounded-2xl border-2 border-gray-200 hover:border-blue-900 hover:shadow-xl transition-all duration-300 hover:-translate-y-2 text-center group">
+                        <div className="flex justify-center mb-4">
+                            <div className="p-4 bg-blue-50 rounded-full text-blue-900 group-hover:bg-blue-900 group-hover:text-white transition-colors duration-300">
+                                <MapPin className="w-8 h-8" />
                             </div>
                         </div>
-                        <h3 className="text-xl font-semibold text-card-foreground mb-3">
-                            Tienda Fisica
-                        </h3>
-                        <p className="text-muted-foreground">
-                            Itagui es nuestro centro
-                        </p>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">Itagüí</h3>
+                        <p className="text-gray-600 font-medium">Tienda Física</p>
                     </div>
 
-                    <div className="bg-card p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-4 text-center group">
-                        <div className="flex justify-center mb-6">
-                            <div className="p-4 bg-primary/10 rounded-full text-primary group-hover:bg-blue-900 group-hover:text-primary-white transition-colors duration-300">
-                                <Briefcase className="w-6 h-6" />
+                    <div className="bg-white p-8 rounded-2xl border-2 border-gray-200 hover:border-blue-900 hover:shadow-xl transition-all duration-300 hover:-translate-y-2 text-center group">
+                        <div className="flex justify-center mb-4">
+                            <div className="p-4 bg-blue-50 rounded-full text-blue-900 group-hover:bg-blue-900 group-hover:text-white transition-colors duration-300">
+                                <DollarSign className="w-8 h-8" />
                             </div>
                         </div>
-                        <h3 className="text-xl font-semibold text-card-foreground mb-3">
-                            Servicios a buen precio
-                        </h3>
-                        <p className="text-muted-foreground">
-                            Buenos benefcios con nosotros
-                        </p>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">Accesible</h3>
+                        <p className="text-gray-600 font-medium">Precios Justos</p>
                     </div>
-
                 </div>
             </section>
 
-            <section className="w-full bg-white py-12 px-6 lg:px-20">
-                <h2 className="text-2xl md:text-3xl font-bold text-center text-foreground mb-10">
-                    Nuestra experiencia
+            {/* Experience Gallery - Fondo Blanco */}
+            <section className="bg-white py-16 px-8 lg:px-20">
+                <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-4">
+                    Nuestra Experiencia
                 </h2>
+                <p className="text-center text-gray-600 mb-12 max-w-2xl mx-auto">
+                    Más de 4 años transformando ideas en realidad
+                </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                    <img
-                        src="/multimedia/experiencia-1.png"
-                        alt="experiencia 1"
-                        className="w-full h-64 object-cover rounded-lg shadow-lg transition-transform duration-500 hover:scale-105"
-                    />
+                <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="relative overflow-hidden rounded-2xl shadow-xl group">
+                        <img
+                            src="/multimedia/experiencia-1.png"
+                            alt="experiencia 1"
+                            className="w-full h-80 object-cover transition-transform duration-700 group-hover:scale-110"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-blue-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    </div>
 
-                    <img
-                        src="/multimedia/experiencia-2.jpg"
-                        alt="experiencia 2"
-                        className="w-full h-64 object-cover rounded-lg shadow-lg transition-transform duration-500 hover:scale-105"
-                    />
-
-                    <img
-                        src="/multimedia/experiencia-3.jpeg"
-                        alt="experiencia 3"
-                        className="w-full h-64 object-cover rounded-lg shadow-lg transition-transform duration-500 hover:scale-105"
-                    />
-
-                    <img
-                        src="/multimedia/experiencia-4.jpeg"
-                        alt="experiencia 4"
-                        className="w-full h-64 object-cover rounded-lg shadow-lg transition-transform duration-500 hover:scale-105"
-                    />
-
+                    <div className="relative overflow-hidden rounded-2xl shadow-xl group">
+                        <img
+                            src="/multimedia/experiencia-2.jpg"
+                            alt="experiencia 2"
+                            className="w-full h-80 object-cover transition-transform duration-700 group-hover:scale-110"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-blue-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    </div>
                 </div>
-
             </section>
 
-
+            {/* Mission, Vision, History - Fondo Gris con Borde Azul Oscuro */}
             <section className="w-full bg-gray-100 py-16 px-8 lg:px-20">
                 <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
                     Conócenos un poco más
@@ -204,7 +171,6 @@ export const QuienesSomos = () => {
                     </div>
                 </div>
             </section>
-
 
 
 

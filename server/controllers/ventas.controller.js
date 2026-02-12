@@ -1,13 +1,15 @@
 // controllers/ventas.controller.js
 import connectDB from "../lib/db.js";
 import { v4 as uuidv4 } from "uuid";
+// controllers/ventas.controller.js - Actualiza el import
 import {
   getAllVentasModel,
   getVentaByIdModel,
   createVentaModel,
   updateVentaModel,
   deleteVentaModel,
-  existeVentaParaPedidoModel
+  existeVentaParaPedidoModel,
+  getVentaByPedidoIdModel
 } from "../models/venta.models.js";
 import {
   getDetalleVentaByVentaIdModel,
@@ -58,91 +60,173 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId) => {
   const connection = await pool.getConnection();
 
   try {
-    const [pedidoRows] = await connection.execute(
-      `SELECT * FROM pedidosclientes WHERE PedidoClienteId = ?`,
-      [PedidoClienteId]
-    );
-    if (pedidoRows.length === 0) {
-      throw new Error("Pedido no encontrado");
-    }
+    console.log("🔄 Creando venta para pedido:", PedidoClienteId);
 
+    // Verificar si ya existe venta
     const [ventaCheck] = await connection.execute(
       "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
       [PedidoClienteId]
     );
     if (ventaCheck.length > 0) {
-      throw new Error("Ya existe una venta para este pedido");
+      connection.release();
+      console.log("ℹ️ Venta ya existente:", ventaCheck[0].VentaId);
+      return {
+        success: true,
+        alreadyExists: true,
+        VentaId: ventaCheck[0].VentaId
+      };
     }
+
+    // Obtener pedido
+    const [pedidoRows] = await connection.execute(
+      `SELECT * FROM pedidosclientes WHERE PedidoClienteId = ?`,
+      [PedidoClienteId]
+    );
+    if (pedidoRows.length === 0) {
+      connection.release();
+      throw new Error("Pedido no encontrado");
+    }
+
+    const pedido = pedidoRows[0];
 
     await connection.beginTransaction();
 
-    const [detallesPedido] = await connection.execute(
-      `SELECT dpc.ProductoServicioId, dpc.Cantidad, ps.Precio, ps.Nombre
-       FROM detallepedidosclientes dpc
-       JOIN productoservicios ps ON dpc.ProductoServicioId = ps.ProductoServicioId
-       WHERE dpc.PedidoClienteId = ?`,
+    // Obtener detalles del pedido
+    const [detallesRows] = await connection.execute(
+      `SELECT * FROM detallepedidosclientes WHERE PedidoClienteId = ?`,
       [PedidoClienteId]
     );
 
-    if (detallesPedido.length === 0) {
+    if (detallesRows.length === 0) {
       await connection.rollback();
+      connection.release();
       throw new Error("El pedido no tiene detalles");
     }
 
-    let total = 0;
-    const detallesConSubtotal = detallesPedido.map(detalle => {
-      const subtotal = detalle.Cantidad * detalle.Precio;
-      total += subtotal;
-      return {
-        ProductoServicioId: detalle.ProductoServicioId,
-        Nombre: detalle.Nombre,
-        Cantidad: detalle.Cantidad,
-        PrecioUnitario: detalle.Precio,
-        Descuento: 0,
-        Subtotal: subtotal
-      };
-    });
-    const iva = total * 0.19;
-
+    // CREAR VENTA
     const VentaId = uuidv4();
+    const IVA = pedido.Total * 0.19;
+    
+    let estadoVenta = pedido.Estado;
+    
+    // Validar que el estado sea uno de los permitidos
+    const estadosPermitidos = ['pendiente', 'aprobado', 'entregado', 'cancelado'];
+    if (!estadosPermitidos.includes(estadoVenta)) {
+      console.warn(`⚠️ Estado del pedido no válido para venta: ${estadoVenta}, usando 'pendiente'`);
+      estadoVenta = 'pendiente';
+    }
+
+    console.log("📊 Creando venta con:", {
+      VentaId,
+      Total: pedido.Total,
+      IVA,
+      EstadoPedido: pedido.Estado,
+      EstadoVenta: estadoVenta,
+      DetallesCount: detallesRows.length
+    });
+
     await connection.execute(
       `INSERT INTO ventas (VentaId, PedidoClienteId, FechaVenta, Total, IVA, Estado)
-       VALUES (?, ?, NOW(), ?, ?, 'Pendiente')`,
-      [VentaId, PedidoClienteId, total, iva]
+       VALUES (?, ?, NOW(), ?, ?, ?)`,
+      [VentaId, PedidoClienteId, pedido.Total, IVA, estadoVenta]
     );
 
-    // CORRECTO: incluye Nombre en el INSERT
-    for (const detalle of detallesConSubtotal) {
+    console.log("✅ Venta creada con estado:", estadoVenta);
+
+    // Crear detalles de venta - CON LOS NUEVOS CAMPOS
+    let detallesCreados = 0;
+    for (const detalle of detallesRows) {
+      let nombreBase = "";
+      let esProducto = false;
+      
+      // Determinar si es producto o servicio y obtener nombre base
+      if (detalle.ProductoId) {
+        esProducto = true;
+        const [producto] = await connection.execute(
+          "SELECT Nombre FROM productos WHERE ProductoId = ? LIMIT 1",
+          [detalle.ProductoId]
+        );
+        nombreBase = producto.length > 0 ? producto[0].Nombre : "Producto";
+      } else if (detalle.ServicioId) {
+        const [servicio] = await connection.execute(
+          "SELECT Nombre FROM servicios WHERE ServicioId = ? LIMIT 1",
+          [detalle.ServicioId]
+        );
+        nombreBase = servicio.length > 0 ? servicio[0].Nombre : "Servicio";
+      }
+
+      const subtotal = detalle.Cantidad * detalle.Precio;
+
+      // ✅ CORRECCIÓN CRÍTICA: Tamaño SOLO para servicios, NULL para productos
+      const tamañoParaInsertar = detalle.ServicioId ? (detalle.Tamaño || 'Mediana') : null;
+
+      console.log("📏 Procesando detalle:", {
+        tipo: esProducto ? "Producto" : "Servicio",
+        tamañoOriginal: detalle.Tamaño,
+        tamañoFinal: tamañoParaInsertar,
+        productoId: detalle.ProductoId,
+        servicioId: detalle.ServicioId
+      });
+
+      // ✅ INSERCIÓN CORREGIDA - INCLUYENDO LOS NUEVOS CAMPOS
       await connection.execute(
         `INSERT INTO detalleventas 
-         (DetalleVentaId, VentaId, ProductoServicioId, Nombre, Cantidad, PrecioUnitario, Descuento, Subtotal)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (DetalleVentaId, VentaId, ProductoId, ServicioId, Nombre, 
+          Cantidad, PrecioUnitario, Descuento, Subtotal, Tamaño, 
+          Descripcion, ColorId)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           uuidv4(),
           VentaId,
-          detalle.ProductoServicioId,
-          detalle.Nombre,
+          detalle.ProductoId || null,
+          detalle.ServicioId || null,
+          nombreBase, // Nombre base del producto/servicio
           detalle.Cantidad,
-          detalle.PrecioUnitario,
-          detalle.Descuento,
-          detalle.Subtotal
+          detalle.Precio,
+          0, // Descuento - valor por defecto
+          subtotal,
+          tamañoParaInsertar, // ← CORREGIDO: NULL para productos, valor para servicios
+          // Descripcion: SOLO para servicios, null para productos
+          detalle.ServicioId ? (detalle.Descripcion || "") : null,
+          // ColorId: SOLO para productos, null para servicios
+          detalle.ProductoId ? (detalle.ColorId || null) : null
         ]
       );
+
+      detallesCreados++;
+      console.log(`✅ Detalle ${detallesCreados} creado:`, {
+        tipo: esProducto ? "Producto" : "Servicio",
+        nombre: nombreBase,
+        color: detalle.ColorId || "N/A",
+        descripcion: detalle.Descripcion?.substring(0, 50) || "N/A",
+        tamaño: tamañoParaInsertar
+      });
     }
 
     await connection.commit();
+    connection.release();
 
-    const ventaCreada = await getVentaByIdModel(VentaId);
-    ventaCreada.detalle = detallesConSubtotal;
-    return ventaCreada;
+    console.log(`🎉 ${detallesCreados} detalles de venta creados exitosamente`);
+
+    return {
+      success: true,
+      VentaId: VentaId,
+      estado: estadoVenta,
+      detalles: detallesCreados,
+      message: "Venta creada exitosamente",
+      alreadyExists: false
+    };
+
   } catch (error) {
     await connection.rollback();
-    throw error;
-  } finally {
     connection.release();
+    console.error("❌ Error al crear venta desde pedido:", error.message);
+    console.error("Stack trace:", error.stack);
+    throw error;
   }
 };
 
+// Esta función ya está bien, pero la dejamos igual
 export const createVentaDesdePedido = async (req, res) => {
   const { PedidoClienteId } = req.body;
   if (!PedidoClienteId) {
@@ -154,7 +238,7 @@ export const createVentaDesdePedido = async (req, res) => {
     res.status(201).json(venta);
   } catch (error) {
     console.error("Error al crear venta desde pedido:", error.message);
-    res.status(400).json({ error: error.message || "Error al crear venta" });
+    res.status(500).json({ error: error.message || "Error al crear venta" });
   }
 };
 
@@ -169,7 +253,11 @@ export const updateVenta = async (req, res) => {
     const ventaActual = await getVentaByIdModel(id);
     if (!ventaActual) return res.status(404).json({ error: "Venta no encontrada" });
 
-    await updateVentaModel(id, { Estado, Total, IVA });
+    // Validar estado con los nuevos valores
+    const estadosPermitidos = ['pendiente', 'aprobado', 'entregado', 'cancelado'];
+    const estadoValidado = estadosPermitidos.includes(Estado) ? Estado : ventaActual.Estado;
+
+    await updateVentaModel(id, { Estado: estadoValidado, Total, IVA });
 
     const ventaActualizada = await getVentaByIdModel(id);
     ventaActualizada.detalle = await getDetalleVentaByVentaIdModel(id);

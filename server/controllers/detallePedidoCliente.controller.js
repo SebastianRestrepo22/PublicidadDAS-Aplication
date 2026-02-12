@@ -6,36 +6,84 @@ import {
 
 export const getDetallesByPedido = async (req, res) => {
   try {
-    const detalles = await getDetallePedidoByPedidoIdModel(req.params.id);
+    const pedidoId = req.params.id;
+    console.log(`🔍 [BACKEND] Buscando detalles para pedido: ${pedidoId}`);
+    
+    const detalles = await getDetallePedidoByPedidoIdModel(pedidoId);
+    
+    console.log(`✅ [BACKEND] Detalles encontrados:`, {
+      cantidad: detalles.length,
+      detalles: detalles.map(d => ({
+        id: d.DetallePedidoClienteId,
+        producto: d.ProductoId,
+        color: d.ColorId,
+        cantidad: d.Cantidad
+      }))
+    });
+    
+    // 🔴 Asegurar que siempre sea un array
+    if (!Array.isArray(detalles)) {
+      console.warn(`⚠️ [BACKEND] Detalles no es array, convirtiendo:`, detalles);
+      res.status(200).json([]);
+      return;
+    }
+    
     res.status(200).json(detalles);
   } catch (error) {
-    console.error("Error al obtener detalles:", error);
-    res.status(500).json({ error: "Error al obtener detalles" });
+    console.error("❌ [BACKEND] Error al obtener detalles:", error);
+    res.status(500).json({ 
+      error: "Error al obtener detalles",
+      details: error.message 
+    });
   }
 };
-
 // ← NUEVO CONTROLADOR
 export const createDetalle = async (req, res) => {
   try {
-    const { PedidoClienteId, ProductoServicioId, Cantidad, Alto, Ancho, Descripcion, UrlImagen } = req.body;
+    const { 
+      PedidoClienteId, 
+      ProductoId, 
+      ServicioId, 
+      Cantidad, 
+      Tamaño, 
+      Descripcion, 
+      UrlImagen, 
+      Precio, 
+      ColorId 
+    } = req.body;
+
+    console.log("🎨 [BACKEND] createDetalle recibido:", {
+      PedidoClienteId,
+      ProductoId,
+      ColorId,  // ✅ Verificar si llega aquí
+      body: req.body
+    });
 
     if (!PedidoClienteId) {
       return res.status(400).json({ error: "PedidoClienteId es obligatorio" });
     }
 
+    if (!ProductoId && !ServicioId) {
+      return res.status(400).json({ error: "Se requiere ProductoId o ServicioId" });
+    }
+
     const nuevoDetalle = await createDetallePedidoModel({
       PedidoClienteId,
-      ProductoServicioId: ProductoServicioId?.toString().trim(),
+      ProductoId,
+      ServicioId,
       Cantidad,
-      Alto,
-      Ancho,
-      Descripcion,
-      UrlImagen
+      Tamaño: Tamaño || null,
+      Descripcion: Descripcion || "",
+      UrlImagen: UrlImagen || null,
+      Precio: Precio,       
+      ColorId: ColorId || null  // ✅ Pasar el ColorId
     });
+
+    console.log("✅ [BACKEND] Detalle creado:", nuevoDetalle);
 
     res.status(201).json(nuevoDetalle);
   } catch (error) {
-    console.error("Error al crear detalle:", error);
+    console.error("❌ [BACKEND] Error al crear detalle:", error);
     res.status(500).json({ error: "Error al crear detalle" });
   }
 };

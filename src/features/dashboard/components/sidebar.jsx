@@ -1,69 +1,45 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
-  LayoutDashboard,
   BarChart3,
   Users,
   UserCheck,
-  Wrench,
   Package,
+  Printer,
+  Boxes,
   Palette,
   ShoppingCart,
-  CreditCard,
   ChevronDown,
   ChevronRight,
-  CalendarDays,
   LogOut,
-  MonitorCheck,
+  X,
 } from "lucide-react";
-import Modal from "./modals/modal";
 import { useAuth } from "../../../context/AuthContext";
 
-// Mapeo de rutas a permisos requeridos
-const permissionMap = {
-  // Roles
-  "/dashboard/roles": ["ver_roles"],
-
-  // Usuarios
-  "/dashboard/usuarios": ["ver_usuarios"],
-
-  // Categorías
-  "/dashboard/categorias": ["ver_categorias"],
-
-  // Productos y Servicios
-  "/dashboard/producto": ["ver_productos"],
-  "/dashboard/Servicio": ["ver_servicios"],
-
-  // Proveedores / Insumos
-  "/dashboard/proveedores": ["ver_proveedores"],
-  "/dashboard/compras": ["ver_compras"],
-  "/dashboard/insumos": ["ver_insumos"],
-
-  // Ventas
-  "/dashboard/pedidosClientes": ["ver_pedidos"],
-  "/dashboard/ventas": ["ver_ventas"],
-
-  // Gestión avanzada (cualquiera de estos)
-  "/dashboard/gestionVentas": [
-    "ver_ventas",
-    "ver_pedidos"
-  ]
-};
-
-
-// Configuración completa del menú con permisos
 const menuItems = [
   {
     icon: BarChart3,
-    label: "Gráficos Estadísticos",
-    to: "/dashboard/graficosEstadisticos",
-    requiredPermission: "ver_dashboard"
+    label: "Medición y Desempeño",
+    hasSubmenu: true,
+    submenu: [
+      {
+        label: "Dashboard",
+        to: "/dashboard/graficosEstadisticos",
+        requiredPermission: "ver_dashboard"
+      }
+    ]
   },
   {
     icon: UserCheck,
-    label: "Roles",
-    to: "/dashboard/roles",
-    requiredPermission: "ver_roles"
+    label: "Configuración",
+    hasSubmenu: true,
+    submenu: [
+      {
+        label: "Roles",
+        to: "/dashboard/roles",
+        requiredPermission: "ver_roles"
+      }
+    ]
   },
   {
     icon: Users,
@@ -72,50 +48,15 @@ const menuItems = [
     requiredPermission: "ver_usuarios"
   },
   {
-    icon: Palette,
-    label: "Diseño",
-    to: "/dashboard/diseño",
-    requiredPermission: "ver_categorias"
-  },
-  {
-    icon: Wrench,
-    label: "Productos",
-    to: "/dashboard/producto",
-    requiredPermission: "ver_productos"
-  },
-  {
-    icon: Wrench,
-    label: "Servicios",
-    to: "/dashboard/servicio",
-    requiredPermission: "ver_servicios"
-  },
-  {
-    icon: Package,
-    label: "Control Insumos",
-    hasSubmenu: true,
-    submenu: [
-      {
-        label: "Proveedores",
-        to: "/dashboard/proveedores",
-        requiredPermission: "ver_proveedores"
-      },
-      {
-        label: "Compras",
-        to: "/dashboard/compras",
-        requiredPermission: "ver_compras"
-      },
-      {
-        label: "Insumos",
-        to: "/dashboard/insumos",
-        requiredPermission: "ver_insumos"
-      }
-    ]
-  },
-  {
     icon: ShoppingCart,
     label: "Ventas",
     hasSubmenu: true,
     submenu: [
+      {
+        label: "Servicios",
+        to: "/dashboard/servicio",
+        requiredPermission: "ver_servicios"
+      },
       {
         label: "Pedidos",
         to: "/dashboard/pedidosClientes",
@@ -127,103 +68,261 @@ const menuItems = [
         requiredPermission: "ver_ventas"
       }
     ]
+  },
+  {
+    icon: Boxes,
+    label: "Compras",
+    hasSubmenu: true,
+    submenu: [
+      {
+        label: "Categorías",
+        to: "/dashboard/categorias",
+        requiredPermission: "ver_categorias"
+      },
+      {
+        label: "Productos",
+        to: "/dashboard/producto",
+        requiredPermission: "ver_productos"
+      },
+      {
+        label: "Proveedores",
+        to: "/dashboard/proveedores",
+        requiredPermission: "ver_proveedores"
+      },
+      {
+        label: "Compras",
+        to: "/dashboard/compras",
+        requiredPermission: "ver_compras"
+      },
+    ]
   }
 ];
 
+// const menuItems = [
+//   {
+//     icon: BarChart3,
+//     label: "Dashboard",
+//     to: "/dashboard/graficosEstadisticos",
+//     requiredPermission: "ver_dashboard"
+//   },
+//   {
+//     icon: UserCheck,
+//     label: "Roles",
+//     to: "/dashboard/roles",
+//     requiredPermission: "ver_roles"
+//   },
+//   {
+//     icon: Users,
+//     label: "Usuarios",
+//     to: "/dashboard/usuarios",
+//     requiredPermission: "ver_usuarios"
+//   },
+//   {
+//     icon: Palette,
+//     label: "Categorías",
+//     to: "/dashboard/categorias",
+//     requiredPermission: "ver_categorias"
+//   },
+//   {
+//     icon: Package,
+//     label: "Productos",
+//     to: "/dashboard/producto",
+//     requiredPermission: "ver_productos"
+//   },
+//   {
+//     icon: Printer,
+//     label: "Servicios",
+//     to: "/dashboard/servicio",
+//     requiredPermission: "ver_servicios"
+//   },
+//   {
+//     icon: Boxes,
+//     label: "Control Insumos",
+//     hasSubmenu: true,
+//     submenu: [
+//       {
+//         label: "Proveedores",
+//         to: "/dashboard/proveedores",
+//         requiredPermission: "ver_proveedores"
+//       },
+//       {
+//         label: "Compras",
+//         to: "/dashboard/compras",
+//         requiredPermission: "ver_compras"
+//       },
+//       {
+//         label: "Insumos",
+//         to: "/dashboard/insumos",
+//         requiredPermission: "ver_insumos"
+//       }
+//     ]
+//   },
+//   {
+//     icon: ShoppingCart,
+//     label: "Ventas",
+//     hasSubmenu: true,
+//     submenu: [
+//       {
+//         label: "Pedidos",
+//         to: "/dashboard/pedidosClientes",
+//         requiredPermission: "ver_pedidos"
+//       },
+//       {
+//         label: "Ventas",
+//         to: "/dashboard/ventas",
+//         requiredPermission: "ver_ventas"
+//       }
+//     ]
+//   }
+// ];
+
+const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => setIsAnimating(true), 10);
+    } else {
+      setIsAnimating(false);
+    }
+  }, [isOpen]);
+
+  const handleOverlayClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div 
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      onClick={handleOverlayClick}
+    >
+      <div className={`
+        w-full max-w-md bg-gradient-to-br from-gray-900 to-gray-950 rounded-xl shadow-2xl border border-gray-800 overflow-hidden
+        transform transition-all duration-300 ease-out
+        ${isAnimating ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-4'}
+      `}>
+        {/* Modal Header with Close Button */}
+        <div className="flex justify-between items-center p-6 pb-0">
+          <div></div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-800 rounded-lg transition-colors duration-200"
+          >
+            <X className="w-5 h-5 text-gray-400 hover:text-white" />
+          </button>
+        </div>
+
+        <div className="p-8 pt-4 text-center">
+          <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-red-700 to-red-800 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
+            <LogOut className="w-10 h-10 text-red-200" />
+          </div>
+          <h3 className="text-2xl font-bold text-white mb-3">Cerrar Sesión</h3>
+          <p className="text-gray-300 mb-8">
+            ¿Está seguro que quiere cerrar sesión?<br />
+            <span className="text-sm text-gray-400">Será redirigido a la página de inicio</span>
+          </p>
+          <div className="flex gap-3">
+            <button
+              className="flex-1 py-3.5 bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-300 shadow-lg hover:shadow-red-900/30 transform hover:-translate-y-0.5 active:translate-y-0"
+              onClick={onConfirm}
+            >
+              Salir
+            </button>
+            <button
+              className="flex-1 py-3.5 bg-gray-800 text-gray-200 font-semibold rounded-lg hover:bg-gray-700 transition-all duration-300 border border-gray-700 transform hover:-translate-y-0.5 active:translate-y-0"
+              onClick={onClose}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+        <div className="px-8 py-4 bg-gray-900/50 border-t border-gray-800 text-center">
+          <p className="text-xs text-gray-400">
+            Panel v2.0 • {new Date().getFullYear()}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const Sidebar = () => {
-  const { logout, user, permissions = [] } = useAuth();
+  const { logout, user, loading, hasPermission } = useAuth();
   const [openModal, setOpenModal] = useState(false);
   const [expandedItems, setExpandedItems] = useState([]);
   const [filteredMenuItems, setFilteredMenuItems] = useState([]);
+  const [activeItem, setActiveItem] = useState("");
 
-  // Verificar si el usuario tiene un permiso específico
-  const hasPermission = (permissionName) => {
-    if (!permissions || permissions.length === 0) {
-      return false;
+  useEffect(() => {
+    if (loading || !user) {
+      setFilteredMenuItems([]);
+      return;
     }
-    
-    // Si es administrador, tiene todos los permisos
-    if (user?.Role?.toLowerCase() === "administrador") {
-      return true;
-    }
-    
-    return permissions.includes(permissionName);
-  };
 
-  // Verificar si tiene al menos uno de varios permisos
-  const hasAnyPermission = (permissionNames) => {
-    if (!permissionNames || permissionNames.length === 0) return true;
-    
-    if (user?.Role?.toLowerCase() === "administrador") {
-      return true;
+    if (user.Role === "administrador") {
+      setFilteredMenuItems(menuItems);
+      return;
     }
-    
-    return permissionNames.some(perm => hasPermission(perm));
-  };
 
-  // Filtrar los items del menú basado en permisos
-  const filterMenuItems = () => {
-    return menuItems.filter(item => {
-      // Verificar permiso para el item principal
-      const mainItemHasPermission = hasPermission(item.requiredPermission);
-      
-      // Si no tiene submenú, solo verificar permiso principal
-      if (!item.hasSubmenu) {
-        return mainItemHasPermission;
-      }
-      
-      // Si tiene submenú, filtrar subitems primero
-      if (item.submenu) {
-        const filteredSubmenu = item.submenu.filter(subItem => 
+    const filtered = menuItems
+      .map(item => {
+        if (!item.hasSubmenu) {
+          return hasPermission(item.requiredPermission) ? item : null;
+        }
+
+        const filteredSubmenu = item.submenu?.filter(subItem =>
           hasPermission(subItem.requiredPermission)
-        );
-        
-        // Mostrar el item principal si:
-        // 1. Tiene permiso para el item principal O
-        // 2. Tiene permiso para al menos un subitem
-        const hasSubPermission = filteredSubmenu.length > 0;
-        
-        // Guardar el submenú filtrado
-        item.filteredSubmenu = filteredSubmenu;
-        
-        return mainItemHasPermission || hasSubPermission;
+        ) || [];
+
+        return filteredSubmenu.length > 0 ? {
+          ...item,
+          filteredSubmenu
+        } : null;
+      })
+      .filter(Boolean);
+
+    setFilteredMenuItems(filtered);
+  }, [user, loading, hasPermission]);
+
+  const toggleSubmenu = (index) => {
+    setExpandedItems(prev => {
+      if (prev.includes(index)) {
+        return prev.filter(i => i !== index);
+      } else {
+        return [index];
       }
-      
-      return mainItemHasPermission;
     });
   };
 
-  // Efecto para filtrar items cuando cambian los permisos
-  useEffect(() => {
-    const filtered = filterMenuItems();
-    setFilteredMenuItems(filtered);
-  }, [permissions, user]);
-
-  const toggleSubmenu = (index) => {
-    setExpandedItems((prev) =>
-      prev.includes(index)
-        ? prev.filter((i) => i !== index)
-        : [...prev, index]
-    );
+  const handleLogout = () => {
+    logout();
+    setOpenModal(false);
   };
 
-  // Si no hay usuario (no está autenticado), no mostrar sidebar
   if (!user) {
     return null;
   }
 
-  // Si está cargando, mostrar esqueleto
-  if (permissions === null) {
+  if (loading) {
     return (
-      <div className="w-48 min-h-screen bg-gray-900 space-y-3 py-4 text-white flex flex-col justify-between">
-        <div className="p-4 pb-6 border-b border-gray-700">
-          <h1 className="text-lg font-bold text-white tracking-tight">Dashboard</h1>
-          <div className="h-4 bg-gray-700 rounded animate-pulse mt-2"></div>
+      <div className="w-72 min-h-screen bg-gray-900 border-r border-gray-800">
+        <div className="p-6 border-b border-gray-800">
+          <div className="h-8 w-32 bg-gray-800 rounded-lg animate-pulse"></div>
+          <div className="mt-6 flex items-center gap-3">
+            <div className="w-12 h-12 bg-gray-800 rounded-full animate-pulse"></div>
+            <div className="space-y-2">
+              <div className="h-4 w-24 bg-gray-800 rounded animate-pulse"></div>
+              <div className="h-3 w-16 bg-gray-800 rounded animate-pulse"></div>
+            </div>
+          </div>
         </div>
-        <div className="flex-1 space-y-1 px-4">
+        <div className="p-4 space-y-2">
           {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="h-10 bg-gray-700 rounded animate-pulse"></div>
+            <div key={i} className="h-12 bg-gray-800 rounded-xl animate-pulse"></div>
           ))}
         </div>
       </div>
@@ -231,139 +330,182 @@ export const Sidebar = () => {
   }
 
   return (
-    <div className="w-48 min-h-screen bg-gray-900 space-y-3 py-4 text-white flex flex-col justify-between">
-      {/* Encabezado con información del usuario */}
-      <div className="p-4 pb-6 border-b border-gray-700">
-        <h1 className="text-lg font-bold text-white tracking-tight">Dashboard</h1>
-        <div className="mt-2">
-          <p className="text-xs text-gray-300 truncate">
-            {user?.NombreCompleto || user?.CorreoElectronico || "Usuario"}
-          </p>
-          <p className="text-xs text-gray-400 capitalize">
-            {user?.Role || "Rol no asignado"}
-          </p>
+    <>
+      {/* Sidebar Container - Modificado para contenido dinámico */}
+      <div className="w-72 h-screen bg-gray-900 border-r border-gray-800 flex flex-col shadow-2xl shadow-black/40">
+        
+        {/* User Profile Header */}
+        <div className="p-6 border-b border-gray-800 shrink-0">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="font-bold text-white text-xl">
+              Panel Administrativo
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <span className="text-white font-bold text-lg">
+                  {user?.NombreCompleto?.charAt(0) || user?.CorreoElectronico?.charAt(0) || "U"}
+                </span>
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-cyan-500 rounded-full border-2 border-gray-900"></div>
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-white truncate">
+                {user?.NombreCompleto?.split(' ')[0] || "Usuario"}
+              </h3>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="px-2.5 py-1 bg-gray-800 text-cyan-300 text-xs font-medium rounded-full">
+                  {user?.Role || "Rol no asignado"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation - Permitir scroll solo cuando sea necesario */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="h-full overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <nav className="py-4 px-3">
+              <div className="space-y-1">
+                {filteredMenuItems.length > 0 ? (
+                  filteredMenuItems.map((item, index) => {
+                    const filteredSubmenu = item.filteredSubmenu || item.submenu;
+                    const hasVisibleSubmenu = filteredSubmenu && filteredSubmenu.length > 0;
+
+                    return (
+                      <div key={index} className="relative">
+                        {/* Main Menu Item */}
+                        <div className="group relative">
+                          {!item.hasSubmenu ? (
+                            <Link
+                              to={item.to}
+                              onClick={() => setActiveItem(item.label)}
+                              className={`
+                                flex items-center gap-3
+                                px-3 py-3.5
+                                rounded-xl
+                                transition-all duration-200
+                                group-hover:bg-gray-800
+                                group-hover:shadow-md
+                                ${activeItem === item.label ? 'bg-gray-800 shadow-inner' : ''}
+                              `}
+                            >
+                              <div className="relative">
+                                <item.icon className={`w-5 h-5 text-cyan-500 transition-all duration-300 group-hover:scale-110 ${activeItem === item.label ? 'scale-110' : ''}`} />
+                              </div>
+                              
+                              <div className="flex-1 flex items-center justify-between">
+                                <span className={`text-sm font-medium transition-all duration-300 ${activeItem === item.label ? 'text-white' : 'text-gray-300'}`}>
+                                  {item.label}
+                                </span>
+                              </div>
+                            </Link>
+                          ) : (
+                            <div
+                              onClick={() => toggleSubmenu(index)}
+                              className={`
+                                flex items-center gap-3
+                                px-3 py-3.5
+                                rounded-xl
+                                cursor-pointer
+                                transition-all duration-200
+                                hover:bg-gray-800
+                                hover:shadow-md
+                                ${expandedItems.includes(index) ? 'bg-gray-800 shadow-inner' : ''}
+                              `}
+                            >
+                              <item.icon className={`w-5 h-5 text-cyan-500 transition-all duration-300 ${expandedItems.includes(index) ? 'scale-110' : ''}`} />
+                              
+                              <>
+                                <span className={`flex-1 text-sm font-medium transition-all duration-300 ${expandedItems.includes(index) ? 'text-white' : 'text-gray-300'}`}>
+                                  {item.label}
+                                </span>
+                                <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${expandedItems.includes(index) ? 'rotate-180 text-cyan-500' : 'text-gray-500'}`} />
+                              </>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Submenu Items */}
+                        {item.hasSubmenu && hasVisibleSubmenu && expandedItems.includes(index) && (
+                          <div className="ml-3 mt-1 pl-8 border-l border-gray-800 space-y-1 py-2">
+                            {filteredSubmenu.map((subItem, subIndex) => (
+                              <Link
+                                key={subIndex}
+                                to={subItem.to}
+                                onClick={() => setActiveItem(subItem.label)}
+                                className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-all duration-200 group"
+                              >
+                                <div className="w-1.5 h-1.5 bg-gray-700 rounded-full group-hover:bg-cyan-400 transition-colors"></div>
+                                <span>{subItem.label}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  !loading && user && (
+                    <div className="p-4 text-center">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-gray-800 rounded-2xl flex items-center justify-center shadow-lg">
+                        <Users className="w-8 h-8 text-gray-600" />
+                      </div>
+                      <p className="text-sm text-gray-400 font-medium mb-2">
+                        Sin permisos asignados
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Contacta al administrador
+                      </p>
+                    </div>
+                  )
+                )}
+              </div>
+            </nav>
+          </div>
+        </div>
+
+        {/* Footer - Fijo en la parte inferior */}
+        <div className="p-4 border-t border-gray-800 shrink-0 mt-auto">
+          <div
+            className={`
+              flex items-center justify-between
+              px-3 py-3
+              bg-gradient-to-r from-red-600/20 to-red-700/10
+              rounded-xl
+              border border-red-800/30
+              group hover:from-red-600/30 hover:to-red-700/20
+              transition-all duration-300
+              cursor-pointer
+              transform hover:-translate-y-0.5 active:translate-y-0
+            `}
+            onClick={() => setOpenModal(true)}
+            title="Cerrar sesión"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-600/30 rounded-lg group-hover:bg-red-600/40 transition-colors">
+                <LogOut className="w-4 h-4 text-red-300 group-hover:scale-110 transition-transform" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-200">Cerrar sesión</p>
+                <p className="text-xs text-gray-300">Salir del sistema</p>
+              </div>
+            </div>
+            
+            <ChevronRight className="w-4 h-4 text-red-400 group-hover:text-red-300 transition-colors" />
+          </div>
         </div>
       </div>
 
-      {/* Menú */}
-      <nav className="flex-1 overflow-y-auto scrollbar-hide">
-        <ul className="space-y-1">
-          {filteredMenuItems.length > 0 ? (
-            filteredMenuItems.map((item, index) => {
-              const filteredSubmenu = item.filteredSubmenu || item.submenu;
-              const hasVisibleSubmenu = filteredSubmenu && filteredSubmenu.length > 0;
-              
-              return (
-                <li key={index}>
-                  <div
-                    className={`flex items-center justify-between px-4 py-3 hover:bg-gray-800 rounded-md transition-colors duration-200 group ${item.hasSubmenu && hasVisibleSubmenu ? "cursor-pointer" : ""
-                      }`}
-                  >
-                    {!item.hasSubmenu ? (
-                      <Link 
-                        to={item.to} 
-                        className="flex items-center gap-3 flex-1"
-                        title={item.label}
-                      >
-                        <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-                        <span className="text-xs font-medium">{item.label}</span>
-                      </Link>
-                    ) : (
-                      <div className="flex items-center flex-1 justify-between">
-                        <Link 
-                          to={item.to} 
-                          className="flex items-center gap-3 flex-1"
-                          title={item.label}
-                        >
-                          <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-                          <span className="text-xs font-medium">{item.label}</span>
-                        </Link>
-                        {hasVisibleSubmenu && (
-                          <button
-                            onClick={() => toggleSubmenu(index)}
-                            className="ml-1 focus:outline-none"
-                            aria-label={expandedItems.includes(index) ? "Contraer menú" : "Expandir menú"}
-                          >
-                            {expandedItems.includes(index) ? (
-                              <ChevronDown className="w-4 h-4 transition-transform duration-200" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 transition-transform duration-200" />
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {item.hasSubmenu && hasVisibleSubmenu && expandedItems.includes(index) && (
-                    <ul className="ml-5 mt-1 space-y-3 py-4 border-l border-gray-700 pl-3">
-                      {filteredSubmenu.map((subItem, subIndex) => (
-                        <li key={subIndex}>
-                          <Link
-                            to={subItem.to}
-                            className="block px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors duration-200"
-                            title={subItem.label}
-                          >
-                            {subItem.label}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              );
-            })
-          ) : (
-            <div className="px-4 py-8 text-center">
-              <p className="text-sm text-gray-400">
-                No tienes permisos para acceder a ninguna sección
-              </p>
-              <p className="text-xs text-gray-500 mt-2">
-                Contacta al administrador
-              </p>
-            </div>
-          )}
-        </ul>
-      </nav>
-
-      {/* Botón de salir */}
-      <div className="p-4 border-t border-gray-700">
-        <button
-          onClick={() => setOpenModal(true)}
-          className="w-full flex items-center justify-center gap-2 bg-red-600 text-white text-sm font-medium py-3 px-3 rounded-md hover:bg-red-700 transition-colors"
-        >
-          <LogOut className="w-3 h-3" />
-          Salir
-        </button>
-
-        {/* Modal de confirmación de logout */}
-        <Modal
-          open={openModal}
-          onClose={() => setOpenModal(false)}
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
-        >
-          <div className="w-[400px] p-6 mx-auto text-center bg-white rounded shadow-lg relative z-50">
-            <p className="mb-6 text-black">¿Está seguro que quiere cerrar sesión?</p>
-            <div className="flex gap-4">
-              <button
-                className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 transition-colors"
-                onClick={() => {
-                  logout();
-                  setOpenModal(false);
-                }}
-              >
-                Cerrar sesión
-              </button>
-              <button
-                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition-colors"
-                onClick={() => setOpenModal(false)}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </Modal>
-      </div>
-    </div>
+      {/* Logout Modal Component */}
+      <LogoutModal
+        isOpen={openModal}
+        onClose={() => setOpenModal(false)}
+        onConfirm={handleLogout}
+      />
+    </>
   );
 };

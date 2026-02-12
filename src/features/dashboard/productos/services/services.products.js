@@ -45,9 +45,38 @@ export const deleteDataproducto = async (id) => {
 //Buscar usuarios
 
 export const buscarProductos = async (campo, valor) => {
-  const response = await axios.get(
-    `${url}producto/buscar`,
-    { params: { campo, valor } }
+    const response = await axios.get(
+        `${url}producto/buscar`,
+        { params: { campo, valor } }
+    );
+    return response.data.results;
+};
+
+export const updateColoresProducto = async (productoId, colores) => {
+  const response = await axios.post(
+    `${url}producto/${productoId}/colores`,
+    { colores }
   );
-  return response.data.results;
+  return response.data;
+};  
+
+export const getColores = async () => {
+  const res = await axios.get("http://localhost:3000/colores");
+  return res.data;
+};
+
+export const getColoresProducto = async (productoId) => {
+  const res = await axios.get(
+    `${url}producto/${productoId}/colores`
+  );
+  return res.data;
+};
+
+export const getProductoByIdService = async (id) => {
+  try {
+    const res = await axios.get(`${url}producto/${id}`);
+    return res.data; // Esto es el objeto del producto
+  } catch (error) {
+    return { status: false, message: "No se pudo obtener el producto", error };
+  }
 };

@@ -22,81 +22,115 @@ export const CartProvider = ({ children }) => {
     }
   }, [cart]);
 
-  const addToCart = (product, options = {}, quantity = 1) => {
+  const addToCart = (product, customization = {}, quantity = 1) => {
     const stock = product.Stock ?? product.stock ?? null;
+    const productId = product.ProductoId || product.ServicioId || product.id;
+    
+    // 🔴 CORREGIDO: Manejo correcto de UUID de color
+    let colorId = null;
+    if (customization.color) {
+      // Si el color es un objeto, extraer el UUID
+      if (typeof customization.color === 'object' && customization.color.ColorId) {
+        colorId = customization.color.ColorId;
+      } 
+      // Si es un string, verificar si es UUID
+      else if (typeof customization.color === 'string') {
+        // Verificar si es un UUID válido
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(customization.color)) {
+          colorId = customization.color;
+        }
+      }
+    }
 
-    const itemId =
-      product.ProductoServicioId ?? product.ServiceId ?? product.id ?? null;
-
-    const existingLine = cart.find((l) => {
-      if (l.ProductoServicioId !== itemId) return false;
-
-      if (!l.EsPersonalizado) return true;
-
-      return (
-        l.options?.alto === options.alto &&
-        l.options?.ancho === options.ancho &&
-        l.options?.descripcion === options.descripcion
-      );
+    // Crear fingerprint considerando el UUID del color
+    const itemFingerprint = JSON.stringify({
+      productId,
+      colorId, // 🔴 Usar el UUID en lugar del objeto completo
+      size: customization.size,
+      personalizacion: customization,
     });
 
-    if (existingLine) {
+    const existingLineIndex = cart.findIndex((l) => {
+      if (l.ProductoId !== product.ProductoId && 
+          l.ServicioId !== product.ServicioId) {
+        return false;
+      }
+      
+      // Comparar UUIDs de color
+      const existingColorId = l.customization?.colorId || 
+                              (typeof l.customization?.color === 'object' ? l.customization.color.ColorId : l.customization?.color);
+      
+      if (colorId && existingColorId !== colorId) {
+        return false;
+      }
+      
+      if (product.EsPersonalizado || customization.Nombre) {
+        const existingFingerprint = JSON.stringify({
+          productId: l.ProductoId || l.ServicioId,
+          colorId: existingColorId,
+          size: l.customization?.size,
+          personalizacion: l.customization
+        });
+        return existingFingerprint === itemFingerprint;
+      }
+      
+      return true;
+    });
+
+    if (existingLineIndex !== -1) {
+      const existingLine = cart[existingLineIndex];
       const newQuantity = existingLine.quantity + quantity;
 
-      // Validación de stock solo para productos
-      if (
-        typeof stock === "number" &&
-        stock > 0 &&
-        product.Tipo === "Producto" &&
-        newQuantity > stock
-      ) {
+      if (stock !== null && newQuantity > stock) {
         toast.error(`Solo hay ${stock} unidades disponibles`);
         return;
       }
 
-      updateQuantity(existingLine.id, newQuantity);
+      const updatedCart = [...cart];
+      updatedCart[existingLineIndex] = {
+        ...existingLine,
+        quantity: newQuantity
+      };
+      setCart(updatedCart);
+      
       toast.success(`${product.Nombre} actualizado en el carrito`);
       return;
     }
 
     const discount = product.Descuento || product.descuento || 0;
     const originalPrice = product.Precio || product.precio || 0;
-
-    const finalPrice =
-      discount > 0
-        ? originalPrice - (originalPrice * discount) / 100
-        : originalPrice;
+    const finalPrice = discount > 0 ? originalPrice - (originalPrice * discount) / 100 : originalPrice;
+    const itemType = product.ServicioId || product.EsPersonalizado ? "servicio" : "producto";
 
     const cartLine = {
       id: uuidv4(),
-      ProductoServicioId: itemId,
+      ProductoId: product.ProductoId || null,
+      ServicioId: product.ServicioId || null,
       Nombre: product.Nombre || "Producto",
+      Descripcion: product.Descripcion || "",
       Precio: finalPrice,
-      UrlImagen: options.urlImagen || product.UrlImagen || product.Url || "",
-      quantity: Math.max(1, parseInt(quantity, 10) || 1),
+      Descuento: discount,
+      UrlImagen: product.UrlImagen || product.Imagen || product.Url || "",
+      Imagen: product.Imagen || product.UrlImagen || "",
       Stock: stock,
-      Tipo: product.Tipo || "Producto",
-      EsPersonalizado:
-        product.EsPersonalizado ??
-        product.esPersonalizado ??
-        product.Customizable ??
-        options.EsPersonalizado ??
-        false,
-      options: {
-        alto: options.alto || null,
-        ancho: options.ancho || null,
-        descripcion: options.descripcion || "",
-        ...options,
+      stock: stock,
+      quantity: Math.max(1, parseInt(quantity, 10) || 1),
+      Tipo: itemType,
+      EsPersonalizado: product.EsPersonalizado || false,
+      // 🔴 CORREGIDO: Guardar el UUID del color en lugar del objeto completo
+      customization: {
+        colorId: colorId, // UUID del color
+        colorName: customization.color?.Nombre || 
+                   (typeof customization.color === 'string' && !colorId ? customization.color : null),
+        size: customization.size || null,
+        ...customization
       },
+      CategoriaId: product.CategoriaId,
+      createdAt: new Date().toISOString()
     };
 
-    // Validación de stock inicial solo para productos
-    if (
-      typeof stock === "number" &&
-      stock > 0 &&
-      product.Tipo === "Producto" &&
-      cartLine.quantity > stock
-    ) {
+    if (stock !== null && cartLine.quantity > stock) {
       toast.error(`Solo hay ${stock} unidades disponibles`);
       return;
     }
@@ -112,36 +146,64 @@ export const CartProvider = ({ children }) => {
   const updateQuantity = (lineId, newQuantity) => {
     setCart((prev) =>
       prev.map((l) => {
+        if (l.id !== lineId) return l;
+        
         const stock = l.Stock ?? null;
+        const validatedQuantity = Math.max(1, newQuantity);
 
-        // Validación de stock solo para productos
-        if (
-          typeof stock === "number" &&
-          stock > 0 &&
-          l.Tipo === "Producto" &&
-          newQuantity > stock
-        ) {
+        if (stock !== null && validatedQuantity > stock) {
           toast.error(`Solo hay ${stock} unidades disponibles`);
-          return l;
+          return { ...l, quantity: stock };
         }
 
-        return { ...l, quantity: Math.max(1, newQuantity) };
+        return { ...l, quantity: validatedQuantity };
       })
     );
   };
 
-  const updateItem = (lineId, changes) => {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.id === lineId
-          ? {
-              ...item,
-              ...changes,
-              options: { ...item.options, ...(changes.options || {}) },
+  // 🔴 FUNCIÓN CORREGIDA PARA ACTUALIZAR COLOR
+  const updateItemColor = (lineId, colorData) => {
+    console.log("🎨 [CART CONTEXT] updateItemColor llamado:", {
+      lineId,
+      colorData
+    });
+    
+    const updatedCart = cart.map((item) => {
+      if (item.id === lineId) {
+        // Extraer UUID del color
+        let colorId = null;
+        let colorName = null;
+        
+        if (colorData) {
+          if (typeof colorData === 'object' && colorData.ColorId) {
+            colorId = colorData.ColorId;
+            colorName = colorData.Nombre;
+          } else if (typeof colorData === 'string') {
+            // Verificar si es UUID
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (uuidRegex.test(colorData)) {
+              colorId = colorData;
+            } else {
+              colorName = colorData;
             }
-          : item
-      )
-    );
+          }
+        }
+        
+        return {
+          ...item,
+          customization: {
+            ...item.customization,
+            colorId: colorId, // Guardar UUID
+            colorName: colorName, // Guardar nombre para display
+            color: colorId || colorName // Mantener compatibilidad
+          }
+        };
+      }
+      return item;
+    });
+    
+    setCart(updatedCart);
+    console.log("📦 [CART CONTEXT] Carrito actualizado:", updatedCart);
   };
 
   const clearCart = () => setCart([]);
@@ -159,7 +221,7 @@ export const CartProvider = ({ children }) => {
         addToCart,
         removeFromCart,
         updateQuantity,
-        updateItem,
+        updateItemColor,
         clearCart,
         getTotal,
       }}

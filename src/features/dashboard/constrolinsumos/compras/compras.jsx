@@ -5,12 +5,14 @@ import {
     updateCompra,
     getDetallesByCompraId,
     createDetalleCompra,
+    deleteDetalleCompra,
     getAllCompras,
     getAllProductos,
     getAllInsumos,
     getAllProveedores
 } from "./services/services.compras";
-import { Pagination } from "../../components/paginacion/pagination"; // 👈 IMPORTANTE
+import { Pagination } from "../../components/paginacion/pagination";
+import { toast, ToastContainer } from "react-toastify";
 
 const getShortId = (id) => {
     const str = String(id || "");
@@ -45,6 +47,11 @@ const formatearFechaParaInput = (f) => {
     return `${year}-${month}-${day}`;
 };
 
+const formatPrice = (value) => {
+    const num = Number(value);
+    return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
+};
+
 const validarFormulario = (form, detalles, listaProveedores) => {
     const errores = [];
     if (!form.ProveedorId || !listaProveedores.some(p => p.ProveedorId === form.ProveedorId)) {
@@ -60,7 +67,7 @@ const validarFormulario = (form, detalles, listaProveedores) => {
         const d = detalles[i];
         if (!d.TipoDetalle) {
             errores.push(`Artículo ${i + 1}: seleccione tipo (Producto/Insumo).`);
-        } else if (d.TipoDetalle === "Producto" && !d.ProductoServicioId) {
+        } else if (d.TipoDetalle === "Producto" && !d.ProductoId) {
             errores.push(`Artículo ${i + 1}: seleccione un producto.`);
         } else if (d.TipoDetalle === "Insumo" && !d.InsumoId) {
             errores.push(`Artículo ${i + 1}: seleccione un insumo.`);
@@ -93,7 +100,7 @@ export const Compras = () => {
         Estado: 1,
     });
     const [detallesCrear, setDetallesCrear] = useState([
-        { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }
+        { TipoDetalle: "", ProductoId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }
     ]);
     const [productos, setProductos] = useState([]);
     const [insumos, setInsumos] = useState([]);
@@ -101,7 +108,7 @@ export const Compras = () => {
     const [errores, setErrores] = useState([]);
     const [returnTo, setReturnTo] = useState(null);
 
-    // 👇 ESTADOS PARA PAGINACIÓN PRINCIPAL
+    // PAGINACIÓN PRINCIPAL
     const [allData, setAllData] = useState([]);
     const [paginatedData, setPaginatedData] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
@@ -109,7 +116,7 @@ export const Compras = () => {
     const [totalItems, setTotalItems] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
 
-    // Estados para la vista de selección de proveedor
+    // Vista de selección de proveedor
     const [searchTermProveedores, setSearchTermProveedores] = useState("");
     const [currentPageProveedores, setCurrentPageProveedores] = useState(1);
     const [totalPagesProveedores, setTotalPagesProveedores] = useState(1);
@@ -117,7 +124,7 @@ export const Compras = () => {
     const [proveedoresPaginados, setProveedoresPaginados] = useState([]);
     const [loadingProveedores, setLoadingProveedores] = useState(false);
 
-    // Estados para la vista de selección de producto/insumo
+    // Vista de selección de producto/insumo
     const [searchTermProdInsumo, setSearchTermProdInsumo] = useState("");
     const [currentPageProdInsumo, setCurrentPageProdInsumo] = useState(1);
     const [totalPagesProdInsumo, setTotalPagesProdInsumo] = useState(1);
@@ -163,7 +170,6 @@ export const Compras = () => {
         fetchCompras();
     }, []);
 
-    // 👇 Reemplazar comprasFiltradas por lógica de paginación
     useEffect(() => {
         let filtered = compras;
         if (filtroCampo && filtroText.trim()) {
@@ -177,7 +183,6 @@ export const Compras = () => {
         setCurrentPage(1);
     }, [filtroText, filtroCampo, compras]);
 
-    // 👇 Efecto para paginar
     useEffect(() => {
         if (allData.length > 0) {
             const totalPagesCalc = Math.ceil(allData.length / itemsPerPage);
@@ -196,9 +201,20 @@ export const Compras = () => {
 
     const goToCreate = () => {
         setFormCrear({ ProveedorId: "", nombreProveedor: "", Total: 0, FechaRegistro: "", Estado: 1 });
-        setDetallesCrear([{ TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }]);
+        setDetallesCrear([{ TipoDetalle: "", ProductoId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }]);
         setErrores([]);
         setViewMode("create");
+    };
+
+    const eliminarDetallesCompra = async (compraId) => {
+        try {
+            const detallesExistentes = await getDetallesByCompraId(compraId);
+            for (const detalle of detallesExistentes) {
+                await deleteDetalleCompra(detalle.DetalleCompraId);
+            }
+        } catch (err) {
+            console.error("Error al eliminar detalles:", err);
+        }
     };
 
     const goToView = async (compra) => {
@@ -206,25 +222,42 @@ export const Compras = () => {
             const detalles = await getDetallesByCompraId(compra.CompraId);
             const proveedor = proveedores.find(p => p.ProveedorId === compra.ProveedorId);
             const nombreProveedor = proveedor?.NombreProveedor || "";
+
             const detallesConTipo = detalles.map(d => {
-                if (d.ProductoId || d.ProductoServicioId) {
+                const precioUnitario = Number(d.PrecioUnitario) || 0;
+                const cantidad = Number(d.Cantidad) || 0;
+
+                if (d.ProductoId) {
                     return {
                         ...d,
                         TipoDetalle: "Producto",
-                        ProductoServicioId: d.ProductoId || d.ProductoServicioId,
-                        InsumoId: null
+                        ProductoId: d.ProductoId,
+                        InsumoId: null,
+                        Cantidad: cantidad,
+                        PrecioUnitario: precioUnitario,
+                        Subtotal: precioUnitario * cantidad
                     };
                 } else if (d.InsumoId) {
                     return {
                         ...d,
                         TipoDetalle: "Insumo",
-                        ProductoServicioId: null,
-                        InsumoId: d.InsumoId
+                        ProductoId: null,
+                        InsumoId: d.InsumoId,
+                        Cantidad: cantidad,
+                        PrecioUnitario: precioUnitario,
+                        Subtotal: precioUnitario * cantidad
                     };
                 } else {
-                    return { ...d, TipoDetalle: "-" };
+                    return {
+                        ...d,
+                        TipoDetalle: "-",
+                        Cantidad: cantidad,
+                        PrecioUnitario: precioUnitario,
+                        Subtotal: precioUnitario * cantidad
+                    };
                 }
             });
+
             setSelectedCompra({
                 ...compra,
                 detalle: detallesConTipo,
@@ -233,7 +266,7 @@ export const Compras = () => {
             setViewMode("view");
         } catch (err) {
             console.error("Error al cargar datos para vista detallada:", err);
-            alert("No se pudieron cargar los detalles de la compra.");
+            toast.error("No se pudieron cargar los detalles de la compra.");
             goToBackToList();
         }
     };
@@ -243,25 +276,42 @@ export const Compras = () => {
             const detalles = await getDetallesByCompraId(compra.CompraId);
             const proveedor = proveedores.find(p => p.ProveedorId === compra.ProveedorId);
             const nombreProveedor = proveedor?.NombreProveedor || "";
+
             const detallesConTipo = detalles.map(d => {
-                if (d.ProductoId || d.ProductoServicioId) {
+                const precioUnitario = Number(d.PrecioUnitario) || 0;
+                const cantidad = Number(d.Cantidad) || 0;
+
+                if (d.ProductoId) {
                     return {
                         ...d,
                         TipoDetalle: "Producto",
-                        ProductoServicioId: d.ProductoId || d.ProductoServicioId,
-                        InsumoId: null
+                        ProductoId: d.ProductoId,
+                        InsumoId: null,
+                        Cantidad: cantidad,
+                        PrecioUnitario: precioUnitario,
+                        Subtotal: precioUnitario * cantidad
                     };
                 } else if (d.InsumoId) {
                     return {
                         ...d,
                         TipoDetalle: "Insumo",
-                        ProductoServicioId: null,
-                        InsumoId: d.InsumoId
+                        ProductoId: null,
+                        InsumoId: d.InsumoId,
+                        Cantidad: cantidad,
+                        PrecioUnitario: precioUnitario,
+                        Subtotal: precioUnitario * cantidad
                     };
                 } else {
-                    return { ...d, TipoDetalle: "" };
+                    return {
+                        ...d,
+                        TipoDetalle: "",
+                        Cantidad: cantidad,
+                        PrecioUnitario: precioUnitario,
+                        Subtotal: precioUnitario * cantidad
+                    };
                 }
             });
+
             setSelectedCompra({
                 ...compra,
                 detalle: detallesConTipo,
@@ -272,7 +322,7 @@ export const Compras = () => {
             setViewMode("edit");
         } catch (err) {
             console.error("Error al cargar detalles para edición:", err);
-            alert("No se pudieron cargar los detalles de la compra.");
+            toast.error("No se pudieron cargar los detalles de la compra.");
         }
     };
 
@@ -282,7 +332,6 @@ export const Compras = () => {
         setErrores([]);
     };
 
-    // Cargar proveedores paginados
     const loadProveedoresPaginados = async (page = 1, search = "") => {
         setLoadingProveedores(true);
         try {
@@ -318,7 +367,6 @@ export const Compras = () => {
         }
     };
 
-    // Cargar productos/insumos paginados
     const loadProdInsumoPaginados = async (page = 1, search = "", type = "todos") => {
         setLoadingProdInsumo(true);
         try {
@@ -328,14 +376,22 @@ export const Compras = () => {
             if (search) params.set("search", search);
             let prodData = [], insumoData = [];
             if (type !== "insumo") {
-                const resProductos = await fetch(`http://localhost:3000/service?${params.toString()}`);
+                const resProductos = await fetch(`http://localhost:3000/producto?${params.toString()}`);
                 const dataProd = await resProductos.json();
-                prodData = Array.isArray(dataProd) ? dataProd.map(p => ({ ...p, tipo: 'producto' })) : [];
+                prodData = Array.isArray(dataProd) ? dataProd.map(p => ({
+                    ...p,
+                    tipo: 'producto',
+                    Precio: Number(p.Precio) || 0
+                })) : [];
             }
             if (type !== "producto") {
                 const resInsumos = await fetch(`http://localhost:3000/api/insumos?${params.toString()}`);
                 const dataIns = await resInsumos.json();
-                insumoData = Array.isArray(dataIns) ? dataIns.map(i => ({ ...i, tipo: 'insumo' })) : [];
+                insumoData = Array.isArray(dataIns) ? dataIns.map(i => ({
+                    ...i,
+                    tipo: 'insumo',
+                    Precio: Number(i.Precio) || 0
+                })) : [];
             }
             if (type === "todos") {
                 const combinedData = [...prodData, ...insumoData].sort((a, b) => a.Nombre?.localeCompare(b.Nombre));
@@ -398,14 +454,14 @@ export const Compras = () => {
             setDetallesCrear(prev => {
                 const nuevos = [...prev];
                 if (item.tipo === "producto") {
-                    nuevos[currentDetailIndex].ProductoServicioId = item.ProductoServicioId;
+                    nuevos[currentDetailIndex].ProductoId = item.ProductoId;
                     nuevos[currentDetailIndex].InsumoId = "";
                 } else if (item.tipo === "insumo") {
                     nuevos[currentDetailIndex].InsumoId = item.InsumoId;
-                    nuevos[currentDetailIndex].ProductoServicioId = "";
+                    nuevos[currentDetailIndex].ProductoId = "";
                 }
                 if (item.Precio) {
-                    nuevos[currentDetailIndex].PrecioUnitario = item.Precio;
+                    nuevos[currentDetailIndex].PrecioUnitario = Number(item.Precio) || 0;
                 }
                 return nuevos;
             });
@@ -413,14 +469,14 @@ export const Compras = () => {
             setSelectedCompra(prev => {
                 const nuevos = [...prev.detalle];
                 if (item.tipo === "producto") {
-                    nuevos[currentDetailIndex].ProductoServicioId = item.ProductoServicioId;
+                    nuevos[currentDetailIndex].ProductoId = item.ProductoId;
                     nuevos[currentDetailIndex].InsumoId = "";
                 } else if (item.tipo === "insumo") {
                     nuevos[currentDetailIndex].InsumoId = item.InsumoId;
-                    nuevos[currentDetailIndex].ProductoServicioId = "";
+                    nuevos[currentDetailIndex].ProductoId = "";
                 }
                 if (item.Precio) {
-                    nuevos[currentDetailIndex].PrecioUnitario = item.Precio;
+                    nuevos[currentDetailIndex].PrecioUnitario = Number(item.Precio) || 0;
                 }
                 return { ...prev, detalle: nuevos };
             });
@@ -440,7 +496,7 @@ export const Compras = () => {
     const añadirDetalleCrear = () => {
         setDetallesCrear(prev => [
             ...prev,
-            { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }
+            { TipoDetalle: "", ProductoId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }
         ]);
     };
 
@@ -449,12 +505,12 @@ export const Compras = () => {
             const nuevos = [...prev];
             nuevos[index][campo] = valor;
             if (campo === "Cantidad" || campo === "PrecioUnitario") {
-                const cantidad = parseFloat(nuevos[index].Cantidad) || 0;
-                const precio = parseFloat(nuevos[index].PrecioUnitario) || 0;
+                const cantidad = Number(nuevos[index].Cantidad) || 0;
+                const precio = Number(nuevos[index].PrecioUnitario) || 0;
                 nuevos[index].Subtotal = cantidad * precio;
             }
             if (campo === "TipoDetalle") {
-                nuevos[index].ProductoServicioId = "";
+                nuevos[index].ProductoId = "";
                 nuevos[index].InsumoId = "";
                 if (valor === "Producto") {
                     goToSelectProductoInsumo("create", index, "producto");
@@ -469,7 +525,7 @@ export const Compras = () => {
     const añadirDetalleEditar = () => {
         setSelectedCompra(prev => ({
             ...prev,
-            detalle: [...prev.detalle, { TipoDetalle: "", ProductoServicioId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }]
+            detalle: [...prev.detalle, { TipoDetalle: "", ProductoId: "", InsumoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }]
         }));
     };
 
@@ -479,12 +535,12 @@ export const Compras = () => {
             const nuevos = [...prev.detalle];
             nuevos[index][campo] = valor;
             if (campo === "Cantidad" || campo === "PrecioUnitario") {
-                const cantidad = parseFloat(nuevos[index].Cantidad) || 0;
-                const precio = parseFloat(nuevos[index].PrecioUnitario) || 0;
+                const cantidad = Number(nuevos[index].Cantidad) || 0;
+                const precio = Number(nuevos[index].PrecioUnitario) || 0;
                 nuevos[index].Subtotal = cantidad * precio;
             }
             if (campo === "TipoDetalle") {
-                nuevos[index].ProductoServicioId = "";
+                nuevos[index].ProductoId = "";
                 nuevos[index].InsumoId = "";
                 if (valor === "Producto") {
                     goToSelectProductoInsumo("edit", index, "producto");
@@ -492,7 +548,7 @@ export const Compras = () => {
                     goToSelectProductoInsumo("edit", index, "insumo");
                 }
             }
-            const nuevoTotal = nuevos.reduce((sum, item) => sum + (item.Subtotal || 0), 0);
+            const nuevoTotal = nuevos.reduce((sum, item) => sum + (Number(item.Subtotal) || 0), 0);
             return { ...prev, detalle: nuevos, Total: nuevoTotal };
         });
     };
@@ -505,29 +561,59 @@ export const Compras = () => {
         }
         setErrores([]);
         try {
-            const total = detallesCrear.reduce((sum, item) => sum + (item.Subtotal || 0), 0);
+            const total = detallesCrear.reduce((sum, item) => sum + (Number(item.Subtotal) || 0), 0);
+
+            // Ajustar el orden según la tabla
             const compraData = {
                 ProveedorId: formCrear.ProveedorId,
-                FechaRegistro: formatearFechaParaInput(formCrear.FechaRegistro),
-                Total: total,
+                Total: total,  // ← TOTAL va SEGUNDO (según tu tabla)
+                FechaRegistro: formatearFechaParaInput(formCrear.FechaRegistro), // ← FechaRegistro TERCERO
                 Estado: formCrear.Estado,
             };
+
+            console.log(' DATOS COMPRA (orden corregido):', {
+                ProveedorId: compraData.ProveedorId,
+                Total: compraData.Total,
+                FechaRegistro: compraData.FechaRegistro,
+                Estado: compraData.Estado
+            });
+            console.log(' Total enviado:', total);
+
             const compraCreada = await createCompra(compraData);
-            const detallesLimpios = detallesCrear.map(d => ({
-                ...d,
-                CompraId: compraCreada.CompraId,
-                ProductoServicioId: d.TipoDetalle === "Producto" ? d.ProductoServicioId || null : null,
-                InsumoId: d.TipoDetalle === "Insumo" ? d.InsumoId || null : null,
-                Subtotal: undefined,
-            }));
-            for (const d of detallesLimpios) {
-                await createDetalleCompra(d);
+
+            // Verificar que la compra tenga el Total correcto
+            if (compraCreada && compraCreada.Total !== undefined) {
+                console.log(' Total en compra creada:', compraCreada.Total);
             }
+
+            // Crear detalles
+            for (let i = 0; i < detallesCrear.length; i++) {
+                const detalle = detallesCrear[i];
+                const detalleData = {
+                    CompraId: compraCreada.CompraId,
+                    TipoDetalle: detalle.TipoDetalle,
+                    Cantidad: Number(detalle.Cantidad) || 0,
+                    PrecioUnitario: Number(detalle.PrecioUnitario) || 0,
+                    Descripcion: detalle.Descripcion || `Compra de ${detalle.TipoDetalle}`,
+                    ProductoId: detalle.TipoDetalle === "Producto" ? (detalle.ProductoId || null) : null,
+                    InsumoId: detalle.TipoDetalle === "Insumo" ? (detalle.InsumoId || null) : null,
+                };
+
+                console.log(`📝 Creando detalle ${i + 1}:`, detalleData);
+                await createDetalleCompra(detalleData);
+            }
+
             goToBackToList();
             fetchCompras();
+            toast.success(` Compra creada exitosamente\nTotal: $${total.toFixed(2)}`);
+
         } catch (err) {
-            console.error("Error al crear compra:", err);
-            setErrores([err.message || "Error al crear la compra. Intente nuevamente."]);
+            console.error("❌ ERROR:", {
+                message: err.message,
+                response: err.response?.data,
+                status: err.response?.status
+            });
+            setErrores([err.response?.data?.error || err.message || "Error al crear la compra."]);
         }
     };
 
@@ -547,18 +633,39 @@ export const Compras = () => {
         }
         setErrores([]);
         try {
-            const total = selectedCompra.detalle.reduce((sum, item) => sum + (item.Subtotal || 0), 0);
+            const total = selectedCompra.detalle.reduce((sum, item) => sum + (Number(item.Subtotal) || 0), 0);
+
             await updateCompra(selectedCompra.CompraId, {
                 ProveedorId: selectedCompra.ProveedorId,
                 Total: total,
                 FechaRegistro: formatearFechaParaInput(selectedCompra.FechaRegistro),
                 Estado: selectedCompra.Estado,
             });
+
+            await eliminarDetallesCompra(selectedCompra.CompraId);
+
+            for (const detalle of selectedCompra.detalle) {
+                const detalleData = {
+                    CompraId: selectedCompra.CompraId,
+                    TipoDetalle: detalle.TipoDetalle,
+                    Cantidad: Number(detalle.Cantidad) || 0,
+                    PrecioUnitario: Number(detalle.PrecioUnitario) || 0,
+                    Descripcion: detalle.Descripcion || `Compra de ${detalle.TipoDetalle}`,
+                    ProductoId: detalle.TipoDetalle === "Producto" ? (detalle.ProductoId || null) : null,
+                    InsumoId: detalle.TipoDetalle === "Insumo" ? (detalle.InsumoId || null) : null,
+                };
+
+                await createDetalleCompra(detalleData);
+            }
+
+                toast.success(' Compra actualizada correctamente');
+
+
             goToBackToList();
             fetchCompras();
         } catch (err) {
             console.error("Error al editar compra:", err);
-            setErrores([err.message || "Error al guardar los cambios."]);
+            setErrores([err.response?.data?.error || err.message || "Error al guardar los cambios."]);
         }
     };
 
@@ -579,12 +686,14 @@ export const Compras = () => {
                     c.CompraId === idCompra ? { ...c, Estado: nuevoEstadoNum } : c
                 )
             );
+
+                toast.success('Estado actualizado correctamente');
+
         } catch (err) {
             console.error("Error al actualizar estado", err);
         }
     };
 
-    // 👇 FUNCIONES DE PAGINACIÓN
     const handlePageChange = (page) => {
         setCurrentPage(page);
     };
@@ -598,6 +707,7 @@ export const Compras = () => {
         <div className="min-h-screen bg-slate-50 p-6">
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Compras</h1>
+
                 {/* LISTA */}
                 {viewMode === "list" && (
                     <>
@@ -605,7 +715,7 @@ export const Compras = () => {
                             <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center">
                                 <button
                                     onClick={goToCreate}
-                                    className="inline-flex items-center gap-2 bg-green-800 text-white px-6 py-3 rounded-lg hover:bg-green-900 transition-colors"
+                                    className="inline-flex items-center gap-2  bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors"
                                 >
                                     <Plus size={18} /> Nueva compra
                                 </button>
@@ -654,7 +764,7 @@ export const Compras = () => {
                                             <td className="py-4 px-6">{getShortId(compra.ProveedorId)}</td>
                                             <td className="py-4 px-6">{formatearFecha(compra.FechaRegistro)}</td>
                                             <td className="py-4 px-6 text-center font-medium">
-                                                ${(Number(compra.Total) || 0).toFixed(2)}
+                                                {formatPrice(compra.Total)}
                                             </td>
                                             <td className="py-4 px-6 text-center">
                                                 <label className="relative inline-flex items-center cursor-pointer">
@@ -700,7 +810,6 @@ export const Compras = () => {
                                 </tbody>
                             </table>
 
-                            {/* 👇 PAGINACIÓN */}
                             {paginatedData.length > 0 && (
                                 <div className="px-6 py-4 border-t border-slate-200">
                                     <Pagination
@@ -717,7 +826,6 @@ export const Compras = () => {
                     </>
                 )}
 
-                {/* === Resto de vistas sin cambios (crear, editar, ver, selectores) === */}
                 {/* CREAR */}
                 {viewMode === "create" && (
                     <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -763,7 +871,7 @@ export const Compras = () => {
                                 <input
                                     type="text"
                                     readOnly
-                                    value={`$${detallesCrear.reduce((sum, item) => sum + (item.Subtotal || 0), 0).toFixed(2)}`}
+                                    value={formatPrice(detallesCrear.reduce((sum, item) => sum + (Number(item.Subtotal) || 0), 0))}
                                     className="w-full h-11 px-3 border rounded bg-gray-100 font-medium"
                                 />
                             </div>
@@ -822,7 +930,7 @@ export const Compras = () => {
                                                             onClick={() => goToSelectProductoInsumo("create", index, "producto")}
                                                             className="w-full h-10 px-3 border rounded bg-white hover:bg-gray-50 text-left flex items-center justify-between"
                                                         >
-                                                            <span>{d.ProductoServicioId ? `ID: ${getShortId(d.ProductoServicioId)}` : "Seleccionar producto"}</span>
+                                                            <span>{d.ProductoId ? `ID: ${getShortId(d.ProductoId)}` : "Seleccionar producto"}</span>
                                                             <ChevronRight size={16} className="text-gray-400" />
                                                         </button>
                                                     ) : d.TipoDetalle === "Insumo" ? (
@@ -861,7 +969,7 @@ export const Compras = () => {
                                                     <input
                                                         type="text"
                                                         readOnly
-                                                        value={`$${(d.Subtotal || 0).toFixed(2)}`}
+                                                        value={formatPrice(d.Subtotal)}
                                                         className="w-full px-2 py-1 border rounded bg-gray-100"
                                                     />
                                                 </td>
@@ -878,7 +986,7 @@ export const Compras = () => {
                             <div className="flex justify-between items-center text-lg font-bold">
                                 <span>Total:</span>
                                 <span className="text-green-700">
-                                    ${detallesCrear.reduce((sum, item) => sum + (item.Subtotal || 0), 0).toFixed(2)}
+                                    {formatPrice(detallesCrear.reduce((sum, item) => sum + (Number(item.Subtotal) || 0), 0))}
                                 </span>
                             </div>
                         </div>
@@ -946,7 +1054,7 @@ export const Compras = () => {
                                 <input
                                     type="text"
                                     readOnly
-                                    value={`$${Number(selectedCompra.Total || 0).toFixed(2)}`}
+                                    value={formatPrice(selectedCompra.Total)}
                                     className="w-full h-11 px-3 border rounded bg-gray-100 font-medium"
                                 />
                             </div>
@@ -1004,7 +1112,7 @@ export const Compras = () => {
                                                             onClick={() => goToSelectProductoInsumo("edit", index, "producto")}
                                                             className="w-full h-10 px-3 border rounded bg-white hover:bg-gray-50 text-left flex items-center justify-between"
                                                         >
-                                                            <span>{d.ProductoServicioId ? `ID: ${getShortId(d.ProductoServicioId)}` : "Seleccionar producto"}</span>
+                                                            <span>{d.ProductoId ? `ID: ${getShortId(d.ProductoId)}` : "Seleccionar producto"}</span>
                                                             <ChevronRight size={16} className="text-gray-400" />
                                                         </button>
                                                     ) : d.TipoDetalle === "Insumo" ? (
@@ -1043,7 +1151,7 @@ export const Compras = () => {
                                                     <input
                                                         type="text"
                                                         readOnly
-                                                        value={`$${(d.Subtotal || 0).toFixed(2)}`}
+                                                        value={formatPrice(d.Subtotal)}
                                                         className="w-full px-2 py-1 border rounded bg-gray-100"
                                                     />
                                                 </td>
@@ -1060,7 +1168,7 @@ export const Compras = () => {
                             <div className="flex justify-between items-center text-lg font-bold">
                                 <span>Total:</span>
                                 <span className="text-green-700">
-                                    ${Number(selectedCompra.Total || 0).toFixed(2)}
+                                    {formatPrice(selectedCompra.Total)}
                                 </span>
                             </div>
                         </div>
@@ -1068,9 +1176,9 @@ export const Compras = () => {
                             <button
                                 type="button"
                                 onClick={handleEdit}
-                                className="flex-1 h-11 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors font-medium"
+                                className="flex-1 h-11 bg-green-500 text-white rounded hover:bg-green-600 transition-colors font-medium"
                             >
-                                Guardar cambios
+                                Guardar 
                             </button>
                             <button
                                 type="button"
@@ -1111,7 +1219,7 @@ export const Compras = () => {
                             <div className="flex flex-col gap-2">
                                 <label className="font-medium text-gray-600">Total</label>
                                 <div className="h-11 px-3 border rounded bg-gray-50 flex items-center font-medium">
-                                    ${Number(selectedCompra.Total || 0).toFixed(2)}
+                                    {formatPrice(selectedCompra.Total)}
                                 </div>
                             </div>
                         </div>
@@ -1137,14 +1245,18 @@ export const Compras = () => {
                                                     <td className="py-2 px-4">{d.TipoDetalle || "-"}</td>
                                                     <td className="py-2 px-4">
                                                         {d.TipoDetalle === "Producto"
-                                                            ? productos.find(p => p.ProductoServicioId === (d.ProductoId || d.ProductoServicioId))?.Nombre || `ID: ${d.ProductoId || d.ProductoServicioId}`
+                                                            ? productos.find(p => p.ProductoId === d.ProductoId)?.Nombre || `ID: ${d.ProductoId}`
                                                             : d.TipoDetalle === "Insumo"
                                                                 ? insumos.find(i => i.InsumoId === d.InsumoId)?.Nombre || `ID: ${d.InsumoId}`
                                                                 : "-"}
                                                     </td>
                                                     <td className="py-2 px-4">{d.Cantidad || 0}</td>
-                                                    <td className="py-2 px-4">${(d.PrecioUnitario || 0).toFixed(2)}</td>
-                                                    <td className="py-2 px-4 font-medium">${(d.Subtotal || 0).toFixed(2)}</td>
+                                                    <td className="py-2 px-4">
+                                                        {formatPrice(d.PrecioUnitario)}
+                                                    </td>
+                                                    <td className="py-2 px-4 font-medium">
+                                                        {formatPrice(d.Subtotal)}
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -1156,7 +1268,7 @@ export const Compras = () => {
                             <div className="flex justify-between items-center text-lg font-bold">
                                 <span>Total:</span>
                                 <span className="text-green-700">
-                                    ${Number(selectedCompra.Total || 0).toFixed(2)}
+                                    {formatPrice(selectedCompra.Total)}
                                 </span>
                             </div>
                         </div>
@@ -1237,7 +1349,6 @@ export const Compras = () => {
                                 )}
                             </div>
                         </div>
-                        {/* Paginación */}
                         {totalPagesProveedores > 1 && (
                             <div className="flex items-center justify-between mt-4">
                                 <button
@@ -1385,7 +1496,7 @@ export const Compras = () => {
                                     <div className="divide-y">
                                         {prodInsumoPaginados.map((item) => (
                                             <div
-                                                key={`${item.tipo}-${item.ProductoServicioId || item.InsumoId}`}
+                                                key={`${item.tipo}-${item.ProductoId || item.InsumoId}`}
                                                 onClick={() => seleccionarProductoInsumoDesdeVista(item)}
                                                 className="p-4 hover:bg-white cursor-pointer transition-colors flex items-center justify-between"
                                             >
@@ -1400,7 +1511,7 @@ export const Compras = () => {
                                                     <div className="text-gray-600 text-sm">SKU: {item.SKU || item.Codigo || "N/A"}</div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <div className="font-medium">${Number(item.Precio || 0).toFixed(2)}</div>
+                                                    <div className="font-medium">{formatPrice(item.Precio)}</div>
                                                     <div className="text-gray-600 text-xs">Precio unitario</div>
                                                 </div>
                                             </div>
@@ -1472,6 +1583,19 @@ export const Compras = () => {
                     </div>
                 )}
             </div>
+            {/* ToastContainer al final del componente */}
+            <ToastContainer
+                position="top-right"
+                autoClose={3000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="colored"
+            />
         </div>
     );
 };

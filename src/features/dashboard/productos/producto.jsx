@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
-import { Search, Plus, Edit, Eye, Trash2, ArrowLeft, X } from "lucide-react";
-import { deleteDataproducto, GetDataproductos, postDataproductos, updateDataproductos, buscarProductos } from "./services/services.products.js";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { Search, Plus, Edit, Eye, Trash2, ArrowLeft, X, ChevronDown, Check, ListFilter } from "lucide-react";
+import { deleteDataproducto, GetDataproductos, postDataproductos, updateDataproductos, buscarProductos, getColores, updateColoresProducto, getColoresProducto } from "./services/services.products.js";
 import { getAllCategorias } from "../categoriadediseño/services/services.categoria.js";
 import axios from "axios";
 
@@ -25,6 +25,9 @@ export const ProductosDashboard = () => {
     return "list";
   }, [location.pathname, id]);
 
+  // Estado para controlar si estamos en proceso de envío
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [values, setValues] = useState({
     ProductoId: "",
     Nombre: "",
@@ -35,6 +38,11 @@ export const ProductosDashboard = () => {
     Stock: "",
     CategoriaId: ""
   });
+
+  const [colores, setColores] = useState([]);
+  const [coloresSeleccionados, setColoresSeleccionados] = useState([]);
+  const [openColores, setOpenColores] = useState(false);
+
   const [submitted, setSubmitted] = useState(false);
 
   const [originalNombre, setOriginalNombre] = useState('');
@@ -44,6 +52,13 @@ export const ProductosDashboard = () => {
   const [categorias, setCategorias] = useState([]);
 
   const [openEliminar, setOpenEliminar] = useState(false);
+
+  // ======================================================
+  // ESTADOS PARA MODAL DE CATEGORÍAS
+  // ======================================================
+  const [openCategoriasModal, setOpenCategoriasModal] = useState(false);
+  const [categoriaBusqueda, setCategoriaBusqueda] = useState("");
+  const [categoriasFiltradas, setCategoriasFiltradas] = useState([]);
 
   // ======================================================
   // ESTADOS DE PAGINACIÓN - COPIAR TAL CUAL
@@ -61,10 +76,35 @@ export const ProductosDashboard = () => {
   useEffect(() => {
     const fetchCategoria = async () => {
       const data = await getAllCategorias();
-      if (data?.data) setCategorias(data.data);
+      if (data?.data) {
+        setCategorias(data.data);
+        setCategoriasFiltradas(data.data);
+      }
     };
     fetchCategoria();
   }, []);
+
+  //Funciones para cargar los colores
+  useEffect(() => {
+    getColores()
+      .then(setColores)
+      .catch(console.error);
+  }, []);
+
+  // ======================================================
+  // FUNCIÓN PARA FILTRAR CATEGORÍAS EN MODAL
+  // ======================================================
+  useEffect(() => {
+    if (categoriaBusqueda.trim() === "") {
+      setCategoriasFiltradas(categorias);
+    } else {
+      const filtradas = categorias.filter(categoria =>
+        categoria.Nombre.toLowerCase().includes(categoriaBusqueda.toLowerCase()) ||
+        categoria.CategoriaId.toLowerCase().includes(categoriaBusqueda.toLowerCase())
+      );
+      setCategoriasFiltradas(filtradas);
+    }
+  }, [categoriaBusqueda, categorias]);
 
   // ======================================================
   // FUNCIÓN PARA PAGINAR - COPIAR TAL CUAL
@@ -170,15 +210,33 @@ export const ProductosDashboard = () => {
     }
   }, [mode, id]);
 
+  useEffect(() => {
+    if (mode === "edit" || mode === "view") {
+      getColoresProducto(id)
+        .then(colores => {
+          setColoresSeleccionados(colores.map(c => c.ColorId));
+        })
+        .catch(console.error);
+    }
+  }, [mode, id]);
+
+  useEffect(() => {
+    if (mode === "create") {
+      setColoresSeleccionados([]);
+    }
+  }, [mode]);
+
   // Navegación entre pestañas
   const goToBackToList = () => {
     navigate("/dashboard/producto");
     resetForm();
+    setColoresSeleccionados([]);
   };
 
   const goToCreate = () => {
     navigate("/dashboard/producto/nuevo");
     resetForm();
+    setColoresSeleccionados([]);
   };
 
   const goToView = (ProductoId) => {
@@ -197,15 +255,22 @@ export const ProductosDashboard = () => {
     });
   };
 
-  const handleNombreBlur = async () => {
-    if (values.Nombre === originalNombre) return;
-    try {
-      const response = await axios.get(`http://localhost:3000/Producto/validar-nombre?nombre=${values.Nombre}`);
-      setNombreError(response.data.exists ? 'Este nombre ya está registrado' : '');
-    } catch {
-      setNombreError('No se pudo validar el nombre');
-    }
-  };
+ const handleNombreBlur = async () => {
+  if (!values.Nombre.trim()) return;
+  if (values.Nombre === originalNombre) return;
+
+  try {
+    const res = await axios.get(
+      `http://localhost:3000/producto/validar-nombre`,
+      { params: { Nombre: values.Nombre } }
+    );
+
+    setNombreError(res.data.exists ? 'Este nombre ya está registrado' : '');
+  } catch (error) {
+    console.error(error);
+    setNombreError('No se pudo validar el nombre');
+  }
+};
 
   const resetForm = () => {
     setValues({
@@ -221,32 +286,135 @@ export const ProductosDashboard = () => {
     setEditData(null);
     setSubmitted(false);
     setNombreError('');
+    setIsSubmitting(false);
   };
 
   // ======================================================
-  // HANDLE SUBMIT
+  // FUNCIONES PARA MODAL DE CATEGORÍAS
+  // ======================================================
+  const abrirModalCategorias = () => {
+    setOpenCategoriasModal(true);
+    setCategoriaBusqueda("");
+  };
+
+  const seleccionarCategoria = (categoria) => {
+    setValues({
+      ...values,
+      CategoriaId: categoria.CategoriaId
+    });
+    setOpenCategoriasModal(false);
+    setCategoriaBusqueda("");
+  };
+
+  const obtenerNombreCategoria = (categoriaId) => {
+    const categoria = categorias.find(c => c.CategoriaId === categoriaId);
+    return categoria ? categoria.Nombre : "Seleccione la categoría";
+  };
+
+  // ======================================================
+  // HANDLE SUBMIT - CORREGIDO PARA EVITAR MEZCLA DE MODOS
+  // ======================================================
+  // ======================================================
+  // HANDLE SUBMIT - CORREGIDO PARA EVITAR MEZCLA DE MODOS
   // ======================================================
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Prevenir múltiples envíos
+    if (isSubmitting) return;
+
     setSubmitted(true);
+    setIsSubmitting(true);
+
+    // Validaciones básicas - SOLO establecer errores, NO mostrar toasts
+    let hasErrors = false;
+
+    if (!values.Nombre.trim()) {
+      setNombreError("El nombre es requerido");
+      hasErrors = true;
+    }
+
+    // Validación de precio
+    if (!values.Precio || parseFloat(values.Precio) <= 0) {
+      hasErrors = true;
+    }
+
+    // Validación de categoría
+    if (!values.CategoriaId) {
+      hasErrors = true;
+    }
+
+    // Validación de imagen
+    if (!values.Imagen.trim()) {
+      hasErrors = true;
+    }
+
+    // Validación de descripción
+    if (!values.Descripcion.trim()) {
+      hasErrors = true;
+    }
+
+    // Validación específica para stock en productos
+    if (values.Stock !== "" && (parseInt(values.Stock) < 0 || isNaN(parseInt(values.Stock)))) {
+      hasErrors = true;
+    }
+
+    // Validación de descuento
+    if (values.Descuento && (parseFloat(values.Descuento) < 0 || parseFloat(values.Descuento) > 100)) {
+      hasErrors = true;
+    }
+
+    // Si hay errores, detener el envío
+    if (hasErrors) {
+      setIsSubmitting(false);
+      return; // Los errores ya se muestran debajo de los inputs
+    }
 
     try {
-      if (editData) {
+      if (mode === "edit" && editData) {
         const response = await updateDataproductos(editData.ProductoId, values);
         if (response.status === 200) {
+          // Actualizar colores solo si hay seleccionados
+          if (coloresSeleccionados.length > 0) {
+            await updateColoresProducto(editData.ProductoId, coloresSeleccionados);
+          }
           toast.success("Producto actualizado correctamente");
           goToBackToList();
         }
-      } else {
+      } else if (mode === "create") {
         const response = await postDataproductos(values);
         if (response.status === 201) {
+          const nuevoProductoId = response.data.ProductoId;
+
+          // Agregar colores solo si hay seleccionados
+          if (coloresSeleccionados.length > 0) {
+            await updateColoresProducto(nuevoProductoId, coloresSeleccionados);
+          }
+
           toast.success("Producto creado correctamente");
           goToBackToList();
         }
       }
     } catch (error) {
-      console.error(error);
-      toast.error("Error al procesar la solicitud");
+      console.error("Error al procesar la solicitud:", error);
+
+      // Manejo específico de errores
+      if (error.response) {
+        if (error.response.status === 400) {
+          toast.error("Datos inválidos. Verifique la información");
+        } else if (error.response.status === 409) {
+          toast.error("Ya existe un producto con ese nombre");
+        } else {
+          toast.error(`Error del servidor: ${error.response.status}`);
+        }
+      } else if (error.request) {
+        toast.error("No se pudo conectar con el servidor");
+      } else {
+        toast.error("Error al procesar la solicitud");
+      }
+
+      // NO navegar en caso de error - permanecer en el modo actual
+      setIsSubmitting(false);
     }
   };
 
@@ -302,12 +470,25 @@ export const ProductosDashboard = () => {
   // Función para renderizar el formulario
   const renderForm = () => {
     const buttonLabel = mode === "edit" ? "Editar" : "Crear";
+    const isEditing = mode === "edit";
 
     return (
       <form onSubmit={handleSubmit} className="flex flex-col gap-6 p-4 bg-white rounded-lg shadow-md">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Indicador de modo */}
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-bold text-gray-800">
+            {isEditing ? "Editar Producto" : "Crear Nuevo Producto"}
+          </h3>
+          {isEditing && editData && (
+            <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+              ID: {editData.ProductoId}
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div className="flex flex-col gap-1">
-            <label className="font-medium">Nombre</label>
+            <label className="font-medium">Nombre *</label>
             <input
               type="text"
               placeholder="Ingrese el nombre"
@@ -317,19 +498,24 @@ export const ProductosDashboard = () => {
               onBlur={handleNombreBlur}
               className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
       ${submitted && !values.Nombre.trim() || nombreError ? "border-red-500" : "border-gray-300"}`}
+              disabled={isSubmitting}
             />
-            <div className="min-h-[16px] mt-0.5">
+            <div className="min-h-[20px] mt-0.5">
               {(!values.Nombre.trim() && submitted) && (
-                <p className="text-red-500 text-[12px] leading-4">Ingrese el nombre</p>
+                <p className="text-red-500 text-[12px] leading-4">
+                  Ingrese el nombre
+                </p>
               )}
               {nombreError && (
-                <p className="text-red-500 text-[12px] leading-4">{nombreError}</p>
+                <p className="text-red-500 text-[12px] leading-4">
+                  {nombreError}
+                </p>
               )}
             </div>
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="font-medium">Descripción</label>
+            <label className="font-medium">Descripción *</label>
             <input
               type="text"
               placeholder="Ingrese la descripción"
@@ -337,18 +523,47 @@ export const ProductosDashboard = () => {
               value={values.Descripcion}
               onChange={handleChanges}
               className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${submitted && !values.Descripcion.trim() ? "border-red-500" : "border-gray-300"}`} />
-            <div className="min-h-[16px] mt-0.5">
+      ${submitted && !values.Descripcion.trim() ? "border-red-500" : "border-gray-300"}`}
+              disabled={isSubmitting}
+            />
+            <div className="min-h-[20px] mt-0.5">
               {(!values.Descripcion.trim() && submitted) && (
-                <p className="text-red-500 text-[12px] leading-4">Ingrese la descripcion</p>
+                <p className="text-red-500 text-[12px] leading-4">
+                  Ingrese la descripción
+                </p>
               )}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-medium">Colores (opcional)</label>
+            <button
+              type="button"
+              onClick={() => setOpenColores(true)}
+              className={`h-10 px-4 text-sm rounded-lg w-fit flex items-center gap-2 transition-colors ${coloresSeleccionados.length > 0
+                ? "bg-blue-500 text-white hover:bg-blue-600"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              disabled={isSubmitting}
+            >
+              <span>Seleccionar colores</span>
+              {coloresSeleccionados.length > 0 && (
+                <span className="bg-white text-blue-600 text-xs px-2 py-0.5 rounded-full">
+                  {coloresSeleccionados.length}
+                </span>
+              )}
+            </button>
+            <div className="min-h-[20px] mt-0.5">
+              <p className="text-xs text-gray-500">
+                Los colores son opcionales. Puede agregarlos después.
+              </p>
             </div>
           </div>
         </div>
 
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 flex flex-col gap-1">
-            <label className="font-medium">Imagen (URL o archivo)</label>
+            <label className="font-medium">Imagen (URL o archivo) *</label>
 
             <input
               type="text"
@@ -357,7 +572,9 @@ export const ProductosDashboard = () => {
               value={values.Imagen}
               onChange={handleChanges}
               className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-              ${submitted && !values.Imagen.trim() ? "border-red-500" : "border-gray-300"}`} />
+              ${submitted && !values.Imagen.trim() ? "border-red-500" : "border-gray-300"}`}
+              disabled={isSubmitting}
+            />
 
             <input
               type="file"
@@ -378,10 +595,13 @@ export const ProductosDashboard = () => {
                 }
               }}
               className="w-full h-10 px-3 border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isSubmitting}
             />
-            <div className="min-h-[16px] mt-0.5">
+            <div className="min-h-[20px] mt-0.5">
               {(!values.Imagen.trim() && submitted) && (
-                <p className="text-red-500 text-[12px] leading-4">Seleccione o ingrese una imagen</p>
+                <p className="text-red-500 text-[12px] leading-4">
+                  Seleccione o ingrese una imagen
+                </p>
               )}
             </div>
           </div>
@@ -400,21 +620,28 @@ export const ProductosDashboard = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="flex flex-col gap-1">
-            <label className="font-medium">Precio</label>
+            <label className="font-medium">Precio *</label>
             <input
               type="number"
               placeholder="Ingrese el precio"
               name="Precio"
               value={values.Precio}
               onChange={handleChanges}
+              min="0"
+              step="0.01"
               className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${submitted && !values.Precio.trim() ? "border-red-500" : "border-gray-300"}`} />
-            <div className="min-h-[16px] mt-0.5">
-              {(!values.Precio.trim() && submitted) && (
-                <p className="text-red-500 text-[12px] leading-4">Ingrese el precio</p>
+      ${submitted && (!values.Precio || parseFloat(values.Precio) <= 0) ? "border-red-500" : "border-gray-300"}`}
+              disabled={isSubmitting}
+            />
+            <div className="min-h-[20px] mt-0.5">
+              {submitted && (!values.Precio || parseFloat(values.Precio) <= 0) && (
+                <p className="text-red-500 text-[12px] leading-4">
+                  Ingrese un precio válido (mayor a 0)
+                </p>
               )}
             </div>
           </div>
+
           <div className="flex flex-col gap-1">
             <label className="font-medium">Descuento</label>
             <input
@@ -423,67 +650,266 @@ export const ProductosDashboard = () => {
               name="Descuento"
               value={values.Descuento}
               onChange={handleChanges}
+              min="0"
+              max="100"
               className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${submitted && !values.Descuento.trim() ? "border-red-500" : "border-gray-300"}`} />
-            <div className="min-h-[16px] mt-0.5">
-              {(!values.Descuento.trim() && submitted) && (
-                <p className="text-red-500 text-[12px] leading-4">Ingrese el descuento</p>
+      ${submitted && values.Descuento && (parseFloat(values.Descuento) < 0 || parseFloat(values.Descuento) > 100) ? "border-red-500" : "border-gray-300"}`}
+              disabled={isSubmitting}
+            />
+            <div className="min-h-[20px] mt-0.5">
+              {submitted && values.Descuento && (parseFloat(values.Descuento) < 0 || parseFloat(values.Descuento) > 100) && (
+                <p className="text-red-500 text-[12px] leading-4">
+                  El descuento debe estar entre 0 y 100%
+                </p>
+              )}
+              {values.Descuento && parseFloat(values.Descuento) > 0 && (
+                <p className="text-green-600 text-[12px] leading-4">
+                  Aplicará un {values.Descuento}% de descuento
+                </p>
               )}
             </div>
           </div>
+
           <div className="flex flex-col gap-1">
-            <label className="font-medium">Stock</label>
+            <label className="font-medium">Stock *</label>
             <input
               type="number"
-              placeholder="Cantidad"
+              placeholder="Cantidad disponible"
               name="Stock"
               value={values.Stock}
               onChange={handleChanges}
-              disabled={values.Tipo === "Servicio"}
-              className={`w-full h-10 px-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
-                ${values.Tipo === "Servicio" ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-white"}
-                ${submitted && values.Tipo === "Producto" && (!values.Stock || values.Stock <= 0) ? "border-red-500" : "border-gray-300"}`}
+              min="0"
+              className={`w-full h-10 px-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white
+                ${submitted && (!values.Stock || parseInt(values.Stock) < 0) ? "border-red-500" : "border-gray-300"}`}
+              disabled={isSubmitting}
             />
+            <div className="min-h-[20px] mt-0.5">
+              {submitted && (!values.Stock || parseInt(values.Stock) < 0) ? (
+                <p className="text-red-500 text-[12px] leading-4">
+                  Ingrese una cantidad válida (0 o más)
+                </p>
+              ) : values.Stock && parseInt(values.Stock) === 0 ? (
+                <p className="text-yellow-600 text-[12px] leading-4">
+                  Stock agotado
+                </p>
+              ) : values.Stock && parseInt(values.Stock) < 10 ? (
+                <p className="text-orange-500 text-[12px] leading-4">
+                  Bajo stock
+                </p>
+              ) : values.Stock && (
+                <p className="text-green-600 text-[12px] leading-4">
+                  Stock disponible
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div className="flex flex-col gap-1">
-            <label>Categoría ID</label>
-            <select
-              name="CategoriaId"
-              value={values.CategoriaId || ""}
-              onChange={handleChanges}
-              className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-              ${submitted && !values.CategoriaId.trim() ? "border-red-500" : "border-gray-300"}`}            >
-              <option value="">Seleccione la categoria</option>
-              {categorias.map((categoria) => (
-                <option key={categoria.CategoriaId} value={categoria.CategoriaId}>
-                  {categoria.Nombre}
-                </option>
-              ))}
-            </select>
-            <div className="min-h-[16px] mt-0.5">
-              {(!values.CategoriaId.trim() && submitted) && (
-                <p className="text-red-500 text-[12px] leading-4">Seleccione una categoría</p>
+            <label className="font-medium">Categoría *</label>
+
+            {/* Botón para abrir modal de categorías */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={abrirModalCategorias}
+                className={`w-full h-10 px-3 border rounded-lg bg-white text-left flex items-center justify-between hover:bg-gray-50 transition-colors
+                  ${submitted && !values.CategoriaId.trim() ? "border-red-500" : "border-gray-300"}`}
+                disabled={isSubmitting}
+              >
+                <span className={`${values.CategoriaId ? "text-gray-900" : "text-gray-500"}`}>
+                  {values.CategoriaId ? obtenerNombreCategoria(values.CategoriaId) : "Seleccione la categoría"}
+                </span>
+                <ChevronDown className="h-4 w-4 text-gray-500" />
+              </button>
+
+              {/* Mostrar categoría seleccionada */}
+              {values.CategoriaId && (
+                <div className="mt-1 text-sm text-gray-600 flex items-center gap-2">
+                  <Check className="h-3 w-3 text-green-500" />
+                  <span>Seleccionada: {obtenerNombreCategoria(values.CategoriaId)}</span>
+                </div>
               )}
             </div>
 
+            <div className="min-h-[20px] mt-0.5">
+              {(!values.CategoriaId.trim() && submitted) && (
+                <p className="text-red-500 text-[12px] leading-4">
+                  Seleccione una categoría
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="flex gap-4 mt-4">
-          <button type="submit" className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors">
-            {buttonLabel}
+        <div className="flex gap-4 mt-4 pt-4 border-t border-gray-200">
+          <button
+            type="submit"
+            className={`flex-1 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${isSubmitting
+              ? "bg-gray-400 text-white cursor-not-allowed"
+              : "bg-green-500 text-white hover:bg-green-600"
+              }`}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Procesando...
+              </>
+            ) : (
+              buttonLabel
+            )}
           </button>
           <button
             type="button"
             className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
             onClick={goToBackToList}
+            disabled={isSubmitting}
           >
             Cancelar
           </button>
         </div>
+
+        {/* MODAL DE COLORES (EXISTENTE) */}
+        <Modal open={openColores} onClose={() => setOpenColores(false)}>
+          <div className="p-6 bg-white rounded-xl w-[400px] max-h-[80vh] overflow-hidden flex flex-col">
+            <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs">C</div>
+              Seleccionar colores (opcional)
+            </h3>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-600">
+                Puede seleccionar uno o más colores para este producto. Esta opción es completamente opcional.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 overflow-y-auto flex-1 pr-2">
+              {colores.map(color => (
+                <label key={color.ColorId} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-gray-50 rounded-lg">
+                  <input
+                    type="checkbox"
+                    checked={coloresSeleccionados.includes(color.ColorId)}
+                    onChange={() => {
+                      setColoresSeleccionados(prev =>
+                        prev.includes(color.ColorId)
+                          ? prev.filter(c => c !== color.ColorId)
+                          : [...prev, color.ColorId]
+                      );
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-6 h-6 rounded-full border border-gray-300 shadow-sm"
+                      style={{ backgroundColor: color.Hex }}
+                      title={color.Nombre}
+                    />
+                    <span className="text-sm font-medium">{color.Nombre}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-sm font-medium">Colores seleccionados: {coloresSeleccionados.length}</span>
+                {coloresSeleccionados.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setColoresSeleccionados([])}
+                    className="text-sm text-red-600 hover:text-red-800"
+                  >
+                    Limpiar selección
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                onClick={() => setOpenColores(false)}
+              >
+                Confirmar ({coloresSeleccionados.length})
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* MODAL DE CATEGORÍAS (NUEVO) */}
+        <Modal open={openCategoriasModal} onClose={() => setOpenCategoriasModal(false)}>
+          <div className="p-6 bg-white rounded-xl w-[500px] max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="mb-6">
+              <h3 className="font-bold text-xl mb-2 flex items-center gap-2">
+                <ListFilter className="h-5 w-5 text-blue-600" />
+                Seleccionar Categoría
+              </h3>
+              <p className="text-gray-600 text-sm mb-4">Busque y seleccione una categoría para el producto</p>
+
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar categoría por nombre o ID..."
+                  value={categoriaBusqueda}
+                  onChange={(e) => setCategoriaBusqueda(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-2">
+              {categoriasFiltradas.length > 0 ? (
+                <div className="grid grid-cols-1 gap-2">
+                  {categoriasFiltradas.map((categoria) => (
+                    <button
+                      key={categoria.CategoriaId}
+                      type="button"
+                      onClick={() => seleccionarCategoria(categoria)}
+                      className={`p-3 text-left rounded-lg border transition-all ${values.CategoriaId === categoria.CategoriaId
+                        ? "bg-blue-50 border-blue-500"
+                        : "border-gray-200 hover:border-blue-300 hover:bg-blue-50"
+                        }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-gray-900">{categoria.Nombre}</div>
+                          <div className="text-sm text-gray-500 mt-1">ID: {categoria.CategoriaId}</div>
+                        </div>
+                        {values.CategoriaId === categoria.CategoriaId && (
+                          <Check className="h-5 w-5 text-blue-600" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                    <Search className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <p className="text-gray-600 font-medium">No se encontraron categorías</p>
+                  <p className="text-gray-500 text-sm mt-1">Intenta con otro término de búsqueda</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">
+                  {categoriasFiltradas.length} categoría(s) encontrada(s)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setOpenCategoriasModal(false)}
+                  className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </Modal>
       </form>
     );
   };
@@ -493,15 +919,36 @@ export const ProductosDashboard = () => {
 
     return (
       <div className="text-left space-y-4 p-4 bg-white rounded-lg shadow-md">
-        <h3 className="text-lg font-black text-gray-800 mb-4">Detalles del Producto/Servicio</h3>
+        <h3 className="text-lg font-black text-gray-800 mb-4">Detalles del Producto</h3>
         <div className="grid grid-cols-2 gap-4">
           <div><strong>ID:</strong> {editData.ProductoId}</div>
           <div><strong>Nombre:</strong> {editData.Nombre}</div>
           <div><strong>Descripción:</strong> {editData.Descripcion || "—"}</div>
-          <div><strong>Precio:</strong> ${editData.Precio}</div>
-          <div><strong>Descuento:</strong> {editData.Descuento}%</div>
+          <div><strong>Precio:</strong> ${parseFloat(editData.Precio || 0).toFixed(2)}</div>
+          {editData.Descuento > 0 && (
+            <div><strong>Descuento:</strong> {editData.Descuento}%</div>
+          )}
           <div><strong>Stock:</strong> {editData.Stock}</div>
           <div><strong>Categoría:</strong> {categorias.find(c => c.CategoriaId === editData.CategoriaId)?.Nombre || editData.CategoriaId}</div>
+          <div>
+            <strong>Colores:</strong>
+            <div className="flex gap-2 mt-2">
+              {coloresSeleccionados.length > 0 ? (
+                colores
+                  .filter(c => coloresSeleccionados.includes(c.ColorId))
+                  .map(c => (
+                    <span
+                      key={c.ColorId}
+                      className="w-6 h-6 rounded-full border"
+                      style={{ backgroundColor: c.Hex }}
+                      title={c.Nombre}
+                    />
+                  ))
+              ) : (
+                <span className="text-gray-400">No tiene colores asignados</span>
+              )}
+            </div>
+          </div>
         </div>
         {editData.Imagen && (
           <div className="mt-4">
@@ -513,9 +960,15 @@ export const ProductosDashboard = () => {
             />
           </div>
         )}
-        <div className="mt-6">
+        <div className="mt-6 flex gap-3">
           <button
-            className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+            className="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors"
+            onClick={() => goToEdit(editData.ProductoId)}
+          >
+            Editar Producto
+          </button>
+          <button
+            className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
             onClick={goToBackToList}
           >
             Volver a la lista
@@ -608,6 +1061,7 @@ export const ProductosDashboard = () => {
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Descuento</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Stock</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Categoría</th>
+                      <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Colores</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Acciones</th>
                     </tr>
                   </thead>
@@ -657,6 +1111,30 @@ export const ProductosDashboard = () => {
                           <td className="py-3 px-4 text-sm text-gray-700 truncate max-w-[120px]" title={categorias.find(c => c.CategoriaId === p.CategoriaId)?.Nombre}>
                             {categorias.find(c => c.CategoriaId === p.CategoriaId)?.Nombre || "—"}
                           </td>
+                          <td className="py-3 px-4">
+                            <div className="flex gap-1 flex-wrap">
+                              {p.Colores && (
+                                <>
+                                  {p.Colores.slice(0, 3).map(c => (
+                                    <span
+                                      key={c.ColorId}
+                                      className="w-4 h-4 rounded-full border"
+                                      style={{ backgroundColor: c.Hex }}
+                                      title={c.Nombre}
+                                    />
+                                  ))}
+
+                                  {p.Colores.length > 3 && (
+                                    <span className="text-xs text-gray-500 ml-1">
+                                      +{p.Colores.length - 3}
+                                    </span>
+                                  )}
+                                </>
+                              )}
+
+                            </div>
+                          </td>
+
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-2">
                               <button

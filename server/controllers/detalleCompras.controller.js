@@ -46,9 +46,9 @@ export const getDetalleByCompraId = async (req, res) => {
   }
 };
 
-// Crear nuevo detalle
+// Crear nuevo detalle - CORREGIDO
 export const createDetalle = async (req, res) => {
-  const { CompraId, TipoDetalle, ProductoServicioId, InsumoId, Cantidad, Descripcion } = req.body;
+  const { CompraId, TipoDetalle, ProductoId, InsumoId, Cantidad, Descripcion, PrecioUnitario } = req.body; // ← Agregar PrecioUnitario
 
   if (!CompraId || !TipoDetalle || !Cantidad) {
     return res.status(400).json({
@@ -60,10 +60,11 @@ export const createDetalle = async (req, res) => {
     const result = await createDetalleModel({
       CompraId,
       TipoDetalle,
-      ProductoServicioId: ProductoServicioId || null,
+      ProductoId: ProductoId || null,
       InsumoId: InsumoId || null,
       Cantidad,
-      Descripcion: Descripcion || null
+      Descripcion: Descripcion || null,
+      PrecioUnitario: PrecioUnitario || 0  // ← IMPORTANTE: Pasar PrecioUnitario al modelo
     });
 
     res.status(201).json(result);
@@ -73,11 +74,11 @@ export const createDetalle = async (req, res) => {
   }
 };
 
-// Actualizar detalle
+// Actualizar detalle - CORREGIDO
 export const updateDetalle = async (req, res) => {
   const id = req.params.id;
 
-  const { TipoDetalle, ProductoServicioId, InsumoId, Cantidad, Descripcion } = req.body;
+  const { TipoDetalle, ProductoId, InsumoId, Cantidad, Descripcion, PrecioUnitario } = req.body; // ← Agregar PrecioUnitario
 
   if (!id || id.length !== 36) {
     return res.status(400).json({ error: "ID inválido" });
@@ -86,10 +87,11 @@ export const updateDetalle = async (req, res) => {
   try {
     const result = await updateDetalleModel(id, {
       TipoDetalle,
-      ProductoServicioId: ProductoServicioId || null,
+      ProductoId: ProductoId || null,
       InsumoId: InsumoId || null,
       Cantidad,
-      Descripcion: Descripcion || null
+      Descripcion: Descripcion || null,
+      PrecioUnitario: PrecioUnitario || 0  // ← IMPORTANTE: Pasar PrecioUnitario al modelo
     });
 
     if (result.affectedRows === 0) {
