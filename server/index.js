@@ -25,6 +25,7 @@ import roleRouter from './routes/role.routes.js';
 import userRouter from './routes/user.routes.js';
 import tipoDocumentoRoutes from './routes/tipoDocumento.js';
 
+
 // Scripts y DB
 import { initRolesAndAdmin } from './scripts/initRolesAndAdmin.js';
 import connectDB from './lib/db.js';

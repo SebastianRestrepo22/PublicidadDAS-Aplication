@@ -2,9 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useMisPedidos } from '../hooks/useMisPedidos';
 import { Navbar } from '../components/Navbar';
 import axios from 'axios';
-import { Search, Package, Clock, CheckCircle, XCircle, ChevronRight } from 'lucide-react';
+import { 
+  Search, Package, Clock, CheckCircle, XCircle, ChevronRight 
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const MisPedidos = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [clienteId, setClienteId] = useState(null);
@@ -37,7 +43,7 @@ const MisPedidos = () => {
     }
   }, []);
 
-  const { pedidos, loading } = useMisPedidos(clienteId);
+  const { pedidos, loading, refetch } = useMisPedidos(clienteId);
 
   const allStatuses = ['Todos', 'pendiente', 'aprobado', 'entregado', 'cancelado'];
 
@@ -68,6 +74,47 @@ const MisPedidos = () => {
       case 'entregado': return <CheckCircle className="w-4 h-4" />;
       case 'cancelado': return <XCircle className="w-4 h-4" />;
       default: return <Package className="w-4 h-4" />;
+    }
+  };
+
+  const handleOrderClick = (order) => {
+    navigate('/cliente/DetallePedido', { 
+      state: { pedido: order, clienteId } 
+    });
+  };
+
+  const handleCancelarPedido = async (pedidoId, e) => {
+    e?.stopPropagation(); // Evita la propagación del evento
+    
+    if (!window.confirm("¿Estás seguro de que deseas cancelar este pedido?")) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.put(
+        `http://localhost:3000/api/pedidos-clientes/${pedidoId}`,
+        { Estado: "cancelado" },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.status === 200) {
+        toast.success("Pedido cancelado exitosamente");
+        // Recargar los pedidos
+        if (refetch) {
+          refetch();
+        } else {
+          // Si no hay refetch, recargar la página
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        }
+      }
+    } catch (error) {
+      console.error("Error al cancelar pedido:", error);
+      toast.error(error.response?.data?.error || "Error al cancelar el pedido");
     }
   };
 
@@ -186,7 +233,8 @@ const MisPedidos = () => {
               {activeOrders.map((order) => (
                 <div
                   key={order.PedidoClienteId}
-                  className="bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200 overflow-hidden group"
+                  onClick={() => handleOrderClick(order)}
+                  className="bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200 overflow-hidden group cursor-pointer"
                 >
                   <div className="p-6">
                     <div className="flex items-start justify-between mb-4">
@@ -196,7 +244,7 @@ const MisPedidos = () => {
                         </div>
                         <div>
                           <h3 className="text-lg font-semibold text-gray-900">
-                            Pedido #{order.PedidoClienteId}
+                            Pedido #{String(order.PedidoClienteId).substring(0, 4)}
                           </h3>
                           <p className="text-sm text-gray-500">
                             {new Date(order.FechaRegistro).toLocaleDateString('es-ES', {
@@ -208,12 +256,25 @@ const MisPedidos = () => {
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-3">
-                        <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border ${getEstadoColor(order.Estado)}`}>
-                          {getEstadoIcon(order.Estado)}
-                          {getEstadoLabel(order.Estado)}
-                        </span>
-                        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" />
+                      <div className="flex flex-col items-end gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border ${getEstadoColor(order.Estado)}`}>
+                            {getEstadoIcon(order.Estado)}
+                            {getEstadoLabel(order.Estado)}
+                          </span>
+                          <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" />
+                        </div>
+                        
+                        {/* Botón de Cancelar - Solo aparece cuando el pedido NO está aprobado */}
+                        {order.Estado === 'pendiente' && (
+                          <button
+                            onClick={(e) => handleCancelarPedido(order.PedidoClienteId, e)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-lg transition-colors text-xs font-medium whitespace-nowrap"
+                          >
+                            <XCircle className="w-3 h-3" />
+                            Cancelar Pedido
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -256,7 +317,8 @@ const MisPedidos = () => {
                 .map((order) => (
                   <div
                     key={order.PedidoClienteId}
-                    className="bg-white rounded-xl border border-gray-200 hover:shadow-sm transition-all duration-200 overflow-hidden opacity-75 hover:opacity-100"
+                    onClick={() => handleOrderClick(order)}
+                    className="bg-white rounded-xl border border-gray-200 hover:shadow-sm transition-all duration-200 overflow-hidden opacity-75 hover:opacity-100 cursor-pointer"
                   >
                     <div className="p-6">
                       <div className="flex items-start justify-between mb-3">
@@ -266,7 +328,7 @@ const MisPedidos = () => {
                           </div>
                           <div>
                             <h3 className="font-semibold text-gray-900">
-                              Pedido #{order.PedidoClienteId}
+                              Pedido #{String(order.PedidoClienteId).substring(0, 4)}
                             </h3>
                             <p className="text-sm text-gray-500">
                               {new Date(order.FechaRegistro).toLocaleDateString('es-ES')}
@@ -274,10 +336,12 @@ const MisPedidos = () => {
                           </div>
                         </div>
                         
-                        <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border ${getEstadoColor(order.Estado)}`}>
-                          {getEstadoIcon(order.Estado)}
-                          {getEstadoLabel(order.Estado)}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border ${getEstadoColor(order.Estado)}`}>
+                            {getEstadoIcon(order.Estado)}
+                            {getEstadoLabel(order.Estado)}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
@@ -302,6 +366,20 @@ const MisPedidos = () => {
           </div>
         )}
       </div>
+
+      {/* Toast Container para notificaciones */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
     </div>
   );
 };

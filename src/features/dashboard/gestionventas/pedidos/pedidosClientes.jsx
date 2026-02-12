@@ -114,21 +114,21 @@ export const PedidosClientes = () => {
   const [viewMode, setViewMode] = useState("list");
   const [selectedPedido, setSelectedPedido] = useState(null);
   const [returnTo, setReturnTo] = useState(null);
-
+  
   // Refs para scroll automático
   const detalleRef = useRef(null);
   const resumenRef = useRef(null);
-
+  
   // Filtros para lista
   const [campoFiltro, setCampoFiltro] = useState("");
   const [busqueda, setBusqueda] = useState("");
-
+  
   // Datos de catálogos
   const [productos, setProductos] = useState([]);
   const [servicios, setServicios] = useState([]);
   const [colores, setColores] = useState([]);
   const [errores, setErrores] = useState([]);
-
+  
   // Estados para crear/editar
   const [formPedido, setFormPedido] = useState({
     ClienteId: "",
@@ -143,7 +143,7 @@ export const PedidosClientes = () => {
     Voucher: "",
     VoucherPreview: "",
   });
-
+  
   const [detallesPedido, setDetallesPedido] = useState([
     {
       _tempId: generateTempId(),
@@ -157,7 +157,7 @@ export const PedidosClientes = () => {
       ColorId: ""
     },
   ]);
-
+  
   // Estados para tipo de cliente
   const [tipoCliente, setTipoCliente] = useState('registrado');
   const [clienteWalkin, setClienteWalkin] = useState({
@@ -165,11 +165,14 @@ export const PedidosClientes = () => {
     Telefono: "",
     Correo: ""
   });
-
+  
   // Estados para subida de archivos
   const [voucherFile, setVoucherFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-
+  
+  // ✅ ESTADO PARA TOGGLE DE VOUCHER
+  const [showVoucher, setShowVoucher] = useState(false);
+  
   // PAGINACIÓN PRINCIPAL
   const [allData, setAllData] = useState([]);
   const [paginatedData, setPaginatedData] = useState([]);
@@ -177,7 +180,7 @@ export const PedidosClientes = () => {
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-
+  
   // Estados para vistas de selección
   const [searchTermProductos, setSearchTermProductos] = useState("");
   const [currentPageProductos, setCurrentPageProductos] = useState(1);
@@ -186,14 +189,14 @@ export const PedidosClientes = () => {
   const [productosPaginados, setProductosPaginados] = useState([]);
   const [loadingProductos, setLoadingProductos] = useState(false);
   const [filterTypeProductos, setFilterTypeProductos] = useState("todos");
-
+  
   const [searchTermColores, setSearchTermColores] = useState("");
   const [currentPageColores, setCurrentPageColores] = useState(1);
   const [totalPagesColores, setTotalPagesColores] = useState(1);
   const [totalColores, setTotalColores] = useState(0);
   const [coloresPaginados, setColoresPaginados] = useState([]);
   const [loadingColores, setLoadingColores] = useState(false);
-
+  
   // Estados para búsqueda de clientes (RUTA INTERNA)
   const [searchTermClientes, setSearchTermClientes] = useState("");
   const [clientesPaginados, setClientesPaginados] = useState([]);
@@ -204,7 +207,7 @@ export const PedidosClientes = () => {
   const [clienteSearchFrom, setClienteSearchFrom] = useState("");
   const [currentDetailIndex, setCurrentDetailIndex] = useState(-1);
   const [selectionType, setSelectionType] = useState("");
-
+  
   // Cargar datos iniciales
   useEffect(() => {
     const fetchData = async () => {
@@ -224,7 +227,7 @@ export const PedidosClientes = () => {
     };
     fetchData();
   }, []);
-
+  
   // Calcular total cuando cambian los detalles
   useEffect(() => {
     if (viewMode === "create") {
@@ -236,7 +239,7 @@ export const PedidosClientes = () => {
       setFormPedido(prev => ({ ...prev, Total: total }));
     }
   }, [detallesPedido, viewMode]);
-
+  
   useEffect(() => {
     if (viewMode === "edit" && selectedPedido && selectedPedido.detalle) {
       const total = selectedPedido.detalle.reduce((sum, d) => {
@@ -247,7 +250,7 @@ export const PedidosClientes = () => {
       setSelectedPedido(prev => ({ ...prev, Total: total }));
     }
   }, [selectedPedido?.detalle]);
-
+  
   // Función para buscar clientes
   const fetchClientes = async (searchTerm = "", page = 1) => {
     try {
@@ -284,7 +287,7 @@ export const PedidosClientes = () => {
       return { clientes: [], total: 0, pages: 1 };
     }
   };
-
+  
   const buscarClientes = async (searchTerm = "", page = 1) => {
     setLoadingClientes(true);
     try {
@@ -302,7 +305,7 @@ export const PedidosClientes = () => {
       setLoadingClientes(false);
     }
   };
-
+  
   // Ir a la vista de selección de clientes
   const goToSelectCliente = (from) => {
     setClienteSearchFrom(from);
@@ -310,7 +313,7 @@ export const PedidosClientes = () => {
     buscarClientes("", 1);
     setViewMode("select-cliente");
   };
-
+  
   // Seleccionar cliente desde la vista de selección
   const seleccionarCliente = (cliente) => {
     if (clienteSearchFrom === "create") {
@@ -332,7 +335,7 @@ export const PedidosClientes = () => {
     }
     setViewMode(clienteSearchFrom);
   };
-
+  
   // Cargar pedidos
   const fetchPedidos = async () => {
     try {
@@ -364,11 +367,11 @@ export const PedidosClientes = () => {
       toast.error("Error al cargar pedidos");
     }
   };
-
+  
   useEffect(() => {
     fetchPedidos();
   }, []);
-
+  
   // Lógica de filtrado y paginación
   useEffect(() => {
     let filtered = Array.isArray(pedidos) ? pedidos : [];
@@ -382,7 +385,7 @@ export const PedidosClientes = () => {
     setTotalItems(filtered.length);
     setCurrentPage(1);
   }, [busqueda, campoFiltro, pedidos]);
-
+  
   useEffect(() => {
     if (Array.isArray(allData) && allData.length > 0) {
       const totalPagesCalc = Math.ceil(allData.length / itemsPerPage);
@@ -398,15 +401,13 @@ export const PedidosClientes = () => {
       setTotalPages(1);
     }
   }, [itemsPerPage, currentPage, allData]);
-
+  
   // Funciones de navegación
   const goToList = () => setViewMode("list");
-
   const goToCreate = () => {
     resetForm();
     setViewMode("create");
   };
-
   const goToView = async (pedido) => {
     try {
       const detalles = await getDetallesByPedidoId(pedido.PedidoClienteId);
@@ -423,7 +424,6 @@ export const PedidosClientes = () => {
       toast.error("Error al cargar los detalles del pedido");
     }
   };
-
   const goToEdit = async (pedido) => {
     try {
       const detalles = await getDetallesByPedidoId(pedido.PedidoClienteId);
@@ -442,7 +442,7 @@ export const PedidosClientes = () => {
       toast.error("Error al cargar el pedido para editar");
     }
   };
-
+  
   // Función para resetear formulario
   const resetForm = () => {
     setFormPedido({
@@ -477,8 +477,9 @@ export const PedidosClientes = () => {
     setTipoCliente('registrado');
     setVoucherFile(null);
     setErrores([]);
+    setShowVoucher(false); // Reset toggle
   };
-
+  
   // Funciones de selección
   const goToSelectProducto = (from, index) => {
     setReturnTo(from);
@@ -489,7 +490,7 @@ export const PedidosClientes = () => {
     loadProductosPaginados(1, "", "todos");
     setViewMode("select-producto");
   };
-
+  
   const goToSelectColor = (from, index) => {
     setReturnTo(from);
     setCurrentDetailIndex(index);
@@ -498,7 +499,7 @@ export const PedidosClientes = () => {
     loadColoresPaginados(1, "");
     setViewMode("select-color");
   };
-
+  
   const seleccionarDesdeVista = (item) => {
     if (selectionType === "producto") {
       if (returnTo === "create") {
@@ -568,7 +569,7 @@ export const PedidosClientes = () => {
     }, 100);
     setViewMode(returnTo);
   };
-
+  
   // Funciones para cargar datos paginados
   const loadProductosPaginados = async (page = 1, search = "", type = "todos") => {
     setLoadingProductos(true);
@@ -582,7 +583,7 @@ export const PedidosClientes = () => {
         (s.Nombre?.toLowerCase() || "").includes(search.toLowerCase()) ||
         (s.Descripcion?.toLowerCase() || "").includes(search.toLowerCase())
       ) : [];
-
+      
       let combinedData = [];
       if (type === "todos") {
         const productosMapped = productosFiltrados.map(p => ({
@@ -607,7 +608,7 @@ export const PedidosClientes = () => {
           ProductoId: s.ServicioId || s.id
         }));
       }
-
+      
       const total = combinedData.length;
       const startIndex = (page - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
@@ -624,7 +625,7 @@ export const PedidosClientes = () => {
       setLoadingProductos(false);
     }
   };
-
+  
   const loadColoresPaginados = async (page = 1, search = "") => {
     setLoadingColores(true);
     try {
@@ -632,7 +633,7 @@ export const PedidosClientes = () => {
         (color.Nombre?.toLowerCase() || "").includes(search.toLowerCase()) ||
         (color.CodigoHex?.toLowerCase() || "").includes(search.toLowerCase())
       ) : [];
-
+      
       const total = coloresFiltrados.length;
       const startIndex = (page - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
@@ -649,7 +650,7 @@ export const PedidosClientes = () => {
       setLoadingColores(false);
     }
   };
-
+  
   // Funciones de detalles
   const añadirDetalle = (mode) => {
     const nuevoDetalle = {
@@ -684,7 +685,7 @@ export const PedidosClientes = () => {
       });
     }
   };
-
+  
   const eliminarDetalle = (index, mode) => {
     if (mode === "create") {
       if (detallesPedido.length > 1) {
@@ -705,7 +706,7 @@ export const PedidosClientes = () => {
       }
     }
   };
-
+  
   const actualizarDetalle = (index, campo, valor, mode) => {
     const calcularTotal = (detalles) => {
       return detalles.reduce((sum, d) => {
@@ -714,6 +715,7 @@ export const PedidosClientes = () => {
         return sum + (cantidad * precio);
       }, 0);
     };
+    
     if (mode === "create") {
       setDetallesPedido(prev => {
         const nuevos = [...prev];
@@ -731,11 +733,11 @@ export const PedidosClientes = () => {
       });
     }
   };
-
-  // Validaciones MEJORADAS - AHORA PERMITE EDICIÓN PARCIAL Y CORRIGE VALIDACIÓN DE WALK-IN
+  
+  // Validaciones MEJORADAS - AHORA CON MÉTODO EFECTIVO
   const validarFormulario = (form, detalles, mode = "create") => {
     const errores = [];
-
+    
     // Solo validar cliente si es creación o si se está cambiando el tipo
     if (mode === "create") {
       if (tipoCliente === 'registrado') {
@@ -751,12 +753,15 @@ export const PedidosClientes = () => {
         }
       }
     }
-
+    
     if (!form.FechaRegistro) {
       errores.push("La fecha de registro es obligatoria.");
     }
-
-    if (form.MetodoPago === "contra_entrega") {
+    
+    // ✅ VALIDACIÓN PARA MÉTODO EFECTIVO
+    if (form.MetodoPago === "efectivo") {
+      // No requiere voucher ni datos de entrega para walk-in
+    } else if (form.MetodoPago === "contra_entrega") {
       if (!form.NombreRecibe?.trim()) {
         errores.push("El nombre de quien recibe es obligatorio para contra entrega.");
       }
@@ -769,16 +774,14 @@ export const PedidosClientes = () => {
       if (!form.DireccionEntrega?.trim()) {
         errores.push("La dirección de entrega es obligatoria para contra entrega.");
       }
-    }
-
-    if (form.MetodoPago === "transferencia" && mode === "create" && !voucherFile && !form.Voucher) {
+    } else if (form.MetodoPago === "transferencia" && mode === "create" && !voucherFile && !form.Voucher) {
       errores.push("Debe adjuntar un comprobante de pago para transferencia.");
     }
-
+    
     if (!detalles || detalles.length === 0) {
       errores.push("Debe agregar al menos un producto/servicio.");
     }
-
+    
     for (let i = 0; i < detalles.length; i++) {
       const d = detalles[i];
       if (!d.ProductoId && !d.ServicioId) {
@@ -791,10 +794,10 @@ export const PedidosClientes = () => {
         errores.push(`Artículo ${i + 1}: el precio debe ser válido.`);
       }
     }
-
+    
     return errores;
   };
-
+  
   // Función para crear pedido - VOUCHER SE SUBE JUNTO CON EL PEDIDO - CORREGIDO
   const handleCreate = async () => {
     const erroresValidacion = validarFormulario(formPedido, detallesPedido, "create");
@@ -803,11 +806,11 @@ export const PedidosClientes = () => {
       toast.error("Por favor corrija los errores en el formulario");
       return;
     }
-
+    
     try {
       setUploading(true);
       console.log('🔍 DEPURACIÓN: Creando pedido...');
-
+      
       const detallesLimpios = detallesPedido.map(d => ({
         ProductoId: d.ProductoId?.trim() || null,
         ServicioId: d.ServicioId?.trim() || null,
@@ -818,7 +821,7 @@ export const PedidosClientes = () => {
         Precio: Number(d.Precio) || 0,
         ColorId: d.ColorId || null
       }));
-
+      
       // Crear FormData para enviar archivo junto con el pedido
       const formData = new FormData();
       
@@ -839,26 +842,26 @@ export const PedidosClientes = () => {
         ClienteCorreo: tipoCliente === 'walkin' ? (clienteWalkin.Correo || null) : null,
         detalle: detallesLimpios
       };
-
+      
       formData.append('pedido', JSON.stringify(pedidoData));
-
+      
       if (formPedido.MetodoPago === "transferencia" && voucherFile) {
         formData.append('voucher', voucherFile);
       }
-
+      
       console.log('📤 Enviando pedido con datos:', pedidoData);
       console.log('📤 Voucher incluido:', voucherFile ? voucherFile.name : 'no');
-
+      
       const response = await fetch('http://localhost:3000/api/pedidos-clientes', {
         method: 'POST',
         body: formData,
       });
-
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`);
       }
-
+      
       const result = await response.json();
       console.log('✅ Pedido creado:', result);
       toast.success("Pedido creado exitosamente");
@@ -875,7 +878,7 @@ export const PedidosClientes = () => {
       setUploading(false);
     }
   };
-
+  
   // Función para editar pedido - CORREGIDO
   const handleEdit = async () => {
     if (!selectedPedido) return;
@@ -887,11 +890,11 @@ export const PedidosClientes = () => {
       toast.error("Por favor corrija los errores en el formulario");
       return;
     }
-
+    
     try {
       setUploading(true);
       console.log('🔍 DEPURACIÓN: Editando pedido...');
-
+      
       const detallesLimpios = selectedPedido.detalle.map(d => ({
         ProductoId: d.ProductoId?.trim() || null,
         ServicioId: d.ServicioId?.trim() || null,
@@ -902,7 +905,7 @@ export const PedidosClientes = () => {
         Precio: Number(d.Precio) || 0,
         ColorId: d.ColorId || null,
       }));
-
+      
       const formData = new FormData();
       
       // ✅ CORREGIDO: Mantener el tipo de cliente original
@@ -922,25 +925,25 @@ export const PedidosClientes = () => {
         ClienteCorreo: selectedPedido.ClienteCorreo || null,
         detalle: detallesLimpios,
       };
-
+      
       formData.append('pedido', JSON.stringify(pedidoData));
-
+      
       if (selectedPedido.MetodoPago === "transferencia" && voucherFile) {
         formData.append('voucher', voucherFile);
       }
-
+      
       console.log('📤 Enviando pedido editado con datos:', pedidoData);
-
+      
       const response = await fetch(`http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`, {
         method: 'PUT',
         body: formData,
       });
-
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`);
       }
-
+      
       const result = await response.json();
       console.log('✅ Pedido actualizado:', result);
       toast.success("Pedido actualizado exitosamente");
@@ -957,7 +960,7 @@ export const PedidosClientes = () => {
       setUploading(false);
     }
   };
-
+  
   const handleDelete = async (pedidoId) => {
     if (window.confirm("¿Está seguro de eliminar este pedido?")) {
       try {
@@ -970,7 +973,7 @@ export const PedidosClientes = () => {
       }
     }
   };
-
+  
   // Handler para actualizar estado del pedido
   const handleUpdateEstado = async (estado) => {
     if (!selectedPedido) return;
@@ -982,10 +985,12 @@ export const PedidosClientes = () => {
         },
         body: JSON.stringify({ Estado: estado }),
       });
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al actualizar el estado');
       }
+      
       toast.success("Estado actualizado correctamente");
       goToList();
       fetchPedidos();
@@ -994,7 +999,7 @@ export const PedidosClientes = () => {
       toast.error(err.message || "No se pudo actualizar el estado");
     }
   };
-
+  
   // Handler para abrir comprobante en nueva pestaña
   const abrirComprobante = (voucherUrl) => {
     if (!voucherUrl) {
@@ -1006,20 +1011,20 @@ export const PedidosClientes = () => {
       : `http://localhost:3000${voucherUrl}`;
     window.open(urlCompleta, '_blank', 'noopener,noreferrer');
   };
-
+  
   // Handlers de paginación
   const handlePageChange = (page) => setCurrentPage(page);
   const handleItemsPerPageChange = (newItemsPerPage) => {
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   };
-
+  
   // ===== RENDERIZADO DE VISTAS =====
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Pedidos</h1>
-
+        
         {/* LISTA DE PEDIDOS */}
         {viewMode === "list" && (
           <>
@@ -1055,7 +1060,7 @@ export const PedidosClientes = () => {
                 </select>
               </div>
             </div>
-
+            
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
               <table className="min-w-full">
                 <thead className="bg-slate-800">
@@ -1124,7 +1129,7 @@ export const PedidosClientes = () => {
                   )}
                 </tbody>
               </table>
-
+              
               {paginatedData.length > 0 && (
                 <div className="px-6 py-4 border-t">
                   <Pagination
@@ -1140,10 +1145,9 @@ export const PedidosClientes = () => {
             </div>
           </>
         )}
-
-        {/* CREAR PEDIDO - SIN CAMBIOS VISUALES NECESARIOS */}
+        
+        {/* CREAR PEDIDO */}
         {viewMode === "create" && (
-          // ... (código existente sin cambios)
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
               <button
@@ -1154,7 +1158,7 @@ export const PedidosClientes = () => {
               </button>
               <h3 className="text-lg font-bold">Nuevo Pedido</h3>
             </div>
-
+            
             {errores.length > 0 && (
               <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
                 <ul className="list-disc pl-5">
@@ -1162,14 +1166,14 @@ export const PedidosClientes = () => {
                 </ul>
               </div>
             )}
-
+            
             <div className="space-y-8">
               {/* INFORMACIÓN DEL CLIENTE */}
               <div className="bg-slate-50 p-6 rounded-xl">
                 <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
                   <User size={20} /> Información del Cliente
                 </h4>
-
+                
                 {/* Selector de tipo de cliente */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-slate-700 mb-3">
@@ -1212,7 +1216,7 @@ export const PedidosClientes = () => {
                     </button>
                   </div>
                 </div>
-
+                
                 {/* Formulario según tipo de cliente */}
                 {tipoCliente === 'registrado' ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1333,7 +1337,7 @@ export const PedidosClientes = () => {
                   </div>
                 )}
               </div>
-
+              
               {/* FECHA Y TOTAL */}
               <div className="bg-slate-50 p-6 rounded-xl">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1350,14 +1354,15 @@ export const PedidosClientes = () => {
                   </div>
                 </div>
               </div>
-
+              
               {/* MÉTODO DE PAGO */}
               <div className="bg-slate-50 p-6 rounded-xl">
                 <h4 className="text-lg font-semibold mb-4 text-slate-700">Método de Pago</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                      {formPedido.MetodoPago === "transferencia" ? <CreditCard size={16} /> : <Truck size={16} />}
+                      {formPedido.MetodoPago === "transferencia" ? <CreditCard size={16} /> : 
+                       formPedido.MetodoPago === "efectivo" ? <DollarSign size={16} /> : <Truck size={16} />}
                       Método de Pago *
                     </label>
                     <select
@@ -1365,78 +1370,110 @@ export const PedidosClientes = () => {
                       onChange={(e) => setFormPedido({ ...formPedido, MetodoPago: e.target.value })}
                       className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
+                      {tipoCliente === 'walkin' && (
+                        <option value="efectivo">Efectivo</option>
+                      )}
                       <option value="transferencia">Transferencia Bancaria</option>
                       <option value="contra_entrega">Contra Entrega</option>
                     </select>
                   </div>
+                  
+                  {/* ✅ MÉTODO EFECTIVO - SOLO PARA WALK-IN */}
+                  {formPedido.MetodoPago === "efectivo" && tipoCliente === 'walkin' && (
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200 mt-4 md:mt-0">
+                      <div className="flex items-center gap-2 text-green-800">
+                        <Check size={20} />
+                        <span className="font-medium">Pago en efectivo - No se requiere comprobante</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* ✅ TOGGLE PARA VOUCHER */}
                   {formPedido.MetodoPago === "transferencia" && (
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                        <FileText size={16} /> Comprobante (Imagen o PDF, máximo 10MB) *
+                        <FileText size={16} /> Comprobante de Pago
+                        <button
+                          type="button"
+                          onClick={() => setShowVoucher(!showVoucher)}
+                          className={`ml-2 px-3 py-1 rounded-full text-xs font-medium ${
+                            showVoucher ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {showVoucher ? 'Ocultar' : 'Mostrar'}
+                        </button>
                       </label>
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          if (file.size > 10 * 1024 * 1024) {
-                            toast.error('El archivo debe ser menor a 10MB');
-                            e.target.value = null;
-                            return;
-                          }
-                          if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
-                            toast.error('Solo se permiten imágenes y PDFs');
-                            e.target.value = null;
-                            return;
-                          }
-                          setVoucherFile(file);
-                          if (file.type.startsWith('image/')) {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              setFormPedido(prev => ({
-                                ...prev,
-                                VoucherPreview: reader.result
-                              }));
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      {uploading && (
-                        <div className="mt-2 flex items-center gap-2 text-blue-600">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                          Subiendo archivo...
-                        </div>
-                      )}
-                      {voucherFile && !uploading && (
-                        <div className="mt-2">
-                          <p className="text-sm text-green-600 flex items-center gap-2">
-                            <Check size={16} />
-                            Archivo seleccionado: <span className="font-medium">{voucherFile.name}</span>
-                            <span className="text-slate-500">({(voucherFile.size / 1024 / 1024).toFixed(2)} MB)</span>
-                          </p>
-                          {formPedido.VoucherPreview && (
-                            <div className="mt-2">
-                              <p className="text-sm text-slate-600 mb-1">Vista previa:</p>
-                              <img
-                                src={formPedido.VoucherPreview}
-                                alt="Preview"
-                                className="w-40 h-40 object-contain rounded-lg border bg-white"
-                              />
+                      
+                      {showVoucher && (
+                        <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 10 * 1024 * 1024) {
+                                toast.error('El archivo debe ser menor a 10MB');
+                                e.target.value = null;
+                                return;
+                              }
+                              if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+                                toast.error('Solo se permiten imágenes y PDFs');
+                                e.target.value = null;
+                                return;
+                              }
+                              setVoucherFile(file);
+                              if (file.type.startsWith('image/')) {
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                  setFormPedido(prev => ({
+                                    ...prev,
+                                    VoucherPreview: reader.result
+                                  }));
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                          
+                          {uploading && (
+                            <div className="mt-2 flex items-center gap-2 text-blue-600">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                              Subiendo archivo...
                             </div>
                           )}
-                          {voucherFile.type === 'application/pdf' && (
-                            <p className="text-sm text-blue-600 mt-1 flex items-center gap-1">
-                              <File size={14} /> Archivo PDF listo para subir
-                            </p>
+                          
+                          {voucherFile && !uploading && (
+                            <div className="mt-3">
+                              <p className="text-sm text-green-600 flex items-center gap-2">
+                                <Check size={16} />
+                                Archivo seleccionado: <span className="font-medium">{voucherFile.name}</span>
+                                <span className="text-slate-500">({(voucherFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+                              </p>
+                              {formPedido.VoucherPreview && (
+                                <div className="mt-3">
+                                  <p className="text-sm text-slate-600 mb-2">Vista previa:</p>
+                                  <img
+                                    src={formPedido.VoucherPreview}
+                                    alt="Preview"
+                                    className="w-48 h-48 object-contain rounded-lg border bg-white"
+                                  />
+                                </div>
+                              )}
+                              {voucherFile.type === 'application/pdf' && (
+                                <p className="text-sm text-blue-600 mt-2 flex items-center gap-1">
+                                  <File size={14} /> Archivo PDF listo para subir
+                                </p>
+                              )}
+                            </div>
                           )}
                         </div>
                       )}
                     </div>
                   )}
                 </div>
+                
                 {formPedido.MetodoPago === "contra_entrega" && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
                     <div>
@@ -1483,7 +1520,7 @@ export const PedidosClientes = () => {
                   </div>
                 )}
               </div>
-
+              
               {/* PRODUCTOS Y SERVICIOS */}
               <div className="bg-slate-50 p-6 rounded-xl">
                 <div className="flex justify-between items-center mb-6">
@@ -1528,6 +1565,7 @@ export const PedidosClientes = () => {
                             <ChevronRight size={16} className="text-slate-400" />
                           </button>
                         </div>
+                        
                         {/* Selección de Color - CON PREVISUALIZACIÓN VISUAL */}
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-slate-700 flex items-center gap-2">
@@ -1539,9 +1577,9 @@ export const PedidosClientes = () => {
                           >
                             <div className="flex items-center gap-2">
                               {d.ColorId && (
-                                <div 
+                                <div
                                   className="w-6 h-6 rounded-full border border-slate-300"
-                                  style={{ 
+                                  style={{
                                     backgroundColor: getColorById(d.ColorId, colores)?.CodigoHex || '#e5e7eb'
                                   }}
                                 ></div>
@@ -1551,6 +1589,7 @@ export const PedidosClientes = () => {
                             <ChevronRight size={16} className="text-slate-400" />
                           </button>
                         </div>
+                        
                         {/* Cantidad y Precio */}
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
@@ -1574,6 +1613,7 @@ export const PedidosClientes = () => {
                             />
                           </div>
                         </div>
+                        
                         {/* Descripción y URL */}
                         <div className="lg:col-span-2 space-y-4">
                           <div className="space-y-2">
@@ -1605,7 +1645,7 @@ export const PedidosClientes = () => {
                   ))}
                 </div>
               </div>
-
+              
               {/* RESUMEN FINAL */}
               <div className="bg-blue-50 p-6 rounded-xl border border-blue-200" ref={resumenRef}>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1630,7 +1670,8 @@ export const PedidosClientes = () => {
                       <div className="flex justify-between">
                         <span className="text-slate-600">Método de pago:</span>
                         <span className="font-medium capitalize">
-                          {formPedido.MetodoPago === 'transferencia' ? 'Transferencia' : 'Contra entrega'}
+                          {formPedido.MetodoPago === 'transferencia' ? 'Transferencia' : 
+                           formPedido.MetodoPago === 'efectivo' ? 'Efectivo' : 'Contra entrega'}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -1653,6 +1694,7 @@ export const PedidosClientes = () => {
                     </div>
                   </div>
                 </div>
+                
                 {/* Mostrar desglose de total */}
                 {detallesPedido.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-blue-200">
@@ -1670,7 +1712,7 @@ export const PedidosClientes = () => {
                   </div>
                 )}
               </div>
-
+              
               {/* BOTONES DE ACCIÓN */}
               <div className="flex gap-4 pt-4">
                 <button
@@ -1699,8 +1741,8 @@ export const PedidosClientes = () => {
             </div>
           </div>
         )}
-
-        {/* VER DETALLES DEL PEDIDO - CON URL DEL COMPROBANTE */}
+        
+        {/* VER DETALLES DEL PEDIDO */}
         {viewMode === "view" && selectedPedido && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center justify-between mb-6">
@@ -1734,7 +1776,7 @@ export const PedidosClientes = () => {
                 </button>
               </div>
             </div>
-
+            
             <div className="space-y-8">
               {/* INFORMACIÓN GENERAL */}
               <div className="bg-slate-50 p-6 rounded-xl">
@@ -1768,7 +1810,7 @@ export const PedidosClientes = () => {
                   </div>
                 </div>
               </div>
-
+              
               {/* INFORMACIÓN DE ENTREGA */}
               {selectedPedido.MetodoPago === "contra_entrega" && (
                 <div className="bg-slate-50 p-6 rounded-xl">
@@ -1791,8 +1833,8 @@ export const PedidosClientes = () => {
                   </div>
                 </div>
               )}
-
-              {/* COMPROBANTE - CON URL VISIBLE */}
+              
+              {/* COMPROBANTE */}
               {selectedPedido.MetodoPago === "transferencia" && selectedPedido.Voucher && (
                 <div className="bg-slate-50 p-6 rounded-xl">
                   <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
@@ -1842,8 +1884,8 @@ export const PedidosClientes = () => {
                               e.target.src = '/placeholder-image.png';
                             }}
                           />
-                          <div 
-                            className="absolute top-2 right-2 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors cursor-pointer" 
+                          <div
+                            className="absolute top-2 right-2 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors cursor-pointer"
                             title="Abrir en nueva pestaña"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1878,7 +1920,7 @@ export const PedidosClientes = () => {
                   </div>
                 </div>
               )}
-
+              
               {/* DETALLES DEL PEDIDO */}
               <div className="bg-slate-50 p-6 rounded-xl">
                 <h4 className="text-lg font-semibold mb-6 text-slate-700 flex items-center gap-2">
@@ -1906,9 +1948,9 @@ export const PedidosClientes = () => {
                           <div className="text-sm text-slate-600 mb-1">Color</div>
                           <div className="font-medium flex items-center gap-2">
                             {d.ColorId && (
-                              <div 
+                              <div
                                 className="w-5 h-5 rounded-full border border-slate-300"
-                                style={{ 
+                                style={{
                                   backgroundColor: getColorById(d.ColorId, colores)?.CodigoHex || '#e5e7eb'
                                 }}
                               ></div>
@@ -1939,6 +1981,7 @@ export const PedidosClientes = () => {
                     </div>
                   ))}
                 </div>
+                
                 {/* TOTAL */}
                 <div className="mt-6 pt-6 border-t border-slate-200">
                   <div className="flex justify-between items-center">
@@ -1947,7 +1990,7 @@ export const PedidosClientes = () => {
                   </div>
                 </div>
               </div>
-
+              
               {/* INFORMACIÓN ADICIONAL */}
               <div className="bg-slate-50 p-6 rounded-xl">
                 <h4 className="text-lg font-semibold mb-4 text-slate-700">Información Adicional</h4>
@@ -1988,7 +2031,7 @@ export const PedidosClientes = () => {
                   </div>
                 </div>
               </div>
-
+              
               {/* SECCIÓN DE ACTUALIZACIÓN DE ESTADO */}
               <div className="bg-slate-50 p-6 rounded-xl">
                 <h4 className="text-lg font-semibold mb-4 text-slate-700">Actualizar Estado del Pedido</h4>
@@ -2022,8 +2065,8 @@ export const PedidosClientes = () => {
             </div>
           </div>
         )}
-
-        {/* EDITAR PEDIDO - BOTÓN AZUL Y VALIDACIÓN MEJORADA */}
+        
+        {/* EDITAR PEDIDO */}
         {viewMode === "edit" && selectedPedido && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
@@ -2035,7 +2078,7 @@ export const PedidosClientes = () => {
               </button>
               <h3 className="text-lg font-bold">Editar Pedido #{shortenId(selectedPedido.PedidoClienteId)}</h3>
             </div>
-
+            
             {errores.length > 0 && (
               <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
                 <ul className="list-disc pl-5">
@@ -2043,7 +2086,7 @@ export const PedidosClientes = () => {
                 </ul>
               </div>
             )}
-
+            
             <div className="space-y-8">
               {/* FECHA Y TOTAL */}
               <div className="bg-slate-50 p-6 rounded-xl">
@@ -2072,14 +2115,15 @@ export const PedidosClientes = () => {
                   </div>
                 </div>
               </div>
-
+              
               {/* MÉTODO DE PAGO */}
               <div className="bg-slate-50 p-6 rounded-xl">
                 <h4 className="text-lg font-semibold mb-4 text-slate-700">Método de Pago</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                      {selectedPedido.MetodoPago === "transferencia" ? <CreditCard size={16} /> : <Truck size={16} />}
+                      {selectedPedido.MetodoPago === "transferencia" ? <CreditCard size={16} /> : 
+                       selectedPedido.MetodoPago === "efectivo" ? <DollarSign size={16} /> : <Truck size={16} />}
                       Método de Pago *
                     </label>
                     <select
@@ -2087,10 +2131,24 @@ export const PedidosClientes = () => {
                       onChange={(e) => setSelectedPedido({ ...selectedPedido, MetodoPago: e.target.value })}
                       className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
+                      {selectedPedido.TipoCliente === 'walkin' && (
+                        <option value="efectivo">Efectivo</option>
+                      )}
                       <option value="transferencia">Transferencia Bancaria</option>
                       <option value="contra_entrega">Contra Entrega</option>
                     </select>
                   </div>
+                  
+                  {/* ✅ MÉTODO EFECTIVO - SOLO PARA WALK-IN */}
+                  {selectedPedido.MetodoPago === "efectivo" && selectedPedido.TipoCliente === 'walkin' && (
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200 mt-4 md:mt-0">
+                      <div className="flex items-center gap-2 text-green-800">
+                        <Check size={20} />
+                        <span className="font-medium">Pago en efectivo - No se requiere comprobante</span>
+                      </div>
+                    </div>
+                  )}
+                  
                   {selectedPedido.MetodoPago === "transferencia" && (
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
@@ -2154,6 +2212,7 @@ export const PedidosClientes = () => {
                     </div>
                   )}
                 </div>
+                
                 {selectedPedido.MetodoPago === "contra_entrega" && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
                     <div>
@@ -2200,7 +2259,7 @@ export const PedidosClientes = () => {
                   </div>
                 )}
               </div>
-
+              
               {/* PRODUCTOS Y SERVICIOS */}
               <div className="bg-slate-50 p-6 rounded-xl">
                 <div className="flex justify-between items-center mb-6">
@@ -2245,6 +2304,7 @@ export const PedidosClientes = () => {
                             <ChevronRight size={16} className="text-slate-400" />
                           </button>
                         </div>
+                        
                         {/* Selección de Color - CON PREVISUALIZACIÓN VISUAL */}
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-slate-700 flex items-center gap-2">
@@ -2256,9 +2316,9 @@ export const PedidosClientes = () => {
                           >
                             <div className="flex items-center gap-2">
                               {d.ColorId && (
-                                <div 
+                                <div
                                   className="w-6 h-6 rounded-full border border-slate-300"
-                                  style={{ 
+                                  style={{
                                     backgroundColor: getColorById(d.ColorId, colores)?.CodigoHex || '#e5e7eb'
                                   }}
                                 ></div>
@@ -2268,6 +2328,7 @@ export const PedidosClientes = () => {
                             <ChevronRight size={16} className="text-slate-400" />
                           </button>
                         </div>
+                        
                         {/* Cantidad y Precio */}
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
@@ -2291,6 +2352,7 @@ export const PedidosClientes = () => {
                             />
                           </div>
                         </div>
+                        
                         {/* Descripción y URL */}
                         <div className="lg:col-span-2 space-y-4">
                           <div className="space-y-2">
@@ -2322,7 +2384,7 @@ export const PedidosClientes = () => {
                   ))}
                 </div>
               </div>
-
+              
               {/* ESTADO DEL PEDIDO */}
               <div className="bg-slate-50 p-6 rounded-xl">
                 <h4 className="text-lg font-semibold mb-4 text-slate-700">Estado del Pedido</h4>
@@ -2341,7 +2403,7 @@ export const PedidosClientes = () => {
                   </div>
                 </div>
               </div>
-
+              
               {/* RESUMEN FINAL */}
               <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -2355,7 +2417,8 @@ export const PedidosClientes = () => {
                       <div className="flex justify-between">
                         <span className="text-slate-600">Método de pago:</span>
                         <span className="font-medium capitalize">
-                          {selectedPedido.MetodoPago === 'transferencia' ? 'Transferencia' : 'Contra entrega'}
+                          {selectedPedido.MetodoPago === 'transferencia' ? 'Transferencia' : 
+                           selectedPedido.MetodoPago === 'efectivo' ? 'Efectivo' : 'Contra entrega'}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -2390,7 +2453,7 @@ export const PedidosClientes = () => {
                   </div>
                 </div>
               </div>
-
+              
               {/* BOTONES DE ACCIÓN */}
               <div className="flex gap-4 pt-4">
                 <button
@@ -2419,10 +2482,9 @@ export const PedidosClientes = () => {
             </div>
           </div>
         )}
-
-        {/* SELECCIONAR CLIENTE, PRODUCTO, COLOR - SIN CAMBIOS NECESARIOS */}
+        
+        {/* SELECCIONAR CLIENTE */}
         {viewMode === "select-cliente" && (
-          // ... código existente
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
               <button
@@ -2436,6 +2498,7 @@ export const PedidosClientes = () => {
                 <p className="text-slate-600 text-sm">Busque y seleccione un cliente del sistema</p>
               </div>
             </div>
+            
             <div className="mb-6">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -2454,6 +2517,7 @@ export const PedidosClientes = () => {
                 Mostrando {clientesPaginados.length} de {totalClientes} clientes
               </div>
             </div>
+            
             {loadingClientes ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -2500,6 +2564,7 @@ export const PedidosClientes = () => {
                 </p>
               </div>
             )}
+            
             {totalPagesClientes > 1 && (
               <div className="mt-6">
                 <Pagination
@@ -2514,9 +2579,9 @@ export const PedidosClientes = () => {
             )}
           </div>
         )}
-
+        
+        {/* SELECCIONAR PRODUCTO */}
         {viewMode === "select-producto" && (
-          // ... código existente
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
               <button
@@ -2530,6 +2595,7 @@ export const PedidosClientes = () => {
                 <p className="text-slate-600 text-sm">Busque y seleccione un producto o servicio</p>
               </div>
             </div>
+            
             <div className="mb-6 space-y-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -2586,6 +2652,7 @@ export const PedidosClientes = () => {
                 </button>
               </div>
             </div>
+            
             {loadingProductos ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -2645,6 +2712,7 @@ export const PedidosClientes = () => {
                 </p>
               </div>
             )}
+            
             {totalPagesProductos > 1 && (
               <div className="mt-6">
                 <Pagination
@@ -2659,9 +2727,9 @@ export const PedidosClientes = () => {
             )}
           </div>
         )}
-
+        
+        {/* SELECCIONAR COLOR */}
         {viewMode === "select-color" && (
-          // ... código existente
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center gap-3 mb-6">
               <button
@@ -2675,6 +2743,7 @@ export const PedidosClientes = () => {
                 <p className="text-slate-600 text-sm">Busque y seleccione un color disponible</p>
               </div>
             </div>
+            
             <div className="mb-6">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -2690,6 +2759,7 @@ export const PedidosClientes = () => {
                 />
               </div>
             </div>
+            
             {loadingColores ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -2729,6 +2799,7 @@ export const PedidosClientes = () => {
                 </p>
               </div>
             )}
+            
             {totalPagesColores > 1 && (
               <div className="mt-6">
                 <Pagination
@@ -2744,7 +2815,7 @@ export const PedidosClientes = () => {
           </div>
         )}
       </div>
-
+      
       <ToastContainer
         position="top-right"
         autoClose={3000}
