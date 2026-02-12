@@ -30,6 +30,7 @@ import { ProductoDetalle } from "../features/landing/nuestrosproductos/productoD
 import { EditarCarritoServicio } from "../features/landing/carritoCompras/CarritoProductos/editarCarritoServicio";
 import { Categorias } from "../features/dashboard/categoriadediseño/categorias";
 import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidosClientes";
+import DetallePedido from "../features/landing/historial/detallePedidos";
 
 export const Routers = () => {
   return (
@@ -63,6 +64,14 @@ export const Routers = () => {
           element={
             <PrivateRoute role="cliente">
               <MisPedidos />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/cliente/DetallePedido"
+          element={
+            <PrivateRoute role="cliente">
+              <DetallePedido />
             </PrivateRoute>
           }
         />
