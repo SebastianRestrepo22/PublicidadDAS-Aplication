@@ -2,16 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Search, Plus, Edit, Eye, Trash2 } from "lucide-react";
 import Modal from "../components/modals/modal.jsx";
-import { GetDataUser, postDataUsers, updateDatauser, deleteDataUser, buscarUsuarios } from './services/services.user';
+import { getDataClients, postDataClients, updateDataClient, deleteDataClient } from './services/services.cliente.js';
 import axios from "axios";
-import { GetDataRoles } from "../roles/services/services.role.js";
 
 //importamos toastify
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Pagination } from "../components/paginacion/pagination.jsx";
 
-export const Usuarios = () => {
+export const Clientes = () => {
   const [user, setUser] = useState([]);
   const [values, setValues] = useState({
     CedulaId: "",
@@ -21,7 +20,6 @@ export const Usuarios = () => {
     CorreoElectronico: "",
     Direccion: "",
     Contrasena: "",
-    RoleId: ""
   });
 
   const [submitted, setSubmitted] = useState(false);
@@ -62,30 +60,7 @@ export const Usuarios = () => {
     fetchTiposDocumento();
   }, []);
 
-  //Traer los roles para el seleccionar un rol para el usuario
-  const [roles, setRoles] = useState([]);
-
-  useEffect(() => {
-    const fetchRoles = async () => {
-      try {
-        const response = await GetDataRoles();
-        //Que solo aparezca los roles activos
-        const activos = response.data.filter(
-  (rol) =>
-    rol.Estado === "Activo" &&
-    rol.Nombre?.trim().toLowerCase() !== "cliente"
-);
-
-setRoles(activos);
-
-      } catch (error) {
-        console.error("Error al cargar roles:", error);
-      }
-    };
-    fetchRoles();
-  }, []);
-
-  //Buscar usuarios
+  //Buscar clientes
   const [filtroCampo, setFiltroCampo] = useState('');
   const [filtroValor, setFiltroValor] = useState('');
 
@@ -112,7 +87,7 @@ setRoles(activos);
         if (filtroCampo && filtroValor) {
           resultados = await buscarUsuarios(filtroCampo, filtroValor);
         } else {
-          const todos = await GetDataUser();
+          const todos = await getDataClients();
           resultados = todos?.data || [];
         }
         // 1. Guardar todos los datos
@@ -162,10 +137,10 @@ setRoles(activos);
   const [cedulaFormatoError, setCedulaFormatoError] = useState("");
   const [telefonoFormatoError, setTelefonoFormatoError] = useState("");
 
-  // Obtener usuarios al cargar
+  // Obtener clientes al cargar
   useEffect(() => {
     const fetchUsers = async () => {
-      const data = await GetDataUser();
+      const data = await getDataClients();
       if (data?.data) setUser(data.data);
     };
     fetchUsers();
@@ -310,7 +285,7 @@ setRoles(activos);
     }
   };
 
-  // Crear / Editar usuario
+  // Crear / Editar cliente
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitted(true);
@@ -319,7 +294,7 @@ setRoles(activos);
     validateCedulaFormat(values.CedulaId);
     validateTelefonoFormat(values.Telefono);
 
-    // Validación campos obligatorios - AHORA INCLUYE RoleId SIEMPRE
+    // Validación campos obligatorios 
     const camposObligatorios = [
       "CedulaId",
       "TipoDocumentoId",
@@ -327,7 +302,6 @@ setRoles(activos);
       "Telefono",
       "CorreoElectronico",
       "Direccion",
-      "RoleId" // Ahora siempre es obligatorio en creación y edición
     ].filter(Boolean);
 
     const camposVacios = camposObligatorios.filter(campo => !values[campo] || !values[campo].toString().trim());
@@ -355,11 +329,54 @@ setRoles(activos);
       return;
     }
 
+    // VALIDAR EXISTENCIA EN BD ANTES DE ENVIAR
+
+    try {
+      const [correoRes, cedulaRes, telefonoRes] = await Promise.all([
+        axios.get(`http://localhost:3000/user/validar-correo?correo=${values.CorreoElectronico}`),
+        axios.get(`http://localhost:3000/user/validar-cedula?cedula=${values.CedulaId}`),
+        axios.get(`http://localhost:3000/user/validar-telefono?telefono=${values.Telefono}`)
+      ]);
+
+      if (!editData && correoRes.data.exists) {
+        toast.warning("Este correo ya está registrado");
+        return;
+      }
+
+      if (!editData && cedulaRes.data.exists) {
+        toast.warning("Esta cédula ya está registrada");
+        return;
+      }
+
+      if (!editData && telefonoRes.data.exists) {
+        toast.warning("Este teléfono ya está registrado");
+        return;
+      }
+
+      // Si está editando, solo validar si cambió el valor
+      if (editData) {
+        if (values.CorreoElectronico !== originalCorreo && correoRes.data.exists) {
+          toast.warning("Este correo ya está registrado");
+          return;
+        }
+
+        if (values.Telefono !== originalTelefono && telefonoRes.data.exists) {
+          toast.warning("Este teléfono ya está registrado");
+          return;
+        }
+      }
+
+    } catch (error) {
+      toast.error("Error validando datos");
+      return;
+    }
+
+
     try {
       if (editData) {
-        const response = await updateDatauser(editData.CedulaId, values);
+        const response = await updateDataClient(editData.CedulaId, values);
         if (response.status === 200) {
-          const updatedList = await GetDataUser();
+          const updatedList = await getDataClients();
 
           // ACTUALIZAR DATOS CON PAGINACIÓN 
           setAllData(updatedList.data || []);
@@ -369,9 +386,9 @@ setRoles(activos);
           toast.success("Usuario actualizado correctamente");
         }
       } else {
-        const response = await postDataUsers(values);
+        const response = await postDataClients(values);
         if (response.status === 201) {
-          const updatedList = await GetDataUser();
+          const updatedList = await getDataClients();
           setUser(updatedList.data);
           // ACTUALIZAR DATOS CON PAGINACIÓN 
           setAllData(updatedList.data || []);
@@ -397,7 +414,6 @@ setRoles(activos);
       CorreoElectronico: "",
       Direccion: "",
       Contrasena: "",
-      RoleId: ""
     });
 
     setEditData(null);
@@ -409,17 +425,17 @@ setRoles(activos);
     setSubmitted(false); // esto evita que muestre validaciones al abrir
   };
 
-  // Eliminar usuario
+  // Eliminar cliente
   const handleDelete = async (id) => {
     try {
-      const response = await deleteDataUser(id); // Usamos la función del servicio
+      const response = await deleteDataClient(id); // Usamos la función del servicio
 
       // Si la respuesta es exitosa (200 o 201)
       if (response.status === 200 || response.status === 201) {
         toast.success(response.data.message); // Mensaje del backend
 
-        // Actualiza la lista de usuarios después de eliminar
-        const updatedList = await GetDataUser();
+        // Actualiza la lista de clientes después de eliminar
+        const updatedList = await getDataClients();
         if (updatedList?.data) {
           // ACTUALIZAR DATOS CON PAGINACIÓN 
           setAllData(updatedList.data);
@@ -432,10 +448,10 @@ setRoles(activos);
       // Manejar específicamente el error 409 (Conflict)
       if (error.response && error.response.status === 409) {
         // Mostrar el mensaje específico del backend
-        toast.warning(error.response.data.message || "No se puede eliminar el usuario porque tiene pedidos asociados");
+        toast.warning(error.response.data.message || "No se puede eliminar el cliente porque tiene pedidos asociados");
       } else {
         // Otros errores
-        toast.error(error.message || "Error al eliminar el usuario");
+        toast.error(error.message || "Error al eliminar el cliente");
       }
       // No cerrar el modal si hay error 409
       if (!error.response || error.response.status !== 409) {
@@ -640,31 +656,6 @@ setRoles(activos);
           </div>
         </div>
 
-        {/* Campo de Rol - AHORA SIEMPRE VISIBLE */}
-        <div className="flex flex-col col-span-1 md:col-span-2">
-          <label className="mb-1">Rol</label>
-          <select
-            name="RoleId"
-            value={values.RoleId || ""}
-            onChange={handleChanges}
-            disabled={isReadOnly}
-            className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-        ${submitted && !values.RoleId ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
-          >
-            <option value="">Seleccione un rol</option>
-            {roles.map((rol) => (
-              <option key={rol.RoleId} value={rol.RoleId}>
-                {rol.Nombre}
-              </option>
-            ))}
-          </select>
-          <div className="min-h-[16px] mt-0.5">
-            {(!values.RoleId && submitted) && (
-              <p className="text-red-500 text-[12px] leading-4">Seleccione un rol</p>
-            )}
-          </div>
-        </div>
-
         {/* Botones */}
         <div className="col-span-1 md:col-span-2 flex gap-4 mt-3">
           {type !== "ver" && (
@@ -721,7 +712,7 @@ setRoles(activos);
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue p-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de usuarios</h1>
+        <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de clientes</h1>
 
         {/* Filtros */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
@@ -732,7 +723,7 @@ setRoles(activos);
               setOpenEditar(false);
               setOpenCreate(true);  // abre el modal de crear limpio
             }} className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg">
-              <Plus size={18} /> Nuevo usuario
+              <Plus size={18} /> Nuevo cliente
             </Link>
 
             <div className="relative flex-1 max-w-md">
@@ -740,7 +731,7 @@ setRoles(activos);
               <input value={filtroValor}
                 onChange={(e) => setFiltroValor(e.target.value)}
                 type="text"
-                placeholder="Buscar usuarios"
+                placeholder="Buscar clientes"
                 className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-700" />
             </div>
 
@@ -755,7 +746,6 @@ setRoles(activos);
               <option value="direccion">Dirección</option>
               <option value="correo">Correo</option>
               <option value="telefono">Telefono</option>
-              <option value="rol">Rol</option>
             </select>
           </div>
         </div>
@@ -766,7 +756,7 @@ setRoles(activos);
           resetForm();
         }}>
           <div className="w-[450px] p-6 mx-auto text-center">
-            <h3 className="text-lg font-black text-gray-800 mb-6">Nuevo usuario</h3>
+            <h3 className="text-lg font-black text-gray-800 mb-6">Nuevo cliente</h3>
             {renderModalForm("create")}
           </div>
         </Modal>
@@ -776,7 +766,7 @@ setRoles(activos);
           resetForm();
         }} >
           <div className="w-[450px] p-6 mx-auto text-center">
-            <h3 className="text-lg font-black text-gray-800 mb-6">Editar usuario</h3>
+            <h3 className="text-lg font-black text-gray-800 mb-6">Editar cliente</h3>
             {renderModalForm("editar")}
           </div>
         </Modal>
@@ -786,7 +776,7 @@ setRoles(activos);
           resetForm();
         }}>
           <div className="w-[450px] p-6 mx-auto text-center">
-            <h3 className="text-lg font-black text-gray-800 mb-6">Ver usuario</h3>
+            <h3 className="text-lg font-black text-gray-800 mb-6">Ver cliente</h3>
             {renderView()}
           </div>
         </Modal>
@@ -796,8 +786,8 @@ setRoles(activos);
           resetForm();
         }}>
           <div className="w-[400px] p-6 mx-auto text-center">
-            <h3 className="text-lg font-black text-gray-800 mb-4">Eliminar usuario</h3>
-            <p className="mb-6">¿Estás seguro de eliminar este usuario?</p>
+            <h3 className="text-lg font-black text-gray-800 mb-4">Eliminar cliente</h3>
+            <p className="mb-6">¿Estás seguro de eliminar este cliente?</p>
             <div className="flex gap-4">
               <button className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors" onClick={() => handleDelete(editData.CedulaId)}>
                 Eliminar
@@ -856,7 +846,7 @@ setRoles(activos);
                 ) : (
                   <tr>
                     <td colSpan="8" className="text-center py-4">
-                      No se encontraron usuarios
+                      No se encontraron clientes
                     </td>
                   </tr>
                 )}

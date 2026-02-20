@@ -18,13 +18,14 @@ import productoRouter from './routes/producto.routes.js';
 import servicioRouter from './routes/services.routes.js';
 import voucherRoutes from './routes/voucher.routes.js';
 import colorRoutes from "./routes/color.routes.js";
+import clientRouter from './routes/cliente.routes.js';
+import servicioTamanosRoutes from './routes/servicioTamanos.routes.js';
 
 // Rutas de autenticación y usuarios
 import authRouter from './routes/authRoutes.js';
 import roleRouter from './routes/role.routes.js';
 import userRouter from './routes/user.routes.js';
 import tipoDocumentoRoutes from './routes/tipoDocumento.js';
-
 
 // Scripts y DB
 import { initRolesAndAdmin } from './scripts/initRolesAndAdmin.js';
@@ -51,8 +52,10 @@ app.use('/comprobantes', express.static(path.join(__dirname, '../public/comproba
 app.use('/auth', authRouter);
 app.use('/roles', roleRouter);
 app.use('/user', userRouter);
+app.use('/client', clientRouter);
 app.use('/producto', productoRouter);
 app.use('/servicio', servicioRouter);
+app.use('/api/servicio', servicioTamanosRoutes);
 app.use("/colores", colorRoutes);
 app.use('/tipos-documento', tipoDocumentoRoutes);
 

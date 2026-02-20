@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   useParams,
   useLocation,
@@ -30,68 +30,78 @@ export const ProductoDetalle = () => {
 
   const [producto, setProducto] = useState(location.state?.producto || null);
   const [coloresProducto, setColoresProducto] = useState([]);
-  const [cantidad, setCantidad] = useState(1);
+  const [cantidad, setCantidad] = useState("1"); // Cambiado a string para poder borrar
   const [colorSeleccionado, setColorSeleccionado] = useState("");
   const [isFavorite, setIsFavorite] = useState(false);
   const [imagenSeleccionada, setImagenSeleccionada] = useState(0);
-  const [tieneColores, setTieneColores] = useState(false);
+  const [tipoStock, setTipoStock] = useState("general");
+  const [stockDisponible, setStockDisponible] = useState(0);
+  const [stockTotal, setStockTotal] = useState(0);
 
   const imagenesGaleria = [
     producto?.Imagen || "/multimedia/placeholder.jpg",
   ].filter(img => img);
 
+  // Calcular stocks según el tipo
+  const calcularStocks = useCallback((prod, colores) => {
+    const usaColores = prod.UsaColores === 1 || prod.UsaColores === "1";
+    setTipoStock(usaColores ? "colores" : "general");
+
+    if (usaColores) {
+      const coloresConStock = colores && colores.length > 0 ? colores : [];
+      setColoresProducto(coloresConStock);
+      
+      const total = coloresConStock.reduce((sum, color) => sum + (color.Stock || 0), 0);
+      setStockTotal(total);
+      
+      if (coloresConStock.length === 1 && coloresConStock[0].Stock > 0) {
+        setColorSeleccionado(coloresConStock[0].Nombre);
+        setStockDisponible(coloresConStock[0].Stock || 0);
+      } else {
+        setStockDisponible(0);
+      }
+    } else {
+      setStockTotal(prod.Stock || 0);
+      setStockDisponible(prod.Stock || 0);
+      setColoresProducto([]);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchColores = async () => {
+    const fetchData = async () => {
       try {
-        const colores = await getColoresProducto(id);
-        setColoresProducto(colores);
+        let prod = producto;
+        let colores = [];
 
-        // Determinar si el producto tiene colores
-        const tieneColores = colores && Array.isArray(colores) && colores.length > 0;
-        setTieneColores(tieneColores);
-
-        // Si solo hay un color, seleccionarlo automáticamente
-        if (tieneColores && colores.length === 1) {
-          setColorSeleccionado(colores[0].Nombre);
+        if (!prod) {
+          prod = await getProductoByIdService(id);
+          setProducto(prod);
         }
+
+        colores = await getColoresProducto(id);
+        calcularStocks(prod, colores);
+
       } catch (err) {
-        toast.error("No se pudieron cargar los colores");
+        console.error("Error cargando producto:", err);
+        toast.error("Producto no encontrado");
+        navigate("/productos");
       }
     };
 
-    if (!producto) {
-      const fetchProducto = async () => {
-        try {
-          const productoData = await getProductoByIdService(id);
-          setProducto(productoData);
+    fetchData();
+  }, [id, navigate, producto, calcularStocks]);
 
-          // Verificar si el producto viene con colores desde la API
-          if (productoData.Colores && Array.isArray(productoData.Colores) && productoData.Colores.length > 0) {
-            setTieneColores(true);
-            setColoresProducto(productoData.Colores);
-          }
-        } catch (err) {
-          toast.error("Producto no encontrado");
-          navigate("/productos");
-        }
-      };
-      fetchProducto();
-    } else {
-      // Si el producto viene por location.state, verificar si tiene colores
-      if (producto.Colores && Array.isArray(producto.Colores) && producto.Colores.length > 0) {
-        setTieneColores(true);
-        setColoresProducto(producto.Colores);
-      } else {
-        // Si no viene con colores, hacer fetch
-        fetchColores();
-      }
+  // Actualizar stock disponible cuando cambia el color seleccionado
+  useEffect(() => {
+    if (tipoStock === "colores" && colorSeleccionado) {
+      const color = coloresProducto.find(c => c.Nombre === colorSeleccionado);
+      setStockDisponible(color?.Stock || 0);
+      
+      // Resetear cantidad si excede el nuevo stock
+      const cantidadNum = parseInt(cantidad) || 1;
+      setCantidad(Math.min(cantidadNum, color?.Stock || 0).toString());
     }
-
-    // Si el producto existe pero no tiene colores en state, hacer fetch
-    if (producto && !producto.Colores) {
-      fetchColores();
-    }
-  }, [id, navigate, producto]);
+  }, [colorSeleccionado, coloresProducto, tipoStock]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -124,87 +134,114 @@ export const ProductoDetalle = () => {
       ? producto.Precio - (producto.Precio * producto.Descuento) / 100
       : producto.Precio;
 
-  // En la función handleAddToCart:
+  const handleQuantityChange = (e) => {
+    const value = e.target.value;
+    
+    // Permitir vacío para poder borrar
+    if (value === "") {
+      setCantidad("");
+      return;
+    }
+
+    // Solo permitir números
+    if (!/^\d*$/.test(value)) return;
+
+    const numValue = parseInt(value, 10);
+    
+    // No permitir 0
+    if (numValue === 0) return;
+
+    // Validar contra stock disponible
+    if (numValue > stockDisponible) {
+      toast.warning(`Cantidad máxima: ${stockDisponible}`);
+      setCantidad(stockDisponible.toString());
+      return;
+    }
+
+    setCantidad(value);
+  };
+
+  const handleQuantityBlur = () => {
+    // Si está vacío, poner 1
+    if (cantidad === "") {
+      setCantidad("1");
+    }
+  };
+
   const handleAddToCart = () => {
-    // Productos personalizados requieren color
-    if (producto.EsPersonalizado) {
+    const cantidadNum = parseInt(cantidad) || 1;
+
+    // Validaciones según tipo de stock
+    if (tipoStock === "colores") {
       if (!colorSeleccionado) {
         toast.error("Por favor selecciona un color");
         return;
       }
-    }
 
-    // Productos con colores requieren selección de color
-    if (tieneColores && !producto.EsPersonalizado && !colorSeleccionado) {
-      toast.error("Por favor selecciona un color antes de agregar al carrito");
-      return;
-    }
+      const colorSeleccionadoObj = coloresProducto.find(c => c.Nombre === colorSeleccionado);
+      
+      if (!colorSeleccionadoObj) {
+        toast.error("Color no válido");
+        return;
+      }
 
-    // Encontrar el color seleccionado y su stock
-    const colorSeleccionadoObj = coloresProducto.find(color => color.Nombre === colorSeleccionado);
+      if (colorSeleccionadoObj.Stock === 0) {
+        toast.error(`El color ${colorSeleccionado} no tiene stock disponible`);
+        return;
+      }
 
-    // Verificar stock del color seleccionado
-    if (colorSeleccionadoObj) {
-      const stockColor = colorSeleccionadoObj.Stock || 0;
-
-      // Calcular cuántos ya hay en el carrito con este mismo color
+      // Verificar stock en carrito
       const existingInCart = cart.filter(item =>
         item.ProductoId === producto.ProductoId &&
         item.customization?.color?.ColorId === colorSeleccionadoObj.ColorId
       );
       const currentQuantityInCart = existingInCart.reduce((sum, item) => sum + item.quantity, 0);
-      const newTotalQuantity = currentQuantityInCart + cantidad;
+      const newTotalQuantity = currentQuantityInCart + cantidadNum;
 
-      if (stockColor === 0) {
-        toast.error(`El color ${colorSeleccionado} no tiene stock disponible`);
+      if (newTotalQuantity > colorSeleccionadoObj.Stock) {
+        toast.error(`Solo hay ${colorSeleccionadoObj.Stock} unidades disponibles del color ${colorSeleccionado}`);
         return;
       }
 
-      if (newTotalQuantity > stockColor) {
-        toast.error(`Solo hay ${stockColor} unidades disponibles del color ${colorSeleccionado}`);
+      // Agregar con color
+      const customizacion = {
+        color: {
+          ColorId: colorSeleccionadoObj.ColorId,
+          Nombre: colorSeleccionadoObj.Nombre,
+          Hex: colorSeleccionadoObj.Hex,
+          Stock: colorSeleccionadoObj.Stock
+        }
+      };
+
+      addToCart(producto, customizacion, cantidadNum);
+      toast.success(
+        `${cantidadNum} ${producto.Nombre} (${colorSeleccionado}) agregado${cantidadNum > 1 ? "s" : ""} al carrito`
+      );
+    } else {
+      // Stock general
+      if (stockDisponible === 0) {
+        toast.error("Producto sin stock disponible");
         return;
       }
-    } else if (tieneColores) {
-      toast.error("Color no válido seleccionado");
-      return;
-    }
 
-    // Incluir color en la personalización si existe
-    const customizacion = {};
-    if (colorSeleccionadoObj) {
-      customizacion.color = {
-        ColorId: colorSeleccionadoObj.ColorId,
-        Nombre: colorSeleccionadoObj.Nombre,
-        Hex: colorSeleccionadoObj.Hex,
-        Stock: colorSeleccionadoObj.Stock || 0
-      };
-    } else if (colorSeleccionado) {
-      customizacion.color = {
-        ColorId: null,
-        Nombre: colorSeleccionado,
-        Hex: "#ccc",
-        Stock: 0
-      };
-    }
+      const existing = cart.find(
+        (item) => item.ProductoId === producto.ProductoId
+      );
+      const currentQuantity = existing ? existing.quantity : 0;
+      const newQuantity = currentQuantity + cantidadNum;
 
-    addToCart(producto, customizacion, cantidad);
-    toast.success(
-      `${cantidad} ${producto.Nombre}${colorSeleccionado ? ` (${colorSeleccionado})` : ''} agregado${cantidad > 1 ? "s" : ""} al carrito`
-    );
+      if (newQuantity > stockDisponible) {
+        toast.error(`Solo hay ${stockDisponible} unidades disponibles`);
+        return;
+      }
+
+      addToCart(producto, {}, cantidadNum);
+      toast.success(`${cantidadNum} ${producto.Nombre} agregado${cantidadNum > 1 ? "s" : ""} al carrito`);
+    }
   };
 
-  useEffect(() => {
-    console.log("🛒 [CARRITO] Estado actual del carrito:", cart);
-    cart.forEach((item, index) => {
-      console.log(`  - Item ${index + 1}: ${item.Nombre}`, {
-        id: item.id,
-        color: item.customization?.color,
-        colorType: typeof item.customization?.color,
-        colorId: item.customization?.color?.ColorId,
-        colorName: item.customization?.color?.Nombre
-      });
-    });
-  }, [cart]);
+  // Determinar si el input debe estar deshabilitado
+  const isQuantityDisabled = tipoStock === "colores" && !colorSeleccionado;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
@@ -265,22 +302,23 @@ export const ProductoDetalle = () => {
                     </span>
                   </div>
 
-                  {producto.Stock !== undefined && (
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-sm font-medium">
-                      <Package className="h-4 w-4" />
-                      <span>En stock: {producto.Stock} unidades</span>
-                    </div>
-                  )}
+                  {/* Stock info según tipo */}
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-sm font-medium">
+                    <Package className="h-4 w-4" />
+                    {tipoStock === "colores" ? (
+                      <span>Stock total: {stockTotal} unidades (en {coloresProducto.length} colores)</span>
+                    ) : (
+                      <span>En stock: {stockDisponible} unidades</span>
+                    )}
+                  </div>
                 </div>
 
-                {/* Mostrar sección de colores solo si el producto tiene colores */}
-                {/* Mostrar sección de colores solo si el producto tiene colores */}
-                {tieneColores && (
+                {/* Sección de colores - SOLO si el producto usa colores */}
+                {tipoStock === "colores" && coloresProducto.length > 0 && (
                   <div className="border-t border-slate-200 pt-6">
                     <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2 text-lg">
                       <Palette className="h-5 w-5 text-blue-600" />
                       Colores Disponibles
-                      {producto.EsPersonalizado && <span className="text-red-500 text-sm">*</span>}
                       <span className="text-sm text-slate-500 font-normal ml-auto">
                         {coloresProducto.length} opciones
                       </span>
@@ -291,12 +329,13 @@ export const ProductoDetalle = () => {
                           key={color.ColorId}
                           onClick={() => setColorSeleccionado(color.Nombre)}
                           disabled={color.Stock === 0}
-                          className={`group relative p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${colorSeleccionado === color.Nombre
-                            ? "border-blue-600 bg-blue-50 shadow-md"
-                            : color.Stock === 0
-                              ? "border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed"
-                              : "border-slate-200 hover:border-slate-300 hover:shadow-sm"
-                            }`}
+                          className={`group relative p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
+                            colorSeleccionado === color.Nombre
+                              ? "border-blue-600 bg-blue-50 shadow-md"
+                              : color.Stock === 0
+                                ? "border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed"
+                                : "border-slate-200 hover:border-slate-300 hover:shadow-sm"
+                          }`}
                         >
                           <div
                             className="w-12 h-12 rounded-full border border-slate-300 shadow-sm"
@@ -307,12 +346,13 @@ export const ProductoDetalle = () => {
                             <span className="text-sm font-medium text-slate-700 block">
                               {color.Nombre}
                             </span>
-                            <span className={`text-xs ${color.Stock === 0
-                              ? "text-red-600"
-                              : color.Stock < 10
-                                ? "text-yellow-600"
-                                : "text-green-600"
-                              }`}>
+                            <span className={`text-xs ${
+                              color.Stock === 0
+                                ? "text-red-600"
+                                : color.Stock < 10
+                                  ? "text-yellow-600"
+                                  : "text-green-600"
+                            }`}>
                               {color.Stock === 0 ? "Agotado" : `${color.Stock} disponibles`}
                             </span>
                           </div>
@@ -321,17 +361,17 @@ export const ProductoDetalle = () => {
                               <span className="text-white text-xs">✓</span>
                             </span>
                           )}
-                          {color.Stock === 0 && (
-                            <span className="absolute inset-0 bg-gray-200/50 rounded-lg flex items-center justify-center">
-                              <span className="text-xs text-gray-700 font-medium">AGOTADO</span>
-                            </span>
-                          )}
                         </button>
                       ))}
                     </div>
-                    {!colorSeleccionado && (
+                    {tipoStock === "colores" && !colorSeleccionado && coloresProducto.some(c => c.Stock > 0) && (
                       <p className="text-sm text-amber-600 mt-2">
                         ⚠️ Por favor selecciona un color antes de agregar al carrito
+                      </p>
+                    )}
+                    {tipoStock === "colores" && coloresProducto.every(c => c.Stock === 0) && (
+                      <p className="text-sm text-red-600 mt-2">
+                        ❌ No hay stock disponible en ningún color
                       </p>
                     )}
                   </div>
@@ -344,72 +384,84 @@ export const ProductoDetalle = () => {
                   <div className="flex items-center gap-4">
                     <div className="flex items-center border-2 border-slate-300 rounded-lg">
                       <button
-                        onClick={() => setCantidad(Math.max(1, cantidad - 1))}
-                        className="px-4 py-2.5 hover:bg-slate-100 transition font-bold text-slate-700"
+                        onClick={() => {
+                          const currentValue = parseInt(cantidad) || 1;
+                          if (currentValue > 1) {
+                            setCantidad((currentValue - 1).toString());
+                          }
+                        }}
+                        disabled={isQuantityDisabled || (parseInt(cantidad) || 1) <= 1}
+                        className="px-4 py-2.5 hover:bg-slate-100 transition font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         −
                       </button>
                       <input
-                        type="number"
-                        min="1"
-                        max={
-                          colorSeleccionado
-                            ? coloresProducto.find(c => c.Nombre === colorSeleccionado)?.Stock || 0
-                            : coloresProducto.reduce((sum, c) => sum + (c.Stock || 0), 0) || 999
-                        }
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={cantidad}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 1;
-                          const maxStock = colorSeleccionado
-                            ? coloresProducto.find(c => c.Nombre === colorSeleccionado)?.Stock || 0
-                            : coloresProducto.reduce((sum, c) => sum + (c.Stock || 0), 0) || 999;
-                          setCantidad(Math.max(1, Math.min(val, maxStock)));
-                        }}
-                        className="w-16 text-center py-2.5 border-x-2 border-slate-300 focus:outline-none font-semibold"
+                        onChange={handleQuantityChange}
+                        onBlur={handleQuantityBlur}
+                        disabled={isQuantityDisabled}
+                        className="w-16 text-center py-2.5 border-x-2 border-slate-300 focus:outline-none font-semibold disabled:bg-gray-100 disabled:text-gray-400"
                       />
                       <button
                         onClick={() => {
-                          const maxStock = colorSeleccionado
-                            ? coloresProducto.find(c => c.Nombre === colorSeleccionado)?.Stock || 0
-                            : coloresProducto.reduce((sum, c) => sum + (c.Stock || 0), 0) || 999;
-                          if (cantidad < maxStock) {
-                            setCantidad(cantidad + 1);
+                          const currentValue = parseInt(cantidad) || 1;
+                          if (currentValue < stockDisponible) {
+                            setCantidad((currentValue + 1).toString());
                           } else {
-                            toast.warning(`Cantidad máxima disponible: ${maxStock}`);
+                            toast.warning(`Cantidad máxima: ${stockDisponible}`);
                           }
                         }}
-                        className="px-4 py-2.5 hover:bg-slate-100 transition font-bold text-slate-700"
+                        disabled={isQuantityDisabled || (parseInt(cantidad) || 1) >= stockDisponible}
+                        className="px-4 py-2.5 hover:bg-slate-100 transition font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         +
                       </button>
                     </div>
 
-                    {/* Mostrar stock según color seleccionado */}
-                    {colorSeleccionado ? (
+                    {/* Stock según tipo */}
+                    {tipoStock === "colores" && colorSeleccionado ? (
                       <span className="text-sm text-slate-600">
                         Stock del color: <span className="font-semibold text-slate-800">
-                          {coloresProducto.find(c => c.Nombre === colorSeleccionado)?.Stock || 0}
+                          {stockDisponible}
+                        </span>
+                      </span>
+                    ) : tipoStock === "colores" ? (
+                      <span className="text-sm text-slate-600">
+                        Stock total: <span className="font-semibold text-slate-800">
+                          {stockTotal}
                         </span>
                       </span>
                     ) : (
                       <span className="text-sm text-slate-600">
-                        Stock total: <span className="font-semibold text-slate-800">
-                          {coloresProducto.reduce((sum, c) => sum + (c.Stock || 0), 0)}
+                        Stock disponible: <span className="font-semibold text-slate-800">
+                          {stockDisponible}
                         </span>
                       </span>
                     )}
                   </div>
                 </div>
-                
+
                 <button
                   onClick={handleAddToCart}
                   className="w-full bg-black hover:bg-slate-800 text-white py-4 md:py-5 rounded-xl font-semibold text-base md:text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:bg-slate-400 disabled:cursor-not-allowed"
-                  disabled={tieneColores && !colorSeleccionado}
+                  disabled={
+                    (tipoStock === "colores" && (!colorSeleccionado || stockDisponible === 0)) ||
+                    (tipoStock === "general" && stockDisponible === 0) ||
+                    cantidad === "" ||
+                    parseInt(cantidad) === 0
+                  }
                 >
                   <ShoppingCart className="h-5 w-5 md:h-6 md:w-6" />
-                  {tieneColores && !colorSeleccionado
+                  {tipoStock === "colores" && !colorSeleccionado
                     ? "Selecciona un color"
-                    : `Agregar al Carrito - ${formatPrice(precioFinal * cantidad)}`}
+                    : stockDisponible === 0
+                      ? "Producto agotado"
+                      : cantidad === "" || parseInt(cantidad) === 0
+                        ? "Ingresa una cantidad"
+                        : `Agregar al Carrito - ${formatPrice(precioFinal * parseInt(cantidad))}`}
                 </button>
 
                 <div className="grid grid-cols-3 gap-3 pt-4">

@@ -60,12 +60,12 @@ export const Inicio = () => {
                     {/* Background Images with Ken Burns Effect */}
                     <AnimatePresence mode="wait">
                         {[
-                            "/multimedia/carrusel1.jpg",
-                            "/multimedia/carrusel2.jpeg",
-                            "/multimedia/carrusel3.jpg",
-                            "/multimedia/carrusel4.jpg",
-                            "/multimedia/carrusel5.png",
-                            "/multimedia/carrusel6.png"
+                            "/multimedia/carruselLanding2.png",
+                            "/multimedia/carruselLanding3.png",
+                            "/multimedia/carruselLanding4.png",
+                            "/multimedia/carruselLanding1.png",
+                            "/multimedia/carruselLanding5.png",
+                            "/multimedia/carruselLanding6.png"
                         ].map((src, i) => (
                             i === currentIndex && (
                                 <motion.div

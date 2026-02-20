@@ -359,12 +359,12 @@ export const Login = () => {
       // Navegar inmediatamente después del login
       const userRole = (userData.Role || "").toLowerCase();
 
-      if (userRole === "administrador") {
-        navigate("/dashboard/graficosEstadisticos");
-      } else if (userRole === "cliente") {
+      if (userRole === "cliente") {
         navigate("/cliente/productos");
       } else {
-        navigate("/dashboard/graficosEstadisticos");
+        // Para administradores y otros roles, ir a la raíz del dashboard
+        // para que el DashboardLayout haga la redirección inteligente
+        navigate("/dashboard");
       }
 
     } catch (error) {

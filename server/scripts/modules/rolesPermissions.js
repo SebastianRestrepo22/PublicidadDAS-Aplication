@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 
-// Configuración de permisos del sistema
+// Configuración de permisos del sistema - AJUSTADO PARA COINCIDIR EXACTAMENTE CON LOS PERMISOS REQUERIDOS EN EL SIDEBAR ACTIVO
 const SYSTEM_PERMISSIONS = [
     // Dashboard / Gráficos
     { Nombre: 'ver_dashboard', Descripcion: 'Ver gráficos estadísticos del sistema', Modulo: 'Dashboard' },
@@ -21,21 +21,27 @@ const SYSTEM_PERMISSIONS = [
     { Nombre: 'ver_productos', Descripcion: 'Ver lista de productos', Modulo: 'Productos' },
     { Nombre: 'gestionar_productos', Descripcion: 'Crear, editar o eliminar productos', Modulo: 'Productos' },
 
+    // Proveedores (Insumos)
+    { Nombre: 'ver_proveedores', Descripcion: 'Ver lista de proveedores', Modulo: 'Insumos' },
+    { Nombre: 'gestionar_proveedores', Descripcion: 'Crear, editar o eliminar proveedores', Modulo: 'Insumos' },
+
+    // Compras
+    { Nombre: 'ver_compras', Descripcion: 'Ver lista de compras', Modulo: 'Insumos' },
+    { Nombre: 'gestionar_compras', Descripcion: 'Registrar o modificar compras', Modulo: 'Insumos' },
+
     // Servicios
     { Nombre: 'ver_servicios', Descripcion: 'Ver lista de servicios', Modulo: 'Servicios' },
     { Nombre: 'gestionar_servicios', Descripcion: 'Crear, editar o eliminar servicios', Modulo: 'Servicios' },
 
-    // Insumos
-    { Nombre: 'ver_proveedores', Descripcion: 'Ver lista de proveedores', Modulo: 'Insumos' },
-    { Nombre: 'gestionar_proveedores', Descripcion: 'Crear, editar o eliminar proveedores', Modulo: 'Insumos' },
-    { Nombre: 'ver_compras', Descripcion: 'Ver lista de compras', Modulo: 'Insumos' },
-    { Nombre: 'gestionar_compras', Descripcion: 'Registrar o modificar compras', Modulo: 'Insumos' },
-    { Nombre: 'ver_insumos', Descripcion: 'Ver lista de insumos', Modulo: 'Insumos' },
-    { Nombre: 'gestionar_insumos', Descripcion: 'Registrar o modificar insumos', Modulo: 'Insumos' },
+    // Clientes - PERMISO AGREGADO SEGÚN SIDEBAR ACTIVO
+    { Nombre: 'ver_clientes', Descripcion: 'Ver lista de clientes', Modulo: 'Clientes' },
+    { Nombre: 'gestionar_clientes', Descripcion: 'Crear, editar o eliminar clientes', Modulo: 'Clientes' },
 
-    // Ventas
+    // Pedidos
     { Nombre: 'ver_pedidos', Descripcion: 'Ver lista de pedidos de clientes', Modulo: 'Ventas' },
     { Nombre: 'gestionar_pedidos', Descripcion: 'Actualizar estado de pedidos', Modulo: 'Ventas' },
+
+    // Ventas
     { Nombre: 'ver_ventas', Descripcion: 'Ver lista de ventas', Modulo: 'Ventas' },
     { Nombre: 'gestionar_ventas', Descripcion: 'Actualizar ventas o generar facturas', Modulo: 'Ventas' }
 ];

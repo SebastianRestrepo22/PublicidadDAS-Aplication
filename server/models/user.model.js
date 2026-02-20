@@ -20,6 +20,10 @@ export const createUsuario = async ({
 };
 
 export const getAllDataUsers = async () => {
+
+  const roles = await rolCliente();
+  const clienteRoleId = roles[0]?.RoleId;
+
   const [rows] = await dbPool.query(`
     SELECT 
       u.CedulaId,
@@ -35,8 +39,10 @@ export const getAllDataUsers = async () => {
     FROM usuarios u
     JOIN roles r ON u.RoleId = r.RoleId
     JOIN TipoDocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
+    WHERE u.RoleId != ?
     ORDER BY u.NombreCompleto ASC
-  `);
+  `, [clienteRoleId]);
+
   return rows;
 };
 
@@ -123,7 +129,7 @@ export const rolCliente = async () => {
   return roles;
 };
 
-export const creatByAdmin = async ({ CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, RoleId, resetToken, resetTokenExpire }) => {
+export const createByAdmin = async ({ CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, RoleId, resetToken, resetTokenExpire }) => {
   await dbPool.query(
     `INSERT INTO usuarios 
                      (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId, resetToken, resetTokenExpire)
@@ -193,7 +199,7 @@ export const validarDataCedula = async (cedula) => {
   return rows;
 };
 
-export const telefonoExistente = async (telefono) => {
+export const telefonoDataExistente = async (telefono) => {
   const [rows] = await dbPool.query(
     'SELECT * FROM usuarios WHERE Telefono = ?',
     [telefono]
@@ -392,4 +398,49 @@ export const createUserWalkinModel = async (userData) => {
   });
 
   return { CedulaId, NombreCompleto };
+};
+
+//Obtener los clientes
+export const getAllDataClientes = async (roleId) => {
+  const [rows] = await dbPool.query(`
+    SELECT 
+      u.CedulaId,
+      u.TipoDocumentoId,
+      td.Nombre AS TipoDocumentoNombre,
+      u.NombreCompleto,
+      u.Telefono,
+      u.CorreoElectronico,
+      u.Direccion,
+      u.RoleId,
+      u.IsSystem,
+      r.Nombre AS RolNombre
+    FROM usuarios u
+    JOIN roles r ON u.RoleId = r.RoleId
+    JOIN TipoDocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
+    WHERE u.RoleId = ?
+    ORDER BY u.NombreCompleto ASC
+  `, [roleId]);
+
+  return rows;
+}
+
+// Buscar usuario por ID
+export const getClientById = async (id, roleId) => {
+  const [rows] = await dbPool.query(`
+    SELECT 
+      u.CedulaId,
+      u.NombreCompleto,
+      u.Telefono,
+      u.CorreoElectronico,
+      u.Direccion,
+      u.RoleId,
+      u.IsSystem,
+      r.Nombre AS RolNombre
+    FROM usuarios u
+    JOIN roles r ON u.RoleId = r.RoleId
+    WHERE u.CedulaId = ?
+      AND u.RoleId = ?
+  `, [id, roleId]);
+
+  return rows[0];
 };

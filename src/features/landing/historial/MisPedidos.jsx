@@ -9,12 +9,14 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useAuth } from '../../../context/AuthContext';
 
 const MisPedidos = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [clienteId, setClienteId] = useState(null);
+  const { authUser, authLoading } = useAuth();
 
   useEffect(() => {
     const usuarioLocal = JSON.parse(localStorage.getItem("usuario"));
@@ -156,7 +158,7 @@ const MisPedidos = () => {
             <p className="text-gray-600">Inicia sesión para ver tus pedidos</p>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 

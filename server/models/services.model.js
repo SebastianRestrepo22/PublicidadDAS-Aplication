@@ -6,27 +6,29 @@ export const createService = async ({
     Nombre,
     Descripcion,
     Imagen,
+    TipoPrecio,
     Precio,
     Descuento,
-    CategoriaId,
-    Tamano
+    CategoriaId
 }) => {
     await dbPool.query(
         `INSERT INTO Servicios 
-     (ServicioId, Nombre, Descripcion, Imagen, Precio, Descuento, CategoriaId, Tamano)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (ServicioId, Nombre, Descripcion, Imagen, TipoPrecio, Precio, Descuento, CategoriaId)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
             ServicioId,
             Nombre,
             Descripcion,
             Imagen,
+            TipoPrecio,
             Precio,
             Descuento,
-            CategoriaId,
-            Tamano
+            CategoriaId
         ]
     );
 };
+
+
 
 // Obtener producto por ID
 export const getDataServiceById = async (ServicioId) => {
@@ -53,19 +55,45 @@ export const updateDataServicio = async ({
     Nombre,
     Descripcion,
     Imagen,
+    TipoPrecio,
     Precio,
     Descuento,
     CategoriaId,
-    Tamano
+    Estado
 }) => {
+
+    if (TipoPrecio === 'POR_TAMANO') {
+        Precio = null;
+    }
+
     const [rows] = await dbPool.query(
         `UPDATE Servicios
-     SET Nombre = ?, Descripcion = ?, Imagen = ?, Precio = ?, Descuento = ?, CategoriaId = ?, Tamano = ?
-     WHERE ServicioId = ?`,
-        [Nombre, Descripcion, Imagen, Precio, Descuento, CategoriaId, Tamano, ServicioId]
+         SET Nombre = ?, 
+             Descripcion = ?, 
+             Imagen = ?, 
+             TipoPrecio = ?,
+             Precio = ?,
+             Descuento = ?, 
+             CategoriaId = ?, 
+             Estado = ?
+         WHERE ServicioId = ?`,
+        [
+            Nombre,
+            Descripcion,
+            Imagen,
+            TipoPrecio,
+            Precio,
+            Descuento,
+            CategoriaId,
+            Estado,
+            ServicioId
+        ]
     );
+
     return rows.affectedRows;
 };
+
+
 
 export const findDuplicateName = async ({ ServicioId, Nombre }) => {
     const [rows] = await dbPool.query(
@@ -93,23 +121,24 @@ export const nombreServiceExiste = async (Nombre) => {
 };
 
 export const buscarServicioDB = async ({ columna, operador, parametro }) => {
-  const columnasSeguras = [
-    'Nombre',
-    'Descripcion',
-    'Precio',
-    'Descuento',
-    'CategoriaId',
-    'Tamano'
-  ];
+    const columnasSeguras = [
+        'Nombre',
+        'Descripcion',
+        'Precio',
+        'Descuento',
+        'CategoriaId',
+        'Estado'
+    ];
 
-  if (!columnasSeguras.includes(columna)) {
-    throw new Error('Columna no permitida');
-  }
 
-  const [servicios] = await dbPool.query(
-    `SELECT * FROM Servicios WHERE ${columna} ${operador} ?`,
-    [parametro]
-  );
+    if (!columnasSeguras.includes(columna)) {
+        throw new Error('Columna no permitida');
+    }
 
-  return servicios;
+    const [servicios] = await dbPool.query(
+        `SELECT * FROM Servicios WHERE ${columna} ${operador} ?`,
+        [parametro]
+    );
+
+    return servicios;
 };
