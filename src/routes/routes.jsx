@@ -34,6 +34,7 @@ import DetallePedido from "../features/landing/historial/detallePedidos";
 import { Clientes } from "../features/dashboard/clientes/clientes";
 import { SinAcceso } from "../features/dashboard/SinAcceso/SinAcceso";
 import { RequirePermission } from "../components/RequirePermission";
+import { CrearVenta } from "../features/dashboard/gestionventas/venta/components/CrearVenta";
 
 export const Routers = () => {
   return (
@@ -227,22 +228,9 @@ export const Routers = () => {
               </RequirePermission>
             } 
           />
-          <Route path="ventas/nuevo" element={
-            <RequirePermission permission="ver_ventas">
-              <Ventas />
-            </RequirePermission>
-          } />
-          <Route path="ventas/:id" element={
-            <RequirePermission permission="ver_ventas">
-              <Ventas />
-            </RequirePermission>
-          } />
-          <Route path="ventas/:id/editar" element={
-            <RequirePermission permission="ver_ventas">
-              <Ventas />
-            </RequirePermission>
-          } />
+          <Route path="ventas/crear" element={<CrearVenta />} />
 
+          
           <Route 
             path="clientes" 
             element={

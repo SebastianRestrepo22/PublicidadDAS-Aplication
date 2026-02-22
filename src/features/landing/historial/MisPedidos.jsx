@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useMisPedidos } from '../hooks/useMisPedidos';
 import { Navbar } from '../components/Navbar';
 import axios from 'axios';
-
 import { 
   Search, Package, Clock, CheckCircle, XCircle, ChevronRight 
 } from 'lucide-react';
@@ -16,35 +15,26 @@ const MisPedidos = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [clienteId, setClienteId] = useState(null);
-  const { authUser, authLoading } = useAuth();
+    const { user, loading: authLoading } = useAuth(); 
 
-  useEffect(() => {
-    const usuarioLocal = JSON.parse(localStorage.getItem("usuario"));
-    console.log('Usuario local:', usuarioLocal);
-    
-    if (usuarioLocal?.CedulaId) {
-      console.log('CedulaId:', usuarioLocal.CedulaId);
-      const loadUser = async () => {
-        try {
-          const token = localStorage.getItem("token");
-          console.log('Token:', token);
-          
-          const response = await axios.get(
-            `http://localhost:3000/user/${usuarioLocal.CedulaId}`,
-            {
-              headers: { Authorization: `Bearer ${token}` }
-            }
-          );
-          console.log('Respuesta usuario:', response.data);
-          setClienteId(String(response.data.CedulaId));
-        } catch (err) {
-          console.error("Error al cargar usuario:", err);
-          console.error("Error details:", err.response?.data);
-        }
-      };
-      loadUser();
-    }
-  }, []);
+ useEffect(() => {
+  // Usar user del contexto (ya tiene CedulaId del token decodificado)
+  if (user?.CedulaId) {
+    const loadUser = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          `http://localhost:3000/user/${user.CedulaId}`, //user.CedulaId sí existe
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setClienteId(String(response.data.CedulaId));
+      } catch (err) {
+        console.error("Error al cargar usuario:", err);
+      }
+    };
+    loadUser();
+  }
+}, [user]); // agregar 'user' como dependencia
 
   const { pedidos, loading, refetch } = useMisPedidos(clienteId);
 
@@ -146,7 +136,7 @@ const MisPedidos = () => {
     );
   }
 
-  if (!authUser) {
+  if (!user) {
     return (
 
       <div className="min-h-screen bg-gray-50">

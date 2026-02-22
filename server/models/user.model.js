@@ -74,6 +74,7 @@ export const getUsuarioById = async (id) => {
   const [rows] = await dbPool.query(`
     SELECT 
       u.CedulaId,
+      u.TipoDocumentoId,
       u.NombreCompleto,
       u.Telefono,
       u.CorreoElectronico,

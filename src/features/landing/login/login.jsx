@@ -26,7 +26,6 @@ export const Login = () => {
 
   const [step, setStep] = useState(1);
 
-  // CORREGIDO: Usar login del contexto
   const { login } = useAuth();
 
   const [tiposDocumento, setTiposDocumento] = useState([]);
@@ -42,7 +41,6 @@ export const Login = () => {
         setTiposDocumento(tiposUnicos);
       } catch (error) {
         console.error("Error obteniendo tipos de documento:", error);
-        // Eliminado: toast.error("Error al cargar tipos de documento");
       }
     };
     fetchTiposDocumento();
@@ -63,7 +61,6 @@ export const Login = () => {
 
   const [confirmarContrasena, setConfirmarContrasena] = useState("");
 
-  // Función para limpiar errores al cambiar entre formularios
   const toggleForm = (isLoginForm) => {
     setIsLogin(isLoginForm);
     if (isLoginForm) {
@@ -87,48 +84,36 @@ export const Login = () => {
     }
   };
 
-  // Funciones de validación
   const validateCedula = (cedula) => {
     if (!cedula) return "La cédula es obligatoria";
     if (!/^\d+$/.test(cedula)) return "La cédula debe contener solo números";
-
-    // Límites para Colombia
     const length = cedula.length;
     if (length < 6 || length > 10) {
       return "La cédula debe tener entre 6 y 10 dígitos";
     }
-
     return "";
   };
 
   const validateTelefono = (telefono) => {
     if (!telefono) return "El teléfono es obligatorio";
     if (!/^\d+$/.test(telefono)) return "El teléfono debe contener solo números";
-
-    // Límites para Colombia
     const length = telefono.length;
     if (length !== 10) {
       return "El teléfono debe tener 10 dígitos (ej: 3001234567)";
     }
-
-    // Validar que empiece con 3 (celulares) o 6/7/8 (fijos)
     const firstDigit = telefono.charAt(0);
     if (!['3', '6', '7', '8'].includes(firstDigit)) {
       return "El teléfono debe comenzar con 3 (celular) o 6/7/8 (fijo)";
     }
-
     return "";
   };
 
-  // Función para validar si un campo ya existe en el backend
   const validarCampoUnico = async (campo, valor) => {
     if (!valor) return;
-
     try {
       const response = await axios.get(`http://localhost:3000/auth/validar-${campo}`, {
         params: { [campo]: valor }
       });
-
       if (response.data.exists) {
         setRegisterErrors(prev => ({
           ...prev,
@@ -146,17 +131,13 @@ export const Login = () => {
     const { name, value } = e.target;
     setValues({ ...values, [name]: value });
 
-    // Limpiar error específico
     if (registerErrors[name]) {
       setRegisterErrors(prev => ({ ...prev, [name]: '' }));
     }
 
-    // Validaciones en tiempo real para cédula y teléfono
     if (name === 'CedulaId') {
       const error = validateCedula(value);
       setRegisterErrors(prev => ({ ...prev, CedulaId: error }));
-
-      // Validar en backend después de validación básica
       if (!error && value.length >= 6) {
         setTimeout(() => validarCampoUnico('cedula', value), 500);
       }
@@ -165,30 +146,23 @@ export const Login = () => {
     if (name === 'Telefono') {
       const error = validateTelefono(value);
       setRegisterErrors(prev => ({ ...prev, Telefono: error }));
-
-      // Validar en backend después de validación básica
       if (!error && value.length === 10) {
         setTimeout(() => validarCampoUnico('telefono', value), 500);
       }
     }
 
-    // Validación de correo en tiempo real
     if (name === 'CorreoElectronico' && value) {
       if (!/\S+@\S+\.\S+/.test(value)) {
         setRegisterErrors(prev => ({ ...prev, CorreoElectronico: "Correo electrónico inválido" }));
       } else {
-        // Validar en backend si el correo ya existe
         setTimeout(() => validarCampoUnico('correo', value), 500);
       }
     }
 
-    // Validación de contraseña en tiempo real
     if (name === 'Contrasena' && value) {
       if (value.length < 6) {
         setRegisterErrors(prev => ({ ...prev, Contrasena: "La contraseña debe tener al menos 6 caracteres" }));
       }
-
-      // Si hay confirmación de contraseña, validar coincidencia
       if (confirmarContrasena && value !== confirmarContrasena) {
         setRegisterErrors(prev => ({
           ...prev,
@@ -206,7 +180,6 @@ export const Login = () => {
   const handleConfirmPasswordChange = (e) => {
     const value = e.target.value;
     setConfirmarContrasena(value);
-
     if (values.Contrasena !== value) {
       setRegisterErrors(prev => ({
         ...prev,
@@ -223,7 +196,6 @@ export const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validaciones específicas para cédula y teléfono
     const cedulaError = validateCedula(values.CedulaId);
     const telefonoError = validateTelefono(values.Telefono);
     const passwordError = values.Contrasena !== confirmarContrasena
@@ -236,7 +208,6 @@ export const Login = () => {
       ConfirmarContrasena: passwordError
     };
 
-    // Validar campos obligatorios
     const requiredFields = {
       TipoDocumentoId: "Tipo de documento es obligatorio",
       NombreCompleto: "Nombre completo es obligatorio",
@@ -251,17 +222,14 @@ export const Login = () => {
       }
     });
 
-    // Validar formato de correo
     if (values.CorreoElectronico && !/\S+@\S+\.\S+/.test(values.CorreoElectronico)) {
       newErrors.CorreoElectronico = "Correo electrónico inválido";
     }
 
-    // Validar contraseña
     if (values.Contrasena && values.Contrasena.length < 6) {
       newErrors.Contrasena = "La contraseña debe tener al menos 6 caracteres";
     }
 
-    // Si hay errores, mostrarlos y detener el envío
     const hasErrors = Object.values(newErrors).some(error => error);
     if (hasErrors) {
       setRegisterErrors(newErrors);
@@ -276,12 +244,9 @@ export const Login = () => {
       }
     } catch (error) {
       console.error("Error en registro:", error);
-      // Manejo de errores del backend
       if (error.response?.data?.errors) {
-        // El backend ahora devuelve { errors: { campo: mensaje } }
         setRegisterErrors(error.response.data.errors);
       } else if (error.response?.data?.message) {
-        // Para compatibilidad con respuestas antiguas
         const errorMsg = error.response.data.message.toLowerCase();
         if (errorMsg.includes("correo") || errorMsg.includes("email")) {
           setRegisterErrors({
@@ -323,7 +288,6 @@ export const Login = () => {
   const handleSubmitLogin = async (e) => {
     e.preventDefault();
 
-    // Validaciones básicas para login
     const newErrors = {};
 
     if (!valuesLogin.CorreoElectronico.trim()) {
@@ -336,7 +300,6 @@ export const Login = () => {
       newErrors.Contrasena = "Ingrese su contraseña";
     }
 
-    // Si hay errores de validación, mostrarlos y detener
     if (Object.keys(newErrors).length > 0) {
       setLoginErrors(newErrors);
       return;
@@ -346,7 +309,6 @@ export const Login = () => {
       const response = await axios.post("http://localhost:3000/auth/login", valuesLogin);
       const token = response.data.token;
 
-      // Obtener userData de la respuesta (ajusta según tu backend)
       const userData = response.data.user || {
         NombreCompleto: response.data.nombre || response.data.NombreCompleto,
         CorreoElectronico: valuesLogin.CorreoElectronico,
@@ -354,23 +316,28 @@ export const Login = () => {
         Permisos: response.data.permisos || response.data.Permisos || []
       };
 
+      // ✅ GUARDAR EN LOCALSTORAGE (estas líneas ya existen)
+      localStorage.setItem('token', token);
+      
+      // 👇 ESTA ES LA LÍNEA CLAVE - GUARDA EL userId
+      localStorage.setItem('userId', userData.CedulaId || response.data.userId || response.data.id || '');
+      
+      localStorage.setItem('userName', userData.NombreCompleto || '');
+      localStorage.setItem('userRole', userData.Role || '');
+
       login(token, userData);
 
-      // Navegar inmediatamente después del login
       const userRole = (userData.Role || "").toLowerCase();
 
       if (userRole === "cliente") {
         navigate("/cliente/productos");
       } else {
-        // Para administradores y otros roles, ir a la raíz del dashboard
-        // para que el DashboardLayout haga la redirección inteligente
         navigate("/dashboard");
       }
 
     } catch (error) {
       console.error("Error en login:", error);
 
-      // Manejo de errores específicos para login
       if (error.response?.status === 401) {
         if (error.response?.data?.message?.includes("no existe")) {
           setLoginErrors({
@@ -404,14 +371,12 @@ export const Login = () => {
     <div className="h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100 flex flex-col relative overflow-hidden">
       <Navbar />
       <div className="flex flex-1 items-center justify-center p-4 relative pt-16">
-        {/* Fondos decorativos */}
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
 
         <div className="w-full max-w-7xl z-10 mt-6">
           <div className="flex flex-col lg:flex-row items-center justify-center gap-12">
-            {/* Imagen a la izquierda */}
             <div className="hidden lg:flex w-2/5 items-center justify-start relative -ml-10">
               <div className="relative group">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-400 rounded-full blur-3xl opacity-30 group-hover:opacity-40 transition-opacity duration-700 scale-110"></div>
@@ -425,10 +390,8 @@ export const Login = () => {
               </div>
             </div>
 
-            {/* Formulario único con fade */}
             <div className="w-full lg:w-3/5 max-w-lg">
               <div className="relative">
-                {/* LOGIN FORM */}
                 <div
                   className={`transition-all duration-500 ${isLogin
                     ? "opacity-100 translate-x-0 pointer-events-auto"
@@ -445,7 +408,6 @@ export const Login = () => {
                       </p>
                     </div>
 
-                    {/* Mostrar error general del login */}
                     {loginErrors.general && (
                       <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                         <p className="text-red-600 text-sm font-medium text-center">
@@ -477,7 +439,6 @@ export const Login = () => {
                             onChange={handleChangesLogin}
                           />
                         </div>
-                        {/* Error específico para correo en login */}
                         {getLoginError("CorreoElectronico") && (
                           <p className="text-red-500 text-xs mt-1.5 h-5">
                             {getLoginError("CorreoElectronico")}
@@ -514,7 +475,6 @@ export const Login = () => {
                             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                           </button>
                         </div>
-                        {/* Error específico para contraseña en login */}
                         {getLoginError("Contrasena") && (
                           <p className="text-red-500 text-xs mt-1.5 h-5">
                             {getLoginError("Contrasena")}
@@ -553,7 +513,6 @@ export const Login = () => {
                   </div>
                 </div>
 
-                {/* REGISTER FORM */}
                 <div
                   className={`transition-all duration-500 ${!isLogin
                     ? "opacity-100 translate-x-0 pointer-events-auto"
@@ -566,14 +525,12 @@ export const Login = () => {
                         <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 bg-clip-text text-transparent">
                           Crear Cuenta
                         </h1>
-                        {/* Indicador de pasos solo en móvil */}
                         <div className="md:hidden flex items-center space-x-2">
                           <div className={`w-2 h-2 rounded-full ${step === 1 ? 'bg-purple-600' : 'bg-gray-300'}`}></div>
                           <div className={`w-2 h-2 rounded-full ${step === 2 ? 'bg-purple-600' : 'bg-gray-300'}`}></div>
                         </div>
                       </div>
 
-                      {/* Mensaje de error general */}
                       {registerErrors.general && (
                         <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                           <p className="text-red-600 text-sm font-medium text-center">
@@ -585,10 +542,8 @@ export const Login = () => {
 
                     <div className="px-4 pb-4 md:px-6 md:pb-6">
                       <form onSubmit={handleSubmit}>
-                        {/* Paso 1 - Información Personal (visible en móvil solo si step=1) */}
                         <div className={`md:block ${step === 1 ? 'block' : 'hidden'}`}>
                           <div className="space-y-4">
-                            {/* Fila 1: Nombre y Email */}
                             <div className="md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
                               <div className="group">
                                 <div className="flex">
@@ -647,7 +602,6 @@ export const Login = () => {
                               </div>
                             </div>
 
-                            {/* Fila 2: Tipo Documento y Número */}
                             <div className="md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
                               <div className="group">
                                 <div className="flex">
@@ -712,7 +666,6 @@ export const Login = () => {
                             </div>
                           </div>
 
-                          {/* Botón Siguiente solo en móvil */}
                           <div className="mt-6 md:hidden">
                             <button
                               type="button"
@@ -724,10 +677,8 @@ export const Login = () => {
                           </div>
                         </div>
 
-                        {/* Paso 2 - Contacto y Contraseñas (visible en móvil solo si step=2) */}
                         <div className={`md:block ${step === 2 ? 'block' : 'hidden'}`}>
                           <div className="space-y-4">
-                            {/* Fila 1: Teléfono y Dirección */}
                             <div className="md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
                               <div className="group">
                                 <div className="flex">
@@ -786,7 +737,6 @@ export const Login = () => {
                               </div>
                             </div>
 
-                            {/* Fila 2: Contraseña y Confirmar */}
                             <div className="md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
                               <div className="group">
                                 <div className="flex">
@@ -859,7 +809,6 @@ export const Login = () => {
                             </div>
                           </div>
 
-                          {/* Botones del paso 2 (móvil) */}
                           <div className="mt-6 md:hidden">
                             <div className="grid grid-cols-2 gap-3">
                               <button
@@ -879,7 +828,6 @@ export const Login = () => {
                           </div>
                         </div>
 
-                        {/* Botón de submit solo en desktop (donde se ve todo junto) */}
                         <div className="hidden md:block mt-6">
                           <button
                             type="submit"
@@ -928,6 +876,7 @@ export const Login = () => {
           .animate-float { animation: float 6s ease-in-out infinite; }
         `}</style>
       </div>
+      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 };
