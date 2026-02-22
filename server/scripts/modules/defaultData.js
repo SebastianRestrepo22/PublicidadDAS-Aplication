@@ -85,9 +85,5 @@ export const initializeDefaultData = async (connection) => {
     const [providers] = await connection.execute('SELECT COUNT(*) as count FROM proveedores');
     console.log(`     ✓ Tabla 'proveedores' verificada (${providers[0].count} registros).`);
 
-    // Verificar tabla insumos
-    const [supplies] = await connection.execute('SELECT COUNT(*) as count FROM insumos');
-    console.log(`     ✓ Tabla 'insumos' verificada (${supplies[0].count} registros).`);
-
     console.log('    Datos por defecto configurados correctamente.');
 };

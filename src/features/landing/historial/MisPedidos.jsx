@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useMisPedidos } from '../hooks/useMisPedidos';
 import { Navbar } from '../components/Navbar';
 import axios from 'axios';
-
 import { 
   Search, Package, Clock, CheckCircle, XCircle, ChevronRight 
 } from 'lucide-react';
@@ -135,18 +134,8 @@ const MisPedidos = () => {
     o.Estado !== 'entregado' && o.Estado !== 'cancelado'
   );
 
-  if (authLoading) {
+  if (!clienteId) {
     return (
-      <>
-        <Navbar />
-        <div className="text-center mt-20">Cargando sesión...</div>
-      </>
-    );
-  }
-
-  if (!authUser) {
-    return (
-
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
@@ -156,7 +145,7 @@ const MisPedidos = () => {
             <p className="text-gray-600">Inicia sesión para ver tus pedidos</p>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 

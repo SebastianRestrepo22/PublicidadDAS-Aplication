@@ -203,7 +203,7 @@ export const Proveedores = () => {
       };
 
       await createProveedor(proveedorData);
-      toast.success("✅ Proveedor creado exitosamente");
+      toast.success(" Proveedor creado exitosamente");
       setOpenCreate(false);
       resetCreateForm();
       fetchProveedores();
@@ -245,7 +245,7 @@ export const Proveedores = () => {
       };
 
       await updateProveedor(selectedProveedor.ProveedorId, proveedorData);
-      toast.success("✅ Proveedor actualizado correctamente");
+      toast.success(" Proveedor actualizado correctamente");
       fetchProveedores();
       setOpenEditar(false);
       setSelectedProveedor(null);
@@ -264,7 +264,7 @@ export const Proveedores = () => {
 
     try {
       await deleteProveedor(selectedProveedor.ProveedorId);
-      toast.success("✅ Proveedor eliminado correctamente");
+      toast.success(" Proveedor eliminado correctamente");
       setOpenEliminar(false);
       setSelectedProveedor(null);
       fetchProveedores();
@@ -310,7 +310,7 @@ export const Proveedores = () => {
           p.ProveedorId === idProveedor ? { ...p, Estado: nuevoEstadoNum } : p
         )
       );
-      toast.success("✅ Estado actualizado correctamente");
+      toast.success(" Estado actualizado correctamente");
     } catch (error) {
       toast.error("Error al actualizar estado: " + (error.message || error));
     }

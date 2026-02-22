@@ -54,10 +54,6 @@ export const getAllProductos = async () => {
   return Array.isArray(response.data) ? response.data : [];
 };
 
-export const getAllInsumos = async () => {
-  const response = await axios.get(`${'http://localhost:3000'}/api/insumos`);
-  return Array.isArray(response.data) ? response.data : [];
-};
 
 export const getAllProveedores = async () => {
   const response = await axios.get(`${'http://localhost:3000'}/api/proveedores`);

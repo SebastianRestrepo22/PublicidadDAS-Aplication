@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 
 // Rutas de negocio
 import proveedorRoutes from './routes/proveedores.routes.js';
-import insumosRoutes from './routes/insumos.routes.js';
 import categoriaRoutes from './routes/categoria.routes.js';
 import comprasRoutes from './routes/compras.routes.js';
 import detalleComprasRoutes from './routes/detalleCompras.routes.js';
@@ -59,7 +58,6 @@ app.use('/tipos-documento', tipoDocumentoRoutes);
 // Rutas de negocio
 app.use('/api/categorias', categoriaRoutes);
 app.use('/api/proveedores', proveedorRoutes);
-app.use('/api/insumos', insumosRoutes);
 app.use('/api/compras', comprasRoutes);
 app.use('/api/detalle-compras', detalleComprasRoutes);
 app.use("/api/pedidos-clientes", pedidoClienteRoutes);
