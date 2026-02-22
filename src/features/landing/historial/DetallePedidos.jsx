@@ -3,8 +3,7 @@ import { Navbar } from '../components/Navbar';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { 
-  ArrowLeft, MapPin, User, Calendar, CreditCard, Truck, AlertCircle,
-  Package, Clock, CheckCircle, XCircle 
+  ArrowLeft, MapPin, User, CreditCard, Package, Clock, CheckCircle, XCircle 
 } from 'lucide-react';
 
 const DetallePedido = () => {
@@ -15,7 +14,6 @@ const DetallePedido = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Si no recibimos el pedido por state, mostrar error
     if (!location.state?.pedido) {
       setError('No se encontró información del pedido. Por favor regresa a la lista de pedidos.');
       setLoading(false);
@@ -36,11 +34,11 @@ const DetallePedido = () => {
 
   const getStatusBadgeColor = (estado) => {
     switch (estado?.toLowerCase()) {
-      case 'pendiente': return 'bg-amber-100 text-amber-800';
-      case 'aprobado': return 'bg-blue-100 text-blue-800';
-      case 'entregado': return 'bg-emerald-100 text-emerald-800';
-      case 'cancelado': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'pendiente': return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'aprobado': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'entregado': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'cancelado': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -54,20 +52,25 @@ const DetallePedido = () => {
     }
   };
 
+  // Función auxiliar para obtener el precio unitario con múltiples fallbacks
+  const getUnitPrice = (item) => {
+    return item.PrecioUnitario ?? item.Precio ?? item.price ?? item.valor ?? 0;
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
         <Navbar />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-            <div className="bg-white rounded-xl p-6 border border-gray-200">
-              <div className="h-48 bg-gray-100 rounded-lg"></div>
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+              <div className="h-32 bg-gray-100 rounded-xl"></div>
             </div>
-            <div className="bg-white rounded-xl p-6 border border-gray-200">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <div className="space-y-4">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-16 bg-gray-100 rounded"></div>
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-20 bg-gray-100 rounded-lg"></div>
                 ))}
               </div>
             </div>
@@ -79,15 +82,17 @@ const DetallePedido = () => {
 
   if (error || !pedido) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
         <Navbar />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <div className="text-center bg-white rounded-xl shadow-sm border border-gray-200 p-12">
-            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <div className="text-center bg-white rounded-2xl shadow-lg border border-gray-100 p-12">
+            <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <XCircle className="w-8 h-8 text-red-500" />
+            </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">{error}</h3>
             <button
               onClick={() => navigate('/cliente/MisPedidos')}
-              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              className="mt-6 px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"
             >
               Volver a Mis Pedidos
             </button>
@@ -98,175 +103,166 @@ const DetallePedido = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <Navbar />
       
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Botón de retroceso */}
         <button
           onClick={() => navigate('/cliente/MisPedidos')}
-          className="flex items-center text-gray-600 hover:text-gray-900 mb-6 transition-colors"
+          className="inline-flex items-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-4 py-2 rounded-lg transition-all mb-6"
         >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Volver a Mis Pedidos
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          <span className="text-sm font-medium">Volver</span>
         </button>
 
-        {/* Pedido Header */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100 mb-8">
-          <div className="flex items-center justify-between mb-4">
+        {/* Header del Pedido */}
+        <div className="bg-gray-200 rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-                Pedido #{String(pedido.PedidoClienteId).substring(0, 4)}
+              <h1 className="text-2xl font-bold text-gray-900">
+                Pedido <span className="text-blue-600">#{String(pedido.PedidoClienteId).substring(0, 4)}</span>
               </h1>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-gray-500 mt-1">
                 {new Date(pedido.FechaRegistro).toLocaleDateString('es-ES', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
+                  year: 'numeric', month: 'long', day: 'numeric'
                 })}
               </p>
             </div>
-            <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusBadgeColor(pedido.Estado)}`}>
+            <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border ${getStatusBadgeColor(pedido.Estado)}`}>
               {getEstadoIcon(pedido.Estado)}
-              <span className="ml-1">{getEstadoLabel(pedido.Estado)}</span>
+              {getEstadoLabel(pedido.Estado)}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-            <div className="bg-white rounded-lg p-4 border border-gray-200">
-              <div className="flex items-center gap-2 text-gray-600 mb-2">
-                <User className="w-4 h-4" />
-                <span className="text-sm">Cliente</span>
+          {/* Info principal en grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl">
+              <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
+                <User className="w-5 h-5 text-blue-600" />
               </div>
-              <p className="font-semibold text-gray-900">{pedido.NombreCliente || 'N/A'}</p>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cliente</p>
+                <p className="font-semibold text-gray-900 mt-0.5">{pedido.NombreCliente || 'N/A'}</p>
+              </div>
             </div>
 
-            <div className="bg-white rounded-lg p-4 border border-gray-200">
-              <div className="flex items-center gap-2 text-gray-600 mb-2">
-                <MapPin className="w-4 h-4" />
-                <span className="text-sm">Dirección</span>
+            <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl md:col-span-2">
+              <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
+                <MapPin className="w-5 h-5 text-blue-600" />
               </div>
-              <p className="font-semibold text-gray-900">
-                {pedido.DireccionEntrega || pedido.Direccion || 'No especificada'}
-              </p>
+              <div className="flex-1">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Dirección de entrega</p>
+                <p className="font-semibold text-gray-900 mt-0.5">
+                  {pedido.DireccionEntrega || pedido.Direccion || pedido.direccion || 'No especificada'}
+                </p>
+              </div>
             </div>
 
-            <div className="bg-white rounded-lg p-4 border border-gray-200">
-              <div className="flex items-center gap-2 text-gray-600 mb-2">
-                <Calendar className="w-4 h-4" />
-                <span className="text-sm">Entrega</span>
+            <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl">
+              <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
+                <CreditCard className="w-5 h-5 text-blue-600" />
               </div>
-              <p className="font-semibold text-gray-900">
-                {pedido.FechaEntrega 
-                  ? new Date(pedido.FechaEntrega).toLocaleDateString('es-ES')
-                  : 'Pendiente'}
-              </p>
-            </div>
-
-            <div className="bg-white rounded-lg p-4 border border-gray-200">
-              <div className="flex items-center gap-2 text-gray-600 mb-2">
-                <Truck className="w-4 h-4" />
-                <span className="text-sm">Método</span>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Método de pago</p>
+                <p className="font-semibold text-gray-900 mt-0.5">
+                  {pedido.MetodoPago || pedido.metodoPago || 'No especificado'}
+                </p>
               </div>
-              <p className="font-semibold text-gray-900">
-                {pedido.MetodoEntrega || 'No especificado'}
-              </p>
             </div>
           </div>
         </div>
 
         {/* Productos */}
-        <div className="bg-white rounded-xl p-6 border border-gray-200 mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-5 flex items-center gap-2">
-            <Package className="w-5 h-5 text-blue-600" />
-            Productos del Pedido
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+              <Package className="w-4 h-4 text-blue-600" />
+            </div>
+            Productos ({pedido.detalle?.length || 0})
           </h2>
           
-          <div className="space-y-4">
+          <div className="space-y-3">
             {pedido.detalle && pedido.detalle.length > 0 ? (
-              pedido.detalle.map((item, index) => (
-                <div
-                  key={index}
-                  className="border-b border-gray-100 pb-4 last:border-b-0 last:pb-0"
-                >
-                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 text-lg">
-                        {item.Descripcion || `Producto ${item.ProductoServicioId}`}
+              pedido.detalle.map((item, index) => {
+                const unitPrice = getUnitPrice(item);
+                const quantity = item.Cantidad || item.cantidad || 1;
+                const itemTotal = unitPrice * quantity;
+                
+                return (
+                  <div
+                    key={index}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors gap-4"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate">
+                        {item.Descripcion || item.descripcion || `Producto ${item.ProductoServicioId || item.id || index + 1}`}
                       </h3>
                       {item.CodigoProducto && (
-                        <p className="text-sm text-gray-600 mt-1">Código: {item.CodigoProducto}</p>
-                      )}
-                      {item.Especificaciones && (
-                        <p className="text-sm text-gray-600 mt-1">Especificaciones: {item.Especificaciones}</p>
+                        <p className="text-sm text-gray-500 mt-1">Código: {item.CodigoProducto}</p>
                       )}
                     </div>
-                    <div className="text-right md:text-left md:w-48 flex-shrink-0">
-                      <p className="font-bold text-gray-900 text-lg">
-                        ${Number(item.PrecioUnitario || 0).toLocaleString('es-ES', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })}
-                      </p>
-                      <p className="text-sm text-gray-600 mt-1">Cantidad: {item.Cantidad || 1}</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1">
-                        Subtotal: ${Number((item.PrecioUnitario || 0) * (item.Cantidad || 1)).toLocaleString('es-ES', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })}
-                      </p>
+                    
+                    <div className="flex items-center gap-6 sm:text-right">
+                      <div>
+                        <p className="text-xs text-gray-500">Precio</p>
+                        <p className="font-bold text-blue-600">
+                          ${Number(unitPrice).toLocaleString('es-ES', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Cant.</p>
+                        <p className="font-medium text-gray-900">{quantity}</p>
+                      </div>
+                      <div className="min-w-[80px]">
+                        <p className="text-xs text-gray-500">Total</p>
+                        <p className="font-bold text-gray-900">
+                          ${Number(itemTotal).toLocaleString('es-ES', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                No hay productos en este pedido
+              <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-xl">
+                <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p>No hay productos en este pedido</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Resumen */}
-        <div className="bg-white rounded-xl p-6 border border-gray-200 mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-5">Resumen del Pedido</h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-5">Resumen</h2>
           <div className="space-y-3">
-            <div className="flex justify-between text-gray-700">
-              <span>Subtotal:</span>
-              <span className="font-semibold">
-                ${Number(pedido.SubTotal || 0).toLocaleString('es-ES', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })}
-              </span>
-            </div>
-            
-            {pedido.Descuento && pedido.Descuento > 0 && (
-              <div className="flex justify-between text-gray-700">
-                <span>Descuento:</span>
-                <span className="font-semibold text-red-600">
-                  -${Number(pedido.Descuento).toLocaleString('es-ES', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}
+            {pedido.Descuento > 0 && (
+              <div className="flex justify-between text-gray-600">
+                <span>Descuento</span>
+                <span className="font-medium text-red-600">
+                  -${Number(pedido.Descuento).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                 </span>
               </div>
             )}
             
-            <div className="flex justify-between text-gray-700">
-              <span>Impuestos:</span>
-              <span className="font-semibold">
-                ${Number(pedido.Impuesto || 0).toLocaleString('es-ES', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })}
-              </span>
-            </div>
+            {pedido.Impuesto > 0 && (
+              <div className="flex justify-between text-gray-600">
+                <span>Impuestos</span>
+                <span className="font-medium">
+                  ${Number(pedido.Impuesto).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
             
-            <div className="flex justify-between text-gray-700 pt-4 border-t border-gray-200">
-              <span className="font-bold text-gray-900 text-lg">Total:</span>
+            <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+              <span className="font-semibold text-gray-900">Total a pagar</span>
               <span className="text-2xl font-bold text-blue-600">
                 ${Number(pedido.Total).toLocaleString('es-ES', {
                   minimumFractionDigits: 2,
@@ -277,45 +273,17 @@ const DetallePedido = () => {
           </div>
         </div>
 
-        {/* Información Adicional */}
-        {(pedido.Nota || pedido.MetodoPago) && (
-          <div className="bg-white rounded-xl p-6 border border-gray-200 mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Información Adicional</h2>
-            <div className="space-y-4">
-              {pedido.Nota && (
-                <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
-                  <div className="flex items-start gap-2 mb-2">
-                    <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-                    <span className="font-semibold text-gray-900">Notas:</span>
-                  </div>
-                  <p className="text-gray-700 mt-1 pl-7">{pedido.Nota}</p>
-                </div>
-              )}
-              
-              {pedido.MetodoPago && (
-                <div className="mt-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CreditCard className="w-5 h-5 text-blue-600" />
-                    <span className="font-semibold text-gray-900">Método de Pago:</span>
-                  </div>
-                  <p className="text-gray-700 mt-1 pl-7">{pedido.MetodoPago}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Acciones según estado */}
+        {/* Acciones */}
         <div className="flex flex-col sm:flex-row gap-3">
           <button 
             onClick={() => navigate('/cliente/MisPedidos')}
-            className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+            className="flex-1 bg-white text-gray-700 border border-gray-300 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors"
           >
             Volver a Mis Pedidos
           </button>
           
           {pedido.Estado === 'entregado' && (
-            <button className="flex-1 bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors">
+            <button className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-medium hover:bg-purple-700 transition-colors shadow-sm">
               Dejar Reseña
             </button>
           )}

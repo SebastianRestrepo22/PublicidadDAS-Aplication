@@ -2,7 +2,6 @@ import { Route, Routes } from "react-router-dom";
 import { Productos } from "../features/landing/nuestrosproductos/productos";
 import { QuienesSomos } from "../features/landing/quienessomos/quienesSomos";
 import { Login } from "../features/landing/login/login";
-import { Insumos } from "../features/dashboard/constrolinsumos/insumos/insumos";
 import { Usuarios } from "../features/dashboard/usuarios/usuarios";
 import { Roles } from "../features/dashboard/roles/roles";
 import { DashboardLayout } from "../features/dashboard/components/dashboardLoyout";
@@ -171,6 +170,24 @@ export const Routers = () => {
               </RequirePermission>
             } 
           />
+
+          <Route path="graficosEstadisticos" element={<GraficosEstadisticos />} />
+          <Route path="categorias" element={<Categorias/>} />
+          <Route path="usuarios" element={<Usuarios />} />
+          <Route path="roles" element={<Roles />} />
+          <Route path="proveedores" element={<Proveedores />} />
+
+          <Route path="producto" element={<ProductosDashboard />} />
+          <Route path="producto/nuevo" element={<ProductosDashboard />} />
+          <Route path="producto/:id" element={<ProductosDashboard />} />
+          <Route path="producto/:id/editar" element={<ProductosDashboard />} />
+
+          <Route path="servicio" element={<ServiciosDashboard />} />
+          <Route path="servicio/nuevo" element={<ServiciosDashboard />} />
+          <Route path="servicio/:id" element={<ServiciosDashboard />} />
+          <Route path="servicio/:id/editar" element={<ServiciosDashboard />} />
+
+          <Route path="ventas" element={<Ventas />} />
 
           <Route 
             path="producto" 
