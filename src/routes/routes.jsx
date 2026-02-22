@@ -30,6 +30,10 @@ import { EditarCarritoServicio } from "../features/landing/carritoCompras/Carrit
 import { Categorias } from "../features/dashboard/categoriadediseño/categorias";
 import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidosClientes";
 import DetallePedido from "../features/landing/historial/detallePedidos";
+import { Clientes } from "../features/dashboard/clientes/clientes";
+import { SinAcceso } from "../features/dashboard/SinAcceso/SinAcceso";
+import { RequirePermission } from "../components/RequirePermission";
+import { CrearVenta } from "../features/dashboard/gestionventas/venta/components/CrearVenta";
 
 export const Routers = () => {
   return (
@@ -39,7 +43,7 @@ export const Routers = () => {
         <Route path="/productos" element={<Productos />} />
         <Route path="/productos/:id" element={<ProductoDetalle />} />
         <Route path="/servicios" element={<Servicios />} />
-        <Route path="/servicios/:id" element={<ServicioDetalle/>} />
+        <Route path="/servicios/:id" element={<ServicioDetalle />} />
 
         {/* Rutas cliente protegidas */}
         <Route
@@ -100,7 +104,6 @@ export const Routers = () => {
           }
         />
 
-
         {/* Dashboard Admin */}
         <Route
           path="/dashboard"
@@ -110,6 +113,64 @@ export const Routers = () => {
             </ProtectedRouteAdmin>
           }
         >
+          {/* Ruta de sin acceso */}
+          <Route path="sin-acceso" element={<SinAcceso />} />
+          
+          {/* Rutas protegidas por permisos */}
+          <Route 
+            path="graficosEstadisticos" 
+            element={
+              <RequirePermission permission="ver_dashboard">
+                <GraficosEstadisticos />
+              </RequirePermission>
+            } 
+          />
+          
+          <Route 
+            path="categorias" 
+            element={
+              <RequirePermission permission="ver_categorias">
+                <Categorias />
+              </RequirePermission>
+            } 
+          />
+          
+          <Route 
+            path="usuarios" 
+            element={
+              <RequirePermission permission="ver_usuarios">
+                <Usuarios />
+              </RequirePermission>
+            } 
+          />
+          
+          <Route 
+            path="roles" 
+            element={
+              <RequirePermission permission="ver_roles">
+                <Roles />
+              </RequirePermission>
+            } 
+          />
+          
+          <Route 
+            path="insumos" 
+            element={
+              <RequirePermission permission="ver_insumos">
+                <Insumos />
+              </RequirePermission>
+            } 
+          />
+          
+          <Route 
+            path="proveedores" 
+            element={
+              <RequirePermission permission="ver_proveedores">
+                <Proveedores />
+              </RequirePermission>
+            } 
+          />
+
           <Route path="graficosEstadisticos" element={<GraficosEstadisticos />} />
           <Route path="categorias" element={<Categorias/>} />
           <Route path="usuarios" element={<Usuarios />} />
@@ -128,22 +189,121 @@ export const Routers = () => {
 
           <Route path="ventas" element={<Ventas />} />
 
-          <Route path="pedidosClientes" element={<PedidosClientes />} />
-          <Route path="pedidosClientes/nuevo" element={<PedidosClientes />} />
-          <Route path="pedidosClientes/:id" element={<PedidosClientes />} />
-          <Route path="pedidosClientes/:id/editar" element={<PedidosClientes />} />
+          <Route 
+            path="producto" 
+            element={
+              <RequirePermission permission="ver_productos">
+                <ProductosDashboard />
+              </RequirePermission>
+            } 
+          />
+          <Route path="producto/nuevo" element={
+            <RequirePermission permission="ver_productos">
+              <ProductosDashboard />
+            </RequirePermission>
+          } />
+          <Route path="producto/:id" element={
+            <RequirePermission permission="ver_productos">
+              <ProductosDashboard />
+            </RequirePermission>
+          } />
+          <Route path="producto/:id/editar" element={
+            <RequirePermission permission="ver_productos">
+              <ProductosDashboard />
+            </RequirePermission>
+          } />
 
-          <Route path="compras" element={<Compras />} />
-          <Route path="compras/nueva" element={<Compras />} />
-          <Route path="compras/:id" element={<Compras />} />
-          <Route path="compras/:id/editar" element={<Compras />} />
+          <Route 
+            path="servicio" 
+            element={
+              <RequirePermission permission="ver_servicios">
+                <ServiciosDashboard />
+              </RequirePermission>
+            } 
+          />
+          <Route path="servicio/nuevo" element={
+            <RequirePermission permission="ver_servicios">
+              <ServiciosDashboard />
+            </RequirePermission>
+          } />
+          <Route path="servicio/:id" element={
+            <RequirePermission permission="ver_servicios">
+              <ServiciosDashboard />
+            </RequirePermission>
+          } />
+          <Route path="servicio/:id/editar" element={
+            <RequirePermission permission="ver_servicios">
+              <ServiciosDashboard />
+            </RequirePermission>
+          } />
 
+          <Route 
+            path="ventas" 
+            element={
+              <RequirePermission permission="ver_ventas">
+                <Ventas />
+              </RequirePermission>
+            } 
+          />
+          <Route path="ventas/crear" element={<CrearVenta />} />
 
-          <Route path="ventas/nuevo" element={<Ventas />} />
-          <Route path="ventas/:id" element={<Ventas />} />
-          <Route path="ventas/:id/editar" element={<Ventas />} />
+          
+          <Route 
+            path="clientes" 
+            element={
+              <RequirePermission permission="ver_clientes">
+                <Clientes />
+              </RequirePermission>
+            } 
+          />
 
+          <Route 
+            path="pedidosClientes" 
+            element={
+              <RequirePermission permission="ver_pedidos">
+                <PedidosClientes />
+              </RequirePermission>
+            } 
+          />
+          <Route path="pedidosClientes/nuevo" element={
+            <RequirePermission permission="ver_pedidos">
+              <PedidosClientes />
+            </RequirePermission>
+          } />
+          <Route path="pedidosClientes/:id" element={
+            <RequirePermission permission="ver_pedidos">
+              <PedidosClientes />
+            </RequirePermission>
+          } />
+          <Route path="pedidosClientes/:id/editar" element={
+            <RequirePermission permission="ver_pedidos">
+              <PedidosClientes />
+            </RequirePermission>
+          } />
 
+          <Route 
+            path="compras" 
+            element={
+              <RequirePermission permission="ver_compras">
+                <Compras />
+              </RequirePermission>
+            } 
+          />
+          <Route path="compras/nueva" element={
+            <RequirePermission permission="ver_compras">
+              <Compras />
+            </RequirePermission>
+          } />
+          <Route path="compras/:id" element={
+            <RequirePermission permission="ver_compras">
+              <Compras />
+            </RequirePermission>
+          } />
+          <Route path="compras/:id/editar" element={
+            <RequirePermission permission="ver_compras">
+              <Compras />
+            </RequirePermission>
+          } />
         </Route>
 
         {/* Página no encontrada */}

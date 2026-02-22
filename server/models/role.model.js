@@ -10,12 +10,21 @@ export const getRoleByName = async (nombre) => {
   return roles[0]; // Devuelve el primer resultado
 };
 
+export const getRoleIdByName = async (nombre) => {
+  const [rows] = await dbPool.query(
+    'SELECT RoleId AS id FROM roles WHERE Nombre = ? LIMIT 1',
+    [nombre]
+  );
+
+  return rows;
+};
+
 export const systemRole = async (id) => {
   const [roles] = await dbPool.query(
-      'SELECT IsSystem, Nombre FROM roles WHERE RoleId = ?',
-      [id]
-    );
-    return roles;
+    'SELECT IsSystem, Nombre FROM roles WHERE RoleId = ?',
+    [id]
+  );
+  return roles;
 }
 
 // Crear rol
@@ -152,7 +161,7 @@ export const getDataPermissonRol = async (RoleId) => {
        FROM permisos p
        JOIN rol_permisos rp ON p.PermisoId = rp.PermisoId
        WHERE rp.RoleId = ?`,
-      [RoleId]
+    [RoleId]
   );
   return permisos;
 };

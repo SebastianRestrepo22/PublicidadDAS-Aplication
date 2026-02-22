@@ -1,112 +1,189 @@
-// models/detalleVentas.models.js
-
 import { v4 as uuidv4 } from "uuid";
 import connectDB from "../lib/db.js";
-
-const sanitize = (v) => (v === undefined ? null : v);
 
 // Obtener detalles por venta
 export const getDetalleVentaByVentaIdModel = async (ventaId) => {
   const connection = await connectDB();
-  const [rows] = await connection.execute(
-    "SELECT * FROM detalleventas WHERE VentaId = ?",
-    [ventaId]
-  );
-  return rows;
+  try {
+    const [rows] = await connection.execute(
+      `SELECT 
+        dv.*,
+        p.Nombre AS ProductoNombre,
+        s.Nombre AS ServicioNombre,
+        st.NombreTamano,
+        c.Nombre AS ColorNombre,
+        c.Hex AS ColorHex
+      FROM detalleventas dv
+      LEFT JOIN productos p ON dv.ProductoId = p.ProductoId
+      LEFT JOIN servicios s ON dv.ServicioId = s.ServicioId
+      LEFT JOIN servicio_tamanos st ON dv.ServicioTamanoId = st.ServicioTamanoId
+      LEFT JOIN colores c ON dv.ColorId = c.ColorId
+      WHERE dv.VentaId = ?`,
+      [ventaId]
+    );
+    return rows;
+  } catch (error) {
+    console.error("Error en getDetalleVentaByVentaIdModel:", error);
+    throw error;
+  } finally {
+    connection.release?.();
+  }
 };
 
-// Crear detalle de venta
-export const createDetalleVentaModel = async ({ 
-  VentaId, 
-  ProductoServicioId, 
-  Nombre,           
-  Cantidad, 
-  PrecioUnitario, 
-  Descuento = 0.00, 
-  Subtotal 
-}) => {
-  const connection = await connectDB();
-  const DetalleVentaId = uuidv4();
+// Crear detalle de venta desde pedido
+export const createDetallesVentaFromPedidoModel = async (connection, VentaId, detallesPedido) => {
+  try {
+    const detallesCreados = [];
+    
+    for (const detalle of detallesPedido) {
+      const DetalleVentaId = uuidv4();
+      
+      // Determinar tipo de item y nombres
+      let tipoItem = null;
+      let productoId = null;
+      let servicioId = null;
+      let servicioTamanoId = null;
+      let nombreSnapshot = "";
+      let descripcionPersonalizada = detalle.Descripcion || null;
+      let urlImagenPersonalizada = detalle.UrlImagen || null;
+      
+      if (detalle.ProductoId) {
+        tipoItem = 'producto';
+        productoId = detalle.ProductoId;
+        
+        // Obtener nombre del producto
+        const [productoRows] = await connection.execute(
+          "SELECT Nombre FROM productos WHERE ProductoId = ?",
+          [detalle.ProductoId]
+        );
+        nombreSnapshot = productoRows.length > 0 ? productoRows[0].Nombre : "Producto";
+        
+      } else if (detalle.ServicioId) {
+        tipoItem = 'servicio';
+        servicioId = detalle.ServicioId;
+        
+        // Obtener nombre del servicio
+        const [servicioRows] = await connection.execute(
+          "SELECT Nombre FROM servicios WHERE ServicioId = ?",
+          [detalle.ServicioId]
+        );
+        nombreSnapshot = servicioRows.length > 0 ? servicioRows[0].Nombre : "Servicio";
+        
+        // Si tiene tamaño, obtener el ID del tamaño
+        if (detalle.Tamaño) {
+          const [tamanoRows] = await connection.execute(
+            "SELECT ServicioTamanoId FROM servicio_tamanos WHERE ServicioId = ? AND NombreTamano = ?",
+            [detalle.ServicioId, detalle.Tamaño]
+          );
+          if (tamanoRows.length > 0) {
+            servicioTamanoId = tamanoRows[0].ServicioTamanoId;
+          }
+        }
+      }
+      
+      const subtotal = detalle.Cantidad * detalle.Precio;
+      
+      await connection.execute(
+        `INSERT INTO detalleventas (
+          DetalleVentaId, VentaId, TipoItem, ProductoId, ServicioId,
+          ServicioTamanoId, NombreSnapshot, Cantidad, PrecioUnitario,
+          Descuento, Subtotal, ColorId, DescripcionPersonalizada, UrlImagenPersonalizada
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          DetalleVentaId,
+          VentaId,
+          tipoItem,
+          productoId,
+          servicioId,
+          servicioTamanoId,
+          nombreSnapshot,
+          detalle.Cantidad,
+          detalle.Precio,
+          detalle.Descuento || 0,
+          subtotal,
+          detalle.ColorId || null,
+          descripcionPersonalizada,
+          urlImagenPersonalizada
+        ]
+      );
+      
+      detallesCreados.push(DetalleVentaId);
+    }
+    
+    return detallesCreados;
+    
+  } catch (error) {
+    console.error("Error en createDetallesVentaFromPedidoModel:", error);
+    throw error;
+  }
+};
 
-  await connection.execute(
-    `INSERT INTO detalleventas 
-     (DetalleVentaId, VentaId, ProductoServicioId, Nombre, Cantidad, PrecioUnitario, Descuento, Subtotal)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      DetalleVentaId,              
+// Crear detalle de venta manual
+export const createDetalleVentaManualModel = async (detalleData) => {
+  const connection = await connectDB();
+  
+  try {
+    const DetalleVentaId = uuidv4();
+    const {
       VentaId,
-      ProductoServicioId,
-      Nombre,                     
+      TipoItem,
+      ProductoId,
+      ServicioId,
+      ServicioTamanoId,
+      NombreSnapshot,
       Cantidad,
       PrecioUnitario,
-      Descuento,
-      Subtotal
-    ]
-  );
-
-  return {
-    DetalleVentaId,
-    VentaId,
-    ProductoServicioId,
-    Nombre,
-    Cantidad,
-    PrecioUnitario,
-    Descuento,
-    Subtotal,
-  };
+      Descuento = 0,
+      Subtotal,
+      ColorId,
+      DescripcionPersonalizada,
+      UrlImagenPersonalizada
+    } = detalleData;
+    
+    await connection.execute(
+      `INSERT INTO detalleventas (
+        DetalleVentaId, VentaId, TipoItem, ProductoId, ServicioId,
+        ServicioTamanoId, NombreSnapshot, Cantidad, PrecioUnitario,
+        Descuento, Subtotal, ColorId, DescripcionPersonalizada, UrlImagenPersonalizada
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        DetalleVentaId,
+        VentaId,
+        TipoItem,
+        ProductoId || null,
+        ServicioId || null,
+        ServicioTamanoId || null,
+        NombreSnapshot,
+        Cantidad,
+        PrecioUnitario,
+        Descuento,
+        Subtotal,
+        ColorId || null,
+        DescripcionPersonalizada || null,
+        UrlImagenPersonalizada || null
+      ]
+    );
+    
+    return DetalleVentaId;
+    
+  } catch (error) {
+    console.error("Error en createDetalleVentaManualModel:", error);
+    throw error;
+  } finally {
+    connection.release?.();
+  }
 };
 
-// Actualizar detalle de venta
-export const updateDetalleVentaModel = async (detalleVentaId, data) => {
-  const connection = await connectDB();
-  const { Cantidad, PrecioUnitario, Descuento, Subtotal, Nombre } = data; // ✅ Añade Nombre si quieres actualizarlo
-
-  const fields = [];
-  const values = [];
-
-  if (Cantidad !== undefined) {
-    fields.push("Cantidad = ?");
-    values.push(sanitize(Cantidad));
+// Eliminar detalles de venta (solo usado al anular)
+export const deleteDetallesByVentaIdModel = async (connection, ventaId) => {
+  try {
+    const [result] = await connection.execute(
+      "DELETE FROM detalleventas WHERE VentaId = ?",
+      [ventaId]
+    );
+    return result;
+  } catch (error) {
+    console.error("Error en deleteDetallesByVentaIdModel:", error);
+    throw error;
   }
-  if (PrecioUnitario !== undefined) {
-    fields.push("PrecioUnitario = ?");
-    values.push(sanitize(PrecioUnitario));
-  }
-  if (Descuento !== undefined) {
-    fields.push("Descuento = ?");
-    values.push(sanitize(Descuento));
-  }
-  if (Subtotal !== undefined) {
-    fields.push("Subtotal = ?");
-    values.push(sanitize(Subtotal));
-  }
-  if (Nombre !== undefined) {
-    fields.push("Nombre = ?");
-    values.push(sanitize(Nombre));
-  }
-
-  if (fields.length === 0) {
-    throw new Error("No hay campos para actualizar");
-  }
-
-  values.push(detalleVentaId);
-
-  const [result] = await connection.execute(
-    `UPDATE detalleventas
-     SET ${fields.join(", ")}
-     WHERE DetalleVentaId = ?`,
-    values
-  );
-
-  return result;
-};
-
-// Eliminar detalle de venta
-export const deleteDetalleVentaModel = async (detalleVentaId) => {
-  const connection = await connectDB();
-  const [result] = await connection.execute(
-    "DELETE FROM detalleventas WHERE DetalleVentaId = ?",
-    [detalleVentaId]
-  );
-  return result;
 };

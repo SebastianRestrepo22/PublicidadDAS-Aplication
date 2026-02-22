@@ -70,10 +70,14 @@ export const Usuarios = () => {
       try {
         const response = await GetDataRoles();
         //Que solo aparezca los roles activos
-        if (response?.data) {
-          const activos = response.data.filter((rol) => rol.Estado === "Activo");
-          setRoles(activos);
-        }
+        const activos = response.data.filter(
+  (rol) =>
+    rol.Estado === "Activo" &&
+    rol.Nombre?.trim().toLowerCase() !== "cliente"
+);
+
+setRoles(activos);
+
       } catch (error) {
         console.error("Error al cargar roles:", error);
       }
@@ -170,12 +174,12 @@ export const Usuarios = () => {
   // Manejo de cambios en inputs con validación de solo números
   const handleChanges = (e) => {
     const { name, value } = e.target;
-    
+
     // Validación para campos numéricos (Cédula y Teléfono)
     if (name === "CedulaId" || name === "Telefono") {
       // Solo permitir números
       const numericValue = value.replace(/[^0-9]/g, '');
-      
+
       // Validar longitud máxima según el campo
       let maxLength = 0;
       if (name === "CedulaId") {
@@ -183,12 +187,12 @@ export const Usuarios = () => {
       } else if (name === "Telefono") {
         maxLength = 10; // Teléfono colombiano: 10 dígitos
       }
-      
+
       // Limitar longitud
       const limitedValue = numericValue.slice(0, maxLength);
-      
+
       setValues({ ...values, [name]: limitedValue });
-      
+
       // Validación de formato en tiempo real
       if (name === "CedulaId") {
         validateCedulaFormat(limitedValue);
@@ -206,20 +210,20 @@ export const Usuarios = () => {
       setCedulaFormatoError("");
       return;
     }
-    
+
     // Validar que sea numérico (ya se hace en handleChanges)
     // Validar longitud: en Colombia las cédulas tienen entre 6 y 10 dígitos
     if (cedula.length < 6 || cedula.length > 10) {
       setCedulaFormatoError("La cédula debe tener entre 6 y 10 dígitos");
       return;
     }
-    
+
     // Validar que no empiece con 0 (opcional, depende de tus reglas)
     if (cedula.startsWith('0')) {
       setCedulaFormatoError("La cédula no puede comenzar con 0");
       return;
     }
-    
+
     // Si pasa todas las validaciones
     setCedulaFormatoError("");
   };
@@ -230,25 +234,25 @@ export const Usuarios = () => {
       setTelefonoFormatoError("");
       return;
     }
-    
+
     // Validar longitud exacta: 10 dígitos para Colombia
     if (telefono.length !== 10) {
       setTelefonoFormatoError("El teléfono debe tener 10 dígitos");
       return;
     }
-    
+
     // Validar que empiece con 3 (celulares en Colombia empiezan con 3)
     // O con 60, 4, etc. dependiendo del tipo
     const codigosAreaValidos = ['3', '60', '4', '5', '6', '7', '8'];
-    const codigoValido = codigosAreaValidos.some(codigo => 
+    const codigoValido = codigosAreaValidos.some(codigo =>
       telefono.startsWith(codigo)
     );
-    
+
     if (!codigoValido) {
       setTelefonoFormatoError("El teléfono debe comenzar con un código válido (3, 60, 4, 5, 6, 7, 8)");
       return;
     }
-    
+
     // Si pasa todas las validaciones
     setTelefonoFormatoError("");
   };
@@ -260,14 +264,14 @@ export const Usuarios = () => {
 
   const handleCorreoBlur = async () => {
     if (values.CorreoElectronico === originalCorreo) return;
-    
+
     // Validación básica de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (values.CorreoElectronico && !emailRegex.test(values.CorreoElectronico)) {
       setCorreoError('Ingrese un correo electrónico válido');
       return;
     }
-    
+
     try {
       const response = await axios.get(`http://localhost:3000/user/validar-correo?correo=${values.CorreoElectronico}`);
       setCorreoError(response.data.exists ? 'Este correo ya está registrado' : '');
@@ -278,11 +282,11 @@ export const Usuarios = () => {
 
   const handleCedulaBlur = async () => {
     if (values.CedulaId === originalCedula) return;
-    
+
     // Primero validar formato
     validateCedulaFormat(values.CedulaId);
     if (cedulaFormatoError) return;
-    
+
     try {
       const response = await axios.get(`http://localhost:3000/user/validar-cedula?cedula=${values.CedulaId}`);
       setCedulaError(response.data.exists ? 'Esta cédula ya está registrada' : '');
@@ -293,11 +297,11 @@ export const Usuarios = () => {
 
   const handleTelefonoBlur = async () => {
     if (values.Telefono === originalTelefono) return;
-    
+
     // Primero validar formato
     validateTelefonoFormat(values.Telefono);
     if (telefonoFormatoError) return;
-    
+
     try {
       const response = await axios.get(`http://localhost:3000/user/validar-telefono?telefono=${values.Telefono}`);
       setTelefonoError(response.data.exists ? 'Este teléfono ya está registrado' : '');
@@ -664,14 +668,14 @@ export const Usuarios = () => {
         {/* Botones */}
         <div className="col-span-1 md:col-span-2 flex gap-4 mt-3">
           {type !== "ver" && (
-            <button 
+            <button
               type="submit"
               className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
             >
               {buttonLabel}
             </button>
           )}
-          
+
           <button
             type="button"
             className={`flex-1 ${type === "ver" ? "w-full" : ""} bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors`}

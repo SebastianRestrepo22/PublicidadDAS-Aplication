@@ -1,16 +1,22 @@
 import {
   getDetalleVentaByVentaIdModel,
-  createDetalleVentaModel,
-  updateDetalleVentaModel,
-  deleteDetalleVentaModel
+  createDetalleVentaManualModel
 } from "../models/detalleVentas.models.js";
+import { getVentaByIdModel } from "../models/venta.models.js";
 
 /**
- * Obtener detalles de una venta específica
+ * Obtener detalles de una venta
  */
 export const getDetallesByVenta = async (req, res) => {
   try {
-    const detalles = await getDetalleVentaByVentaIdModel(req.params.id);
+    const { ventaId } = req.params;
+    
+    const venta = await getVentaByIdModel(ventaId);
+    if (!venta) {
+      return res.status(404).json({ error: "Venta no encontrada" });
+    }
+    
+    const detalles = await getDetalleVentaByVentaIdModel(ventaId);
     res.status(200).json(detalles);
   } catch (error) {
     console.error("Error al obtener detalles:", error);
@@ -19,66 +25,34 @@ export const getDetallesByVenta = async (req, res) => {
 };
 
 /**
- * Crear detalle de venta independiente
+ * Crear detalle para venta existente (solo si la venta no está anulada)
  */
 export const createDetalle = async (req, res) => {
   try {
-    const { VentaId, ProductoServicioId, Cantidad, PrecioUnitario, Descuento, Subtotal } = req.body;
-
-    if (!VentaId) {
-      return res.status(400).json({ error: "VentaId es obligatorio" });
+    const { ventaId } = req.params;
+    const detalleData = req.body;
+    
+    const venta = await getVentaByIdModel(ventaId);
+    if (!venta) {
+      return res.status(404).json({ error: "Venta no encontrada" });
     }
-
-    const nuevoDetalle = await createDetalleVentaModel({
-      VentaId,
-      ProductoServicioId: ProductoServicioId?.toString().trim(),
-      Cantidad,
-      PrecioUnitario,
-      Descuento: Descuento || 0,
-      Subtotal
+    
+    if (venta.Estado === 'anulado') {
+      return res.status(400).json({ error: "No se pueden agregar detalles a una venta anulada" });
+    }
+    
+    detalleData.VentaId = ventaId;
+    const detalleId = await createDetalleVentaManualModel(detalleData);
+    
+    const detalles = await getDetalleVentaByVentaIdModel(ventaId);
+    
+    res.status(201).json({
+      success: true,
+      message: "Detalle creado exitosamente",
+      detalles
     });
-
-    res.status(201).json(nuevoDetalle);
   } catch (error) {
     console.error("Error al crear detalle:", error);
     res.status(500).json({ error: "Error al crear detalle" });
-  }
-};
-
-/**
- * Actualizar detalle de venta
- */
-export const updateDetalle = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { Cantidad, PrecioUnitario, Descuento, Subtotal } = req.body;
-
-    await updateDetalleVentaModel(id, { Cantidad, PrecioUnitario, Descuento, Subtotal });
-
-    // Devolver todos los detalles de la venta a la que pertenece
-    // Esto permite que el frontend tenga siempre el listado actualizado
-    const detalleActualizado = await getDetalleVentaByVentaIdModel(req.body.VentaId);
-    res.status(200).json(detalleActualizado);
-  } catch (error) {
-    console.error("Error al actualizar detalle:", error);
-    res.status(500).json({ error: "Error al actualizar detalle" });
-  }
-};
-
-/**
- * Eliminar detalle de venta
- */
-export const deleteDetalle = async (req, res) => {
-  try {
-    const result = await deleteDetalleVentaModel(req.params.id);
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: "Detalle no encontrado" });
-    }
-
-    res.status(204).send();
-  } catch (error) {
-    console.error("Error al eliminar detalle:", error);
-    res.status(500).json({ error: "Error al eliminar detalle" });
   }
 };

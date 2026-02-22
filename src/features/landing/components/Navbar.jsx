@@ -34,7 +34,7 @@ export const Navbar = () => {
                 animate={isHomePage ? { opacity: 1, y: 0 } : false}
                 transition={isHomePage ? { duration: 0.6 } : undefined}
                 className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${shouldUseScrolledStyle
-                        ? 'bg-[#e8e8e8] border-b border-gray-300' // ✅ Fondo gris más claro
+                        ? 'bg-[#e8e8e8] border-b border-gray-300' // Fondo gris más claro
                         : 'bg-white/5 backdrop-blur-md border-b border-white/30'
                     }`}
             >
@@ -76,7 +76,7 @@ export const Navbar = () => {
                                         ? 'text-gray-500'
                                         : 'text-white/70'
                                     }`}>
-                                    Papelería Premium
+                                    Papelería
                                 </p>
                             </div>
                         </motion.div>

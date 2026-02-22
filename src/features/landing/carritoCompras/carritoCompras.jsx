@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer";
 import { useCart } from "../../../context/CartContext";
@@ -32,53 +32,63 @@ export const CarritoCompras = () => {
   const [editingStock, setEditingStock] = useState(null);
   const [editingColorItem, setEditingColorItem] = useState(null);
   const [newQuantity, setNewQuantity] = useState(1);
-  const [productColors, setProductColors] = useState({}); // {productoId: [colores]}
+  const [productColors, setProductColors] = useState({});
   const [loadingColors, setLoadingColors] = useState({});
+  const [colorsLoaded, setColorsLoaded] = useState(false);
 
-  useEffect(() => {
-    // Cargar colores para todos los productos en el carrito que tengan ProductoId
-    const loadColorsForProducts = async () => {
-      const productIds = cart
-        .filter(item => item.ProductoId && !productColors[item.ProductoId])
-        .map(item => item.ProductoId);
+  // Función para cargar colores - MEMOIZADA
+  const loadColorsForProducts = useCallback(async () => {
+    const productIds = cart
+      .filter(item => item.ProductoId && !productColors[item.ProductoId])
+      .map(item => item.ProductoId);
 
-      for (const productId of productIds) {
-        if (!loadingColors[productId]) {
-          setLoadingColors(prev => ({ ...prev, [productId]: true }));
-          try {
-            const colors = await getColoresProducto(productId);
-            setProductColors(prev => ({
-              ...prev,
-              [productId]: colors
-            }));
-          } catch (error) {
-            console.error(`Error cargando colores para producto ${productId}:`, error);
-            setProductColors(prev => ({
-              ...prev,
-              [productId]: []
-            }));
-          } finally {
-            setLoadingColors(prev => ({ ...prev, [productId]: false }));
-          }
+    if (productIds.length === 0) {
+      setColorsLoaded(true);
+      return;
+    }
+
+    const newLoading = { ...loadingColors };
+    const newColors = { ...productColors };
+
+    for (const productId of productIds) {
+      if (!newLoading[productId]) {
+        newLoading[productId] = true;
+        try {
+          const colors = await getColoresProducto(productId);
+          newColors[productId] = colors || [];
+        } catch (error) {
+          console.error(`Error cargando colores para producto ${productId}:`, error);
+          newColors[productId] = [];
+        } finally {
+          newLoading[productId] = false;
         }
       }
-    };
-
-    if (cart.length > 0) {
-      loadColorsForProducts();
     }
+
+    setLoadingColors(newLoading);
+    setProductColors(newColors);
+    setColorsLoaded(true);
   }, [cart, productColors, loadingColors]);
 
+  // Efecto para cargar colores - SOLO cuando cambia el carrito
   useEffect(() => {
-    console.log("🛒 [CARRITO] Estado actual del carrito:", cart);
-    cart.forEach(item => {
-      console.log(`  - ${item.Nombre}:`, {
-        customization: item.customization,
-        color: item.customization?.color,
-        colorId: item.customization?.color?.ColorId
+    setColorsLoaded(false);
+    loadColorsForProducts();
+  }, [cart, loadColorsForProducts]);
+
+  // Efecto para debug - SOLO cuando cambia el carrito
+  useEffect(() => {
+    if (colorsLoaded) {
+      console.log("🛒 [CARRITO] Estado actual del carrito:", cart);
+      cart.forEach(item => {
+        console.log(`  - ${item.Nombre}:`, {
+          customization: item.customization,
+          color: item.customization?.color,
+          colorId: item.customization?.color?.ColorId
+        });
       });
-    });
-  }, [cart]);
+    }
+  }, [cart, colorsLoaded]);
 
   const verificarDatosCarrito = () => {
     console.log("=== VERIFICACIÓN DE DATOS DEL CARRITO ===");
@@ -161,25 +171,25 @@ export const CarritoCompras = () => {
 
     console.log("🎨 [CARRITO] Guardando ColorId UUID:", color.ColorId);
 
-    // CORREGIDO: Guardar SOLO el UUID, no el objeto completo
-    updateItemColor(editingColorItem.id, color.ColorId);
+    if (color.Stock === 0) {
+      toast.error(`El color ${color.Nombre} no tiene stock disponible`);
+      return;
+    }
 
+    updateItemColor(editingColorItem.id, color);
     setEditingColorItem(null);
     toast.success(`Color cambiado a ${color.Nombre}`);
   };
 
-  // Obtiene el NOMBRE del color
   const getColorDisplay = (item) => {
     if (!item?.customization?.color) return null;
 
-    // Si color es un string UUID o nombre
     if (typeof item.customization.color === 'string') {
       const colors = productColors[item.ProductoId] || [];
       const colorObj = colors.find(c => c.ColorId === item.customization.color);
       return colorObj?.Nombre || item.customization.color;
     }
 
-    // Si color es un objeto
     return item.customization.color?.Nombre || null;
   };
 
@@ -206,9 +216,24 @@ export const CarritoCompras = () => {
 
   const total = getTotal();
 
-  // Filtrar productos y servicios para mostrar por separado
+  // Filtrar productos y servicios
   const productos = cart.filter(item => item.ProductoId || (!item.ServicioId && !item.EsPersonalizado));
   const servicios = cart.filter(item => item.ServicioId || item.EsPersonalizado);
+
+  // Si no ha terminado de cargar, mostrar loader
+  if (!colorsLoaded && cart.length > 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <Navbar />
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-slate-600 text-lg">Cargando carrito...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -233,8 +258,8 @@ export const CarritoCompras = () => {
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                   {productos.map((item) => {
                     const colors = productColors[item.ProductoId] || [];
-                    const currentColorName = getColorDisplay(item, productColors);
-                    const currentColorObj = colors.find(col => col.ColorId === item.customization?.color);
+                    const currentColorName = getColorDisplay(item);
+                    const currentColorObj = colors.find(col => col.ColorId === item.customization?.color?.ColorId);
 
                     return (
                       <div key={item.id} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors">
@@ -245,6 +270,10 @@ export const CarritoCompras = () => {
                               src={item.UrlImagen || item.Imagen || "https://via.placeholder.com/200"}
                               alt={item.Nombre}
                               className="w-24 h-24 object-cover rounded-lg"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = "https://via.placeholder.com/200";
+                              }}
                             />
                             <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
                               Producto
@@ -315,7 +344,7 @@ export const CarritoCompras = () => {
                                       type="number"
                                       min="1"
                                       max={item.Stock || item.stock || 999}
-                                      value={editingQuantities[item.id] ?? item.quantity} // toma valor temporal o real
+                                      value={editingQuantities[item.id] ?? item.quantity}
                                       onChange={(e) => {
                                         const value = e.target.value;
                                         if (/^\d*$/.test(value)) {
@@ -334,13 +363,13 @@ export const CarritoCompras = () => {
 
                                         if (!qty || qty < 1 || (item.Stock || item.stock) < qty) {
                                           toast.error(`Cantidad inválida (máx ${item.Stock || item.stock})`);
-                                          setEditingQuantities(prev => ({ ...prev, [item.id]: item.quantity })); // restaurar
+                                          setEditingQuantities(prev => ({ ...prev, [item.id]: item.quantity }));
                                           return;
                                         }
 
                                         updateQuantity(item.id, qty);
-                                        setEditingStock(null); // cerrar input
-                                        setEditingQuantities(prev => ({ ...prev, [item.id]: undefined })); // limpiar temporal
+                                        setEditingStock(null);
+                                        setEditingQuantities(prev => ({ ...prev, [item.id]: undefined }));
                                         toast.success("Cantidad actualizada");
                                       }}
                                       className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
@@ -350,8 +379,8 @@ export const CarritoCompras = () => {
 
                                     <button
                                       onClick={() => {
-                                        setEditingStock(null); // cerrar input sin guardar
-                                        setEditingQuantities(prev => ({ ...prev, [item.id]: undefined })); // limpiar temporal
+                                        setEditingStock(null);
+                                        setEditingQuantities(prev => ({ ...prev, [item.id]: undefined }));
                                       }}
                                       className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
                                     >
@@ -419,85 +448,92 @@ export const CarritoCompras = () => {
                   🎨 Servicios ({servicios.length})
                 </h2>
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                  {servicios.map((item) => (
-                    <div key={item.id} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors">
-                      <div className="flex gap-4">
-                        {/* Imagen */}
-                        <div className="relative">
-                          <img
-                            src={item.UrlImagen || item.Imagen || "https://via.placeholder.com/200"}
-                            alt={item.Nombre}
-                            className="w-24 h-24 object-cover rounded-lg"
-                          />
-                          <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs px-2 py-1 rounded-full">
-                            {item.EsPersonalizado ? "Personalizado" : "Servicio"}
-                          </span>
-                        </div>
+                  {servicios.map((item) => {
+                    // Determinar la imagen a mostrar
+                    const imagenSrc = 
+                      item.customization?.UrlImagen || 
+                      item.UrlImagen || 
+                      item.Imagen || 
+                      "https://via.placeholder.com/200";
 
-                        {/* Información */}
-                        <div className="flex-1">
-                          <h3 className="font-bold text-slate-800">{item.Nombre}</h3>
-                          <p className="text-sm text-slate-600 line-clamp-2">{item.Descripcion}</p>
+                    return (
+                      <div key={item.id} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors">
+                        <div className="flex gap-4">
+                          {/* Imagen - CORREGIDA */}
+                          <div className="relative">
+                            <img
+                              src={imagenSrc}
+                              alt={item.Nombre}
+                              className="w-24 h-24 object-cover rounded-lg"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = "https://via.placeholder.com/200";
+                              }}
+                            />
+                            <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs px-2 py-1 rounded-full">
+                              {item.EsPersonalizado ? "Personalizado" : "Servicio"}
+                            </span>
+                          </div>
 
-                          {/* Detalles de personalización */}
-                          {item.customization && (
-                            <div className="mt-3 space-y-1">
-                              <h4 className="text-sm font-semibold text-slate-700">Detalles de personalización:</h4>
-                              <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded border border-slate-200">
-                                {item.customization.Nombre && (
-                                  <p className="mb-1"><span className="font-medium">Proyecto:</span> {item.customization.Nombre}</p>
-                                )}
-                                {item.customization.Tamaño && (
-                                  <p className="mb-1"><span className="font-medium">Tamaño:</span> {item.customization.Tamaño}</p>
-                                )}
-                                {item.customization.ColorPreferido && (
-                                  <p className="mb-1"><span className="font-medium">Color:</span> {item.customization.ColorPreferido}</p>
-                                )}
-                                {item.customization.Cantidad && (
-                                  <p className="mb-1"><span className="font-medium">Cantidad:</span> {item.customization.Cantidad}</p>
-                                )}
-                                {item.customization.FechaEntrega && (
-                                  <p className="mb-1"><span className="font-medium">Entrega:</span> {item.customization.FechaEntrega}</p>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                          {/* Información */}
+                          <div className="flex-1">
+                            <h3 className="font-bold text-slate-800">{item.Nombre}</h3>
+                            <p className="text-sm text-slate-600 line-clamp-2">{item.Descripcion}</p>
 
-                        {/* Precio y acciones */}
-                        <div className="flex flex-col items-end justify-between">
-                          <div className="text-right">
-                            <div className="font-bold text-lg text-purple-600">
-                              {formatPrice(calculateItemTotal(item))}
-                            </div>
-                            <div className="text-sm text-slate-500">
-                              {formatPrice(item.Precio)} c/u
-                            </div>
-                            {item.Descuento > 0 && (
-                              <div className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded mt-1">
-                                -{item.Descuento}% de descuento
+                            {/* Detalles de personalización */}
+                            {item.customization && (
+                              <div className="mt-3 space-y-1">
+                                <h4 className="text-sm font-semibold text-slate-700">Detalles de personalización:</h4>
+                                <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded border border-slate-200">
+                                  {item.customization.Descripcion && (
+                                    <p className="mb-1"><span className="font-medium">Descripción:</span> {item.customization.Descripcion}</p>
+                                  )}
+                                  {item.customization.Tamaño && (
+                                    <p className="mb-1"><span className="font-medium">Tamaño:</span> {item.customization.Tamaño}</p>
+                                  )}
+                                  {item.customization.archivosAdjuntos && item.customization.archivosAdjuntos.length > 0 && (
+                                    <p className="mb-1"><span className="font-medium">Archivos:</span> {item.customization.archivosAdjuntos.length}</p>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>
 
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => navigate("/editarcarritoservicio", { state: { item } })}
-                              className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium transition"
-                            >
-                              <Edit2 className="h-4 w-4" /> Editar
-                            </button>
-                            <button
-                              onClick={() => setConfirmDelete(item.id)}
-                              className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm font-medium transition"
-                            >
-                              <Trash2 className="h-4 w-4" /> Eliminar
-                            </button>
+                          {/* Precio y acciones */}
+                          <div className="flex flex-col items-end justify-between">
+                            <div className="text-right">
+                              <div className="font-bold text-lg text-purple-600">
+                                {formatPrice(calculateItemTotal(item))}
+                              </div>
+                              <div className="text-sm text-slate-500">
+                                {formatPrice(item.Precio)} c/u
+                              </div>
+                              {item.Descuento > 0 && (
+                                <div className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded mt-1">
+                                  -{item.Descuento}% de descuento
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => navigate("/editarcarritoservicio", { state: { item } })}
+                                className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium transition"
+                              >
+                                <Edit2 className="h-4 w-4" /> Editar
+                              </button>
+                              <button
+                                onClick={() => setConfirmDelete(item.id)}
+                                className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm font-medium transition"
+                              >
+                                <Trash2 className="h-4 w-4" /> Eliminar
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -541,8 +577,8 @@ export const CarritoCompras = () => {
                   <div key={item.id} className="flex justify-between items-center text-sm">
                     <div className="truncate">
                       <span className="font-medium">{item.quantity}x</span> {item.Nombre}
-                      {getColorDisplay(item, productColors) && (
-                        <span className="text-slate-500 ml-1">({getColorDisplay(item, productColors)})</span>
+                      {getColorDisplay(item) && (
+                        <span className="text-slate-500 ml-1">({getColorDisplay(item)})</span>
                       )}
                     </div>
                     <span className="font-medium">
@@ -732,7 +768,7 @@ export const CarritoCompras = () => {
               <div className="flex items-center gap-2 mb-3">
                 <Palette className="h-5 w-5 text-slate-500" />
                 <span className="font-medium text-slate-700">
-                  Color actual: {getColorDisplay(editingColorItem, productColors) || "No seleccionado"}
+                  Color actual: {getColorDisplay(editingColorItem) || "No seleccionado"}
                 </span>
               </div>
 
@@ -750,24 +786,38 @@ export const CarritoCompras = () => {
               <>
                 {productColors[editingColorItem.ProductoId]?.length > 0 ? (
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-6 max-h-[300px] overflow-y-auto pr-2">
-                    {productColors[editingColorItem.ProductoId].map((color) => (
-                      <button
-                        key={color.ColorId}
-                        onClick={() => handleSelectColor(color)}
-                        className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all ${getColorDisplay(editingColorItem, productColors) === color.Nombre
-                          ? "border-blue-600 bg-blue-50"
-                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                          }`}
-                      >
-                        <div
-                          className="w-12 h-12 rounded-full border border-slate-300 mb-2"
-                          style={{ backgroundColor: color.Hex || '#ccc' }}
-                        />
-                        <span className="text-sm font-medium text-slate-700">
-                          {color.Nombre}
-                        </span>
-                      </button>
-                    ))}
+                    {productColors[editingColorItem.ProductoId].map((color) => {
+                      const currentColorObj = editingColorItem.customization?.color;
+                      const isCurrentColor = currentColorObj?.ColorId === color.ColorId;
+
+                      return (
+                        <button
+                          key={color.ColorId}
+                          onClick={() => handleSelectColor(color)}
+                          disabled={color.Stock === 0}
+                          className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all ${isCurrentColor
+                            ? "border-blue-600 bg-blue-50"
+                            : color.Stock === 0
+                              ? "border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed"
+                              : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                            }`}
+                        >
+                          <div
+                            className="w-12 h-12 rounded-full border border-slate-300 mb-2"
+                            style={{ backgroundColor: color.Hex || '#ccc' }}
+                          />
+                          <span className="text-sm font-medium text-slate-700">
+                            {color.Nombre}
+                          </span>
+                          <span className={`text-xs mt-1 ${color.Stock === 0
+                            ? "text-red-600"
+                            : "text-green-600"
+                            }`}>
+                            {color.Stock === 0 ? "Agotado" : `${color.Stock} uds`}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-6 text-slate-500">
@@ -786,7 +836,7 @@ export const CarritoCompras = () => {
                   toast.success("Color eliminado");
                 }}
                 className="flex-1 py-2 border-2 border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition"
-                disabled={!getColorDisplay(editingColorItem, productColors)}
+                disabled={!getColorDisplay(editingColorItem)}
               >
                 Eliminar color
               </button>

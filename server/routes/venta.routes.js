@@ -1,21 +1,36 @@
-// routes/ventas.routes.js
 import { Router } from "express";
 import {
   getVentas,
   getVentaById,
-  updateVenta,
-  deleteVenta,
-  createVentaDesdePedido
+  createVentaDesdePedido,
+  createVentaManual,
+  anularVenta,
+  getDetallesByVenta
 } from "../controllers/ventas.controller.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = Router();
 
-router.get("/", getVentas);
-router.get("/:id", authMiddleware, getVentaById);
-router.post('/desde-pedido', createVentaDesdePedido); 
-router.put("/:id", updateVenta);
-router.delete("/:id", deleteVenta);
+// Todas las rutas requieren autenticación
+router.use(authMiddleware);
 
-console.log("Rutas de ventas registradas");
+// Obtener todas las ventas
+router.get("/", getVentas);
+
+// Obtener venta por ID
+router.get("/:id", getVentaById);
+
+// Obtener detalles de una venta
+router.get("/:id/detalles", getDetallesByVenta);
+
+// Crear venta desde pedido
+router.post("/desde-pedido", createVentaDesdePedido);
+
+// Crear venta manual
+router.post("/manual", createVentaManual);
+
+// Anular venta (NO eliminar)
+router.put("/:id/anular", anularVenta);
+
+console.log("✅ Rutas de ventas registradas correctamente");
 export default router;

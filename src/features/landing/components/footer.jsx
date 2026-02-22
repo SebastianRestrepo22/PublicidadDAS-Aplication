@@ -71,7 +71,7 @@ export const Footer = () => {
                 {/* Copyright */}
                 <div className="border-t border-gray-700 text-center py-4">
                     <p className="text-sm text-gray-500">
-                        © {new Date().getFullYear()} Design and Style. Todos los derechos reservados.
+                        © {new Date().getFullYear()} PublicidadDAS. Todos los derechos reservados.
                     </p>
                 </div>
             </footer>

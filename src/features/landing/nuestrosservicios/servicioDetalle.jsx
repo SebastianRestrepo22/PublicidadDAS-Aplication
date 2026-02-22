@@ -6,10 +6,11 @@ import {
   X,
   ArrowLeft,
   Save,
-  Edit2,
+  Package,
+  Ruler,
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
-import { GetDataservicios } from "../../dashboard/servicios/services/services.servicios";
+import { GetDataservicios, getTamanosByServicio } from "../../dashboard/servicios/services/services.servicios";
 import { toast } from "react-toastify";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer";
@@ -22,10 +23,12 @@ export const ServicioDetalle = () => {
 
   const [servicio, setServicio] = useState(null);
   const [descripcion, setDescripcion] = useState("");
-  const [tamano, setTamano] = useState("Mediana");
+  const [tamano, setTamano] = useState("");
+  const [tamanosDisponibles, setTamanosDisponibles] = useState([]);
   const [archivosAdjuntos, setArchivosAdjuntos] = useState([]);
   const [imagenPreview, setImagenPreview] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [precioSeleccionado, setPrecioSeleccionado] = useState(0);
 
   useEffect(() => {
     const fetchServicio = async () => {
@@ -42,8 +45,26 @@ export const ServicioDetalle = () => {
         }
 
         setServicio(servicioEncontrado);
-        setTamano(servicioEncontrado.Tamano || "Mediana");
         setImagenPreview(servicioEncontrado.Imagen || servicioEncontrado.UrlImagen || "");
+
+        // Si es POR_TAMANO, cargar los tamaños disponibles
+        if (servicioEncontrado.TipoPrecio === 'POR_TAMANO') {
+          try {
+            const tamanos = await getTamanosByServicio(id);
+            if (tamanos && tamanos.length > 0) {
+              setTamanosDisponibles(tamanos);
+              // Seleccionar el primer tamaño por defecto
+              setTamano(tamanos[0].NombreTamano);
+              setPrecioSeleccionado(tamanos[0].Precio);
+            }
+          } catch (error) {
+            console.error("Error cargando tamaños:", error);
+            toast.error("Error al cargar los tamaños disponibles");
+          }
+        } else {
+          // Si es UNICO, usar el precio del servicio
+          setPrecioSeleccionado(servicioEncontrado.Precio);
+        }
       } catch (err) {
         console.error(err);
         toast.error("Error al cargar el servicio");
@@ -78,67 +99,54 @@ export const ServicioDetalle = () => {
     );
   };
 
+  const handleTamanoChange = (e) => {
+    const nombreTamano = e.target.value;
+    setTamano(nombreTamano);
+    
+    // Actualizar el precio según el tamaño seleccionado
+    const tamanoSeleccionado = tamanosDisponibles.find(t => t.NombreTamano === nombreTamano);
+    if (tamanoSeleccionado) {
+      setPrecioSeleccionado(tamanoSeleccionado.Precio);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (isSubmitting) return;
 
+    // Validar que se haya seleccionado un tamaño si es POR_TAMANO
+    if (servicio.TipoPrecio === 'POR_TAMANO' && !tamano) {
+      toast.error("Debes seleccionar un tamaño");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // Calcular precio con descuento
-      const precioConDescuento = servicio.Descuento > 0
-        ? servicio.Precio * (1 - servicio.Descuento / 100)
-        : servicio.Precio;
-
-      // Preparar objeto de servicio para agregar al carrito
-      // Usando EXACTAMENTE los campos que se guardan en DetallePedidosClientes
-      const servicioParaCarrito = {
-        ServicioId: servicio.ServicioId,
-        ProductoId: null, // Para servicios, ProductoId es null
-        Nombre: servicio.Nombre,
-        Descripcion: descripcion || "Servicio personalizado", // Descripción del usuario
-        Precio: precioConDescuento,
-        Descuento: servicio.Descuento || 0,
-        Imagen: imagenPreview || servicio.Imagen || servicio.UrlImagen || "",
-        Tamaño: tamano, // Tamaño seleccionado por el usuario
-        // Campos que se guardan en DetallePedidosClientes
-        customization: {
-          Descripcion: descripcion, // Se guarda en campo Descripcion
-          Tamaño: tamano, // Se guarda en campo Tamaño
-          UrlImagen: imagenPreview, // Se guarda en campo UrlImagen
-          archivosAdjuntos: archivosAdjuntos.map(f => ({
-            nombre: f.nombre,
-            tipo: f.tipo,
-            tamaño: f.tamaño
-          })),
-          // Información del servicio base
-          ServicioBase: {
-            Nombre: servicio.Nombre,
-            PrecioOriginal: servicio.Precio,
-            Descuento: servicio.Descuento
-          }
-        },
-        // Estos campos son para el frontend
-        EsPersonalizado: true,
-        CategoriaId: servicio.CategoriaId
+      // 🔥 Crear objeto de personalización para el carrito
+      const customizacion = {
+        Descripcion: descripcion,
+        Tamaño: tamano,
+        UrlImagen: imagenPreview,
+        archivosAdjuntos: archivosAdjuntos.map(f => ({
+          nombre: f.nombre,
+          tipo: f.tipo,
+          tamaño: f.tamaño
+        }))
       };
 
-      // AGREGAR AL CARRITO
-      // Pasar solo los campos que realmente se guardarán
-      addToCart(servicioParaCarrito, {
-        // SOLO los campos que van a DetallePedidosClientes
-        Descripcion: descripcion, // → campo Descripcion en DB
-        Tamaño: tamano, // → campo Tamaño en DB
-        UrlImagen: imagenPreview, // → campo UrlImagen en DB
-        // Estos van como metadata adicional
-        archivosAdjuntos: archivosAdjuntos.length,
-        tipo: "servicio"
-      }, 1);
+      // Si es por tamaño, incluir el precio seleccionado
+      if (servicio.TipoPrecio === 'POR_TAMANO' && tamano) {
+        customizacion.precioSeleccionado = precioSeleccionado;
+        customizacion.tamanoSeleccionado = tamano;
+      }
+
+      // 🔥 Agregar al carrito
+      addToCart(servicio, customizacion, 1);
 
       toast.success(`"${servicio.Nombre}" agregado al carrito`);
 
-      // Redirigir al carrito de compras
       setTimeout(() => {
         navigate("/carritodecompras");
       }, 1000);
@@ -151,16 +159,12 @@ export const ServicioDetalle = () => {
     }
   };
 
-  const precioConDescuento =
-    servicio?.Descuento > 0
-      ? servicio.Precio * (1 - servicio.Descuento / 100)
-      : servicio?.Precio || 0;
-
   const formatPrice = (precio) => {
     return new Intl.NumberFormat("es-CO", {
       style: "currency",
       currency: "COP",
       minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(precio);
   };
 
@@ -178,6 +182,10 @@ export const ServicioDetalle = () => {
     );
   }
 
+  const precioConDescuento = servicio.Descuento > 0
+    ? precioSeleccionado * (1 - servicio.Descuento / 100)
+    : precioSeleccionado;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <Navbar />
@@ -192,12 +200,13 @@ export const ServicioDetalle = () => {
         </button>
 
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-white">
-              Personaliza tu Servicio: {servicio.Nombre}
+          {/* Encabezado */}
+          <div className="border-b border-gray-200 p-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+              {servicio.Nombre}
             </h1>
-            <p className="text-blue-100 mt-2">
-              Describe lo que necesitas y sube imágenes de referencia
+            <p className="text-gray-600 mt-2">
+              Personaliza tu servicio según tus necesidades
             </p>
           </div>
 
@@ -213,7 +222,7 @@ export const ServicioDetalle = () => {
                 <textarea
                   value={descripcion}
                   onChange={(e) => setDescripcion(e.target.value)}
-                  placeholder="Describe en detalle lo que necesitas. Ej: Necesito un diseño moderno para un restaurante de comida italiana, con colores rojo y blanco..."
+                  placeholder="Describe en detalle lo que necesitas..."
                   rows="5"
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
@@ -221,20 +230,35 @@ export const ServicioDetalle = () => {
                 />
               </div>
 
+              {/* Selector de Tamaño */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Tamaño
+                  Tamaño {servicio.TipoPrecio === 'POR_TAMANO' && '*'}
                 </label>
-                <select
-                  value={tamano}
-                  onChange={(e) => setTamano(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={isSubmitting}
-                >
-                  <option value="Pequeña">Pequeña (hasta A5)</option>
-                  <option value="Mediana">Mediana (A4)</option>
-                  <option value="Grande">Grande (A3 o mayor)</option>
-                </select>
+                
+                {servicio.TipoPrecio === 'POR_TAMANO' ? (
+                  <div className="space-y-3">
+                    <select
+                      value={tamano}
+                      onChange={handleTamanoChange}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={isSubmitting}
+                      required
+                    >
+                      <option value="">Selecciona un tamaño</option>
+                      {tamanosDisponibles.map((t) => (
+                        <option key={t.TamanoId || t.NombreTamano} value={t.NombreTamano}>
+                          {t.NombreTamano} - {formatPrice(t.Precio)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <Package className="w-5 h-5 text-gray-500" />
+                    <span className="text-gray-700">Tamaño único</span>
+                  </div>
+                )}
               </div>
 
               {/* Adjuntar archivos */}
@@ -242,16 +266,10 @@ export const ServicioDetalle = () => {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Adjuntar Archivos de Referencia
                 </label>
-                <p className="text-sm text-slate-500 mb-3">
-                  Sube imágenes, logos, documentos o cualquier archivo que sirva como referencia para tu proyecto.
-                </p>
                 <label className="flex flex-col items-center justify-center w-full px-4 py-8 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors">
                   <Upload className="w-10 h-10 text-slate-400 mb-3" />
                   <span className="text-sm text-slate-600 mb-1">
                     Arrastra archivos aquí o haz clic para seleccionar
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    Imágenes, PDF, Word, PowerPoint (Max 10MB por archivo)
                   </span>
                   <input
                     type="file"
@@ -266,9 +284,6 @@ export const ServicioDetalle = () => {
 
               {archivosAdjuntos.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-slate-700">
-                    Archivos adjuntos ({archivosAdjuntos.length}):
-                  </h3>
                   {archivosAdjuntos.map((archivo) => (
                     <div
                       key={archivo.id}
@@ -282,16 +297,12 @@ export const ServicioDetalle = () => {
                         )}
                         <div>
                           <p className="text-sm font-medium text-slate-800">{archivo.nombre}</p>
-                          <p className="text-xs text-slate-500">
-                            {(archivo.tamaño / 1024).toFixed(2)} KB
-                          </p>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => eliminarArchivo(archivo.id)}
                         className="text-red-500 hover:text-red-700 p-1"
-                        disabled={isSubmitting}
                       >
                         <X className="w-5 h-5" />
                       </button>
@@ -310,7 +321,6 @@ export const ServicioDetalle = () => {
                   <div>
                     <h4 className="font-semibold text-slate-700 mb-2">Servicio Base</h4>
                     <p className="text-slate-800 font-medium">{servicio.Nombre}</p>
-                    <p className="text-sm text-slate-600 mt-1">{servicio.Descripcion}</p>
                   </div>
 
                   <div className="border-t border-blue-200 pt-4">
@@ -318,7 +328,12 @@ export const ServicioDetalle = () => {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-slate-600">Precio base:</span>
-                        <span className="font-medium">{formatPrice(servicio.Precio)}</span>
+                        <span className="font-medium">
+                          {servicio.TipoPrecio === 'POR_TAMANO' && tamano 
+                            ? `${tamano}: ${formatPrice(precioSeleccionado)}`
+                            : formatPrice(precioSeleccionado)
+                          }
+                        </span>
                       </div>
 
                       {servicio.Descuento > 0 && (
@@ -326,67 +341,45 @@ export const ServicioDetalle = () => {
                           <div className="flex justify-between">
                             <span className="text-slate-600">Descuento ({servicio.Descuento}%):</span>
                             <span className="text-green-600 font-medium">
-                              -{formatPrice(servicio.Precio * (servicio.Descuento / 100))}
+                              -{formatPrice(precioSeleccionado * (servicio.Descuento / 100))}
                             </span>
                           </div>
                           <div className="flex justify-between text-lg font-bold pt-2 border-t border-blue-200">
                             <span className="text-slate-800">Precio final:</span>
                             <span className="text-blue-600">{formatPrice(precioConDescuento)}</span>
                           </div>
-                          <p className="text-sm text-green-600 bg-green-50 p-2 rounded">
-                            ¡Estás ahorrando {formatPrice(servicio.Precio - precioConDescuento)}!
-                          </p>
                         </>
                       )}
-                    </div>
-                  </div>
 
-                  <div className="border-t border-blue-200 pt-4">
-                    <h4 className="font-semibold text-slate-700 mb-3">Tu Personalización</h4>
-                    <div className="space-y-2 text-sm">
-                      {descripcion && (
-                        <div>
-                          <span className="font-medium">Descripción:</span>
-                          <p className="text-slate-600 mt-1">{descripcion}</p>
+                      {servicio.Descuento === 0 && (
+                        <div className="flex justify-between text-lg font-bold pt-2 border-t border-blue-200">
+                          <span className="text-slate-800">Precio final:</span>
+                          <span className="text-blue-600">{formatPrice(precioSeleccionado)}</span>
                         </div>
                       )}
-                      <p><span className="font-medium">Tamaño:</span> {tamano}</p>
-                      {archivosAdjuntos.length > 0 && (
-                        <p><span className="font-medium">Archivos adjuntos:</span> {archivosAdjuntos.length}</p>
-                      )}
                     </div>
                   </div>
-                </div>
 
-                <div className="mt-8 p-4 bg-white rounded-lg border border-blue-200">
-                  <h4 className="font-bold text-slate-800 mb-3">¿Qué incluye?</h4>
-                  <ul className="space-y-2 text-sm text-slate-600">
-                    <li className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5"></div>
-                      <span>Diseño personalizado según tus especificaciones</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5"></div>
-                      <span>Revisiones hasta que quedes satisfecho</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5"></div>
-                      <span>Archivos en formatos editables y listos para imprimir</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5"></div>
-                      <span>Soporte y asesoría durante el proceso</span>
-                    </li>
-                  </ul>
+                  {descripcion && (
+                    <div className="border-t border-blue-200 pt-4">
+                      <h4 className="font-semibold text-slate-700 mb-2">Tu Personalización</h4>
+                      <p className="text-sm text-slate-600">{descripcion}</p>
+                    </div>
+                  )}
                 </div>
 
                 <button
                   type="submit"
-                  disabled={isSubmitting || !descripcion.trim()}
-                  className={`w-full mt-6 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl ${isSubmitting || !descripcion.trim()
+                  disabled={
+                    isSubmitting || 
+                    !descripcion.trim() || 
+                    (servicio.TipoPrecio === 'POR_TAMANO' && !tamano)
+                  }
+                  className={`w-full mt-6 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl ${
+                    isSubmitting || !descripcion.trim() || (servicio.TipoPrecio === 'POR_TAMANO' && !tamano)
                       ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed"
                       : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                    }`}
+                  }`}
                 >
                   {isSubmitting ? (
                     <>
@@ -400,10 +393,6 @@ export const ServicioDetalle = () => {
                     </>
                   )}
                 </button>
-
-                <p className="text-xs text-slate-500 text-center mt-3">
-                  Al continuar, aceptas nuestros términos y condiciones. El pago se realizará al confirmar el carrito.
-                </p>
               </div>
             </div>
           </form>

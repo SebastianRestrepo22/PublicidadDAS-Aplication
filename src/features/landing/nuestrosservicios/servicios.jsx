@@ -8,9 +8,12 @@ import {
   ChevronRight,
   X,
   Tag,
+  Layers,
+  Ruler,
+  Package,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { GetDataservicios } from "../../dashboard/servicios/services/services.servicios";
+import { GetDataservicios, getTamanosByServicio } from "../../dashboard/servicios/services/services.servicios";
 import { getAllCategorias } from "../../dashboard/categoriadediseño/services/services.categoria";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -24,13 +27,61 @@ export const Servicios = () => {
   const [servicios, setServicios] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [showOfertasModal, setShowOfertasModal] = useState(false);
+  const [showCategoriasModal, setShowCategoriasModal] = useState(false);
   const [serviciosOferta, setServiciosOferta] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [tamanosMap, setTamanosMap] = useState({});
 
-  // Preparar servicios en oferta
+  // Función para obtener información de tamaños
+  const getTamanosInfo = async (servicioId) => {
+    try {
+      const tamanos = await getTamanosByServicio(servicioId);
+      if (tamanos && tamanos.length > 0) {
+        const precios = tamanos.map(t => t.Precio);
+        return {
+          minPrecio: Math.min(...precios),
+          maxPrecio: Math.max(...precios),
+          cantidad: tamanos.length,
+          tamanos: tamanos.sort((a, b) => a.Precio - b.Precio)
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error("Error obteniendo tamaños:", error);
+      return null;
+    }
+  };
+
+  // Cargar tamaños para servicios POR_TAMANO
+  useEffect(() => {
+    const cargarTamanosParaServicios = async () => {
+      const serviciosPorTamano = servicios.filter(s => s.TipoPrecio === 'POR_TAMANO');
+      const nuevoMap = { ...tamanosMap };
+
+      for (const servicio of serviciosPorTamano) {
+        try {
+          const info = await getTamanosInfo(servicio.ServicioId);
+          if (info) {
+            nuevoMap[servicio.ServicioId] = info;
+          }
+        } catch (error) {
+          console.error(`Error cargando tamaños para servicio ${servicio.ServicioId}:`, error);
+        }
+      }
+
+      setTamanosMap(nuevoMap);
+    };
+
+    if (servicios.length > 0) {
+      cargarTamanosParaServicios();
+    }
+  }, [servicios]);
+
+  // Preparar servicios en oferta (solo activos)
   const prepararServiciosOferta = useCallback((serviciosData) => {
-    const serviciosConDescuento = serviciosData.filter(s => s.Descuento > 0);
+    const serviciosActivos = serviciosData.filter(s => s.Estado === "Activo");
+    const serviciosConDescuento = serviciosActivos.filter(s => s.Descuento > 0);
     const ofertasAleatorias = [...serviciosConDescuento]
       .sort(() => 0.5 - Math.random())
       .slice(0, 3);
@@ -50,13 +101,18 @@ export const Servicios = () => {
 
         if (!isMounted) return;
 
-        setServicios(Array.isArray(serviciosRes.data) ? serviciosRes.data : []);
+        // Filtrar solo servicios ACTIVOS
+        const serviciosActivos = Array.isArray(serviciosRes.data)
+          ? serviciosRes.data.filter(s => s.Estado === "Activo")
+          : [];
+
+        setServicios(serviciosActivos);
 
         if (Array.isArray(categoriasRes.data)) {
           setCategorias(categoriasRes.data);
         }
 
-        prepararServiciosOferta(serviciosRes.data || []);
+        prepararServiciosOferta(serviciosActivos);
       } catch (err) {
         console.error("Error al cargar servicios:", err);
         toast.error("Error al cargar servicios o categorías");
@@ -73,13 +129,22 @@ export const Servicios = () => {
     };
   }, [prepararServiciosOferta]);
 
-  // Máximo 6 servicios destacados
+  // Servicios destacados (solo activos)
   const featuredServices = servicios
     .filter((s) => s.Descuento > 0)
     .sort(() => 0.5 - Math.random())
     .slice(0, 6);
 
+  // Filtrar servicios activos
   const filteredServices = servicios.filter((servicio) => {
+    // Solo mostrar servicios activos (ya filtrados arriba, pero por seguridad)
+    if (servicio.Estado !== "Activo") return false;
+
+    // Si seleccionó "ofertas", mostrar solo servicios con descuento
+    if (selectedCategory === "ofertas") {
+      return servicio.Descuento > 0;
+    }
+
     const matchesCategory =
       selectedCategory === "all" ||
       String(servicio.CategoriaId) === selectedCategory;
@@ -117,12 +182,108 @@ export const Servicios = () => {
       style: "currency",
       currency: "COP",
       minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(precio);
   };
 
   const calcularPrecioConDescuento = (precio, descuento) => {
     return precio - (precio * descuento) / 100;
   };
+
+  // Componente para precios ÚNICOS - altura fija y diseño consistente
+  const PrecioUnico = ({ servicio, formatPrice, calcularPrecioConDescuento }) => {
+    const tieneDescuento = servicio.Descuento > 0;
+
+    return (
+      <div className="h-[64px] flex flex-col justify-center">
+        <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border ${tieneDescuento
+          ? 'bg-red-50 border-red-200'
+          : 'bg-blue-50 border-blue-200'
+          }`}>
+          {tieneDescuento ? (
+            <>
+              <span className="text-sm text-gray-400 line-through">
+                {formatPrice(servicio.Precio)}
+              </span>
+              <span className="text-lg font-bold text-red-600">
+                {formatPrice(calcularPrecioConDescuento(servicio.Precio, servicio.Descuento))}
+              </span>
+              <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full">
+                -{servicio.Descuento}%
+              </span>
+            </>
+          ) : (
+            <span className="text-lg font-bold text-blue-600">
+              {formatPrice(servicio.Precio)}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Componente para mostrar precios de servicios POR TAMAÑO - AHORA SOLO 2 PRECIOS
+  const PrecioPorTamano = ({ servicio, tamanosInfo, formatPrice, calcularPrecioConDescuento }) => {
+    // Loading state con misma altura
+    if (!tamanosInfo) {
+      return (
+        <div className="h-[64px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200">
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-300 border-t-blue-600"></div>
+            <span>Cargando precios...</span>
+          </div>
+        </div>
+      );
+    }
+
+    const tieneDescuento = servicio.Descuento > 0;
+    const minPrecio = tieneDescuento
+      ? calcularPrecioConDescuento(tamanosInfo.minPrecio, servicio.Descuento)
+      : tamanosInfo.minPrecio;
+
+    return (
+      <div className="h-[64px] flex flex-col justify-center">
+        <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border ${tieneDescuento
+            ? 'bg-red-50 border-red-200'
+            : 'bg-blue-50 border-blue-200'
+          }`}>
+          <Ruler className={`w-4 h-4 ${tieneDescuento ? 'text-red-600' : 'text-blue-600'}`} />
+
+          <div className="flex items-baseline gap-2">
+            {tieneDescuento && (
+              <span className="text-xs text-gray-400 line-through">
+                {formatPrice(tamanosInfo.minPrecio)}
+              </span>
+            )}
+            <span className={`text-lg font-bold ${tieneDescuento ? 'text-red-600' : 'text-blue-600'}`}>
+              {formatPrice(minPrecio)}
+            </span>
+            <span className={`text-xs ${tieneDescuento ? 'text-red-600' : 'text-blue-600'} font-medium`}>
+              desde
+            </span>
+          </div>
+
+          {tieneDescuento && (
+            <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full">
+              -{servicio.Descuento}%
+            </span>
+          )}
+        </div>
+
+        {/* Badge de tamaños - fuera del contenedor principal para no afectar altura */}
+        <div className="mt-1 pl-1">
+          <span className="text-[10px] text-gray-500">
+            {tamanosInfo.cantidad} tamaño{tamanosInfo.cantidad > 1 ? 's' : ''}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  const handleCategorySelect = useCallback((categoriaId) => {
+    setSelectedCategory(String(categoriaId));
+    setShowCategoriasModal(false);
+  }, []);
 
   if (isLoading) {
     return (
@@ -159,7 +320,7 @@ export const Servicios = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-[80px]">
-        <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex flex-col lg:flex-row gap-8 min-h-[calc(100vh-200px)]">
           <div className="flex-1 space-y-8 mt-8">
             {/* Carrusel de servicios destacados */}
             {featuredServices.length > 0 && (
@@ -172,38 +333,47 @@ export const Servicios = () => {
                   >
                     {featuredServices.map((servicio) => (
                       <div key={servicio.ServicioId} className="min-w-full">
-                        <div className="relative h-64 md:h-[320px]">
+                        <div className="relative h-48 overflow-hidden flex-shrink-0 group">
+                          {/* Imagen con z-index base */}
                           <img
                             src={servicio.Imagen || "/multimedia/placeholder.jpg"}
                             alt={servicio.Nombre}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            style={{ zIndex: 1 }}
+                            onError={(e) => (e.currentTarget.src = "/multimedia/placeholder.jpg")}
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                          <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                            <div className="max-w-2xl">
-                              <h3 className="text-xl md:text-2xl font-bold mb-2">
-                                {servicio.Nombre}
-                              </h3>
-                              <div className="flex items-center gap-3 mb-3">
-                                <span className="text-lg md:text-xl font-bold">
-                                  {formatPrice(calcularPrecioConDescuento(servicio.Precio, servicio.Descuento))}
-                                </span>
+
+                          {/* Overlay oscuro sutil al hover */}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" style={{ zIndex: 2 }} />
+
+                          {/* Badges - posicionados con más margen y z-index alto */}
+                          <div className="absolute top-3 left-3 right-3 flex justify-between items-start z-10">
+                            {(servicio.Descuento > 0 || servicio.TipoPrecio === 'POR_TAMANO') && (
+                              <div className="flex flex-col gap-1">
                                 {servicio.Descuento > 0 && (
-                                  <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded">
+                                  <span className="bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-sm">
                                     -{servicio.Descuento}%
                                   </span>
                                 )}
+                                {servicio.TipoPrecio === 'POR_TAMANO' && !servicio.Descuento && (
+                                  <span className="bg-blue-500/95 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1">
+                                    <Package className="w-3 h-3" />
+                                    Por tamaño
+                                  </span>
+                                )}
                               </div>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={(e) => handleViewDetails(servicio.ServicioId, e)}
-                                  className="bg-white text-black px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100"
-                                >
-                                  <ShoppingCart className="h-4 w-4 mr-1 inline" />
-                                  Ver Detalles
-                                </button>
-                              </div>
-                            </div>
+                            )}
+
+                            {/* Botón de carrito - solo visible al hover */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewDetails(servicio.ServicioId, e);
+                              }}
+                              className="bg-white/95 hover:bg-white text-black rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-y-2 group-hover:translate-y-0"
+                            >
+                              <ShoppingCart className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -243,14 +413,18 @@ export const Servicios = () => {
 
             {/* Listado de servicios */}
             <section>
-              <div className="flex items-center justify-center mb-7">
+              <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold text-slate-800">
-                  Todos los Servicios
-                  {selectedCategory !== "all" && (
-                    <span className="text-slate-600 ml-2">
-                      ({filteredServices.length})
-                    </span>
+                  {selectedCategory === "all" && "Todos los Servicios"}
+                  {selectedCategory === "ofertas" && "Servicios en Oferta"}
+                  {selectedCategory !== "all" && selectedCategory !== "ofertas" && (
+                    <>
+                      {categorias.find(c => String(c.CategoriaId) === selectedCategory)?.Nombre || "Categoría"}
+                    </>
                   )}
+                  <span className="text-slate-600 ml-2">
+                    ({filteredServices.length})
+                  </span>
                 </h2>
               </div>
 
@@ -264,50 +438,44 @@ export const Servicios = () => {
                     <div
                       key={servicio.ServicioId}
                       onClick={(e) => handleViewDetails(servicio.ServicioId, e)}
-                      className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-200 cursor-pointer"
+                      className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-200 cursor-pointer flex flex-col h-full"
                     >
-                      <div className="relative h-64 overflow-hidden">
+                      {/* Imagen */}
+                      <div className="relative h-48 overflow-hidden flex-shrink-0">
                         <img
                           src={servicio.Imagen || "/multimedia/placeholder.jpg"}
                           alt={servicio.Nombre}
-                          className="w-full h-full object-cover"
-                          onError={(e) =>
-                            (e.currentTarget.src = "/multimedia/placeholder.jpg")
-                          }
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          style={{ zIndex: 1 }}
+                          onError={(e) => {
+                            console.warn(`Error cargando: ${servicio.Imagen}`);
+                            e.currentTarget.src = "/multimedia/placeholder.jpg";
+                            e.currentTarget.onerror = null;
+                          }}
                         />
-                        {/* Botones estáticos (siempre visibles) */}
-                        <div className="absolute top-3 right-3 flex gap-2">
-                          <button
-                            onClick={(e) => handleViewDetails(servicio.ServicioId, e)}
-                            className="bg-white/90 hover:bg-white text-black rounded-full p-2 shadow-lg"
-                          >
-                            <ShoppingCart className="h-5 w-5" />
-                          </button>
-                        </div>
                       </div>
-                      <div className="p-5">
-                        <h3 className="font-bold text-lg mb-1 text-slate-800">
+
+                      {/* Contenido - AGREGAR min-h-0 para que flex funcione */}
+                      <div className="p-5 flex-1 flex flex-col min-h-0">
+                        <h3 className="font-bold text-lg mb-2 text-slate-800 line-clamp-1">
                           {servicio.Nombre}
                         </h3>
+
                         <p className="text-sm text-slate-600 line-clamp-2 mb-3">
                           {servicio.Descripcion}
                         </p>
-                        <div className="flex items-center justify-between">
-                          {servicio.Descuento > 0 && (
-                            <span className="text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded">
-                              -{servicio.Descuento}%
-                            </span>
-                          )}
-                          <span
-                            className={`text-lg font-bold ${servicio.Descuento > 0 ? "text-red-600 line-through" : "text-blue-600"
-                              }`}
-                          >
-                            {formatPrice(servicio.Precio)}
-                          </span>
-                          {servicio.Descuento > 0 && (
-                            <span className="text-lg font-bold text-blue-600">
-                              {formatPrice(calcularPrecioConDescuento(servicio.Precio, servicio.Descuento))}
-                            </span>
+
+                        {/* Empujar precio al fondo con mt-auto en lugar de flex-1 vacío */}
+                        <div className="mt-auto">
+                          {servicio.TipoPrecio === 'UNICO' ? (
+                            <PrecioUnico servicio={servicio} formatPrice={formatPrice} calcularPrecioConDescuento={calcularPrecioConDescuento} />
+                          ) : (
+                            <PrecioPorTamano
+                              servicio={servicio}
+                              tamanosInfo={tamanosMap[servicio.ServicioId]}
+                              formatPrice={formatPrice}
+                              calcularPrecioConDescuento={calcularPrecioConDescuento}
+                            />
                           )}
                         </div>
                       </div>
@@ -320,179 +488,291 @@ export const Servicios = () => {
 
           {/* Sidebar */}
           <aside className="lg:w-80 shrink-0">
-            <div className="sticky top-24 space-y-6">
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <h3 className="font-bold text-lg mb-4 text-slate-800">Categorías</h3>
-                <div className="space-y-2">
-                  <button
-                    onClick={() => setSelectedCategory("all")}
-                    className={`w-full flex items-center justify-between p-3 rounded-lg transition ${selectedCategory === "all"
-                      ? "bg-blue-600 text-white"
-                      : "text-slate-700 hover:bg-slate-100"
-                      }`}
-                  >
-                    <span className="font-medium">Todos los Servicios</span>
-                    <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded">
-                      {servicios.length}
-                    </span>
-                  </button>
-                  {categorias.map((cat) => (
-                    <button
-                      key={cat.CategoriaId}
-                      onClick={() => setSelectedCategory(String(cat.CategoriaId))}
-                      className={`w-full flex items-center justify-between p-3 rounded-lg transition ${selectedCategory === String(cat.CategoriaId)
-                        ? "bg-blue-600 text-white"
-                        : "text-slate-700 hover:bg-slate-100"
-                        }`}
-                    >
-                      <span className="font-medium">{cat.Nombre}</span>
-                      <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded">
-                        {
-                          servicios.filter(
-                            (s) => String(s.CategoriaId) === String(cat.CategoriaId)
-                          ).length
-                        }
-                      </span>
-                    </button>
-                  ))}
+            <div className="sticky top-[120px] space-y-4 py-[60px]">
+              <button
+                onClick={() => setShowCategoriasModal(true)}
+                className="w-full bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-all group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition">
+                      <Layers className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-semibold text-slate-800">Categorías</h3>
+                      <p className="text-xs text-slate-500">
+                        {selectedCategory === "all" ? "Todas las categorías" :
+                          selectedCategory === "ofertas" ? "Ofertas" :
+                            categorias.find(c => String(c.CategoriaId) === selectedCategory)?.Nombre || "Seleccionar"}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-blue-600 transition" />
                 </div>
-              </div>
+              </button>
 
-              {/* Oferta especial para servicios */}
-              <div className="bg-gradient-to-br from-green-600 to-teal-700 text-white rounded-xl shadow-md p-6">
-                <h3 className="font-bold text-lg mb-2">¡Oferta Especial en Servicios!</h3>
-                <p className="text-sm opacity-90 mb-4">
-                  Obtén descuentos en varios de los servicios que ofrecemos
+              <button
+                onClick={() => {
+                  setSelectedCategory("ofertas");
+                  setShowOfertasModal(true);
+                }}
+                className="w-full bg-gradient-to-r from-red-50 to-orange-50 rounded-xl shadow-md p-4 hover:shadow-lg transition-all group border border-red-100"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-red-100 p-2 rounded-lg group-hover:bg-red-200 transition">
+                      <Tag className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-semibold text-red-700">Ofertas Especiales</h3>
+                      <p className="text-xs text-red-600">
+                        {servicios.filter(s => s.Descuento > 0).length} servicios con descuento
+                      </p>
+                    </div>
+                  </div>
+                  <div className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                    {servicios.filter(s => s.Descuento > 0).length}
+                  </div>
+                </div>
+              </button>
+
+              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-xl shadow-md p-4">
+                <h3 className="font-bold text-base mb-1">¡Encuentra lo que buscas!</h3>
+                <p className="text-xs opacity-90">
+                  Usa los botones para explorar categorías y ofertas
                 </p>
-                <button
-                  onClick={() => setShowOfertasModal(true)}
-                  className="w-full bg-white text-green-600 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
-                >
-                  Ver Ofertas
-                </button>
               </div>
             </div>
           </aside>
         </div>
       </div>
 
-      {/* Modal de Ofertas para Servicios */}
-      {showOfertasModal && (
+      {/* Modales */}
+      {showCategoriasModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-            {/* Encabezado del Modal */}
-            <div className="shrink-0 bg-gradient-to-r from-green-600 to-teal-700 text-white p-6">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+            <div className="shrink-0 bg-blue-800 text-white p-5 rounded-t-2xl">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Tag className="h-6 w-6" />
+                  <div className="bg-blue-700 p-2 rounded-lg">
+                    <Layers className="h-6 w-6" />
+                  </div>
                   <div>
-                    <h2 className="text-2xl font-bold">Ofertas Especiales en Servicios</h2>
+                    <h2 className="text-2xl font-bold">Categorías</h2>
+                    <p className="text-sm text-blue-100">
+                      {categorias.length} categorías • {servicios.length} servicios activos
+                    </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => setShowOfertasModal(false)}
-                  className="bg-white/20 hover:bg-white/30 rounded-full p-2 transition"
+                  onClick={() => setShowCategoriasModal(false)}
+                  className="bg-blue-700 hover:bg-blue-600 rounded-full p-2 transition"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
             </div>
 
-            {/* Contenido del Modal - Scrollable */}
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-6">
-                {serviciosOferta.length === 0 ? (
-                  <div className="text-center py-12 text-slate-500">
-                    <Tag className="h-12 w-12 mx-auto mb-4 text-slate-300" />
-                    <p className="text-lg">No hay ofertas disponibles en este momento</p>
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="mb-4">
+                <button
+                  onClick={() => handleCategorySelect("all")}
+                  className={`w-full flex items-center justify-between p-3 rounded-lg transition border ${selectedCategory === "all"
+                    ? "bg-blue-800 text-white border-blue-800"
+                    : "bg-white border-gray-200 hover:border-blue-300 hover:bg-blue-50"
+                    }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Layers className={`h-5 w-5 ${selectedCategory === "all" ? "text-white" : "text-blue-800"}`} />
+                    <span className="font-medium">Todos los Servicios</span>
                   </div>
-                ) : (
-                  <>
-                    <div className="grid md:grid-cols-3 gap-6 mb-8">
-                      {serviciosOferta.map((servicio) => (
-                        <div
-                          key={servicio.ServicioId}
-                          className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200"
-                        >
-                          <div className="relative h-48">
-                            <img
-                              src={servicio.Imagen || "/multimedia/placeholder.jpg"}
-                              alt={servicio.Nombre}
-                              className="w-full h-full object-cover"
-                              onError={(e) => (e.currentTarget.src = "/multimedia/placeholder.jpg")}
-                            />
-                            <div className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded-md font-bold text-sm">
-                              -{servicio.Descuento}%
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewDetails(servicio.ServicioId, e);
-                                setShowOfertasModal(false);
-                              }}
-                              className="absolute bottom-3 right-3 bg-green-600 text-white rounded-full p-2 hover:bg-green-700 shadow-lg"
-                            >
-                              <ShoppingCart className="h-4 w-4" />
-                            </button>
-                          </div>
-                          <div className="p-4">
-                            <h3 className="font-semibold text-slate-800 mb-2 line-clamp-1">
-                              {servicio.Nombre}
-                            </h3>
-                            <p className="text-sm text-slate-600 mb-3 line-clamp-2">
-                              {servicio.Descripcion}
-                            </p>
-                            <div className="flex items-center justify-between">
-                              <div className="flex flex-col">
-                                <span className="text-sm text-slate-500 line-through">
-                                  {formatPrice(servicio.Precio)}
-                                </span>
-                                <span className="text-lg font-bold text-green-600">
-                                  {formatPrice(calcularPrecioConDescuento(servicio.Precio, servicio.Descuento))}
-                                </span>
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setShowOfertasModal(false);
-                                  handleViewDetails(servicio.ServicioId, e);
-                                }}
-                                className="text-green-600 hover:text-green-700 text-sm font-medium"
-                              >
-                                Ver detalles →
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  <span className={`text-sm px-2 py-0.5 rounded-full ${selectedCategory === "all"
+                    ? "bg-blue-700 text-white"
+                    : "bg-gray-100 text-gray-700"
+                    }`}>
+                    {servicios.length}
+                  </span>
+                </button>
+              </div>
 
-                    {/* Información adicional */}
-                    <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-xl p-6 border border-green-100 mb-6">
-                      <div className="flex items-start gap-4">
-                        <div className="bg-green-100 p-3 rounded-lg">
-                          <Tag className="h-6 w-6 text-green-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-slate-800 mb-2">¿Cómo funciona la oferta?</h3>
-                          <ul className="text-sm text-slate-600 space-y-1">
-                            <li>• Aplica para servicios personalizados</li>
-                            <li>• El descuento se aplica automáticamente al contratar</li>
-                          </ul>
-                        </div>
+              <div className="relative py-3">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-white px-3 text-xs font-medium text-gray-500">
+                    Categorías
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {categorias.map((cat) => {
+                  const serviceCount = servicios.filter(
+                    (s) => String(s.CategoriaId) === String(cat.CategoriaId)
+                  ).length;
+
+                  return (
+                    <button
+                      key={cat.CategoriaId}
+                      onClick={() => handleCategorySelect(cat.CategoriaId)}
+                      className={`flex items-center justify-between p-3 rounded-lg transition border ${selectedCategory === String(cat.CategoriaId)
+                        ? "bg-blue-800 text-white border-blue-800"
+                        : "bg-white border-gray-200 hover:border-blue-300 hover:bg-blue-50"
+                        }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${selectedCategory === String(cat.CategoriaId)
+                          ? "bg-white"
+                          : "bg-blue-800"
+                          }`} />
+                        <span className="font-medium text-sm">{cat.Nombre}</span>
                       </div>
-                    </div>
-                  </>
-                )}
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${selectedCategory === String(cat.CategoriaId)
+                        ? "bg-blue-700 text-white"
+                        : "bg-gray-100 text-gray-700"
+                        }`}>
+                        {serviceCount}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Pie del Modal - Siempre visible */}
-            <div className="shrink-0 border-t border-slate-200 p-4 bg-slate-50">
-              <div className="flex justify-between items-center">
+            <div className="shrink-0 border-t border-gray-200 p-3 bg-gray-50 rounded-b-2xl">
+              <div className="flex justify-end gap-2">
                 <button
-                  onClick={() => setShowOfertasModal(false)}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition"
+                  onClick={() => setShowCategoriasModal(false)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => setShowCategoriasModal(false)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-800 text-white hover:bg-blue-700"
+                >
+                  Aplicar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showOfertasModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="shrink-0 bg-gradient-to-r from-red-800 to-red-900 text-white p-5 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-red-700/50 p-2 rounded-lg">
+                    <Tag className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">Ofertas Especiales</h2>
+                    <p className="text-sm text-red-100">
+                      {servicios.filter(s => s.Descuento > 0).length} servicios con descuento
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowOfertasModal(false);
+                    setSelectedCategory("all");
+                  }}
+                  className="bg-red-700/50 hover:bg-red-700 rounded-full p-2 transition"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5">
+              {serviciosOferta.length === 0 ? (
+                <div className="text-center py-8">
+                  <Tag className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <p className="text-gray-500">No hay ofertas disponibles en este momento</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-3 gap-4">
+                  {serviciosOferta.map((servicio) => (
+                    <div
+                      key={servicio.ServicioId}
+                      className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition group"
+                    >
+                      <div className="relative h-40">
+                        <img
+                          src={servicio.Imagen || "/multimedia/placeholder.jpg"}
+                          alt={servicio.Nombre}
+                          className="w-full h-full object-cover"
+                          onError={(e) => (e.currentTarget.src = "/multimedia/placeholder.jpg")}
+                        />
+                        <div className="absolute top-2 left-2 bg-gradient-to-r from-red-800 to-red-900 text-white px-2 py-0.5 rounded text-xs font-bold shadow-lg">
+                          -{servicio.Descuento}%
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewDetails(servicio.ServicioId, e);
+                            setShowOfertasModal(false);
+                          }}
+                          className="absolute bottom-2 right-2 bg-gradient-to-r from-red-800 to-red-900 text-white rounded-full p-1.5 hover:from-red-700 hover:to-red-800 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <ShoppingCart className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="p-3">
+                        <h3 className="font-semibold text-sm mb-1 line-clamp-1 text-gray-800">
+                          {servicio.Nombre}
+                        </h3>
+                        <p className="text-xs text-gray-600 mb-2 line-clamp-2">
+                          {servicio.Descripcion}
+                        </p>
+                        <div className="flex items-center justify-between">
+                          {servicio.TipoPrecio === 'UNICO' ? (
+                            <div>
+                              <span className="text-xs text-gray-400 line-through">
+                                {formatPrice(servicio.Precio)}
+                              </span>
+                              <span className="text-sm font-bold text-red-800 ml-1">
+                                {formatPrice(calcularPrecioConDescuento(servicio.Precio, servicio.Descuento))}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <Package className="w-3 h-3 text-gray-500" />
+                              <span className="text-xs text-gray-600">
+                                Por tamaño
+                              </span>
+                            </div>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowOfertasModal(false);
+                              handleViewDetails(servicio.ServicioId, e);
+                            }}
+                            className="text-red-800 hover:text-red-600 text-xs font-medium"
+                          >
+                            Ver detalles →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="shrink-0 border-t border-gray-200 p-3 bg-gray-50 rounded-b-2xl">
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    setShowOfertasModal(false);
+                    setSelectedCategory("all");
+                  }}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-red-800 to-red-900 text-white hover:from-red-700 hover:to-red-800 shadow-md"
                 >
                   Cerrar
                 </button>
