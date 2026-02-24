@@ -1,3 +1,4 @@
+
 // controllers/ventas.controller.js
 import connectDB from "../lib/db.js";
 import { v4 as uuidv4 } from "uuid";
@@ -62,7 +63,6 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId) => {
   try {
     console.log("🔄 Creando venta para pedido:", PedidoClienteId);
 
-<<<<<<< Updated upstream
     // Verificar si ya existe venta
     const [ventaCheck] = await connection.execute(
       "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
@@ -297,7 +297,6 @@ export const deleteVenta = async (req, res) => {
     res.status(500).json({ error: "Error al eliminar venta" });
   } finally {
     connection.release();
-=======
 export const createVentaManual = async (req, res) => {
   let connection;
   try {
@@ -452,6 +451,5 @@ export const crearVentaDesdePedidoId = async (pedidoId, usuarioVendedorId = null
   } catch (error) {
     console.error('❌ [VENTAS] Error en crearVentaDesdePedidoId:', error);
     throw error;
->>>>>>> Stashed changes
   }
 };
