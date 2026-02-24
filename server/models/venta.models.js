@@ -1,79 +1,3 @@
-// models/venta.models.js
-import { v4 as uuidv4 } from "uuid";
-import connectDB from "../lib/db.js";
-
-const sanitize = (v) => (v === undefined ? null : v);
-
-// Obtener todas las ventas
-export const getAllVentasModel = async () => {
-  const connection = await connectDB();
-  try {
-    const [rows] = await connection.execute(`
-      SELECT 
-        v.VentaId,
-        v.Origen,
-        v.PedidoClienteId,
-        v.ClienteId,
-        v.ClienteNombre,
-        v.ClienteTelefono,
-        v.ClienteCorreo,
-        v.UsuarioVendedorId,
-        u.NombreCompleto AS UsuarioVendedorNombre,
-        v.FechaVenta,
-        v.Subtotal,
-        v.IVA,
-        v.Total,
-        v.Estado
-      FROM ventas v
-      LEFT JOIN usuarios u ON v.UsuarioVendedorId = u.CedulaId
-      ORDER BY v.FechaVenta DESC
-    `);
-    return rows;
-  } catch (error) {
-    console.error("Error en getAllVentasModel:", error);
-    throw error;
-  } finally {
-    if (connection) connection.release();
-  }
-};
-
-// Obtener venta por ID
-export const getVentaByIdModel = async (ventaId) => {
-  const connection = await connectDB();
-  try {
-    const [rows] = await connection.execute(
-      `SELECT 
-        v.*,
-        u.NombreCompleto AS UsuarioVendedorNombre,
-        u.Telefono AS UsuarioTelefono,
-        u.CorreoElectronico AS UsuarioCorreo,
-        pc.FechaRegistro AS FechaPedido,
-        pc.Estado AS EstadoPedido
-      FROM ventas v
-      LEFT JOIN usuarios u ON v.UsuarioVendedorId = u.CedulaId
-      LEFT JOIN pedidosclientes pc ON v.PedidoClienteId = pc.PedidoClienteId
-      WHERE v.VentaId = ?`,
-      [ventaId]
-    );
-    return rows[0] || null;
-  } catch (error) {
-    console.error("Error en getVentaByIdModel:", error);
-    throw error;
-  } finally {
-    if (connection) connection.release();
-  }
-};
-
-// ✅ CORREGIDO: Crear venta desde pedido (acepta UsuarioVendedorId = null)
-export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId = null) => {
-  const connection = await connectDB();
-  
-  try {
-    await connection.beginTransaction();
-
-    // Verificar si ya existe venta para este pedido
-    const [ventaExistente] = await connection.execute(
-=======
 import { v4 as uuidv4 } from "uuid";
 import { dbPool } from "../lib/db.js";
 
@@ -146,7 +70,6 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
     
     if (ventaExistente.length > 0) {
       await connection.rollback();
-      console.log("⚠️ Ya existe venta para este pedido:", ventaExistente[0].VentaId);
       console.log("Ya existe venta para este pedido:", ventaExistente[0].VentaId);
       return { 
         success: false, 
@@ -156,175 +79,32 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
     }
     
     const VentaId = uuidv4();
-    const subtotal = pedidoData.Total || 0;
-    const IVA = subtotal * 0.19; // 19% IVA
-    const total = subtotal + IVA;
     
-    // Determinar datos del cliente según el tipo
-    let clienteId = null;
-    let clienteNombre = pedidoData.ClienteNombre || null;
-    let clienteTelefono = pedidoData.ClienteTelefono || null;
-    let clienteCorreo = pedidoData.ClienteCorreo || null;
+    // 🔥 SOLUCIÓN: Limpiar y formatear correctamente el Total
+    let subtotal = pedidoData.Total || 0;
     
-    if (pedidoData.TipoCliente === 'registrado' && pedidoData.ClienteId) {
-      clienteId = pedidoData.ClienteId;
-      // Obtener datos del cliente registrado (opcional, si no vienen en el pedido)
-      if (!clienteNombre || !clienteTelefono || !clienteCorreo) {
-        const [clienteRows] = await connection.execute(
-          "SELECT NombreCompleto, Telefono, CorreoElectronico FROM usuarios WHERE CedulaId = ?",
-          [pedidoData.ClienteId]
-        );
-        if (clienteRows.length > 0) {
-          clienteNombre = clienteRows[0].NombreCompleto;
-          clienteTelefono = clienteRows[0].Telefono;
-          clienteCorreo = clienteRows[0].CorreoElectronico;
-        }
-      }
+    // Si es string, limpiar formato
+    if (typeof subtotal === 'string') {
+      // Eliminar puntos de miles y convertir coma a punto si es necesario
+      subtotal = subtotal.replace(/\./g, '').replace(',', '.');
     }
     
-    console.log("🔄 Creando venta desde pedido:", {
-      PedidoClienteId: pedidoData.PedidoClienteId,
-      VentaId,
-      Subtotal: subtotal,
+    // Convertir a número y redondear a 2 decimales
+    subtotal = parseFloat(subtotal).toFixed(2);
+    subtotal = parseFloat(subtotal); // Volver a número para cálculos
+    
+    // Calcular IVA (19%) con 2 decimales
+    const IVA = parseFloat((subtotal * 0.19).toFixed(2));
+    
+    // Total final con 2 decimales
+    const total = parseFloat((subtotal + IVA).toFixed(2));
+    
+    console.log('Valores formateados:', {
+      subtotalOriginal: pedidoData.Total,
+      subtotalLimpio: subtotal,
       IVA,
-      Total: total,
-      UsuarioVendedorId: usuarioVendedorId || 'null (pendiente)'
+      total
     });
-    
-    // ✅ CORREGIDO: usuarioVendedorId puede ser null
-    await connection.execute(
-      `INSERT INTO ventas (
-        VentaId, Origen, PedidoClienteId, ClienteId, ClienteNombre, 
-        ClienteTelefono, ClienteCorreo, UsuarioVendedorId, FechaVenta, 
-        Subtotal, IVA, Total, Estado
-      ) VALUES (?, 'pedido', ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, 'pagado')`,
-      [
-        VentaId, 
-        pedidoData.PedidoClienteId, 
-        sanitize(clienteId), 
-        sanitize(clienteNombre), 
-        sanitize(clienteTelefono), 
-        sanitize(clienteCorreo), 
-        sanitize(usuarioVendedorId), // ✅ Permite null
-        subtotal, 
-        IVA, 
-        total
-      ]
-    );
-    
-    console.log("✅ Venta principal creada:", VentaId);
-    
-    await connection.commit();
-    
-    return {
-      success: true,
-      VentaId: VentaId,
-      alreadyExists: false
-    };
-    
-  } catch (error) {
-    await connection.rollback();
-    console.error("❌ Error en createVentaFromPedidoModel:", error);
-    throw error;
-  } finally {
-    if (connection) connection.release();
-  }
-};
-
-// Crear venta manual
-export const createVentaManualModel = async (ventaData) => {
-  const connection = await connectDB();
-  
-  try {
-    const VentaId = uuidv4();
-    const {
-      ClienteId,
-      ClienteNombre,
-      ClienteTelefono,
-      ClienteCorreo,
-      UsuarioVendedorId,
-      Subtotal,
-      IVA,
-      Total,
-      Estado = 'pagado'
-    } = ventaData;
-    
-    await connection.execute(
-      `INSERT INTO ventas (
-        VentaId, Origen, ClienteId, ClienteNombre, ClienteTelefono, 
-        ClienteCorreo, UsuarioVendedorId, FechaVenta, Subtotal, IVA, Total, Estado
-      ) VALUES (?, 'manual', ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)`,
-      [
-        VentaId, 
-        sanitize(ClienteId), 
-        sanitize(ClienteNombre), 
-        sanitize(ClienteTelefono), 
-        sanitize(ClienteCorreo), 
-        sanitize(UsuarioVendedorId), 
-        Subtotal, 
-        IVA, 
-        Total, 
-        Estado
-      ]
-    );
-    
-    return VentaId;
-    
-  } catch (error) {
-    console.error("Error en createVentaManualModel:", error);
-    throw error;
-  } finally {
-    if (connection) connection.release();
-  }
-};
-
-// Actualizar estado de venta (solo a ANULADO)
-export const anularVentaModel = async (ventaId) => {
-  const connection = await connectDB();
-  
-  try {
-    // Verificar que la venta existe y no está ya anulada
-    const [venta] = await connection.execute(
-      "SELECT Estado FROM ventas WHERE VentaId = ?",
-      [ventaId]
-    );
-    
-    if (venta.length === 0) {
-      return { success: false, message: "Venta no encontrada" };
-    }
-    
-    if (venta[0].Estado === 'anulado') {
-      return { success: false, message: "La venta ya está anulada" };
-    }
-    
-    const [result] = await connection.execute(
-      "UPDATE ventas SET Estado = 'anulado' WHERE VentaId = ?",
-      [ventaId]
-    );
-    
-    return { 
-      success: true, 
-      affectedRows: result.affectedRows 
-    };
-    
-  } catch (error) {
-    console.error("Error en anularVentaModel:", error);
-    throw error;
-  } finally {
-    if (connection) connection.release();
-  }
-};
-
-// Verificar si existe venta para un pedido
-export const existeVentaParaPedidoModel = async (pedidoClienteId) => {
-  const connection = await connectDB();
-  try {
-    const [rows] = await connection.execute(
-    }
-    
-    const VentaId = uuidv4();
-    const subtotal = pedidoData.Total || 0;
-    const IVA = subtotal * 0.19;
     
     // Determinar datos del cliente según el tipo
     let clienteId = null;
@@ -366,9 +146,9 @@ export const existeVentaParaPedidoModel = async (pedidoClienteId) => {
         clienteTelefono, 
         clienteCorreo, 
         usuarioVendedorId || null, 
-        subtotal, 
-        IVA, 
-        subtotal + IVA
+        subtotal,  // ✅ Valor limpio
+        IVA,       // ✅ Valor limpio
+        total      // ✅ Valor limpio
       ]
     );
     
@@ -395,7 +175,7 @@ export const createVentaManualModel = async (ventaData) => {
   
   try {
     const VentaId = uuidv4();
-    const {
+    let {
       ClienteId,
       ClienteNombre,
       ClienteTelefono,
@@ -406,6 +186,18 @@ export const createVentaManualModel = async (ventaData) => {
       Total,
       Estado = 'pagado'
     } = ventaData;
+    
+    // 🔥 Limpiar y formatear valores numéricos
+    const limpiarNumero = (valor) => {
+      if (typeof valor === 'string') {
+        valor = valor.replace(/\./g, '').replace(',', '.');
+      }
+      return parseFloat(parseFloat(valor).toFixed(2));
+    };
+    
+    Subtotal = limpiarNumero(Subtotal || 0);
+    IVA = limpiarNumero(IVA || (Subtotal * 0.19));
+    Total = limpiarNumero(Total || (Subtotal + IVA));
     
     await connection.query(
       `INSERT INTO ventas (
@@ -435,7 +227,6 @@ export const createVentaManualModel = async (ventaData) => {
     connection.release();
   }
 };
-
 // Actualizar estado de venta (solo a ANULADO)
 export const anularVentaModel = async (ventaId) => {
   try {
@@ -480,21 +271,11 @@ export const existeVentaParaPedidoModel = async (pedidoClienteId) => {
   } catch (error) {
     console.error("Error en existeVentaParaPedidoModel:", error);
     throw error;
-  } finally {
-    if (connection) connection.release();
   }
 };
 
 // Obtener venta por ID de pedido
 export const getVentaByPedidoIdModel = async (pedidoClienteId) => {
-  const connection = await connectDB();
-  try {
-    const [rows] = await connection.execute(
-      `SELECT v.*, u.NombreCompleto AS UsuarioVendedorNombre
-      FROM ventas v
-      LEFT JOIN usuarios u ON v.UsuarioVendedorId = u.CedulaId
-      WHERE v.PedidoClienteId = ?`,
-
   try {
     const [rows] = await dbPool.query(
       `SELECT v.*, u.NombreCompleto AS UsuarioVendedorNombre
@@ -507,7 +288,5 @@ export const getVentaByPedidoIdModel = async (pedidoClienteId) => {
   } catch (error) {
     console.error("Error en getVentaByPedidoIdModel:", error);
     throw error;
-  } finally {
-    if (connection) connection.release();
   }
 };
