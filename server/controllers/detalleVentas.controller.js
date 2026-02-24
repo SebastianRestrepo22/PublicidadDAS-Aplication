@@ -4,9 +4,6 @@ import {
 } from "../models/detalleVentas.models.js";
 import { getVentaByIdModel } from "../models/venta.models.js";
 
-/**
- * Obtener detalles de una venta
- */
 export const getDetallesByVenta = async (req, res) => {
   try {
     const { ventaId } = req.params;
@@ -24,9 +21,6 @@ export const getDetallesByVenta = async (req, res) => {
   }
 };
 
-/**
- * Crear detalle para venta existente (solo si la venta no está anulada)
- */
 export const createDetalle = async (req, res) => {
   try {
     const { ventaId } = req.params;
