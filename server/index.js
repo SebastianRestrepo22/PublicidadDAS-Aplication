@@ -19,6 +19,7 @@ import voucherRoutes from './routes/voucher.routes.js';
 import colorRoutes from "./routes/color.routes.js";
 import clientRouter from './routes/cliente.routes.js';
 import servicioTamanosRoutes from './routes/servicioTamanos.routes.js';
+import dashboardRoutes from './routes/dashboard.routes.js';
 
 // Rutas de autenticación y usuarios
 import authRouter from './routes/authRoutes.js';
@@ -68,6 +69,7 @@ app.use("/api/detalle-pedido", detallePedidoClienteRoutes);
 app.use("/api/ventas", ventasRoutes);
 app.use("/api/detalle-ventas", detalleVentasRoutes);
 app.use('/api/voucher', voucherRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 // Iniciar servidor

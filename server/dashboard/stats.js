@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-// const pool = require('../config/database'); 
 
 router.get('/dashboard/stats', async (req, res) => {
   try {

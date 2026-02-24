@@ -12,17 +12,15 @@ import {
   createDetallePedidoModel,
   getDetallePedidoByPedidoIdModel,
   deleteDetallePedidoModel,
-  deleteDetallesByPedidoIdModel  // ← Importar esta nueva función
+  deleteDetallesByPedidoIdModel
 } from "../models/detallePedidoCliente.model.js";
 import { crearVentaDesdePedidoId } from "./ventas.controller.js";
 import QRCode from "qrcode";
 import { getAllColoresDB } from "../models/color.model.js";
 import { v4 as uuidv4 } from "uuid";
-import fs from 'fs'; // ← Importar fs para manejar archivos
+import fs from 'fs';
+import { dbPool } from "../lib/db.js";
 
-// ========================================
-// ✅ NUEVA FUNCIÓN: SUBIR VOUCHER A PEDIDO EXISTENTE
-// ========================================
 export const uploadVoucherToPedido = async (req, res) => {
   try {
     const { id } = req.params;
@@ -39,12 +37,12 @@ export const uploadVoucherToPedido = async (req, res) => {
     const pedidoExistente = await getPedidoClienteByIdModel(id);
     if (!pedidoExistente) {
       console.log('❌ Pedido no encontrado:', id);
-      
+
       // Eliminar el archivo subido si el pedido no existe
       fs.unlink(file.path, (err) => {
         if (err) console.error('Error eliminando archivo huérfano:', err);
       });
-      
+
       return res.status(404).json({ error: 'Pedido no encontrado' });
     }
 
@@ -103,9 +101,9 @@ export const uploadVoucherToPedido = async (req, res) => {
       });
     }
 
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error al procesar el voucher',
-      message: error.message 
+      message: error.message
     });
   }
 };
@@ -265,15 +263,13 @@ export const createPedidoCliente = async (req, res) => {
   } catch (error) {
     console.error("❌ Error al crear pedido:", error.message);
 
-    // Limpiar pedido huérfano - CORREGIDO: usar el modelo en lugar de dbPool
+    // Limpiar pedido huérfano
     if (nuevoPedido?.PedidoClienteId) {
       try {
-        console.log(`🗑️  Eliminando detalles del pedido huérfano: ${nuevoPedido.PedidoClienteId}`);
-        
-        // ✅ Usar el modelo en lugar de dbPool directamente
+        console.log(`🗑️ Eliminando detalles del pedido huérfano: ${nuevoPedido.PedidoClienteId}`);
         await deleteDetallesByPedidoIdModel(nuevoPedido.PedidoClienteId);
-        
-        console.log(`🗑️  Eliminando pedido huérfano: ${nuevoPedido.PedidoClienteId}`);
+
+        console.log(`🗑️ Eliminando pedido huérfano: ${nuevoPedido.PedidoClienteId}`);
         await deletePedidoClienteModel(nuevoPedido.PedidoClienteId);
         console.log(`✅ Pedido huérfano eliminado`);
       } catch (cleanupError) {
@@ -295,87 +291,132 @@ export const createPedidoCliente = async (req, res) => {
   }
 };
 
-
-// En pedidoCliente.controller.js - función updatePedidoCliente
+// ========================================
+// ✅ ACTUALIZAR PEDIDO - VERSIÓN CORREGIDA (USA PedidoClienteId)
+// ========================================
 export const updatePedidoCliente = async (req, res) => {
   const { id } = req.params;
   let updates = { ...req.body };
 
   try {
-    console.log('🔍 [CONTROLLER] Actualizando pedido...');
-    console.log('📦 Body recibido:', updates);
+    console.log('🔍 [PEDIDOS] ===== INICIANDO ACTUALIZACIÓN =====');
+    console.log('📦 ID del pedido (PedidoClienteId):', id);
+    console.log('📦 Updates recibidos:', updates);
+    console.log('📦 Nuevo estado:', updates.Estado);
 
-    // ✅ Validar que el estado sea uno de los permitidos para pedidos
+    // Validar que el estado sea uno de los permitidos
     if (updates.Estado) {
       const estadosPermitidos = ['pendiente', 'aprobado', 'cancelado'];
       if (!estadosPermitidos.includes(updates.Estado)) {
-        return res.status(400).json({ 
-          message: `Estado no válido. Debe ser: ${estadosPermitidos.join(', ')}` 
+        return res.status(400).json({
+          message: `Estado no válido. Debe ser: ${estadosPermitidos.join(', ')}`
         });
       }
     }
 
-    // 1. Obtener el estado actual del pedido (antes de actualizar)
+    // Obtener el pedido actual
     const pedidoActual = await getPedidoClienteByIdModel(id);
     if (!pedidoActual) {
+      console.log('❌ [PEDIDOS] Pedido no encontrado');
       return res.status(404).json({ message: 'Pedido no encontrado.' });
     }
 
-    // 2. Actualizar el pedido (solo con los valores permitidos)
+    console.log('📦 Pedido actual:', {
+      id: pedidoActual.PedidoClienteId,
+      estado: pedidoActual.Estado,
+      total: pedidoActual.Total,
+      tipoCliente: pedidoActual.TipoCliente
+    });
+
+    // Actualizar el pedido
     const result = await updatePedidoClienteModel(id, updates);
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Pedido no encontrado.' });
-    }
+    console.log('✅ Resultado de actualización:', result);
 
-    // 3. Obtener el pedido actualizado
+    // Obtener el pedido actualizado
     const updated = await getPedidoClienteByIdModel(id);
     updated.detalle = await getDetallePedidoByPedidoIdModel(id);
 
-    // 4. ✅ SI EL ESTADO ES "aprobado", CREAR VENTA AUTOMÁTICAMENTE (con estado "pagado")
+    console.log('📦 Pedido actualizado:', {
+      id: updated.PedidoClienteId,
+      nuevoEstado: updated.Estado,
+      total: updated.Total
+    });
+
+    // ===== SI EL ESTADO ES "aprobado", CREAR VENTA =====
     if (updated.Estado === 'aprobado') {
+      console.log('🎯 [PEDIDOS] Estado "aprobado" detectado. Intentando crear venta...');
+
       try {
-        console.log('✅ Estado "aprobado" detectado. Creando venta en módulo de ventas...');
-        
-        // La función crearVentaDesdePedidoId debe crear la venta con estado "pagado"
-        const resultadoVenta = await crearVentaDesdePedidoId(id);
-        
-        console.log('✅ Venta creada exitosamente en módulo de ventas:', resultadoVenta);
-        
-        // Opcional: incluir info de la venta en la respuesta
-        updated.ventaCreada = {
-          id: resultadoVenta.VentaId,
-          estado: 'pagado',  // ← La venta se crea como "pagado"
-          mensaje: 'Venta generada automáticamente'
-        };
+        // ✅ Usar null para UsuarioVendedorId (se asignará después)
+        const usuarioVendedorId = null;
+        console.log('👤 UsuarioVendedorId será null (se asignará después en el módulo de ventas)');
+
+        // Verificar si ya existe una venta para este pedido
+        const [ventaExistente] = await dbPool.execute(
+          "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
+          [id] // ✅ Usamos id que es el PedidoClienteId
+        );
+
+        if (ventaExistente.length > 0) {
+          console.log('⚠️ Ya existe una venta para este pedido:', ventaExistente[0].VentaId);
+          updated.ventaCreada = {
+            id: ventaExistente[0].VentaId,
+            yaExiste: true,
+            mensaje: 'La venta ya había sido creada anteriormente'
+          };
+        } else {
+          // Llamar a la función para crear venta (con usuarioVendedorId = null)
+          console.log('🚀 Llamando a crearVentaDesdePedidoId con PedidoClienteId:', id);
+          console.log('🚀 UsuarioVendedorId:', usuarioVendedorId);
+
+          const resultadoVenta = await crearVentaDesdePedidoId(id, usuarioVendedorId);
+
+          console.log('✅ RESULTADO DE CREACIÓN DE VENTA:', JSON.stringify(resultadoVenta, null, 2));
+
+          updated.ventaCreada = {
+            id: resultadoVenta.VentaId,
+            estado: 'pagado',
+            mensaje: 'Venta generada automáticamente'
+          };
+        }
+
       } catch (ventaError) {
-        console.error('⚠️ Error al crear venta automáticamente:', ventaError.message);
-        // El pedido se actualizó igual, pero la venta falló (se puede reintentar después)
-        updated.errorVenta = ventaError.message;
+        console.error('❌ [PEDIDOS] ERROR AL CREAR VENTA:');
+        console.error('❌ Mensaje:', ventaError.message);
+        console.error('❌ Stack:', ventaError.stack);
+
+        updated.errorVenta = {
+          mensaje: ventaError.message,
+          stack: ventaError.stack
+        };
       }
+    } else {
+      console.log('⏭️ [PEDIDOS] Estado no es "aprobado", no se crea venta');
     }
 
+    console.log('✅ [PEDIDOS] ===== ACTUALIZACIÓN COMPLETADA =====');
     res.json(updated);
+
   } catch (error) {
-    console.error('❌ Error en updatePedidoCliente:', error);
-    res.status(500).json({ 
+    console.error('❌ [PEDIDOS] ERROR GENERAL:');
+    console.error('❌ Mensaje:', error.message);
+    console.error('❌ Stack:', error.stack);
+    res.status(500).json({
       message: 'Error al actualizar el pedido.',
-      error: error.message 
+      error: error.message
     });
   }
 };
 
-// ========================================
-// RESTO DE FUNCIONES (SIN CAMBIOS)
-// ========================================
 export const getPedidosClientes = async (req, res) => {
   try {
     console.log('🔍 [CONTROLLER] Obteniendo todos los pedidos...');
-    
+
     const pedidos = await getAllPedidosClientesModel();
-    
+
     console.log(`✅ [CONTROLLER] Pedidos obtenidos: ${pedidos.length}`);
-    
-    // 🔴 Manejar errores al obtener detalles individualmente
+
+    // Manejar errores al obtener detalles individualmente
     for (let p of pedidos) {
       try {
         p.detalle = await getDetallePedidoByPedidoIdModel(p.PedidoClienteId);
@@ -389,7 +430,7 @@ export const getPedidosClientes = async (req, res) => {
     res.status(200).json(pedidos);
   } catch (error) {
     console.error("❌ [CONTROLLER] Error al obtener pedidos:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Error al obtener pedidos",
       details: error.message,
       sqlError: error.code
