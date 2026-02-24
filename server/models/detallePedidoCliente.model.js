@@ -1,12 +1,13 @@
 import { v4 as uuidv4 } from "uuid";
 import { dbPool } from "../lib/db.js";
 
-
+// ========================================
+// OBTENER DETALLES POR ID DE PEDIDO
+// ========================================
 export const getDetallePedidoByPedidoIdModel = async (PedidoClienteId) => {
   try {
     console.log(`🔍 [MODEL] Buscando detalles con colores para pedido: ${PedidoClienteId}`);
     
-    // 🔥 REMOVIDO: d.Subtotal (no existe en la tabla)
     const [rows] = await dbPool.execute(
       `SELECT 
         d.DetallePedidoClienteId,
@@ -26,7 +27,7 @@ export const getDetallePedidoByPedidoIdModel = async (PedidoClienteId) => {
       [PedidoClienteId]
     );
     
-    // 🔥 Calcula Subtotal en JS (no en DB)
+    // Calcula Subtotal en JS (no en DB)
     const detallesConSubtotal = rows.map(row => ({
       ...row,
       Subtotal: (row.Cantidad || 0) * (row.Precio || 0)
@@ -40,6 +41,9 @@ export const getDetallePedidoByPedidoIdModel = async (PedidoClienteId) => {
   }
 };
 
+// ========================================
+// CREAR DETALLE DE PEDIDO
+// ========================================
 export const createDetallePedidoModel = async ({
   PedidoClienteId,
   ProductoId,
@@ -52,7 +56,7 @@ export const createDetallePedidoModel = async ({
   ColorId
 }) => {
   try {
-    const DetallePedidoClienteId = uuidv4(); // ← Generar UUID
+    const DetallePedidoClienteId = uuidv4();
     
     const query = `
       INSERT INTO detallePedidosClientes 
@@ -61,7 +65,7 @@ export const createDetallePedidoModel = async ({
     `;
     
     const values = [
-      DetallePedidoClienteId, // ← Incluir el ID generado
+      DetallePedidoClienteId,
       PedidoClienteId,
       ProductoId || null,
       ServicioId || null,
@@ -91,9 +95,11 @@ export const createDetallePedidoModel = async ({
   }
 };
 
+// ========================================
+// ELIMINAR DETALLE DE PEDIDO POR ID
+// ========================================
 export const deleteDetallePedidoModel = async (id) => {
   try {
-    // ✅ Usar el nombre exacto: detallePedidosClientes
     const [result] = await dbPool.execute(
       "DELETE FROM detallePedidosClientes WHERE DetallePedidoClienteId = ?",
       [id]
@@ -101,6 +107,26 @@ export const deleteDetallePedidoModel = async (id) => {
     return result;
   } catch (error) {
     console.error("❌ Error en deleteDetallePedidoModel:", error);
+    throw error;
+  }
+};
+
+// ========================================
+// ✅ NUEVA FUNCIÓN: ELIMINAR TODOS LOS DETALLES DE UN PEDIDO
+// ========================================
+export const deleteDetallesByPedidoIdModel = async (pedidoId) => {
+  try {
+    console.log(`🗑️ [MODEL] Eliminando todos los detalles del pedido: ${pedidoId}`);
+    
+    const [result] = await dbPool.execute(
+      "DELETE FROM detallePedidosClientes WHERE PedidoClienteId = ?",
+      [pedidoId]
+    );
+    
+    console.log(`✅ [MODEL] ${result.affectedRows} detalles eliminados del pedido ${pedidoId}`);
+    return result;
+  } catch (error) {
+    console.error("❌ [MODEL] Error en deleteDetallesByPedidoIdModel:", error);
     throw error;
   }
 };

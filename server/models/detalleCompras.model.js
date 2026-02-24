@@ -18,56 +18,60 @@ export const getDetalleByIdModel = async (id) => {
 
 export const getDetalleByCompraIdModel = async (CompraId) => {
   const [rows] = await dbPool.execute(
-    'SELECT *, TipoDetalle AS TipoDetalle FROM DetalleCompras WHERE CompraId = ?',
+    'SELECT * FROM DetalleCompras WHERE CompraId = ?',
     [CompraId]
   );
   return rows;
 };
 
-// CORREGIDO: Agregar PrecioUnitario
+// ✅ SOLO ProductoId, eliminado InsumoId y TipoDetalle
 export const createDetalleCompra = async ({  
     CompraId,
-    TipoDetalle, 
     ProductoId, 
-    InsumoId,
     Cantidad, 
     Descripcion,
-    PrecioUnitario  // ← AGREGAR
+    PrecioUnitario
  }) => {
   const DetalleCompraId = uuidv4();
 
+  // La tabla DetalleCompras ahora solo tiene:
+  // DetalleCompraId, CompraId, ProductoId, Cantidad, PrecioUnitario, Descripcion
   await dbPool.execute(
     `INSERT INTO DetalleCompras 
-    (DetalleCompraId, CompraId, TipoDetalle, ProductoId, InsumoId, Cantidad, PrecioUnitario, Descripcion) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    (DetalleCompraId, CompraId, ProductoId, Cantidad, PrecioUnitario, Descripcion) 
+    VALUES (?, ?, ?, ?, ?, ?)`,
     [
       DetalleCompraId,
       CompraId, 
-      sanitize(TipoDetalle),
       sanitize(ProductoId), 
-      sanitize(InsumoId), 
       sanitize(Cantidad),
-      sanitize(PrecioUnitario || 0),  // ← AGREGAR
+      sanitize(PrecioUnitario || 0),
       sanitize(Descripcion),
     ]
   );
-  return { DetalleCompraId, CompraId, TipoDetalle, ProductoId, InsumoId, Cantidad, PrecioUnitario, Descripcion };
+  
+  return { 
+    DetalleCompraId, 
+    CompraId, 
+    ProductoId, 
+    Cantidad, 
+    PrecioUnitario, 
+    Descripcion 
+  };
 };
 
-// CORREGIDO: Agregar PrecioUnitario
+// ✅ Actualización solo con ProductoId
 export const updateDetalleCompra = async (id, data) => {
-  const { TipoDetalle, ProductoId, InsumoId, Cantidad, Descripcion, PrecioUnitario } = data;
+  const { ProductoId, Cantidad, Descripcion, PrecioUnitario } = data;
 
   const [result] = await dbPool.execute(
     `UPDATE DetalleCompras
-    SET TipoDetalle = ?, ProductoId = ?, InsumoId = ?, Cantidad = ?, PrecioUnitario = ?, Descripcion = ?
-    WHERE DetalleCompraId = ?`,
+     SET ProductoId = ?, Cantidad = ?, PrecioUnitario = ?, Descripcion = ?
+     WHERE DetalleCompraId = ?`,
     [
-      sanitize(TipoDetalle), 
       sanitize(ProductoId), 
-      sanitize(InsumoId), 
       sanitize(Cantidad), 
-      sanitize(PrecioUnitario || 0),  // ← AGREGAR
+      sanitize(PrecioUnitario || 0),
       sanitize(Descripcion), 
       id
     ]

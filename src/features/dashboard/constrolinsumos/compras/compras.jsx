@@ -5,9 +5,8 @@ import { ComprasCreate } from "./components/ComprasCreate";
 import { ComprasView } from "./components/ComprasView";
 import { ComprasSelectProveedor } from "./components/ComprasSelectProveedor";
 import { ComprasSelectProducto } from "./components/ComprasSelectProducto";
-import { getDetallesByCompraId, createCompra, createDetalleCompra } from "./services/services.compras";
+import { getDetallesByCompraId, createCompra, createDetalleCompra, getProductosPaginados } from "./services/services.compras";
 import { toast, ToastContainer } from "react-toastify";
-import axios from "axios";
 
 const getShortId = (id) => {
   const str = String(id || "");
@@ -31,6 +30,15 @@ const formatearFechaParaInput = (f) => {
 const formatPrice = (value) => {
   const num = Number(value);
   return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
+};
+
+// Función para obtener la fecha actual en formato YYYY-MM-DD
+const getTodayDate = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const validarFormulario = (form, detalles, listaProveedores) => {
@@ -77,7 +85,7 @@ export const Compras = () => {
     ProveedorId: "",
     nombreProveedor: "",
     Total: 0,
-    FechaRegistro: "",
+    FechaRegistro: getTodayDate(),
     Estado: 1,
   });
   const [detallesCrear, setDetallesCrear] = useState([
@@ -104,7 +112,7 @@ export const Compras = () => {
   const [proveedoresPaginados, setProveedoresPaginados] = useState([]);
   const [loadingProveedores, setLoadingProveedores] = useState(false);
 
-  // Select Producto
+  // Select Producto - SOLO productos, sin insumos
   const [searchTermProductos, setSearchTermProductos] = useState("");
   const [currentPageProductos, setCurrentPageProductos] = useState(1);
   const [totalPagesProductos, setTotalPagesProductos] = useState(1);
@@ -178,7 +186,7 @@ export const Compras = () => {
     }
   };
 
-  // Load Productos Paginados
+  // Load Productos Paginados - SOLO productos
   const loadProductosPaginados = async (page = 1, search = "") => {
     setLoadingProductos(true);
     try {
@@ -186,16 +194,18 @@ export const Compras = () => {
       params.set("page", page);
       params.set("limit", itemsPerPage);
       if (search) params.set("search", search);
+      
       const resProductos = await fetch(`http://localhost:3000/producto?${params.toString()}`);
       if (!resProductos.ok) {
         throw new Error(`HTTP error! status: ${resProductos.status}`);
       }
+      
       const dataProd = await resProductos.json();
       const prodData = Array.isArray(dataProd) ? dataProd.map(p => ({
         ...p,
-        tipo: 'producto',
         Precio: Number(p.Precio) || 0
       })) : [];
+      
       setProductosPaginados(prodData);
       setTotalProductos(prodData.length);
       setTotalPagesProductos(Math.ceil(prodData.length / itemsPerPage) || 1);
@@ -217,7 +227,7 @@ export const Compras = () => {
       ProveedorId: "",
       nombreProveedor: "",
       Total: 0,
-      FechaRegistro: new Date().toISOString().split('T')[0],
+      FechaRegistro: getTodayDate(),
       Estado: 1
     });
     setDetallesCrear([{ ProductoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }]);
@@ -347,33 +357,51 @@ export const Compras = () => {
       return;
     }
     setErrores([]);
+    
     try {
       const total = detallesCrear.reduce((sum, item) => sum + (Number(item.Subtotal) || 0), 0);
+      
       const compraData = {
         ProveedorId: formCrear.ProveedorId,
         Total: total,
-        FechaRegistro: formatearFechaParaInput(formCrear.FechaRegistro),
+        FechaRegistro: formCrear.FechaRegistro,
         Estado: formCrear.Estado,
       };
+
       const compraCreada = await createCompra(compraData);
+      
+      if (!compraCreada || !compraCreada.CompraId) {
+        throw new Error("No se recibió el ID de la compra creada");
+      }
+
+      // Crear cada detalle - SOLO con ProductoId
       for (let i = 0; i < detallesCrear.length; i++) {
         const detalle = detallesCrear[i];
+        
         const detalleData = {
           CompraId: compraCreada.CompraId,
+          ProductoId: detalle.ProductoId, 
           Cantidad: Number(detalle.Cantidad) || 0,
           PrecioUnitario: Number(detalle.PrecioUnitario) || 0,
-          Descripcion: detalle.Descripcion || `Compra de producto`,
-          ProductoId: detalle.ProductoId || null,
+          Descripcion: detalle.Descripcion || `Compra de producto`
         };
+        
         await createDetalleCompra(detalleData);
       }
+
       goToBackToList();
-      fetchCompras();
-      toast.success(`Compra creada exitosamente. Total: $${total.toFixed(2)}`);
+      await fetchCompras();
+      toast.success(`Compra creada exitosamente. Total: ${formatPrice(total)}`);
+      
     } catch (err) {
-      console.error("ERROR:", err);
-      setErrores([err.response?.data?.error || err.message || "Error al crear la compra."]);
-      toast.error("Error al crear la compra");
+      console.error("ERROR DETALLADO:", err);
+      const errorMsg = err.response?.data?.error || 
+                      err.response?.data?.message || 
+                      err.message || 
+                      "Error al crear la compra.";
+      
+      setErrores([errorMsg]);
+      toast.error(` Error: ${errorMsg}`);
     }
   };
 

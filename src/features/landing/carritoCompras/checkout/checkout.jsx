@@ -155,16 +155,18 @@ export const Checkout = () => {
         FechaRegistro: new Date().toISOString().split("T")[0],
         Total: getTotal(),
         Estado: "pendiente",
-        metodoPago: metodoPago === "entrega" ? "contra_entrega" : metodoPago,
+        MetodoPago: metodoPago === "entrega" ? "contra_entrega" : metodoPago,
         detalle: detallesFinales
       };
 
       // ✅ AGREGAR DATOS DE ENTREGA SI ES CONTRA ENTREGA
       if (metodoPago === "entrega") {
-        payload.nombre_recibe = datosEntrega.nombreRecibe;
-        payload.telefono_entrega = datosEntrega.telefono;
-        payload.direccion_entrega = datosEntrega.direccion;
+        payload.NombreRecibe = datosEntrega.nombreRecibe;
+        payload.TelefonoEntrega = datosEntrega.telefono;
+        payload.DireccionEntrega = datosEntrega.direccion;
       }
+
+      console.log('📦 Enviando pedido:', payload);
 
       // ✅ ENVIAR AL BACKEND
       const res = await fetch("http://localhost:3000/api/pedidos-clientes", {
@@ -253,24 +255,22 @@ export const Checkout = () => {
       }
 
       const formData = new FormData();
-      formData.append("voucher", file);  // 🔴 CORREGIDO: "voucher" en lugar de "comprobante"
-      formData.append("pedidoId", pedidoId);
+      formData.append("voucher", file);
 
       setUploading(true);
       try {
-        console.log('📤 Subiendo comprobante desde checkout...');
+        console.log('📤 Subiendo comprobante para pedido:', pedidoId);
         console.log('📄 Archivo:', file.name);
-        console.log('🎫 Pedido ID:', pedidoId);
 
-        const res = await fetch("http://localhost:3000/api/voucher", {
+        // ✅ ENDPOINT CORREGIDO - Actualiza el pedido con el voucher
+        const res = await fetch(`http://localhost:3000/api/pedidos-clientes/${pedidoId}/voucher`, {
           method: "POST",
           body: formData
-          // ⚠️ NO agregues headers Content-Type
         });
 
         if (res.ok) {
           const data = await res.json();
-          console.log('✅ Comprobante subido:', data);
+          console.log('✅ Comprobante subido y pedido actualizado:', data);
 
           setSuccess(true);
           toast.success("¡Comprobante enviado! Revisaremos tu pago en 24-48 horas");
@@ -282,15 +282,15 @@ export const Checkout = () => {
                 id: pedidoId,
                 referencia: `PED${pedidoId.toString().padStart(6, '0')}`,
                 total: voucher?.total,
-                voucherUrl: data.url // Agregar URL del voucher
+                voucherUrl: data.voucher // La URL del voucher guardada
               }
             });
           }, 2000);
 
         } else {
-          const errorText = await res.text();
-          console.error('❌ Error del servidor:', errorText);
-          const errorMsg = "Error al subir el comprobante. Intenta nuevamente";
+          const errorData = await res.json().catch(() => ({}));
+          console.error('❌ Error del servidor:', errorData);
+          const errorMsg = errorData.error || "Error al subir el comprobante. Intenta nuevamente";
           toast.error(errorMsg);
         }
       } catch (err) {
@@ -635,15 +635,17 @@ export const Checkout = () => {
 
             {/* Opción 1: QR */}
             <div
-              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "qr" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-                }`}
+              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                metodoPago === "qr" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+              }`}
               onClick={() => setMetodoPago("qr")}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "qr" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                      }`}
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                      metodoPago === "qr" ? "border-blue-500 bg-blue-500" : "border-gray-300"
+                    }`}
                   >
                     {metodoPago === "qr" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                   </div>
@@ -676,14 +678,16 @@ export const Checkout = () => {
 
             {/* Opción 2: Transferencia */}
             <div
-              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-                }`}
+              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                metodoPago === "transferencia" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+              }`}
               onClick={() => setMetodoPago("transferencia")}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                    }`}
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                    metodoPago === "transferencia" ? "border-blue-500 bg-blue-500" : "border-gray-300"
+                  }`}
                 >
                   {metodoPago === "transferencia" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                 </div>
@@ -714,14 +718,16 @@ export const Checkout = () => {
 
             {/* Opción 3: Contra entrega */}
             <div
-              className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "entrega" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-                }`}
+              className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                metodoPago === "entrega" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+              }`}
               onClick={() => setMetodoPago("entrega")}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "entrega" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                    }`}
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                    metodoPago === "entrega" ? "border-blue-500 bg-blue-500" : "border-gray-300"
+                  }`}
                 >
                   {metodoPago === "entrega" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                 </div>
@@ -740,8 +746,9 @@ export const Checkout = () => {
                         placeholder="Nombre completo *"
                         value={datosEntrega.nombreRecibe}
                         onChange={(e) => setDatosEntrega({ ...datosEntrega, nombreRecibe: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${erroresEntrega.nombreRecibe ? "border-red-500" : "border-gray-300"
-                          }`}
+                        className={`w-full p-3 rounded-lg border ${
+                          erroresEntrega.nombreRecibe ? "border-red-500" : "border-gray-300"
+                        }`}
                       />
                       {erroresEntrega.nombreRecibe && (
                         <p className="text-red-500 text-sm mt-1">{erroresEntrega.nombreRecibe}</p>
@@ -753,8 +760,9 @@ export const Checkout = () => {
                         placeholder="Teléfono *"
                         value={datosEntrega.telefono}
                         onChange={(e) => setDatosEntrega({ ...datosEntrega, telefono: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${erroresEntrega.telefono ? "border-red-500" : "border-gray-300"
-                          }`}
+                        className={`w-full p-3 rounded-lg border ${
+                          erroresEntrega.telefono ? "border-red-500" : "border-gray-300"
+                        }`}
                       />
                       {erroresEntrega.telefono && (
                         <p className="text-red-500 text-sm mt-1">{erroresEntrega.telefono}</p>
@@ -765,8 +773,9 @@ export const Checkout = () => {
                         placeholder="Dirección completa *"
                         value={datosEntrega.direccion}
                         onChange={(e) => setDatosEntrega({ ...datosEntrega, direccion: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${erroresEntrega.direccion ? "border-red-500" : "border-gray-300"
-                          }`}
+                        className={`w-full p-3 rounded-lg border ${
+                          erroresEntrega.direccion ? "border-red-500" : "border-gray-300"
+                        }`}
                         rows="2"
                       />
                       {erroresEntrega.direccion && (
@@ -783,10 +792,11 @@ export const Checkout = () => {
           <button
             onClick={enviarPedido}
             disabled={loading || cart.length === 0}
-            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${loading || cart.length === 0
+            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${
+              loading || cart.length === 0
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-black hover:bg-gray-800 hover:shadow-xl"
-              }`}
+            }`}
           >
             {loading ? (
               <div className="flex items-center justify-center gap-2">
