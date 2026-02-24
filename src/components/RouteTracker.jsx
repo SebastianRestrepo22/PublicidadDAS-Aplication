@@ -1,4 +1,3 @@
-// components/RouteTracker.jsx
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -17,7 +16,6 @@ export const RouteTracker = () => {
         '/login', 
         '/recuperar-contrasena', 
         '/reset-password',
-        '/pedido-exitoso',
         '/carritodecompras',
         '/editarcarritoservicio',
         '/checkout'
@@ -28,10 +26,12 @@ export const RouteTracker = () => {
         location.pathname.includes(path)
       );
       
-      // Solo guardar rutas protegidas (dashboard y cliente)
+      // Rutas que SÍ deben guardarse (dashboard, cliente, y detalles)
       const isProtectedRoute = 
         location.pathname.startsWith('/dashboard') || 
-        location.pathname.startsWith('/cliente');
+        location.pathname.startsWith('/cliente') ||
+        location.pathname.startsWith('/productos/') ||
+        location.pathname.startsWith('/servicios/');
       
       if (!shouldExclude && isProtectedRoute) {
         const fullPath = location.pathname + location.search + location.hash;
