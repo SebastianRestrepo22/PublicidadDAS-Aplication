@@ -1,8 +1,10 @@
-import { Navigate } from "react-router-dom";
+// ProtectedRouteAdmin.jsx
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export const ProtectedRouteAdmin = ({ children }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -13,17 +15,16 @@ export const ProtectedRouteAdmin = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" />;
+    localStorage.setItem('redirectAfterLogin', location.pathname);
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   const userRole = user?.Role?.toLowerCase();
   
-  // Solo clientes NO pueden acceder al dashboard
   if (userRole === "cliente") {
-    return <Navigate to="/cliente/productos" />;
+    return <Navigate to="/cliente/productos" replace />;
   }
 
-  // CUALQUIER otro rol (administrador, empleado, vendedor, diseñador, etc.)
-  // SÍ puede acceder al dashboard
+  // Si es admin o cualquier otro rol no-cliente, puede pasar
   return children;
 };

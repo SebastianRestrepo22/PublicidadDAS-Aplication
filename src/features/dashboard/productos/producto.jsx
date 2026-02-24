@@ -2,7 +2,6 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Search, Plus, ArrowLeft } from "lucide-react";
 import { deleteDataproducto, GetDataproductos, postDataproductos, updateDataproductos, buscarProductos, getColores, updateColoresProducto, getColoresProducto, cambiarEstadoProducto } from "./services/services.products.js";
-import { getAllCategorias } from "../categoriadediseño/services/services.categoria.js";
 import axios from "axios";
 
 import { toast, ToastContainer } from "react-toastify";
@@ -16,6 +15,7 @@ import { ProductoView } from "./components/ProductoView.jsx";
 import { ProductosTable } from "./components/ProductosTable.jsx";
 import { ProductoColoresModal } from "./components/ProductoColoresModal.jsx";
 import { CategoriaModal } from "./components/CategoriaModal.jsx";
+import { getAllCategorias } from "../categoria/services/services.categoria.js";
 
 export const ProductosDashboard = () => {
   const navigate = useNavigate();

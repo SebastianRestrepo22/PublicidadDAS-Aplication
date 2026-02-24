@@ -14,9 +14,9 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { GetDataservicios, getTamanosByServicio } from "../../dashboard/servicios/services/services.servicios";
-import { getAllCategorias } from "../../dashboard/categoriadediseño/services/services.categoria";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { getAllCategorias } from "../../dashboard/categoria/services/services.categoria";
 
 export const Servicios = () => {
   const navigate = useNavigate();

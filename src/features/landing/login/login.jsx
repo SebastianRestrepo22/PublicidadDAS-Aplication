@@ -316,12 +316,9 @@ export const Login = () => {
         Permisos: response.data.permisos || response.data.Permisos || []
       };
 
-      // ✅ GUARDAR EN LOCALSTORAGE (estas líneas ya existen)
+      // Guardar en localStorage
       localStorage.setItem('token', token);
-      
-      // 👇 ESTA ES LA LÍNEA CLAVE - GUARDA EL userId
       localStorage.setItem('userId', userData.CedulaId || response.data.userId || response.data.id || '');
-      
       localStorage.setItem('userName', userData.NombreCompleto || '');
       localStorage.setItem('userRole', userData.Role || '');
 
@@ -329,10 +326,24 @@ export const Login = () => {
 
       const userRole = (userData.Role || "").toLowerCase();
 
+      // Obtener la ruta a redirigir (NUEVO)
+      const redirectAfterLogin = localStorage.getItem('redirectAfterLogin');
+      const lastPath = localStorage.getItem('lastPath');
+
+      // Limpiar las rutas guardadas (NUEVO)
+      localStorage.removeItem('redirectAfterLogin');
+
       if (userRole === "cliente") {
         navigate("/cliente/productos");
       } else {
-        navigate("/dashboard");
+        // Priorizar: redirectAfterLogin > lastPath > dashboard (NUEVO)
+        if (redirectAfterLogin && redirectAfterLogin !== '/login') {
+          navigate(redirectAfterLogin);
+        } else if (lastPath && lastPath !== '/login' && !lastPath.includes('/login')) {
+          navigate(lastPath);
+        } else {
+          navigate("/dashboard");
+        }
       }
 
     } catch (error) {
@@ -363,6 +374,7 @@ export const Login = () => {
       }
     }
   };
+
 
   const getRegisterError = (fieldName) => registerErrors[fieldName] || '';
   const getLoginError = (fieldName) => loginErrors[fieldName] || '';

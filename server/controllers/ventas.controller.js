@@ -180,10 +180,23 @@ export const createVentaDesdePedido = async (req, res) => {
 export const createVentaManual = async (req, res) => {
   let connection;
   try {
+    let ventaData;
+    
+    // Verificar si los datos vienen en req.body (JSON) o en req.body.ventaData (FormData)
+    if (req.body.ventaData) {
+      // Viene de FormData (con archivos)
+      ventaData = JSON.parse(req.body.ventaData);
+      console.log("Datos desde FormData:", ventaData);
+    } else {
+      // Viene como JSON directo (sin archivos)
+      ventaData = req.body;
+      console.log("Datos desde JSON:", ventaData);
+    }
+
     const {
       ClienteId, ClienteNombre, ClienteTelefono, ClienteCorreo,
       UsuarioVendedorId, Subtotal, IVA, Total, detalles
-    } = req.body;
+    } = ventaData;
 
     if (!UsuarioVendedorId) {
       return res.status(400).json({ error: "UsuarioVendedorId es obligatorio" });
@@ -203,9 +216,15 @@ export const createVentaManual = async (req, res) => {
         ClienteCorreo, UsuarioVendedorId, FechaVenta, Subtotal, IVA, Total, Estado
       ) VALUES (?, 'manual', ?, ?, ?, ?, ?, NOW(), ?, ?, ?, 'pagado')`,
       [
-        VentaId, ClienteId || null, ClienteNombre || null,
-        ClienteTelefono || null, ClienteCorreo || null,
-        UsuarioVendedorId, Subtotal || 0, IVA || 0, Total || 0
+        VentaId, 
+        ClienteId || null, 
+        ClienteNombre || null,
+        ClienteTelefono || null, 
+        ClienteCorreo || null,
+        UsuarioVendedorId, 
+        Subtotal || 0, 
+        IVA || 0, 
+        Total || 0
       ]
     );
 
@@ -220,12 +239,19 @@ export const createVentaManual = async (req, res) => {
           Descuento, Subtotal, ColorId, DescripcionPersonalizada, UrlImagenPersonalizada
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          DetalleVentaId, VentaId, detalle.TipoItem || 'producto',
-          detalle.ProductoId || null, detalle.ServicioId || null,
-          detalle.ServicioTamanoId || null, detalle.NombreSnapshot || '',
-          detalle.Cantidad || 1, detalle.PrecioUnitario || 0,
-          detalle.Descuento || 0, subtotalDetalle,
-          detalle.ColorId || null, detalle.DescripcionPersonalizada || null,
+          DetalleVentaId, 
+          VentaId, 
+          detalle.TipoItem || 'producto',
+          detalle.ProductoId || null, 
+          detalle.ServicioId || null,
+          detalle.ServicioTamanoId || null, 
+          detalle.NombreSnapshot || '',
+          detalle.Cantidad || 1, 
+          detalle.PrecioUnitario || 0,
+          detalle.Descuento || 0, 
+          subtotalDetalle,
+          detalle.ColorId || null, 
+          detalle.DescripcionPersonalizada || null,
           detalle.UrlImagenPersonalizada || null
         ]
       );

@@ -52,7 +52,7 @@ const shortenId = (id) => {
   return strId.length > 3 ? strId.slice(-3) : strId.padStart(3, '0');
 };
 
-// Formatear precio - AHORA MANEJA STRINGS Y NUMEROS
+// Formatear precio
 const formatPrice = (value) => {
   if (value === null || value === undefined) return "$0.00";
   const num = typeof value === 'string' ? parseFloat(value) : Number(value);
@@ -92,9 +92,10 @@ const OrigenBadge = ({ origen }) => {
   );
 };
 
-// Componente de detalles expandibles
+// Componente de detalles expandibles - MEJORADO con nombres de colores e imágenes
 const DetallesProductosAcordeon = ({ detalles }) => {
   const [mostrarDetalles, setMostrarDetalles] = useState(false);
+  const [imagenAmpliada, setImagenAmpliada] = useState(null);
 
   if (!detalles || detalles.length === 0) {
     return <p className="text-gray-500 text-center py-4">No hay productos en esta venta</p>;
@@ -177,20 +178,54 @@ const DetallesProductosAcordeon = ({ detalles }) => {
                 <div className="col-span-2 text-center">{formatPrice(item.PrecioUnitario)}</div>
                 <div className="col-span-2 text-center font-semibold">{formatPrice(item.Subtotal)}</div>
                 <div className="col-span-2 text-center text-xs">
-                  {item.ColorNombre && (
+                  {/* Mostrar color con nombre y muestra visual */}
+                  {item.ColorId && (
                     <div className="flex items-center justify-center gap-1 mb-1">
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.ColorHex || '#ccc' }}></span>
-                      <span>{item.ColorNombre}</span>
+                      {item.ColorHex ? (
+                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.ColorHex }}></span>
+                      ) : (
+                        <span className="w-3 h-3 rounded-full bg-gray-300"></span>
+                      )}
+                      <span className="font-medium">{item.ColorNombre || `Color ID: ${shortenId(item.ColorId)}`}</span>
                     </div>
                   )}
-                  {item.NombreTamano && (
-                    <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">
-                      {item.NombreTamano}
-                    </span>
+                  
+                  {/* Mostrar tamaño */}
+                  {item.ServicioTamanoId && (
+                    <div className="mb-1">
+                      <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">
+                        {item.NombreTamano || `Tamaño ID: ${shortenId(item.ServicioTamanoId)}`}
+                      </span>
+                    </div>
                   )}
+                  
+                  {/* Descripción personalizada */}
                   {item.DescripcionPersonalizada && (
-                    <div className="text-gray-500 truncate max-w-[150px]" title={item.DescripcionPersonalizada}>
-                      {item.DescripcionPersonalizada.substring(0, 20)}...
+                    <div className="text-gray-600 mb-1 italic" title={item.DescripcionPersonalizada}>
+                      "{item.DescripcionPersonalizada.length > 20 
+                        ? item.DescripcionPersonalizada.substring(0, 20) + '...' 
+                        : item.DescripcionPersonalizada}"
+                    </div>
+                  )}
+                  
+                  {/* Imagen personalizada - mostrada como miniatura */}
+                  {item.UrlImagenPersonalizada && (
+                    <div className="mt-2 flex justify-center">
+                      <div className="relative group">
+                        <img 
+                          src={item.UrlImagenPersonalizada} 
+                          alt="Personalizada" 
+                          className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-500 transition-all"
+                          onClick={() => setImagenAmpliada(item.UrlImagenPersonalizada)}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.parentElement.innerHTML = '<span class="text-xs text-red-500">Error al cargar</span>';
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 rounded-lg transition-all flex items-center justify-center">
+                          <Eye size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -209,6 +244,27 @@ const DetallesProductosAcordeon = ({ detalles }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal para ver imagen ampliada */}
+      {imagenAmpliada && (
+        <Modal open={true} onClose={() => setImagenAmpliada(null)}>
+          <div className="p-4 max-w-3xl max-h-[90vh] overflow-auto">
+            <div className="flex justify-end mb-2">
+              <button 
+                onClick={() => setImagenAmpliada(null)}
+                className="p-1 hover:bg-gray-100 rounded-full"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <img 
+              src={imagenAmpliada} 
+              alt="Imagen ampliada" 
+              className="w-full h-auto object-contain rounded-lg"
+            />
+          </div>
+        </Modal>
       )}
     </div>
   );
@@ -257,9 +313,33 @@ const ModalAnular = ({ open, onClose, onConfirm, venta }) => {
   );
 };
 
-// Modal de ver detalles
+// Modal de ver detalles - MEJORADO
 const ModalVerVenta = ({ open, onClose, venta }) => {
   if (!venta) return null;
+
+  // Extraer información del vendedor
+  const vendedorNombre = venta.UsuarioVendedor?.NombreCompleto || 
+                        venta.vendedor?.NombreCompleto || 
+                        venta.UsuarioVendedorNombre || 
+                        'No especificado';
+  
+  const vendedorId = venta.UsuarioVendedor?.CedulaId || 
+                    venta.vendedor?.CedulaId || 
+                    venta.UsuarioVendedorId || 
+                    '-';
+
+  // Extraer información del pedido asociado
+  const pedidoId = venta.PedidoCliente?.PedidoClienteId || 
+                  venta.pedido?.PedidoClienteId || 
+                  venta.PedidoClienteId;
+
+  const fechaPedido = venta.PedidoCliente?.FechaRegistro || 
+                     venta.pedido?.FechaRegistro || 
+                     venta.FechaPedido;
+
+  const estadoPedido = venta.PedidoCliente?.Estado || 
+                      venta.pedido?.Estado || 
+                      venta.EstadoPedido;
 
   return (
     <Modal open={open} onClose={onClose}>
@@ -328,16 +408,16 @@ const ModalVerVenta = ({ open, onClose, venta }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-xs text-slate-500">Nombre</p>
-                <p className="font-medium">{venta.UsuarioVendedorNombre || 'No especificado'}</p>
+                <p className="font-medium">{vendedorNombre}</p>
               </div>
               <div>
                 <p className="text-xs text-slate-500">ID Vendedor</p>
-                <p className="font-mono text-sm">{venta.UsuarioVendedorId || '-'}</p>
+                <p className="font-mono text-sm">{vendedorId}</p>
               </div>
             </div>
           </div>
 
-          {venta.PedidoClienteId && (
+          {pedidoId && (
             <div className="bg-slate-50 p-5 rounded-xl">
               <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
                 <ShoppingBag size={16} /> Pedido Asociado
@@ -345,20 +425,22 @@ const ModalVerVenta = ({ open, onClose, venta }) => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-1">
                   <p className="text-xs text-slate-500">ID Pedido</p>
-                  <p className="font-mono text-sm font-medium">{venta.PedidoClienteId}</p>
+                  <p className="font-mono text-sm font-medium">{pedidoId}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Fecha Pedido</p>
-                  <p>{venta.FechaPedido ? formatDate(venta.FechaPedido) : '-'}</p>
+                  <p>{fechaPedido ? formatDate(fechaPedido) : '-'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Estado Pedido</p>
                   <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    venta.EstadoPedido === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                    venta.EstadoPedido === 'aprobado' ? 'bg-blue-100 text-blue-800' :
-                    'bg-green-100 text-green-800'
+                    estadoPedido === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                    estadoPedido === 'aprobado' ? 'bg-blue-100 text-blue-800' :
+                    estadoPedido === 'entregado' ? 'bg-green-100 text-green-800' :
+                    estadoPedido === 'cancelado' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
                   }`}>
-                    {venta.EstadoPedido || '-'}
+                    {estadoPedido || '-'}
                   </span>
                 </div>
               </div>
@@ -593,7 +675,7 @@ export const Ventas = () => {
           {/* FILTROS Y BOTÓN DE CREAR */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              {/* BOTÓN DE CREAR VENTA - AGREGADO */}
+              {/* BOTÓN DE CREAR VENTA */}
               <button
                 onClick={() => navigate("/dashboard/ventas/crear")}
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow"
@@ -690,6 +772,7 @@ export const Ventas = () => {
                     <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-left">Cliente</th>
                     <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-left">Fecha</th>
                     <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-left">Total</th>
+                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-left">Items</th>
                     <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-left">Origen</th>
                     <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-left">Estado</th>
                     <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-center">Acciones</th>
@@ -698,7 +781,7 @@ export const Ventas = () => {
                 <tbody className="divide-y divide-slate-100">
                   {cargando ? (
                     <tr>
-                      <td colSpan="7" className="py-12 text-center">
+                      <td colSpan="8" className="py-12 text-center">
                         <div className="flex justify-center">
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
                         </div>
@@ -717,15 +800,26 @@ export const Ventas = () => {
                           {venta.ClienteTelefono && (
                             <div className="text-xs text-slate-500">{venta.ClienteTelefono}</div>
                           )}
+                          {venta.ClienteCorreo && (
+                            <div className="text-xs text-slate-500 truncate max-w-[150px]">{venta.ClienteCorreo}</div>
+                          )}
                         </td>
                         <td className="py-4 px-6">
                           <div className="text-sm">{formatDate(venta.FechaVenta)}</div>
                         </td>
                         <td className="py-4 px-6">
                           <div className="font-semibold text-blue-600">{formatPrice(venta.Total)}</div>
-                          <div className="text-xs text-slate-500">
-                            {venta.detalle?.length || 0} items
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="text-sm">
+                            <span className="font-medium">{venta.detalle?.length || 0}</span> items
                           </div>
+                          {venta.detalle && (
+                            <div className="text-xs text-slate-500">
+                              {venta.detalle.filter(d => d.TipoItem === 'producto').length} prod / 
+                              {venta.detalle.filter(d => d.TipoItem === 'servicio').length} serv
+                            </div>
+                          )}
                         </td>
                         <td className="py-4 px-6">
                           <OrigenBadge origen={venta.Origen} />
@@ -758,7 +852,7 @@ export const Ventas = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="7" className="py-12 text-center">
+                      <td colSpan="8" className="py-12 text-center">
                         <div className="text-slate-500">
                           <ShoppingBag size={48} className="mx-auto mb-3 text-slate-300" />
                           <p className="text-lg font-medium">No hay ventas registradas</p>

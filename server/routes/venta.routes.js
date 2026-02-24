@@ -1,3 +1,4 @@
+import express from 'express';
 import { Router } from "express";
 import {
   getVentas,
@@ -27,10 +28,10 @@ router.get("/:id/detalles", getDetallesByVenta);
 router.post("/desde-pedido", createVentaDesdePedido);
 
 // Crear venta manual
-router.post("/manual", createVentaManual);
+router.post('/manual', express.json({ limit: '50mb' }), createVentaManual);
 
 // Anular venta (NO eliminar)
 router.put("/:id/anular", anularVenta);
 
-console.log("✅ Rutas de ventas registradas correctamente");
+console.log("Rutas de ventas registradas correctamente");
 export default router;
