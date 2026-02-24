@@ -4,9 +4,16 @@ import connectDB from "../lib/db.js";
 
 const sanitize = (v) => (v === undefined ? null : v);
 
+<<<<<<< Updated upstream
 export const createVentaFromPedidoModel = async (pedidoData, detallesPedido) => {
+<<<<<<< HEAD
 // Obtener todas las ventas
 export const getAllVqentasModel = async () => {
+=======
+=======
+// Obtener todas las ventas
+export const getAllVentasModel = async () => {
+>>>>>>> 4952df6 (Cambios de pedidos, inicio graficos)
   const connection = await connectDB();
   try {
     const [rows] = await connection.execute(`
@@ -66,6 +73,10 @@ export const getVentaByIdModel = async (ventaId) => {
 
 // Crear venta desde pedido
 export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) => {
+<<<<<<< HEAD
+=======
+>>>>>>> Stashed changes
+>>>>>>> 4952df6 (Cambios de pedidos, inicio graficos)
   const connection = await connectDB();
   
   try {
