@@ -6,6 +6,15 @@ const formatPrice = (value) => {
   return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
 };
 
+// Función para obtener la fecha actual en formato YYYY-MM-DD
+const getTodayDate = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export const ComprasCreate = ({
   formCrear,
   setFormCrear,
@@ -61,6 +70,7 @@ export const ComprasCreate = ({
           <input
             type="date"
             value={formCrear.FechaRegistro}
+            max={getTodayDate()}
             onChange={(e) => setFormCrear({ ...formCrear, FechaRegistro: e.target.value })}
             className="w-full h-11 px-3 border rounded focus:outline-none focus:ring-2 focus:ring-green-500"
           />
@@ -161,14 +171,20 @@ export const ComprasCreate = ({
                         />
                       </td>
                       <td className="py-4 px-6 text-right">
-                        <input
-                          type="number"
-                          value={d.PrecioUnitario}
-                          onChange={(e) => onActualizarDetalle(index, "PrecioUnitario", e.target.value)}
-                          className="w-28 px-3 py-2 border rounded text-right focus:outline-none focus:ring-2 focus:ring-green-500"
-                          min="0"
-                          step="0.01"
-                        />
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
+                            $
+                          </span>
+                          <input
+                            type="number"
+                            value={d.PrecioUnitario}
+                            onChange={(e) => onActualizarDetalle(index, "PrecioUnitario", e.target.value)}
+                            className="w-28 pl-7 pr-3 py-2 border rounded text-right focus:outline-none focus:ring-2 focus:ring-green-500"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                          />
+                        </div>
                       </td>
                       <td className="py-4 px-6 text-right font-medium text-gray-800">
                         {formatPrice(d.Subtotal)}

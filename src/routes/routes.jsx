@@ -27,9 +27,19 @@ import { ProductosDashboard } from "../features/dashboard/productos/producto";
 import { ServiciosDashboard } from "../features/dashboard/servicios/servicio";
 import { ProductoDetalle } from "../features/landing/nuestrosproductos/productoDetalle";
 import { EditarCarritoServicio } from "../features/landing/carritoCompras/CarritoProductos/editarCarritoServicio";
+<<<<<<< Updated upstream
 import { Categorias } from "../features/dashboard/categoriadediseño/categorias";
 import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidosClientes";
 import DetallePedido from "../features/landing/historial/detallePedidos";
+=======
+import { Clientes } from "../features/dashboard/clientes/clientes";
+import { SinAcceso } from "../features/dashboard/SinAcceso/SinAcceso";
+import { RequirePermission } from "../components/RequirePermission";
+import { CrearVenta } from "../features/dashboard/gestionventas/venta/components/CrearVenta";
+import DetallePedido from "../features/landing/historial/DetallePedidos";
+import { Categorias } from "../features/dashboard/categoria/categorias";
+import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidosClientes";
+>>>>>>> Stashed changes
 
 export const Routers = () => {
   return (
@@ -110,6 +120,59 @@ export const Routers = () => {
             </ProtectedRouteAdmin>
           }
         >
+<<<<<<< Updated upstream
+=======
+          {/* Ruta de sin acceso */}
+          <Route path="sin-acceso" element={<SinAcceso />} />
+          
+          {/* Rutas protegidas por permisos */}
+          <Route 
+            path="graficosEstadisticos" 
+            element={
+              <RequirePermission permission="ver_dashboard">
+                <GraficosEstadisticos />
+              </RequirePermission>
+            } 
+          />
+          
+          <Route 
+            path="categorias" 
+            element={
+              <RequirePermission permission="ver_categorias">
+                <Categorias />
+              </RequirePermission>
+            } 
+          />
+          
+          <Route 
+            path="usuarios" 
+            element={
+              <RequirePermission permission="ver_usuarios">
+                <Usuarios />
+              </RequirePermission>
+            } 
+          />
+          
+          <Route 
+            path="roles" 
+            element={
+              <RequirePermission permission="ver_roles">
+                <Roles />
+              </RequirePermission>
+            } 
+          />
+          
+          
+          <Route 
+            path="proveedores" 
+            element={
+              <RequirePermission permission="ver_proveedores">
+                <Proveedores />
+              </RequirePermission>
+            } 
+          />
+
+>>>>>>> Stashed changes
           <Route path="graficosEstadisticos" element={<GraficosEstadisticos />} />
           <Route path="categorias" element={<Categorias/>} />
           <Route path="usuarios" element={<Usuarios />} />
@@ -143,6 +206,32 @@ export const Routers = () => {
           <Route path="ventas/:id" element={<Ventas />} />
           <Route path="ventas/:id/editar" element={<Ventas />} />
 
+<<<<<<< Updated upstream
+=======
+          <Route 
+            path="pedidosClientes" 
+            element={
+              <RequirePermission permission="ver_pedidos">
+                <PedidosClientes />
+              </RequirePermission>
+            } 
+          />
+          <Route path="pedidosClientes/nuevo" element={
+            <RequirePermission permission="ver_pedidos">
+              <PedidosClientes />
+            </RequirePermission>
+          } />
+          <Route path="pedidosClientes/:id" element={
+            <RequirePermission permission="ver_pedidos">
+              <PedidosClientes />
+            </RequirePermission>
+          } />
+          <Route path="pedidosClientes/:id/editar" element={
+            <RequirePermission permission="ver_pedidos">
+              <PedidosClientes/>
+            </RequirePermission>
+          } />
+>>>>>>> Stashed changes
 
         </Route>
 

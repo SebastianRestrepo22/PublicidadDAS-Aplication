@@ -48,20 +48,18 @@ export const getDetalleByCompraId = async (req, res) => {
 
 // Crear nuevo detalle - CORREGIDO
 export const createDetalle = async (req, res) => {
-  const { CompraId, TipoDetalle, ProductoId, InsumoId, Cantidad, Descripcion, PrecioUnitario } = req.body; // ← Agregar PrecioUnitario
+  const { CompraId,  ProductoId, Cantidad, Descripcion, PrecioUnitario } = req.body; // ← Agregar PrecioUnitario
 
-  if (!CompraId || !TipoDetalle || !Cantidad) {
+  if (!CompraId || !Cantidad) {
     return res.status(400).json({
-      error: "CompraId, TipoDetalle y Cantidad son obligatorios"
+      error: "CompraId, y Cantidad son obligatorios"
     });
   }
 
   try {
     const result = await createDetalleModel({
       CompraId,
-      TipoDetalle,
       ProductoId: ProductoId || null,
-      InsumoId: InsumoId || null,
       Cantidad,
       Descripcion: Descripcion || null,
       PrecioUnitario: PrecioUnitario || 0  // ← IMPORTANTE: Pasar PrecioUnitario al modelo
@@ -78,7 +76,7 @@ export const createDetalle = async (req, res) => {
 export const updateDetalle = async (req, res) => {
   const id = req.params.id;
 
-  const { TipoDetalle, ProductoId, InsumoId, Cantidad, Descripcion, PrecioUnitario } = req.body; // ← Agregar PrecioUnitario
+  const { ProductoId, Cantidad, Descripcion, PrecioUnitario } = req.body; // ← Agregar PrecioUnitario
 
   if (!id || id.length !== 36) {
     return res.status(400).json({ error: "ID inválido" });
@@ -86,9 +84,7 @@ export const updateDetalle = async (req, res) => {
 
   try {
     const result = await updateDetalleModel(id, {
-      TipoDetalle,
       ProductoId: ProductoId || null,
-      InsumoId: InsumoId || null,
       Cantidad,
       Descripcion: Descripcion || null,
       PrecioUnitario: PrecioUnitario || 0  // ← IMPORTANTE: Pasar PrecioUnitario al modelo

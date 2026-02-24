@@ -6,21 +6,110 @@ import {
   createPedidoClienteModel,
   updatePedidoClienteModel,
   deletePedidoClienteModel,
-  getClienteByIdModel
+  getClienteByIdModel,
 } from "../models/pedidoCliente.model.js";
 import {
   createDetallePedidoModel,
   getDetallePedidoByPedidoIdModel,
-  deleteDetallePedidoModel
+  deleteDetallePedidoModel,
+  deleteDetallesByPedidoIdModel  // ← Importar esta nueva función
 } from "../models/detallePedidoCliente.model.js";
 import { crearVentaDesdePedidoId } from "./ventas.controller.js";
 import QRCode from "qrcode";
 import { getAllColoresDB } from "../models/color.model.js";
 import { v4 as uuidv4 } from "uuid";
+import fs from 'fs'; // ← Importar fs para manejar archivos
 
 // ========================================
-// ✅ CREAR PEDIDO - MANEJA FORMDATA
+// ✅ NUEVA FUNCIÓN: SUBIR VOUCHER A PEDIDO EXISTENTE
 // ========================================
+export const uploadVoucherToPedido = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const file = req.file;
+
+    console.log('📥 [CONTROLLER] Recibida petición para subir voucher a pedido:', id);
+    console.log('📎 Archivo recibido:', file ? file.originalname : 'No hay archivo');
+
+    if (!file) {
+      return res.status(400).json({ error: 'No se proporcionó ningún archivo' });
+    }
+
+    // Verificar que el pedido existe
+    const pedidoExistente = await getPedidoClienteByIdModel(id);
+    if (!pedidoExistente) {
+      console.log('❌ Pedido no encontrado:', id);
+      
+      // Eliminar el archivo subido si el pedido no existe
+      fs.unlink(file.path, (err) => {
+        if (err) console.error('Error eliminando archivo huérfano:', err);
+      });
+      
+      return res.status(404).json({ error: 'Pedido no encontrado' });
+    }
+
+    // Construir URL del voucher
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const voucherUrl = `${protocol}://${host}/uploads/vouchers/${file.filename}`;
+
+    console.log('📝 Actualizando pedido con voucher:', voucherUrl);
+
+    // Actualizar el pedido con el voucher
+    const result = await updatePedidoClienteModel(id, { Voucher: voucherUrl });
+
+    if (result.affectedRows === 0) {
+      throw new Error('No se pudo actualizar el pedido');
+    }
+
+    // Obtener el pedido actualizado con detalles
+    const pedidoActualizado = await getPedidoClienteByIdModel(id);
+    pedidoActualizado.detalle = await getDetallePedidoByPedidoIdModel(id);
+
+    // Enviar email de confirmación al cliente
+    if (pedidoActualizado.ClienteId) {
+      try {
+        const cliente = await getClienteByIdModel(pedidoActualizado.ClienteId);
+        if (cliente?.CorreoElectronico) {
+          await sendVoucherEmail(
+            cliente.CorreoElectronico,
+            cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
+            id,
+            voucherUrl
+          );
+          console.log('📧 Email de voucher enviado');
+        }
+      } catch (emailError) {
+        console.error('⚠️ Error enviando email de voucher:', emailError);
+      }
+    }
+
+    console.log('✅ Pedido actualizado con voucher exitosamente');
+
+    res.json({
+      success: true,
+      message: 'Voucher subido correctamente',
+      voucher: voucherUrl,
+      pedido: pedidoActualizado
+    });
+
+  } catch (error) {
+    console.error('❌ Error al subir voucher:', error);
+
+    // Eliminar el archivo si hubo error
+    if (req.file) {
+      fs.unlink(req.file.path, (err) => {
+        if (err) console.error('Error eliminando archivo tras error:', err);
+      });
+    }
+
+    res.status(500).json({ 
+      error: 'Error al procesar el voucher',
+      message: error.message 
+    });
+  }
+};
+
 // ========================================
 // ✅ CREAR PEDIDO - MANEJA FORMDATA Y JSON PURO
 // ========================================
@@ -176,29 +265,24 @@ export const createPedidoCliente = async (req, res) => {
   } catch (error) {
     console.error("❌ Error al crear pedido:", error.message);
 
-    // Limpiar pedido huérfano
-    // Limpiar pedido huérfano
-if (nuevoPedido?.PedidoClienteId) {
-  try {
-    console.log(`🗑️  Eliminando detalles del pedido huérfano: ${nuevoPedido.PedidoClienteId}`);
-    // Primero: eliminar detalles
-    await dbPool.execute(
-      "DELETE FROM detallepedidosclientes WHERE PedidoClienteId = ?",
-      [nuevoPedido.PedidoClienteId]
-    );
-    
-    console.log(`🗑️  Eliminando pedido huérfano: ${nuevoPedido.PedidoClienteId}`);
-    // Luego: eliminar pedido
-    await deletePedidoClienteModel(nuevoPedido.PedidoClienteId);
-    console.log(`✅ Pedido huérfano eliminado`);
-  } catch (cleanupError) {
-    console.error("❌ Error limpiando pedido huérfano:", cleanupError);
-  }
-}
+    // Limpiar pedido huérfano - CORREGIDO: usar el modelo en lugar de dbPool
+    if (nuevoPedido?.PedidoClienteId) {
+      try {
+        console.log(`🗑️  Eliminando detalles del pedido huérfano: ${nuevoPedido.PedidoClienteId}`);
+        
+        // ✅ Usar el modelo en lugar de dbPool directamente
+        await deleteDetallesByPedidoIdModel(nuevoPedido.PedidoClienteId);
+        
+        console.log(`🗑️  Eliminando pedido huérfano: ${nuevoPedido.PedidoClienteId}`);
+        await deletePedidoClienteModel(nuevoPedido.PedidoClienteId);
+        console.log(`✅ Pedido huérfano eliminado`);
+      } catch (cleanupError) {
+        console.error("❌ Error limpiando pedido huérfano:", cleanupError);
+      }
+    }
 
     // Si hay un archivo subido, eliminarlo
     if (req.file) {
-      const fs = require('fs');
       fs.unlink(req.file.path, (err) => {
         if (err) console.error('Error eliminando archivo:', err);
       });
@@ -211,29 +295,24 @@ if (nuevoPedido?.PedidoClienteId) {
   }
 };
 
-// ========================================
-// ✅ ACTUALIZAR PEDIDO - MANEJA FORMDATA
-// ========================================
+
+// En pedidoCliente.controller.js - función updatePedidoCliente
 export const updatePedidoCliente = async (req, res) => {
   const { id } = req.params;
-  const updates = { ...req.body };
+  let updates = { ...req.body };
 
   try {
     console.log('🔍 [CONTROLLER] Actualizando pedido...');
-    console.log('📁 Archivo recibido:', req.file);
     console.log('📦 Body recibido:', updates);
 
-    // Si se subió un nuevo comprobante
-    if (req.file) {
-      const protocol = req.protocol;
-      const host = req.get('host');
-      const voucherUrl = `${protocol}://${host}/uploads/pedidos/${req.file.filename}`;
-      updates.Voucher = voucherUrl;
-    }
-
-    // Validar que al menos haya algo para actualizar
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ message: 'No se proporcionaron datos para actualizar.' });
+    // ✅ Validar que el estado sea uno de los permitidos para pedidos
+    if (updates.Estado) {
+      const estadosPermitidos = ['pendiente', 'aprobado', 'cancelado'];
+      if (!estadosPermitidos.includes(updates.Estado)) {
+        return res.status(400).json({ 
+          message: `Estado no válido. Debe ser: ${estadosPermitidos.join(', ')}` 
+        });
+      }
     }
 
     // 1. Obtener el estado actual del pedido (antes de actualizar)
@@ -242,7 +321,7 @@ export const updatePedidoCliente = async (req, res) => {
       return res.status(404).json({ message: 'Pedido no encontrado.' });
     }
 
-    // 2. Actualizar el pedido
+    // 2. Actualizar el pedido (solo con los valores permitidos)
     const result = await updatePedidoClienteModel(id, updates);
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Pedido no encontrado.' });
@@ -250,20 +329,28 @@ export const updatePedidoCliente = async (req, res) => {
 
     // 3. Obtener el pedido actualizado
     const updated = await getPedidoClienteByIdModel(id);
+    updated.detalle = await getDetallePedidoByPedidoIdModel(id);
 
-    // 4. ✅ SI EL ESTADO ES "aprobado", CREAR VENTA AUTOMÁTICAMENTE
+    // 4. ✅ SI EL ESTADO ES "aprobado", CREAR VENTA AUTOMÁTICAMENTE (con estado "pagado")
     if (updated.Estado === 'aprobado') {
       try {
-        console.log('✅ Estado "aprobado" detectado. Creando venta...');
-        const resultadoVenta = await crearVentaDesdePedidoId(id);
-        console.log('✅ Resultado de creación de venta:', resultadoVenta);
+        console.log('✅ Estado "aprobado" detectado. Creando venta en módulo de ventas...');
         
-        // Opcional: incluir info de venta en la respuesta
-        updated.ventaCreada = resultadoVenta;
+        // La función crearVentaDesdePedidoId debe crear la venta con estado "pagado"
+        const resultadoVenta = await crearVentaDesdePedidoId(id);
+        
+        console.log('✅ Venta creada exitosamente en módulo de ventas:', resultadoVenta);
+        
+        // Opcional: incluir info de la venta en la respuesta
+        updated.ventaCreada = {
+          id: resultadoVenta.VentaId,
+          estado: 'pagado',  // ← La venta se crea como "pagado"
+          mensaje: 'Venta generada automáticamente'
+        };
       } catch (ventaError) {
         console.error('⚠️ Error al crear venta automáticamente:', ventaError.message);
-        // Nota: No lanzamos error aquí para no romper la actualización del pedido
-        // El pedido se actualiza igual, pero la venta falla (se puede revisar logs)
+        // El pedido se actualizó igual, pero la venta falló (se puede reintentar después)
+        updated.errorVenta = ventaError.message;
       }
     }
 

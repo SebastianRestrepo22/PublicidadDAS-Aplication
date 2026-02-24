@@ -12,7 +12,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../../../context/CartContext";
 import { GetDataproductos } from "../../dashboard/productos/services/services.products";
-import { getAllCategorias } from "../../dashboard/categoriadediseño/services/services.categoria";
+import { getAllCategorias } from "../../dashboard/categoria/services/services.categoria";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Navbar } from "../components/Navbar";

@@ -160,7 +160,6 @@ export const ComprasView = ({
                           </div>
                         </div>
                       </td>
-                      {/* ✅ CAMPO DESCRIPCIÓN MÁS ANCHO */}
                       <td className="py-4 px-6">
                         <p className="text-gray-700 max-w-md break-words">
                           {d.Descripcion || <span className="text-gray-400 italic">Sin descripción</span>}

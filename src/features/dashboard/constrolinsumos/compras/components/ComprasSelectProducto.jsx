@@ -34,7 +34,7 @@ export const ComprasSelectProducto = ({
         </button>
         <div>
           <h3 className="text-lg font-bold">Seleccionar Producto</h3>
-          <p className="text-sm text-gray-600 ml-2">
+          <p className="text-sm text-gray-600">
             Busca y selecciona el producto que deseas agregar a la compra
           </p>
         </div>
@@ -82,11 +82,8 @@ export const ComprasSelectProducto = ({
                   className="p-4 hover:bg-emerald-50 cursor-pointer transition-colors flex items-center justify-between"
                 >
                   <div className="flex-1">
-                    <div className="font-medium flex items-center gap-2">
+                    <div className="font-medium">
                       {item.Nombre}
-                      <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
-                        Producto
-                      </span>
                     </div>
                     <div className="text-gray-600 text-sm">SKU: {item.SKU || "N/A"}</div>
                   </div>

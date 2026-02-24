@@ -4,7 +4,71 @@ import connectDB from "../lib/db.js";
 
 const sanitize = (v) => (v === undefined ? null : v);
 
+<<<<<<< Updated upstream
 export const createVentaFromPedidoModel = async (pedidoData, detallesPedido) => {
+=======
+// Obtener todas las ventas
+export const getAllVentasModel = async () => {
+  const connection = await connectDB();
+  try {
+    const [rows] = await connection.execute(`
+      SELECT 
+        v.VentaId,
+        v.Origen,
+        v.PedidoClienteId,
+        v.ClienteId,
+        v.ClienteNombre,        v.ClienteTelefono,
+        v.ClienteCorreo,
+        v.UsuarioVendedorId,
+        u.NombreCompleto AS UsuarioVendedorNombre,
+        v.FechaVenta,
+        v.Subtotal,
+        v.IVA,
+        v.Total,
+        v.Estado
+      FROM ventas v
+      LEFT JOIN usuarios u ON v.UsuarioVendedorId = u.CedulaId
+      ORDER BY v.FechaVenta DESC
+    `);
+    return rows;
+  } catch (error) {
+    console.error("Error en getAllVentasModel:", error);
+    throw error;
+  } finally {
+    connection.release?.();
+  }
+};
+
+// Obtener venta por ID
+export const getVentaByIdModel = async (ventaId) => {
+  const connection = await connectDB();
+  try {
+    const [rows] = await connection.execute(
+      `SELECT 
+        v.*,
+        u.NombreCompleto AS UsuarioVendedorNombre,
+        u.Telefono AS UsuarioTelefono,
+        u.CorreoElectronico AS UsuarioCorreo,
+        pc.FechaRegistro AS FechaPedido,
+        pc.Estado AS EstadoPedido
+      FROM ventas v
+      LEFT JOIN usuarios u ON v.UsuarioVendedorId = u.CedulaId
+      LEFT JOIN pedidosclientes pc ON v.PedidoClienteId = pc.PedidoClienteId
+      WHERE v.VentaId = ?`,
+      [ventaId]
+    );
+    return rows[0] || null;
+  } catch (error) {
+    console.error("Error en getVentaByIdModel:", error);
+    throw error;
+  } finally {
+    connection.release?.();
+  }
+};
+
+// Crear venta desde pedido
+export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) => {
+>>>>>>> Stashed changes
   const connection = await connectDB();
   
   try {

@@ -3,9 +3,6 @@ import {
   getAllCompras,
   getAllProductos,
   getAllProveedores,
-  getDetallesByCompraId,
-  createCompra,
-  createDetalleCompra,
   updateCompra
 } from "../services/services.compras";
 import { toast } from "react-toastify";

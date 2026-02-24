@@ -10,8 +10,13 @@ import {
   Tag,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+<<<<<<< Updated upstream
 import { GetDataservicios } from "../../dashboard/servicios/services/services.servicios";
 import { getAllCategorias } from "../../dashboard/categoriadediseño/services/services.categoria";
+=======
+import { GetDataservicios, getTamanosByServicio } from "../../dashboard/servicios/services/services.servicios";
+import { getAllCategorias } from "../../dashboard/categoria/services/services.categoria";
+>>>>>>> Stashed changes
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
