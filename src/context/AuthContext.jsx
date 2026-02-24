@@ -1,3 +1,4 @@
+// context/AuthContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { jwtDecode } from "jwt-decode";
 import axios from "axios";
@@ -9,7 +10,6 @@ export const AuthProvider = ({ children }) => {
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Inicializar autenticación desde localStorage
   useEffect(() => {
     const initAuth = () => {
       const token = localStorage.getItem("token");
@@ -25,17 +25,17 @@ export const AuthProvider = ({ children }) => {
       try {
         const decoded = jwtDecode(token);
 
-        // Verificar si el token ha expirado
         if (decoded.exp * 1000 < Date.now()) {
           localStorage.removeItem("token");
           localStorage.removeItem("userData");
+          localStorage.removeItem("userId");
+          localStorage.removeItem("lastPath"); // AÑADIDO
           setUser(null);
           setPermissions([]);
           setLoading(false);
           return;
         }
 
-        // Combinar datos del token con userData
         const parsedUserData = userData ? JSON.parse(userData) : {};
         const combinedUser = {
           ...decoded,
@@ -43,19 +43,19 @@ export const AuthProvider = ({ children }) => {
           Role: (decoded.Role || parsedUserData.Role || "").toLowerCase()
         };
         
-        // Extraer permisos
         const perms = decoded.Permisos || parsedUserData.Permisos || [];
         
         setUser(combinedUser);
         setPermissions(Array.isArray(perms) ? perms : []);
         
-        // Configurar headers de axios
         axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
         
       } catch (error) {
         console.error("Error al inicializar auth:", error);
         localStorage.removeItem("token");
         localStorage.removeItem("userData");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("lastPath"); // AÑADIDO
         setUser(null);
         setPermissions([]);
       } finally {
@@ -67,10 +67,24 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (token, userData) => {
-    // Guardar en localStorage
     localStorage.setItem("token", token);
+    
     if (userData) {
       localStorage.setItem("userData", JSON.stringify(userData));
+      
+      // Extraer userId del token SIEMPRE
+      try {
+        const decoded = jwtDecode(token);
+        const userId = decoded.CedulaId || userData.CedulaId || userData.id || userData.userId || '';
+        
+        if (userId) {
+          localStorage.setItem("userId", userId);
+        } else {
+          console.warn("No se encontró userId en el token ni en userData");
+        }
+      } catch (error) {
+        console.error("Error decodificando token en login:", error);
+      }
     }
 
     try {
@@ -83,14 +97,11 @@ export const AuthProvider = ({ children }) => {
       
       const perms = decoded.Permisos || userData?.Permisos || [];
       
-      // Actualizar estado SIN setTimeout
       setUser(combinedUser);
       setPermissions(Array.isArray(perms) ? perms : []);
       
-      // Configurar headers de axios
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       
-      // IMPORTANTE: Establecer loading como false inmediatamente
       setLoading(false);
       
     } catch (error) {
@@ -102,6 +113,8 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("userData");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("lastPath"); // AÑADIDO
     delete axios.defaults.headers.common["Authorization"];
     setUser(null);
     setPermissions([]);

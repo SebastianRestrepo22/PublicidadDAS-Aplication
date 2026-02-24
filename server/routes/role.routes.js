@@ -8,7 +8,6 @@ import {
   changeState,
   validarRol,
   buscarRoles,
-  // Nuevas funciones
   getAllPermissions,
   getRolePermissions,
   updateRolePermissions,

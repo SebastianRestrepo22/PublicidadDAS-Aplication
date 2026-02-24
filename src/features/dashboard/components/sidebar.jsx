@@ -48,28 +48,6 @@ const menuItems = [
     requiredPermission: "ver_usuarios"
   },
   {
-    icon: ShoppingCart,
-    label: "Ventas",
-    hasSubmenu: true,
-    submenu: [
-      {
-        label: "Servicios",
-        to: "/dashboard/servicio",
-        requiredPermission: "ver_servicios"
-      },
-      {
-        label: "Pedidos",
-        to: "/dashboard/pedidosClientes",
-        requiredPermission: "ver_pedidos"
-      },
-      {
-        label: "Ventas",
-        to: "/dashboard/ventas",
-        requiredPermission: "ver_ventas"
-      }
-    ]
-  },
-  {
     icon: Boxes,
     label: "Compras",
     hasSubmenu: true,
@@ -94,6 +72,33 @@ const menuItems = [
         to: "/dashboard/compras",
         requiredPermission: "ver_compras"
       },
+    ]
+  },
+  {
+    icon: ShoppingCart,
+    label: "Ventas",
+    hasSubmenu: true,
+    submenu: [
+      {
+        label: "Servicios",
+        to: "/dashboard/servicio",
+        requiredPermission: "ver_servicios"
+      },
+      {
+        label: "Clientes",
+        to: "/dashboard/clientes",
+        requiredPermission: "ver_clientes"
+      },
+      {
+        label: "Pedidos",
+        to: "/dashboard/pedidosClientes",
+        requiredPermission: "ver_pedidos"
+      },
+      {
+        label: "Ventas",
+        to: "/dashboard/ventas",
+        requiredPermission: "ver_ventas"
+      }
     ]
   }
 ];

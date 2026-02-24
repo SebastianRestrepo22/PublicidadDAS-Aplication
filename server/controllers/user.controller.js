@@ -3,7 +3,7 @@ import { sendResetPasswordEmail } from '../utils/email.js';
 import dayjs from "dayjs"; // para manejar expiraciones
 import crypto from "crypto";
 import {
-    buscarUsuarioData, correoExiste, creatByAdmin, deleteDataUser, getAllDataUsers, getUsuarioById, hashPassword, obtenerUsuarioActualizado, pedidosUsuarios, resetTokenModel, rolCliente, telefonoExistente, traerDatosActuales, updateDataUser, validarDataCedula, searchUsuariosModel,
+    buscarUsuarioData, correoExiste, createByAdmin, deleteDataUser, getAllDataUsers, getUsuarioById, hashPassword, obtenerUsuarioActualizado, pedidosUsuarios, resetTokenModel, rolCliente, telefonoDataExistente, traerDatosActuales, updateDataUser, validarDataCedula, searchUsuariosModel,
     getAllUsuariosSimpleModel,
     searchUsuariosForPedidosModel,
     getUserSystem,
@@ -37,7 +37,7 @@ export const createUser = async (req, res) => {
             const resetToken = crypto.randomBytes(32).toString("hex");
             const resetTokenExpire = dayjs().add(1, "hour").toDate();
 
-            await creatByAdmin({ CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, RoleId, resetToken, resetTokenExpire });
+            await createByAdmin({ CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, RoleId, resetToken, resetTokenExpire });
             // Enviar correo con link al frontend   
             await sendResetPasswordEmail(CorreoElectronico, resetToken);
 
@@ -63,7 +63,7 @@ export const getAllUsers = async (req, res) => {
 };
 
 
-// Obtener usuario por ID // corregi esta funcion porque generaba error 
+// Obtener usuario por ID 
 export const getUserById = async (req, res) => {
     const { id } = req.params;
     try {
@@ -90,6 +90,17 @@ export const updateUser = async (req, res) => {
         if (rows.length === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
 
         const currentUser = rows[0];
+
+        // Obtener RoleId del cliente
+        const rolesCliente = await rolCliente();
+        const clienteRoleId = rolesCliente[0]?.RoleId;
+
+        // Bloquear intento de asignar rol cliente
+        if (req.body.RoleId === clienteRoleId) {
+            return res.status(403).json({
+                message: 'No se puede asignar el rol Cliente desde el módulo de usuarios'
+            });
+        }
 
         // Crear objeto con campos actualizados - IMPORTANTE: Incluir RoleId del body
         const updatedUser = {
@@ -200,7 +211,7 @@ export const validarTelefono = async (req, res) => {
     const { telefono } = req.query;
 
     try {
-        const usuarios = await telefonoExistente(telefono);
+        const usuarios = await telefonoDataExistente(telefono);
 
         res.status(200).json({ exists: usuarios.length > 0 });
     } catch (error) {

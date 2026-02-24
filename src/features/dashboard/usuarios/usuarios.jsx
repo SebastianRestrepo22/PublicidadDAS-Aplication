@@ -70,10 +70,14 @@ export const Usuarios = () => {
       try {
         const response = await GetDataRoles();
         //Que solo aparezca los roles activos
-        if (response?.data) {
-          const activos = response.data.filter((rol) => rol.Estado === "Activo");
-          setRoles(activos);
-        }
+        const activos = response.data.filter(
+  (rol) =>
+    rol.Estado === "Activo" &&
+    rol.Nombre?.trim().toLowerCase() !== "cliente"
+);
+
+setRoles(activos);
+
       } catch (error) {
         console.error("Error al cargar roles:", error);
       }
@@ -157,6 +161,8 @@ export const Usuarios = () => {
   // Nuevos estados para validaciones de formato
   const [cedulaFormatoError, setCedulaFormatoError] = useState("");
   const [telefonoFormatoError, setTelefonoFormatoError] = useState("");
+  // Estado para validación del nombre
+  const [nombreError, setNombreError] = useState("");
 
   // Obtener usuarios al cargar
   useEffect(() => {
@@ -167,15 +173,34 @@ export const Usuarios = () => {
     fetchUsers();
   }, []);
 
+  // Función para validar que el nombre solo contenga letras y espacios
+  const validateNombre = (nombre) => {
+    if (!nombre) {
+      setNombreError("");
+      return true;
+    }
+    
+    // Expresión regular: solo letras (incluyendo tildes y ñ) y espacios
+    const nombreRegex = /^[A-Za-zÁáÉéÍíÓóÚúÑñ\s]+$/;
+    
+    if (!nombreRegex.test(nombre)) {
+      setNombreError("El nombre solo puede contener letras y espacios");
+      return false;
+    }
+    
+    setNombreError("");
+    return true;
+  };
+
   // Manejo de cambios en inputs con validación de solo números
   const handleChanges = (e) => {
     const { name, value } = e.target;
-    
+
     // Validación para campos numéricos (Cédula y Teléfono)
     if (name === "CedulaId" || name === "Telefono") {
       // Solo permitir números
       const numericValue = value.replace(/[^0-9]/g, '');
-      
+
       // Validar longitud máxima según el campo
       let maxLength = 0;
       if (name === "CedulaId") {
@@ -183,19 +208,27 @@ export const Usuarios = () => {
       } else if (name === "Telefono") {
         maxLength = 10; // Teléfono colombiano: 10 dígitos
       }
-      
+
       // Limitar longitud
       const limitedValue = numericValue.slice(0, maxLength);
-      
+
       setValues({ ...values, [name]: limitedValue });
-      
+
       // Validación de formato en tiempo real
       if (name === "CedulaId") {
         validateCedulaFormat(limitedValue);
       } else if (name === "Telefono") {
         validateTelefonoFormat(limitedValue);
       }
-    } else {
+    } 
+    // Validación para el nombre (solo letras y espacios)
+    else if (name === "NombreCompleto") {
+      // Permitir letras, espacios y eliminar cualquier carácter no deseado
+      const nombreValue = value.replace(/[^A-Za-zÁáÉéÍíÓóÚúÑñ\s]/g, '');
+      setValues({ ...values, [name]: nombreValue });
+      validateNombre(nombreValue);
+    }
+    else {
       setValues({ ...values, [name]: value });
     }
   };
@@ -206,20 +239,20 @@ export const Usuarios = () => {
       setCedulaFormatoError("");
       return;
     }
-    
+
     // Validar que sea numérico (ya se hace en handleChanges)
     // Validar longitud: en Colombia las cédulas tienen entre 6 y 10 dígitos
     if (cedula.length < 6 || cedula.length > 10) {
       setCedulaFormatoError("La cédula debe tener entre 6 y 10 dígitos");
       return;
     }
-    
+
     // Validar que no empiece con 0 (opcional, depende de tus reglas)
     if (cedula.startsWith('0')) {
       setCedulaFormatoError("La cédula no puede comenzar con 0");
       return;
     }
-    
+
     // Si pasa todas las validaciones
     setCedulaFormatoError("");
   };
@@ -230,25 +263,25 @@ export const Usuarios = () => {
       setTelefonoFormatoError("");
       return;
     }
-    
+
     // Validar longitud exacta: 10 dígitos para Colombia
     if (telefono.length !== 10) {
       setTelefonoFormatoError("El teléfono debe tener 10 dígitos");
       return;
     }
-    
+
     // Validar que empiece con 3 (celulares en Colombia empiezan con 3)
     // O con 60, 4, etc. dependiendo del tipo
     const codigosAreaValidos = ['3', '60', '4', '5', '6', '7', '8'];
-    const codigoValido = codigosAreaValidos.some(codigo => 
+    const codigoValido = codigosAreaValidos.some(codigo =>
       telefono.startsWith(codigo)
     );
-    
+
     if (!codigoValido) {
       setTelefonoFormatoError("El teléfono debe comenzar con un código válido (3, 60, 4, 5, 6, 7, 8)");
       return;
     }
-    
+
     // Si pasa todas las validaciones
     setTelefonoFormatoError("");
   };
@@ -260,14 +293,14 @@ export const Usuarios = () => {
 
   const handleCorreoBlur = async () => {
     if (values.CorreoElectronico === originalCorreo) return;
-    
+
     // Validación básica de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (values.CorreoElectronico && !emailRegex.test(values.CorreoElectronico)) {
       setCorreoError('Ingrese un correo electrónico válido');
       return;
     }
-    
+
     try {
       const response = await axios.get(`http://localhost:3000/user/validar-correo?correo=${values.CorreoElectronico}`);
       setCorreoError(response.data.exists ? 'Este correo ya está registrado' : '');
@@ -278,11 +311,11 @@ export const Usuarios = () => {
 
   const handleCedulaBlur = async () => {
     if (values.CedulaId === originalCedula) return;
-    
+
     // Primero validar formato
     validateCedulaFormat(values.CedulaId);
     if (cedulaFormatoError) return;
-    
+
     try {
       const response = await axios.get(`http://localhost:3000/user/validar-cedula?cedula=${values.CedulaId}`);
       setCedulaError(response.data.exists ? 'Esta cédula ya está registrada' : '');
@@ -293,11 +326,11 @@ export const Usuarios = () => {
 
   const handleTelefonoBlur = async () => {
     if (values.Telefono === originalTelefono) return;
-    
+
     // Primero validar formato
     validateTelefonoFormat(values.Telefono);
     if (telefonoFormatoError) return;
-    
+
     try {
       const response = await axios.get(`http://localhost:3000/user/validar-telefono?telefono=${values.Telefono}`);
       setTelefonoError(response.data.exists ? 'Este teléfono ya está registrado' : '');
@@ -314,6 +347,7 @@ export const Usuarios = () => {
     // Validar formatos antes de enviar
     validateCedulaFormat(values.CedulaId);
     validateTelefonoFormat(values.Telefono);
+    validateNombre(values.NombreCompleto);
 
     // Validación campos obligatorios - AHORA INCLUYE RoleId SIEMPRE
     const camposObligatorios = [
@@ -342,6 +376,12 @@ export const Usuarios = () => {
     // Validar formato de teléfono antes de enviar
     if (values.Telefono.length !== 10) {
       toast.warning("El teléfono debe tener exactamente 10 dígitos");
+      return;
+    }
+
+    // Validar formato del nombre
+    if (nombreError) {
+      toast.warning("El nombre contiene caracteres no válidos");
       return;
     }
 
@@ -402,6 +442,7 @@ export const Usuarios = () => {
     setTelefonoError("");
     setCedulaFormatoError("");
     setTelefonoFormatoError("");
+    setNombreError("");
     setSubmitted(false); // esto evita que muestre validaciones al abrir
   };
 
@@ -465,6 +506,7 @@ export const Usuarios = () => {
     setTelefonoError('');
     setCedulaFormatoError('');
     setTelefonoFormatoError('');
+    setNombreError('');
     setOpenEditar(true);
   };
 
@@ -542,23 +584,29 @@ export const Usuarios = () => {
           </div>
         </div>
 
-        {/* Nombre completo */}
+        {/* Nombre completo - CON VALIDACIÓN */}
         <div className="flex flex-col">
-          <label className="mb-1">Nombre completo</label>
+          <label className="mb-1">Nombre completo *</label>
           <input
             type="text"
             name="NombreCompleto"
             value={values.NombreCompleto}
-            placeholder="Ingrese su nombre"
+            placeholder="Ingrese su nombre (solo letras)"
             readOnly={isReadOnly}
             onChange={handleChanges}
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${submitted && !values.NombreCompleto.trim() ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
+      ${(submitted && !values.NombreCompleto.trim()) || nombreError ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
-          <div className="min-h-[16px] mt-0.5">
-            {(!values.NombreCompleto.trim() && submitted) && (
+          <div className="min-h-[32px] mt-0.5">
+            {(!values.NombreCompleto.trim() && submitted) ? (
               <p className="text-red-500 text-[12px] leading-4">Ingrese su nombre completo</p>
-            )}
+            ) : nombreError ? (
+              <p className="text-red-500 text-[12px] leading-4">{nombreError}</p>
+            ) : values.NombreCompleto ? (
+              <p className="text-gray-500 text-[11px] leading-4">
+                {values.NombreCompleto.length} caracteres • Solo letras permitidas
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -664,14 +712,14 @@ export const Usuarios = () => {
         {/* Botones */}
         <div className="col-span-1 md:col-span-2 flex gap-4 mt-3">
           {type !== "ver" && (
-            <button 
+            <button
               type="submit"
               className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
             >
               {buttonLabel}
             </button>
           )}
-          
+
           <button
             type="button"
             className={`flex-1 ${type === "ver" ? "w-full" : ""} bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors`}

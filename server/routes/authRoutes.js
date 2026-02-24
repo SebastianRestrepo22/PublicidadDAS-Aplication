@@ -433,7 +433,7 @@ router.post('/forgot-password', async (req, res) => {
                         
                         <div class="footer">
                             <p>Este es un correo automático, por favor no respondas a este mensaje.</p>
-                            <p>© ${new Date().getFullYear()} Sistema de Gestión. Todos los derechos reservados.</p>
+                            <p>© ${new Date().getFullYear()} PublicidadDAS. Todos los derechos reservados.</p>
                             <p style="margin-top: 10px; font-size: 11px; color: #a0aec0;">
                                 🔒 Por tu seguridad, nunca te pediremos tu contraseña por correo electrónico.
                             </p>

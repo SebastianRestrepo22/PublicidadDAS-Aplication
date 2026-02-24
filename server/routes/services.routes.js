@@ -6,7 +6,8 @@ import {
     updateService,
     deleteService,
     validarNombre,
-    buscarService
+    buscarService,
+    cambiarEstadoService // NUEVO
 } from '../controllers/servicios.controller.js';
 
 const router = express.Router();
@@ -23,13 +24,16 @@ router.post('/', postService);
 // Obtener todos los servicios
 router.get('/', getAllService);
 
-// // Obtener servicio por ID
+// Obtener servicio por ID
 router.get('/:id', getServiceById);
 
-// // Actualizar servicio
+// Actualizar servicio
 router.put('/:ServicioId', updateService);
 
-// // Eliminar servicio
+// NUEVO: Cambiar estado del servicio
+router.patch('/:id/estado', cambiarEstadoService);
+
+// Eliminar servicio
 router.delete('/:id', deleteService);
 
 export default router;

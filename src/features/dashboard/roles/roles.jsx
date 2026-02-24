@@ -422,143 +422,189 @@ export const Roles = () => {
 
     const totalSelected = selectedPermissions.length;
     const totalPermissions = allPermissions.length;
+    const allSelected = totalSelected === totalPermissions;
+
+    // Orden de módulos según el sidebar
+    const sidebarModuleOrder = [
+      'Dashboard',      // Medición y Desempeño
+      'Roles',          // Configuración
+      'Usuarios',       // Usuarios
+      'Categorias',     // Compras
+      'Productos',      // Compras
+      'Insumos',        // Compras (Proveedores + Compras)
+      'Servicios',      // Ventas
+      'Clientes',       // Ventas
+      'Ventas'          // Ventas (Pedidos + Ventas)
+    ];
+
+    // Ordenar los módulos según el sidebar
+    const orderedModules = Object.keys(permissionsByModule).sort((a, b) => {
+      const indexA = sidebarModuleOrder.indexOf(a);
+      const indexB = sidebarModuleOrder.indexOf(b);
+      return indexA - indexB;
+    });
+
+    // Agrupar módulos bajo las secciones del sidebar para mejor organización visual
+    const sidebarSections = [
+      { name: 'Medición y Desempeño', modules: ['Dashboard'] },
+      { name: 'Configuración', modules: ['Roles'] },
+      { name: 'Usuarios', modules: ['Usuarios'] },
+      { name: 'Compras', modules: ['Categorias', 'Productos', 'Insumos'] },
+      { name: 'Ventas', modules: ['Servicios', 'Clientes', 'Ventas'] }
+    ];
 
     return (
-      <div className="text-left flex flex-col h-full">
-        {/* Encabezado - fijo */}
-        <div className="mb-4">
-          <h4 className="text-lg font-semibold text-gray-800">Asignar permisos a:</h4>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-              {editData.Nombre}
-            </div>
-            <span className="text-sm text-gray-600">
-              ({totalSelected} de {totalPermissions} permisos seleccionados)
+      <div className="flex flex-col h-full">
+        {/* Encabezado minimalista */}
+        <div className="mb-5 pb-3 border-b border-gray-200">
+          <h3 className="text-lg font-bold text-gray-800">Permisos para: <span className="text-blue-600">{editData.Nombre}</span></h3>
+          <div className="mt-2 flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${totalSelected > 0 ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+            <span className="text-sm text-gray-600 font-medium">
+              {totalSelected} de {totalPermissions} permisos seleccionados
             </span>
           </div>
         </div>
 
-        {/* Controles globales - fijo */}
-        <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handleSelectAllPermissions}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors"
-            >
-              <Check size={16} />
-              {totalSelected === totalPermissions ? 'Deseleccionar todos' : 'Seleccionar todos'}
-            </button>
-            <div className="text-sm text-gray-500">
-              {Math.round((totalSelected / totalPermissions) * 100)}% seleccionado
-            </div>
-          </div>
+        {/* Controles compactos */}
+        <div className="mb-4 flex gap-2">
+          <button
+            type="button"
+            onClick={handleSelectAllPermissions}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${allSelected
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+          >
+            {allSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedPermissions([])}
+            className="px-4 bg-white border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+          >
+            Limpiar
+          </button>
         </div>
 
-        {/* CONTENEDOR DE PERMISOS CON SCROLL - CORRECCIÓN COMPLETA */}
-        <div className="flex-1 overflow-hidden relative">
-          <div className="absolute inset-0 overflow-y-auto pr-2">
-            {Object.keys(permissionsByModule).map((modulo) => {
-              const modulePermisos = permissionsByModule[modulo];
-              const moduleSelectedCount = modulePermisos.filter(p => selectedPermissions.includes(p.PermisoId)).length;
-              const isModuleExpanded = expandedModules.includes(modulo);
-              const isModuleAllSelected = modulePermisos.every(p => selectedPermissions.includes(p.PermisoId));
+        {/* Contenedor de permisos - ordenado según sidebar */}
+        <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+          {sidebarSections.map((section) => {
+            // Filtrar solo los módulos que existen en permissionsByModule
+            const sectionModules = section.modules.filter(module => permissionsByModule[module]);
 
-              return (
-                <div key={modulo} className="border border-gray-200 rounded-lg overflow-hidden mb-3">
-                  {/* Cabecera del módulo */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
-                    onClick={() => toggleModule(modulo)}>
-                    <div className="flex items-center gap-2">
-                      <div className={`p-1 rounded ${isModuleExpanded ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                        {isModuleExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      </div>
-                      <div>
-                        <h5 className="font-medium text-gray-800 text-sm">{modulo}</h5>
-                        <p className="text-xs text-gray-500">
-                          {moduleSelectedCount} de {modulePermisos.length} permisos
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSelectAllModule(modulo);
-                      }}
-                      className="text-xs font-medium text-blue-600 hover:text-blue-800 px-2 py-1 hover:bg-blue-50 rounded transition-colors"
-                    >
-                      {isModuleAllSelected ? 'Deseleccionar' : 'Seleccionar'} todos
-                    </button>
+            if (sectionModules.length === 0) return null;
+
+            return (
+              <div key={section.name} className="mb-5 last:mb-0">
+                {/* Título de sección (solo si tiene más de un módulo) */}
+                {sectionModules.length > 1 && (
+                  <div className="mb-3 pb-2 border-b border-gray-200">
+                    <span className="text-sm font-semibold text-gray-700">{section.name}</span>
                   </div>
+                )}
 
-                  {/* Permisos del módulo (expandido) */}
-                  {isModuleExpanded && (
-                    <div className="p-3 bg-white border-t border-gray-100">
-                      <div className="grid grid-cols-1 gap-2">
-                        {modulePermisos.map((permiso) => {
-                          const isSelected = selectedPermissions.includes(permiso.PermisoId);
-                          return (
-                            <div key={permiso.PermisoId}
-                              className={`flex items-center p-2 rounded-md transition-colors ${isSelected ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 hover:bg-gray-100'}`}>
-                              <button
-                                type="button"
-                                onClick={() => handlePermissionToggle(permiso.PermisoId)}
-                                className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'}`}
-                              >
-                                {isSelected && <Check size={10} className="text-white" />}
-                              </button>
-                              <label className="ml-2 cursor-pointer flex-1" onClick={() => handlePermissionToggle(permiso.PermisoId)}>
-                                <div className="font-medium text-sm text-gray-800">{permiso.Nombre}</div>
-                                {permiso.Descripcion && (
-                                  <div className="text-xs text-gray-500 mt-0.5">{permiso.Descripcion}</div>
-                                )}
-                              </label>
-                            </div>
-                          );
-                        })}
+                {sectionModules.map((modulo) => {
+                  const modulePermisos = permissionsByModule[modulo];
+                  const moduleSelectedCount = modulePermisos.filter(p => selectedPermissions.includes(p.PermisoId)).length;
+                  const isModuleExpanded = expandedModules.includes(modulo);
+                  const moduleAllSelected = moduleSelectedCount === modulePermisos.length;
+
+                  // Mapear nombres de módulos para mostrar mejor
+                  const moduleName = modulo === 'Insumos'
+                    ? 'Proveedores y Compras'
+                    : modulo === 'Ventas' && section.name === 'Ventas'
+                      ? 'Pedidos y Ventas'
+                      : modulo;
+
+                  return (
+                    <div key={modulo} className="mb-3 last:mb-0">
+                      {/* Header del módulo */}
+                      <div
+                        className="flex items-center justify-between py-2 cursor-pointer group"
+                        onClick={() => toggleModule(modulo)}
+                      >
+                        <div className="flex items-center gap-2">
+                          {isModuleExpanded ? (
+                            <ChevronUp size={16} className="text-gray-500 group-hover:text-gray-700 transition-colors" />
+                          ) : (
+                            <ChevronDown size={16} className="text-gray-500 group-hover:text-gray-700 transition-colors" />
+                          )}
+                          <span className="font-medium text-gray-800">{moduleName}</span>
+                          {moduleSelectedCount > 0 && (
+                            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${moduleAllSelected ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                              }`}>
+                              {moduleSelectedCount}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectAllModule(modulo);
+                          }}
+                          className={`text-xs font-medium px-2 py-1 rounded ${moduleAllSelected
+                              ? 'text-green-700 bg-green-100 hover:bg-green-200'
+                              : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                            }`}
+                        >
+                          {moduleAllSelected ? 'Todos' : 'Seleccionar'}
+                        </button>
                       </div>
+
+                      {/* Lista de permisos */}
+                      {isModuleExpanded && (
+                        <div className="mt-2 space-y-1.5 pl-6">
+                          {modulePermisos.map((permiso) => {
+                            const isSelected = selectedPermissions.includes(permiso.PermisoId);
+                            return (
+                              <div
+                                key={permiso.PermisoId}
+                                className={`flex items-center py-1.5 px-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+                                  }`}
+                                onClick={() => handlePermissionToggle(permiso.PermisoId)}
+                              >
+                                <div className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center mr-2 ${isSelected
+                                    ? 'bg-blue-600 border-blue-600'
+                                    : 'border-gray-300 bg-white hover:border-blue-400'
+                                  }`}>
+                                  {isSelected && <Check size={10} className="text-white" />}
+                                </div>
+                                <div className="flex-1">
+                                  <div className={`text-sm ${isSelected ? 'font-medium text-gray-800' : 'text-gray-700'}`}>
+                                    {permiso.Nombre}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Botones - fijos en la parte inferior */}
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-sm">
-              <span className="font-medium text-gray-700">Permisos seleccionados: </span>
-              <span className="font-semibold text-blue-700">{totalSelected}</span>
-              <span className="text-gray-500"> / {totalPermissions}</span>
-            </div>
-            <div className="text-xs text-gray-500">
-              {totalSelected === 0 ? 'Sin permisos seleccionados' :
-                totalSelected === totalPermissions ? 'Todos seleccionados' :
-                  `${totalSelected} permisos`}
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
-              onClick={handleSavePermissions}
-            >
-              <Check size={16} />
-              Guardar Permisos
-            </button>
-            <button
-              type="button"
-              className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
-              onClick={() => setOpenPermissions(false)}
-            >
-              <X size={16} />
-              Cancelar
-            </button>
-          </div>
+        {/* Botones de acción */}
+        <div className="mt-6 pt-4 border-t border-gray-200 flex gap-3">
+          <button
+            type="button"
+            className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            onClick={handleSavePermissions}
+          >
+            Guardar permisos
+          </button>
+          <button
+            type="button"
+            className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+            onClick={() => setOpenPermissions(false)}
+          >
+            Cancelar
+          </button>
         </div>
       </div>
     );
