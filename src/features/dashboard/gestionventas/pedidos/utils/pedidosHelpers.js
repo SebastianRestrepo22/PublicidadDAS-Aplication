@@ -37,9 +37,28 @@ export const shortenId = (id) => {
 };
 
 // Formatear precio
-export const formatPrice = (value) => {
-  const num = Number(value);
-  return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
+export const formatPrice = (value, currency = '$') => {
+  if (value === null || value === undefined || value === '') return `${currency}0.00`;
+  
+  // Convertir a número si es string
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  
+  // Verificar si es un número válido
+  if (isNaN(num)) return `${currency}0.00`;
+  
+  // Formatear con separador de miles y 2 decimales
+  return `${currency}${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+};
+
+/**
+ * Parsea un string de precio formateado a número
+ * Útil para cuando necesitas el valor numérico
+ */
+export const parsePrice = (formattedPrice) => {
+  if (!formattedPrice) return 0;
+  // Eliminar símbolo de moneda y comas, luego convertir a número
+  const cleanValue = formattedPrice.replace(/[$,]/g, '');
+  return parseFloat(cleanValue) || 0;
 };
 
 // Función para obtener nombre de color

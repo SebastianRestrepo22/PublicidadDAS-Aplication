@@ -550,7 +550,7 @@ export const PedidosClientes = () => {
     if (!selectedPedido) return;
 
     try {
-      console.log('📝 Enviando actualización de estado:', {
+      console.log(' Enviando actualización de estado:', {
         id: selectedPedido.PedidoClienteId,
         estado
       });
@@ -561,7 +561,7 @@ export const PedidosClientes = () => {
         { headers: { 'Content-Type': 'application/json' } }
       );
 
-      console.log('✅ Respuesta completa del servidor:', response.data);
+      console.log(' Respuesta completa del servidor:', response.data);
 
       if (estado === 'aprobado') {
         // Verificar si se creó la venta
@@ -570,7 +570,7 @@ export const PedidosClientes = () => {
           const ventaId = ventaInfo.id || ventaInfo.VentaId || '';
           
           toast.success(
-            `✅ Pedido aprobado. Venta #${ventaId.toString().slice(-3)} generada`,
+            ` Pedido aprobado. Venta #${ventaId.toString().slice(-3)} generada`,
             {
               onClick: () => navigate(`/ventas/${ventaId}`),
               closeOnClick: true
@@ -582,11 +582,11 @@ export const PedidosClientes = () => {
             ? response.data.errorVenta.mensaje || 'Error desconocido'
             : response.data.errorVenta;
           
-          toast.warning(`⚠️ Pedido aprobado, pero la venta falló: ${errorMsg}`);
-          console.error('❌ Error en creación de venta:', response.data.errorVenta);
+          toast.warning(` Pedido aprobado, pero la venta falló: ${errorMsg}`);
+          console.error(' Error en creación de venta:', response.data.errorVenta);
         } 
         else {
-          toast.success("✅ Pedido aprobado correctamente");
+          toast.success(" Pedido aprobado correctamente");
         }
       } else {
         toast.success(`Estado actualizado a ${estado}`);
@@ -596,7 +596,7 @@ export const PedidosClientes = () => {
       await fetchPedidos();
 
     } catch (err) {
-      console.error('❌ Error en la petición:', err);
+      console.error(' Error en la petición:', err);
       
       let errorMessage = "No se pudo actualizar el estado";
       if (err.response?.data) {
@@ -605,7 +605,7 @@ export const PedidosClientes = () => {
                        JSON.stringify(err.response.data);
       }
       
-      toast.error(`❌ Error: ${errorMessage}`);
+      toast.error(` Error: ${errorMessage}`);
     }
   };
 

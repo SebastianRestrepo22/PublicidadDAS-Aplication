@@ -79,8 +79,32 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
     }
     
     const VentaId = uuidv4();
-    const subtotal = pedidoData.Total || 0;
-    const IVA = subtotal * 0.19;
+    
+    // 🔥 SOLUCIÓN: Limpiar y formatear correctamente el Total
+    let subtotal = pedidoData.Total || 0;
+    
+    // Si es string, limpiar formato
+    if (typeof subtotal === 'string') {
+      // Eliminar puntos de miles y convertir coma a punto si es necesario
+      subtotal = subtotal.replace(/\./g, '').replace(',', '.');
+    }
+    
+    // Convertir a número y redondear a 2 decimales
+    subtotal = parseFloat(subtotal).toFixed(2);
+    subtotal = parseFloat(subtotal); // Volver a número para cálculos
+    
+    // Calcular IVA (19%) con 2 decimales
+    const IVA = parseFloat((subtotal * 0.19).toFixed(2));
+    
+    // Total final con 2 decimales
+    const total = parseFloat((subtotal + IVA).toFixed(2));
+    
+    console.log('Valores formateados:', {
+      subtotalOriginal: pedidoData.Total,
+      subtotalLimpio: subtotal,
+      IVA,
+      total
+    });
     
     // Determinar datos del cliente según el tipo
     let clienteId = null;
@@ -122,9 +146,9 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
         clienteTelefono, 
         clienteCorreo, 
         usuarioVendedorId || null, 
-        subtotal, 
-        IVA, 
-        subtotal + IVA
+        subtotal,  // ✅ Valor limpio
+        IVA,       // ✅ Valor limpio
+        total      // ✅ Valor limpio
       ]
     );
     
@@ -151,7 +175,7 @@ export const createVentaManualModel = async (ventaData) => {
   
   try {
     const VentaId = uuidv4();
-    const {
+    let {
       ClienteId,
       ClienteNombre,
       ClienteTelefono,
@@ -162,6 +186,18 @@ export const createVentaManualModel = async (ventaData) => {
       Total,
       Estado = 'pagado'
     } = ventaData;
+    
+    // 🔥 Limpiar y formatear valores numéricos
+    const limpiarNumero = (valor) => {
+      if (typeof valor === 'string') {
+        valor = valor.replace(/\./g, '').replace(',', '.');
+      }
+      return parseFloat(parseFloat(valor).toFixed(2));
+    };
+    
+    Subtotal = limpiarNumero(Subtotal || 0);
+    IVA = limpiarNumero(IVA || (Subtotal * 0.19));
+    Total = limpiarNumero(Total || (Subtotal + IVA));
     
     await connection.query(
       `INSERT INTO ventas (
@@ -191,7 +227,6 @@ export const createVentaManualModel = async (ventaData) => {
     connection.release();
   }
 };
-
 // Actualizar estado de venta (solo a ANULADO)
 export const anularVentaModel = async (ventaId) => {
   try {

@@ -1,5 +1,6 @@
+// OrderList.jsx
 import React from "react";
-import { Eye, Plus, Search, Trash2 } from "lucide-react"; // Trash2 se queda importado pero no se usa
+import { Eye, Plus, Search, Trash2 } from "lucide-react";
 import { Pagination } from "../../components/paginacion/pagination";
 import { formatDate, shortenId, formatPrice } from "../../gestionventas/pedidos/utils/pedidosHelpers";
 
@@ -17,7 +18,6 @@ export const OrderList = ({
   handleItemsPerPageChange,
   goToCreate,
   goToView
-  // Eliminado handleDelete
 }) => {
   return (
     <>
@@ -64,7 +64,7 @@ export const OrderList = ({
               <th className="px-6 py-4 text-left text-sm font-semibold text-white">Total</th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-white">Método</th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-white">Estado</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-white">Acciones</th> {/* Se mantiene igual */}
+              <th className="px-6 py-4 text-left text-sm font-semibold text-white">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -79,7 +79,9 @@ export const OrderList = ({
                       (pedido.TipoCliente === 'walkin' ? 'Cliente Walk-in' : '—')}
                   </td>
                   <td className="px-6 py-4 text-sm">{formatDate(pedido.FechaRegistro)}</td>
-                  <td className="px-6 py-4 text-sm font-medium">{formatPrice(pedido.Total)}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-blue-600">
+                    {formatPrice(pedido.Total)}
+                  </td>
                   <td className="px-6 py-4">
                     <span className="text-sm font-medium capitalize">
                       {pedido.MetodoPago?.replace('_', ' ') || '—'}
@@ -106,7 +108,6 @@ export const OrderList = ({
                     >
                       <Eye size={18} />
                     </button>
-                    {/* Eliminado el botón de eliminar */}
                   </td>
                 </tr>
               ))
