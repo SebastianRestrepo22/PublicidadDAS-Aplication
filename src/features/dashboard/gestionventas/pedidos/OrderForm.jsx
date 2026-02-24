@@ -103,11 +103,10 @@ export const OrderForm = ({
                     setFormData({ ...formData, ClienteId: "", NombreCliente: "" });
                     setClienteWalkin({ Nombre: "", Telefono: "", Correo: "" });
                   }}
-                  className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${
-                    tipoCliente === 'registrado'
+                  className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${tipoCliente === 'registrado'
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
                       : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   <UserCheck size={24} className="mb-2" />
                   <div className="font-medium">Cliente Registrado</div>
@@ -120,11 +119,10 @@ export const OrderForm = ({
                     setFormData({ ...formData, ClienteId: "", NombreCliente: "" });
                     setClienteWalkin({ Nombre: "", Telefono: "", Correo: "" });
                   }}
-                  className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${
-                    tipoCliente === 'walkin'
+                  className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${tipoCliente === 'walkin'
                       ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                       : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   <Store size={24} className="mb-2" />
                   <div className="font-medium">Cliente Walk-in</div>
@@ -187,11 +185,10 @@ export const OrderForm = ({
                     ...clienteWalkin,
                     Telefono: formatearTelefono(e.target.value)
                   })}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${
-                    clienteWalkin.Telefono && !validarTelefono(clienteWalkin.Telefono)
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${clienteWalkin.Telefono && !validarTelefono(clienteWalkin.Telefono)
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
                       : 'border-slate-300 focus:border-emerald-500 focus:ring-emerald-500'
-                  }`}
+                    }`}
                   placeholder="10 dígitos"
                   maxLength="10"
                 />
@@ -240,7 +237,7 @@ export const OrderForm = ({
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
                 {formData.MetodoPago === "transferencia" ? <CreditCard size={16} /> :
-                 formData.MetodoPago === "efectivo" ? <DollarSign size={16} /> : <Truck size={16} />}
+                  formData.MetodoPago === "efectivo" ? <DollarSign size={16} /> : <Truck size={16} />}
                 Método de Pago *
               </label>
               <select
@@ -264,9 +261,8 @@ export const OrderForm = ({
                   <button
                     type="button"
                     onClick={() => setShowVoucher(!showVoucher)}
-                    className={`ml-2 px-3 py-1 rounded-full text-xs font-medium ${
-                      showVoucher ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700'
-                    }`}
+                    className={`ml-2 px-3 py-1 rounded-full text-xs font-medium ${showVoucher ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700'
+                      }`}
                   >
                     {showVoucher ? 'Ocultar' : 'Mostrar'}
                   </button>
@@ -425,12 +421,18 @@ export const OrderForm = ({
 
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Selección de Producto/Servicio con IMAGEN */}
+                    {/* Selección de Producto/Servicio con IMAGEN */}
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-slate-700">
                         Producto / Servicio *
                       </label>
                       <button
-                        onClick={() => goToSelectProducto(isEdit ? "edit" : "create", index)}
+                        type="button"  // ✅ IMPORTANTE: Asegurar que sea type="button"
+                        onClick={(e) => {
+                          e.preventDefault();  // ✅ Prevenir comportamiento por defecto
+                          e.stopPropagation(); // ✅ Detener propagación del evento
+                          goToSelectProducto(isEdit ? "edit" : "create", index);
+                        }}
                         className="w-full px-4 py-3 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-left flex items-center gap-3"
                       >
                         {imagenUrl ? (
@@ -449,6 +451,35 @@ export const OrderForm = ({
                             ? getProductoNombre(d.ProductoId || d.ServicioId, productos, servicios)
                             : "Seleccionar producto/servicio"}
                         </span>
+                        <ChevronRight size={16} className="text-slate-400" />
+                      </button>
+                    </div>
+
+                    {/* Selección de Color */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-slate-700 flex items-center gap-2">
+                        <Palette size={16} /> Color
+                      </label>
+                      <button
+                        type="button"  // ✅ IMPORTANTE: Asegurar que sea type="button"
+                        onClick={(e) => {
+                          e.preventDefault();  // ✅ Prevenir comportamiento por defecto
+                          e.stopPropagation(); // ✅ Detener propagación del evento
+                          goToSelectColor(isEdit ? "edit" : "create", index);
+                        }}
+                        className="w-full px-4 py-3 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-left flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          {d.ColorId && (
+                            <div
+                              className="w-6 h-6 rounded-full border border-slate-300"
+                              style={{
+                                backgroundColor: getColorById(d.ColorId, colores)?.CodigoHex || '#e5e7eb'
+                              }}
+                            ></div>
+                          )}
+                          <span>{d.ColorId ? getColorName(d.ColorId, colores) : "Seleccionar color"}</span>
+                        </div>
                         <ChevronRight size={16} className="text-slate-400" />
                       </button>
                     </div>
