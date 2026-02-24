@@ -3,7 +3,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
 
-//  Servicios
+// Servicios
 import {
   getAllPedidosClientes,
   getDetallesByPedidoId,
@@ -12,7 +12,7 @@ import {
   getAllColores,
 } from "./services/services.pedidosClientes";
 
-// Componentes hijos (asegúrate que existan en estas rutas)
+// Componentes hijos
 import { Pagination } from "../../components/paginacion/pagination";
 import { OrderList } from "./OrderList";
 import { OrderForm } from "./OrderForm";
@@ -20,95 +20,17 @@ import { OrderView } from "./OrderView";
 import { ClientSelector } from "./ClientSelector";
 import { ProductSelector } from "./ProductSelector";
 import { ColorSelector } from "./ColorSelector";
+import { useNavigate } from "react-router-dom";
 
-//  Helpers - Ajusta la ruta según tu estructura real
-// Si no tienes el archivo, usa las funciones inline de abajo
+// Helpers
 import { generateTempId, calcularTotalDetalles } from "../../gestionventas/pedidos/utils/pedidosHelpers";
-
-// ============================================================================
-// HELPERS INLINE (por si no tienes el archivo pedidosHelpers.js)
-// ============================================================================
-
-// Si prefieres no usar el import de helpers, descomenta estas funciones:
-/*
-const generateTempId = () => 'temp_' + Math.random().toString(36).substr(2, 9);
-
-const calcularTotalDetalles = (detalles) => {
-  if (!Array.isArray(detalles)) return 0;
-  return detalles.reduce((total, d) => {
-    const cantidad = Number(d.Cantidad) || 0;
-    const precio = Number(d.Precio) || 0;
-    return total + (cantidad * precio);
-  }, 0);
-};
-
-const formatDate = (dateString) => {
-  if (!dateString) return "—";
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat('es-ES', {
-    day: 'numeric', month: 'long', year: 'numeric'
-  }).format(date);
-};
-
-const shortenId = (id) => {
-  if (!id) return "—";
-  const str = String(id);
-  return str.length > 3 ? str.slice(-3) : str.padStart(3, '0');
-};
-
-const formatPrice = (value) => {
-  const num = Number(value);
-  return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
-};
-
-const getColorName = (colorId, colores) => {
-  if (!colorId || !colores?.length) return "—";
-  const c = colores.find(col => col.ColorId === colorId);
-  return c?.Nombre || "—";
-};
-
-const getColorById = (colorId, colores) => {
-  if (!colorId || !colores?.length) return null;
-  return colores.find(col => col.ColorId === colorId);
-};
-
-const getProductoNombre = (id, productos, servicios) => {
-  if (!id) return "—";
-  const p = productos?.find(x => x.ProductoId === id);
-  if (p) return p.Nombre || p.nombre || "Producto";
-  const s = servicios?.find(x => x.ServicioId === id);
-  if (s) return s.Nombre || s.nombre || "Servicio";
-  return "—";
-};
-
-const esServicio = (id, servicios) => servicios?.some(s => s.ServicioId === id);
-
-const getProductoImagen = (id, productos, servicios) => {
-  const p = productos?.find(x => x.ProductoId === id);
-  if (p?.UrlImagen) return p.UrlImagen;
-  const s = servicios?.find(x => x.ServicioId === id);
-  return s?.UrlImagen || null;
-};
-
-const getMinDate = () => {
-  const today = new Date();
-  const y = today.getFullYear();
-  const m = String(today.getMonth() + 1).padStart(2, '0');
-  const d = String(today.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
-const validarTelefono = (tel) => !tel || /^\d{10}$/.test(tel);
-const formatearTelefono = (tel) => tel?.replace(/\D/g, '').slice(0, 10) || "";
-const getEstadoPago = (estado) => estado === 'aprobado' ? 'pagado' : estado;
-*/
 
 export const PedidosClientes = () => {
   const [pedidos, setPedidos] = useState([]);
   const [viewMode, setViewMode] = useState("list");
   const [selectedPedido, setSelectedPedido] = useState(null);
   const [returnTo, setReturnTo] = useState(null);
+  const navigate = useNavigate();
 
   // ===== FILTROS =====
   const [campoFiltro, setCampoFiltro] = useState("");
@@ -122,23 +44,37 @@ export const PedidosClientes = () => {
 
   // ===== FORMULARIO =====
   const [formPedido, setFormPedido] = useState({
-    ClienteId: "", NombreCliente: "",
+    ClienteId: "", 
+    NombreCliente: "",
     FechaRegistro: new Date().toISOString().split('T')[0],
-    Total: 0, Estado: "pendiente", MetodoPago: "transferencia",
-    NombreRecibe: "", TelefonoEntrega: "", DireccionEntrega: "",
-    Voucher: "", VoucherPreview: ""
+    Total: 0, 
+    Estado: "pendiente", 
+    MetodoPago: "transferencia",
+    NombreRecibe: "", 
+    TelefonoEntrega: "", 
+    DireccionEntrega: "",
+    Voucher: "", 
+    VoucherPreview: ""
   });
 
   const [detallesPedido, setDetallesPedido] = useState([{
-    _tempId: generateTempId(), ProductoId: "", ServicioId: "",
-    Cantidad: 1, Tamaño: "Mediana", Descripcion: "",
-    UrlImagen: "", Precio: 0, ColorId: ""
+    _tempId: generateTempId(), 
+    ProductoId: "", 
+    ServicioId: "",
+    Cantidad: 1, 
+    Tamaño: "Mediana", 
+    Descripcion: "",
+    UrlImagen: "", 
+    Precio: 0, 
+    ColorId: ""
   }]);
 
   // ===== TIPO DE CLIENTE =====
   const [tipoCliente, setTipoCliente] = useState('registrado');
   const [clienteWalkin, setClienteWalkin] = useState({
-    Nombre: "", Telefono: "", Correo: ""
+    Nombre: "", 
+    Telefono: "", 
+    Correo: ""
   });
 
   // ===== UPLOAD =====
@@ -164,7 +100,9 @@ export const PedidosClientes = () => {
     const fetchData = async () => {
       try {
         const [p, s, c] = await Promise.all([
-          getAllProductos(), getAllServicios(), getAllColores()
+          getAllProductos(), 
+          getAllServicios(), 
+          getAllColores()
         ]);
         setProductos(Array.isArray(p) ? p : []);
         setServicios(Array.isArray(s) ? s : []);
@@ -189,7 +127,11 @@ export const PedidosClientes = () => {
   const fetchPedidos = async () => {
     try {
       const base = await getAllPedidosClientes();
-      if (!Array.isArray(base)) { setPedidos([]); return; }
+      if (!Array.isArray(base)) { 
+        setPedidos([]); 
+        return; 
+      }
+      
       const conDetalles = await Promise.all(
         base.map(async (p) => {
           try {
@@ -197,10 +139,15 @@ export const PedidosClientes = () => {
             return {
               ...p,
               detalle: Array.isArray(det)
-                ? det.map(item => ({ ...item, _tempId: item.DetallePedidoClienteId || generateTempId() }))
+                ? det.map(item => ({ 
+                    ...item, 
+                    _tempId: item.DetallePedidoClienteId || generateTempId() 
+                  }))
                 : []
             };
-          } catch { return { ...p, detalle: [] }; }
+          } catch { 
+            return { ...p, detalle: [] }; 
+          }
         })
       );
       setPedidos(conDetalles);
@@ -210,7 +157,9 @@ export const PedidosClientes = () => {
     }
   };
 
-  useEffect(() => { fetchPedidos(); }, []);
+  useEffect(() => { 
+    fetchPedidos(); 
+  }, []);
 
   // ===== FILTRADO Y PAGINACIÓN =====
   useEffect(() => {
@@ -240,9 +189,16 @@ export const PedidosClientes = () => {
   }, [itemsPerPage, currentPage, allData]);
 
   // ===== NAVEGACIÓN =====
-  const goToList = () => { setViewMode("list"); setSelectedPedido(null); setErrores([]); };
+  const goToList = () => { 
+    setViewMode("list"); 
+    setSelectedPedido(null); 
+    setErrores([]); 
+  };
 
-  const goToCreate = () => { resetForm(); setViewMode("create"); };
+  const goToCreate = () => { 
+    resetForm(); 
+    setViewMode("create"); 
+  };
 
   const goToView = async (pedido) => {
     try {
@@ -250,11 +206,16 @@ export const PedidosClientes = () => {
       setSelectedPedido({
         ...pedido,
         detalle: Array.isArray(det)
-          ? det.map(item => ({ ...item, _tempId: item.DetallePedidoClienteId || generateTempId() }))
+          ? det.map(item => ({ 
+              ...item, 
+              _tempId: item.DetallePedidoClienteId || generateTempId() 
+            }))
           : []
       });
       setViewMode("view");
-    } catch { toast.error("Error al cargar detalles"); }
+    } catch { 
+      toast.error("Error al cargar detalles"); 
+    }
   };
 
   const goToEdit = async (pedido) => {
@@ -263,29 +224,50 @@ export const PedidosClientes = () => {
       setSelectedPedido({
         ...pedido,
         detalle: Array.isArray(det)
-          ? det.map(item => ({ ...item, _tempId: item.DetallePedidoClienteId || generateTempId() }))
+          ? det.map(item => ({ 
+              ...item, 
+              _tempId: item.DetallePedidoClienteId || generateTempId() 
+            }))
           : []
       });
       setErrores([]);
       setViewMode("edit");
-    } catch { toast.error("Error al cargar para editar"); }
+    } catch { 
+      toast.error("Error al cargar para editar"); 
+    }
   };
 
   // ===== RESET FORM =====
   const resetForm = () => {
     setFormPedido({
-      ClienteId: "", NombreCliente: "",
+      ClienteId: "", 
+      NombreCliente: "",
       FechaRegistro: new Date().toISOString().split('T')[0],
-      Total: 0, Estado: "pendiente", MetodoPago: "transferencia",
-      NombreRecibe: "", TelefonoEntrega: "", DireccionEntrega: "",
-      Voucher: "", VoucherPreview: ""
+      Total: 0, 
+      Estado: "pendiente", 
+      MetodoPago: "transferencia",
+      NombreRecibe: "", 
+      TelefonoEntrega: "", 
+      DireccionEntrega: "",
+      Voucher: "", 
+      VoucherPreview: ""
     });
     setDetallesPedido([{
-      _tempId: generateTempId(), ProductoId: "", ServicioId: "",
-      Cantidad: 1, Tamaño: "Mediana", Descripcion: "",
-      UrlImagen: "", Precio: 0, ColorId: ""
+      _tempId: generateTempId(), 
+      ProductoId: "", 
+      ServicioId: "",
+      Cantidad: 1, 
+      Tamaño: "Mediana", 
+      Descripcion: "",
+      UrlImagen: "", 
+      Precio: 0, 
+      ColorId: ""
     }]);
-    setClienteWalkin({ Nombre: "", Telefono: "", Correo: "" });
+    setClienteWalkin({ 
+      Nombre: "", 
+      Telefono: "", 
+      Correo: "" 
+    });
     setTipoCliente('registrado');
     setVoucherFile(null);
     setErrores([]);
@@ -364,15 +346,22 @@ export const PedidosClientes = () => {
   // ===== DETALLES =====
   const añadirDetalle = (mode) => {
     const nuevo = {
-      _tempId: generateTempId(), ProductoId: "", ServicioId: "",
-      Cantidad: 1, Tamaño: "Mediana", Descripcion: "",
-      UrlImagen: "", Precio: 0, ColorId: ""
+      _tempId: generateTempId(), 
+      ProductoId: "", 
+      ServicioId: "",
+      Cantidad: 1, 
+      Tamaño: "Mediana", 
+      Descripcion: "",
+      UrlImagen: "", 
+      Precio: 0, 
+      ColorId: ""
     };
     if (mode === "create") {
       setDetallesPedido(prev => [...prev, nuevo]);
     } else if (mode === "edit" && selectedPedido) {
       setSelectedPedido(prev => ({
-        ...prev, detalle: [...prev.detalle, nuevo]
+        ...prev, 
+        detalle: [...prev.detalle, nuevo]
       }));
     }
   };
@@ -382,7 +371,8 @@ export const PedidosClientes = () => {
       setDetallesPedido(prev => prev.filter((_, i) => i !== index));
     } else if (mode === "edit" && selectedPedido?.detalle?.length > 1) {
       setSelectedPedido(prev => ({
-        ...prev, detalle: prev.detalle.filter((_, i) => i !== index)
+        ...prev, 
+        detalle: prev.detalle.filter((_, i) => i !== index)
       }));
     }
   };
@@ -409,8 +399,9 @@ export const PedidosClientes = () => {
     if (!form.FechaRegistro) errs.push("La fecha es obligatoria.");
     if (!detalles?.length) errs.push("Agregue al menos un producto/servicio.");
     detalles?.forEach((d, i) => {
-      if (!d.ProductoId && !d.ServicioId) errs.push(`Artículo ${i + 1}: seleccione producto.`);
+      if (!d.ProductoId && !d.ServicioId) errs.push(`Artículo ${i + 1}: seleccione producto/servicio.`);
       if (!d.Cantidad || Number(d.Cantidad) <= 0) errs.push(`Artículo ${i + 1}: cantidad inválida.`);
+      if (!d.Precio || Number(d.Precio) <= 0) errs.push(`Artículo ${i + 1}: precio inválido.`);
     });
     return errs;
   };
@@ -418,22 +409,14 @@ export const PedidosClientes = () => {
   // ===== CREAR =====
   const handleCreate = async () => {
     const errs = validarFormulario(formPedido, detallesPedido, "create");
-    if (errs.length) { setErrores(errs); toast.error("Corrija los errores"); return; }
+    if (errs.length) { 
+      setErrores(errs); 
+      toast.error("Corrija los errores"); 
+      return; 
+    }
 
     try {
       setUploading(true);
-
-      // 🔴 LOG 1: Verificar el estado de voucherFile
-      console.log('🔍 ESTADO ACTUAL:');
-      console.log('   - formPedido.MetodoPago:', formPedido.MetodoPago);
-      console.log('   - voucherFile existe:', !!voucherFile);
-      console.log('   - voucherFile contenido:', voucherFile);
-
-      if (voucherFile) {
-        console.log('   - Nombre:', voucherFile.name);
-        console.log('   - Tamaño:', voucherFile.size);
-        console.log('   - Tipo:', voucherFile.type);
-      }
 
       // Preparar datos del pedido
       const detallesLimpios = detallesPedido.map(d => ({
@@ -468,25 +451,10 @@ export const PedidosClientes = () => {
       });
 
       formData.append('pedido', pedidoString);
-      console.log('📦 pedido JSON:', pedidoString);
 
-      // ✅ AGREGAR EL VOUCHER SI EXISTE
+      // Agregar el voucher si existe
       if (formPedido.MetodoPago === "transferencia" && voucherFile) {
         formData.append('voucher', voucherFile);
-        console.log('📎 Voucher adjunto al FormData:', voucherFile.name);
-      } else {
-        console.log('⚠️ No se adjunta voucher porque:',
-          formPedido.MetodoPago !== "transferencia" ? 'método de pago no es transferencia' : 'voucherFile es null');
-      }
-
-      // 🔴 LOG 2: Verificar qué tiene FormData
-      console.log('📦 FormData entries:');
-      for (let pair of formData.entries()) {
-        if (pair[0] === 'voucher') {
-          console.log('   - voucher:', pair[1]?.name || 'Archivo presente');
-        } else {
-          console.log('   -', pair[0], ':', pair[1]);
-        }
       }
 
       // Enviar petición
@@ -512,8 +480,13 @@ export const PedidosClientes = () => {
   // ===== EDITAR =====
   const handleEdit = async () => {
     if (!selectedPedido) return;
+    
     const errs = validarFormulario(selectedPedido, selectedPedido.detalle, "edit");
-    if (errs.length) { setErrores(errs); toast.error("Corrija los errores"); return; }
+    if (errs.length) { 
+      setErrores(errs); 
+      toast.error("Corrija los errores"); 
+      return; 
+    }
 
     try {
       setUploading(true);
@@ -572,8 +545,7 @@ export const PedidosClientes = () => {
     }
   };
 
-  // ===== ACTUALIZAR ESTADO =====
-  // ===== ACTUALIZAR ESTADO =====
+  // ===== ACTUALIZAR ESTADO (CORREGIDO) =====
   const handleUpdateEstado = async (estado) => {
     if (!selectedPedido) return;
 
@@ -589,26 +561,55 @@ export const PedidosClientes = () => {
         { headers: { 'Content-Type': 'application/json' } }
       );
 
-      console.log('✅ Estado actualizado:', response.data);
+      console.log('✅ Respuesta completa del servidor:', response.data);
 
-      // Mostrar mensaje apropiado
       if (estado === 'aprobado') {
-        toast.success("✅ Pedido aprobado. Venta generada automáticamente");
+        // Verificar si se creó la venta
+        if (response.data.ventaCreada) {
+          const ventaInfo = response.data.ventaCreada;
+          const ventaId = ventaInfo.id || ventaInfo.VentaId || '';
+          
+          toast.success(
+            `✅ Pedido aprobado. Venta #${ventaId.toString().slice(-3)} generada`,
+            {
+              onClick: () => navigate(`/ventas/${ventaId}`),
+              closeOnClick: true
+            }
+          );
+        } 
+        else if (response.data.errorVenta) {
+          const errorMsg = typeof response.data.errorVenta === 'object' 
+            ? response.data.errorVenta.mensaje || 'Error desconocido'
+            : response.data.errorVenta;
+          
+          toast.warning(`⚠️ Pedido aprobado, pero la venta falló: ${errorMsg}`);
+          console.error('❌ Error en creación de venta:', response.data.errorVenta);
+        } 
+        else {
+          toast.success("✅ Pedido aprobado correctamente");
+        }
       } else {
         toast.success(`Estado actualizado a ${estado}`);
       }
 
-      // ✅ VOLVER A LA LISTA Y REFRESCAR
-      goToList();  // Esto vuelve a la tabla principal
-      await fetchPedidos();  // Esto refresca los datos
+      goToList();
+      await fetchPedidos();
 
     } catch (err) {
-      console.error('❌ Error:', err);
-      toast.error(err.response?.data?.error || "No se pudo actualizar");
+      console.error('❌ Error en la petición:', err);
+      
+      let errorMessage = "No se pudo actualizar el estado";
+      if (err.response?.data) {
+        errorMessage = err.response.data.error || 
+                       err.response.data.message || 
+                       JSON.stringify(err.response.data);
+      }
+      
+      toast.error(`❌ Error: ${errorMessage}`);
     }
   };
 
-  // ===== HANDLERS DE PAGINACIÓN - ✅ DEFINIDOS LOCALMENTE =====
+  // ===== HANDLERS DE PAGINACIÓN =====
   const handlePageChange = (page) => setCurrentPage(page);
 
   const handleItemsPerPageChange = (newItems) => {

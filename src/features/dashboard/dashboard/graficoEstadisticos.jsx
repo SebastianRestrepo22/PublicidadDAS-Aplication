@@ -30,33 +30,29 @@ export const GraficosEstadisticos = () => {
   }, []);
 
   const cargarDatosDashboard = async () => {
-  try {
-    setCargando(true);
-    
-    // Ajusta la URL según tu backend
-    const response = await fetch('http://localhost:3001/api/dashboard/stats', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        // Si necesitas autenticación:
-        // 'Authorization': `Bearer ${localStorage.getItem('token')}`
+    try {
+      setCargando(true);
+
+      // Ajusta la URL según tu backend
+      const response = await fetch('http://localhost:3000/api/dashboard/stats', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al cargar datos');
       }
-    });
-    
-    if (!response.ok) {
-      throw new Error('Error al cargar datos');
+
+      const datosReales = await response.json();
+      setDatos(datosReales);
+      setCargando(false);
+
+    } catch (error) {
+      console.error("Error cargando datos:", error);
+      setError("No se pudieron cargar los datos");
+      setCargando(false);
     }
-    
-    const datosReales = await response.json();
-    setDatos(datosReales);
-    setCargando(false);
-    
-  } catch (error) {
-    console.error("Error cargando datos:", error);
-    setError("No se pudieron cargar los datos");
-    setCargando(false);
-  }
-};
+  };
 
   // Mostrar cargando mientras obtenemos datos
   if (cargando) {
@@ -76,7 +72,7 @@ export const GraficosEstadisticos = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-500 mb-4">{error}</p>
-          <button 
+          <button
             onClick={cargarDatosDashboard}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
@@ -111,7 +107,7 @@ export const GraficosEstadisticos = () => {
           <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow p-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-sm font-medium">Ventas Totales</span>
-              <ShoppingCart className="h-4 w-4"/>
+              <ShoppingCart className="h-4 w-4" />
             </div>
             <div className="text-2xl font-bold">
               ${totales.ventasTotales.toLocaleString()}
@@ -124,7 +120,7 @@ export const GraficosEstadisticos = () => {
           <div className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl shadow p-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-sm font-medium">Pedidos</span>
-              <Package className="h-4 w-4"/>
+              <Package className="h-4 w-4" />
             </div>
             <div className="text-2xl font-bold">
               {totales.pedidos.toLocaleString()}
@@ -137,7 +133,7 @@ export const GraficosEstadisticos = () => {
           <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-xl shadow p-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-sm font-medium">Usuarios Activos</span>
-              <Users className="h-4 w-4"/>
+              <Users className="h-4 w-4" />
             </div>
             <div className="text-2xl font-bold">
               {totales.usuariosActivos.toLocaleString()}
@@ -150,7 +146,7 @@ export const GraficosEstadisticos = () => {
           <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow p-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-sm font-medium">Crecimiento</span>
-              <TrendingUp className="h-4 w-4"/>
+              <TrendingUp className="h-4 w-4" />
             </div>
             <div className="text-2xl font-bold">
               {totales.crecimiento > 0 ? '+' : ''}{totales.crecimiento}%
@@ -170,10 +166,10 @@ export const GraficosEstadisticos = () => {
               Ventas por mes en el último semestre
             </p>
             <BarChart width={400} height={300} data={ventasMensuales}>
-              <CartesianGrid strokeDasharray="3 3"/>
-              <XAxis dataKey="mes"/>
-              <YAxis/>
-              <Tooltip/>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="mes" />
+              <YAxis />
+              <Tooltip />
               <Bar dataKey="ventas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </div>
@@ -182,14 +178,14 @@ export const GraficosEstadisticos = () => {
           <div className="bg-white rounded-xl shadow p-4">
             <h2 className="text-lg font-bold">Ventas semanales</h2>
             <p className="text-sm text-gray-500 mb-4">
-              Tendencia de ventas por semana 
+              Tendencia de ventas por semana
             </p>
             <LineChart width={400} height={300} data={ventasSemanales}>
-              <CartesianGrid strokeDasharray="3 3"/>
-              <XAxis dataKey="semana"/>
-              <YAxis/>
-              <Tooltip/>
-              <Line type="monotone" dataKey="ventas" stroke="#3b82f6" strokeWidth={3} dot={{fill: "#3b82f6", strokeWidth: 2, r: 4}}/>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="semana" />
+              <YAxis />
+              <Tooltip />
+              <Line type="monotone" dataKey="ventas" stroke="#3b82f6" strokeWidth={3} dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }} />
             </LineChart>
           </div>
 
@@ -197,14 +193,14 @@ export const GraficosEstadisticos = () => {
           <div className="bg-white rounded-xl shadow p-4">
             <h2 className="text-lg font-bold">Pedidos semanales</h2>
             <p className="text-sm text-gray-500 mb-4">
-              Volumen de pedidos por semana 
+              Volumen de pedidos por semana
             </p>
             <AreaChart width={400} height={300} data={pedidosSemanales}>
-              <CartesianGrid strokeDasharray="3 3"/>
-              <XAxis dataKey="semana"/>
-              <YAxis/>
-              <Tooltip/>
-              <Area 
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="semana" />
+              <YAxis />
+              <Tooltip />
+              <Area
                 type="monotone"
                 dataKey="pedidos"
                 stroke="#10b981"
@@ -218,7 +214,7 @@ export const GraficosEstadisticos = () => {
           <div className="bg-white rounded-xl shadow p-4">
             <h2 className="text-lg font-bold">Usuarios activos mensuales</h2>
             <p className="text-sm text-gray-500 mb-4">
-              Distribucion de usuarios por estado 
+              Distribucion de usuarios por estado
             </p>
             <PieChart width={400} height={300}>
               <Pie
@@ -231,7 +227,7 @@ export const GraficosEstadisticos = () => {
                 dataKey="value"
               >
                 {usuariosActivos.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color}/>
+                  <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
             </PieChart>

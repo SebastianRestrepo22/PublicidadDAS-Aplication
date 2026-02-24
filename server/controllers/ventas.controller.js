@@ -1,3 +1,4 @@
+// src/controllers/ventas.controller.js
 import { dbPool } from "../lib/db.js";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -37,143 +38,42 @@ export const getVentaById = async (req, res) => {
   }
 };
 
+// ✅ CORREGIDO: Esta función ahora usa correctamente PedidoClienteId
 export const createVentaDesdePedido = async (req, res) => {
-  let connection;
   try {
     const { PedidoClienteId, UsuarioVendedorId } = req.body;
     
+    console.log('📦 [API] createVentaDesdePedido recibido:', { PedidoClienteId, UsuarioVendedorId });
+
     if (!PedidoClienteId) {
       return res.status(400).json({ error: "PedidoClienteId es obligatorio" });
     }
+
+    // UsuarioVendedorId es opcional
     if (!UsuarioVendedorId) {
-      return res.status(400).json({ error: "UsuarioVendedorId es obligatorio" });
+      console.warn('⚠️ [API] UsuarioVendedorId no proporcionado');
     }
-    
-    connection = await dbPool.getConnection();
-    await connection.beginTransaction();
-    
-    const existe = await existeVentaParaPedidoModel(PedidoClienteId);
-    if (existe) {
-      await connection.rollback();
-      return res.status(400).json({ error: "Ya existe una venta para este pedido" });
+
+    // Llamar a la función interna que ya tiene toda la lógica
+    const resultado = await crearVentaDesdePedidoId(PedidoClienteId, UsuarioVendedorId);
+
+    if (resultado.alreadyExists) {
+      return res.status(400).json({ 
+        error: "Ya existe una venta para este pedido",
+        ventaId: resultado.VentaId 
+      });
     }
-    
-    const [pedidoRows] = await connection.execute(
-      `SELECT * FROM pedidosclientes WHERE PedidoClienteId = ?`,
-      [PedidoClienteId]
-    );
-    if (pedidoRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ error: "Pedido no encontrado" });
-    }
-    const pedido = pedidoRows[0];
-    
-    const [detallesRows] = await connection.execute(
-      `SELECT * FROM detallepedidosclientes WHERE PedidoClienteId = ?`,
-      [PedidoClienteId]
-    );
-    if (detallesRows.length === 0) {
-      await connection.rollback();
-      return res.status(400).json({ error: "El pedido no tiene detalles" });
-    }
-    
-    const VentaId = uuidv4();
-    const subtotal = pedido.Total || 0;
-    const IVA = subtotal * 0.19;
-    const total = subtotal + IVA;
-    
-    let clienteId = null;
-    let clienteNombre = pedido.ClienteNombre || null;
-    let clienteTelefono = pedido.ClienteTelefono || null;
-    let clienteCorreo = pedido.ClienteCorreo || null;
-    
-    if (pedido.TipoCliente === 'registrado' && pedido.ClienteId) {
-      clienteId = pedido.ClienteId;
-    }
-    
-    await connection.execute(
-      `INSERT INTO ventas (
-        VentaId, Origen, PedidoClienteId, ClienteId, ClienteNombre,
-        ClienteTelefono, ClienteCorreo, UsuarioVendedorId, FechaVenta,
-        Subtotal, IVA, Total, Estado
-      ) VALUES (?, 'pedido', ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, 'pagado')`,
-      [
-        VentaId, PedidoClienteId, clienteId, clienteNombre,
-        clienteTelefono, clienteCorreo, UsuarioVendedorId,
-        subtotal, IVA, total
-      ]
-    );
-    
-    for (const detalle of detallesRows) {
-      const DetalleVentaId = uuidv4();
-      let tipoItem = null;
-      let productoId = null;
-      let servicioId = null;
-      let servicioTamanoId = null;
-      let nombreSnapshot = "";
-      
-      if (detalle.ProductoId) {
-        tipoItem = 'producto';
-        productoId = detalle.ProductoId;
-        const [productoRows] = await connection.execute(
-          "SELECT Nombre FROM productos WHERE ProductoId = ?",
-          [detalle.ProductoId]
-        );
-        nombreSnapshot = productoRows.length > 0 ? productoRows[0].Nombre : "Producto";
-      } else if (detalle.ServicioId) {
-        tipoItem = 'servicio';
-        servicioId = detalle.ServicioId;
-        const [servicioRows] = await connection.execute(
-          "SELECT Nombre FROM servicios WHERE ServicioId = ?",
-          [detalle.ServicioId]
-        );
-        nombreSnapshot = servicioRows.length > 0 ? servicioRows[0].Nombre : "Servicio";
-        
-        if (detalle.Tamaño) {
-          const [tamanoRows] = await connection.execute(
-            "SELECT ServicioTamanoId FROM servicio_tamanos WHERE ServicioId = ? AND NombreTamano = ?",
-            [detalle.ServicioId, detalle.Tamaño]
-          );
-          if (tamanoRows.length > 0) {
-            servicioTamanoId = tamanoRows[0].ServicioTamanoId;
-          }
-        }
-      }
-      
-      const subtotalDetalle = detalle.Cantidad * detalle.Precio;
-      
-      await connection.execute(
-        `INSERT INTO detalleventas (
-          DetalleVentaId, VentaId, TipoItem, ProductoId, ServicioId,
-          ServicioTamanoId, NombreSnapshot, Cantidad, PrecioUnitario,
-          Descuento, Subtotal, ColorId, DescripcionPersonalizada, UrlImagenPersonalizada
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          DetalleVentaId, VentaId, tipoItem, productoId, servicioId,
-          servicioTamanoId, nombreSnapshot, detalle.Cantidad, detalle.Precio,
-          detalle.Descuento || 0, subtotalDetalle, detalle.ColorId || null,
-          detalle.Descripcion || null, detalle.UrlImagen || null
-        ]
-      );
-    }
-    
-    await connection.commit();
-    
-    const ventaCreada = await getVentaByIdModel(VentaId);
-    ventaCreada.detalle = await getDetalleVentaByVentaIdModel(VentaId);
-    
+
     res.status(201).json({
       success: true,
       message: "Venta creada exitosamente desde el pedido",
-      venta: ventaCreada
+      venta: resultado.venta,
+      VentaId: resultado.VentaId
     });
-    
+
   } catch (error) {
-    if (connection) await connection.rollback();
-    console.error("Error al crear venta desde pedido:", error);
-    res.status(500).json({ error: "Error al crear venta desde pedido" });
-  } finally {
-    if (connection) connection.release();
+    console.error("❌ Error en createVentaDesdePedido:", error);
+    res.status(500).json({ error: error.message || "Error al crear venta desde pedido" });
   }
 };
 
@@ -184,13 +84,11 @@ export const createVentaManual = async (req, res) => {
     
     // Verificar si los datos vienen en req.body (JSON) o en req.body.ventaData (FormData)
     if (req.body.ventaData) {
-      // Viene de FormData (con archivos)
       ventaData = JSON.parse(req.body.ventaData);
-      console.log("Datos desde FormData:", ventaData);
+      console.log("📦 Datos desde FormData:", ventaData);
     } else {
-      // Viene como JSON directo (sin archivos)
       ventaData = req.body;
-      console.log("Datos desde JSON:", ventaData);
+      console.log("📦 Datos desde JSON:", ventaData);
     }
 
     const {
@@ -259,15 +157,18 @@ export const createVentaManual = async (req, res) => {
 
     await connection.commit();
 
+    const ventaCreada = await getVentaByIdModel(VentaId);
+    ventaCreada.detalle = await getDetalleVentaByVentaIdModel(VentaId);
+
     res.status(201).json({
       success: true,
       message: "Venta creada exitosamente",
-      VentaId
+      venta: ventaCreada
     });
 
   } catch (error) {
     if (connection) await connection.rollback();
-    console.error("Error en createVentaManual:", error);
+    console.error("❌ Error en createVentaManual:", error);
     res.status(500).json({ error: error.message || "Error al crear venta" });
   } finally {
     if (connection) connection.release();
@@ -313,46 +214,76 @@ export const getDetallesByVenta = async (req, res) => {
   }
 };
 
+// ✅ FUNCIÓN PRINCIPAL PARA CREAR VENTA DESDE PEDIDO (usada internamente)
 export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId = null) => {
   let connection;
   try {
+    console.log('🎯 [VENTAS] ===== INICIANDO CREACIÓN DE VENTA DESDE PEDIDO =====');
+    console.log('📦 PedidoClienteId:', PedidoClienteId);
+    console.log('👤 UsuarioVendedorId:', UsuarioVendedorId);
+    
     if (!PedidoClienteId) throw new Error("PedidoClienteId es obligatorio");
     
     connection = await dbPool.getConnection();
     await connection.beginTransaction();
+    console.log('🔄 Transacción iniciada');
 
+    // Verificar si ya existe venta
+    console.log('🔍 Verificando si ya existe venta...');
     const [ventaExistente] = await connection.execute(
       "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
       [PedidoClienteId]
     );
+    
     if (ventaExistente.length > 0) {
+      console.log('⚠️ Ya existe venta:', ventaExistente[0].VentaId);
       await connection.rollback();
-      return { success: false, alreadyExists: true, VentaId: ventaExistente[0].VentaId };
+      return { 
+        success: false, 
+        alreadyExists: true, 
+        VentaId: ventaExistente[0].VentaId 
+      };
     }
     
+    // Obtener el pedido
+    console.log('🔍 Obteniendo datos del pedido...');
     const [pedidoRows] = await connection.execute(
       `SELECT * FROM pedidosclientes WHERE PedidoClienteId = ?`,
       [PedidoClienteId]
     );
     if (pedidoRows.length === 0) {
+      console.log('❌ Pedido no encontrado');
       await connection.rollback();
       throw new Error("Pedido no encontrado");
     }
     const pedido = pedidoRows[0];
+    console.log('✅ Pedido encontrado:', {
+      id: pedido.PedidoClienteId,
+      total: pedido.Total,
+      tipoCliente: pedido.TipoCliente
+    });
     
+    // Obtener detalles del pedido
+    console.log('🔍 Obteniendo detalles del pedido...');
     const [detallesRows] = await connection.execute(
       `SELECT * FROM detallepedidosclientes WHERE PedidoClienteId = ?`,
       [PedidoClienteId]
     );
     if (detallesRows.length === 0) {
+      console.log('❌ El pedido no tiene detalles');
       await connection.rollback();
       throw new Error("El pedido no tiene detalles");
     }
+    console.log(`✅ Encontrados ${detallesRows.length} detalles`);
     
     const VentaId = uuidv4();
+    console.log('🆔 Nuevo VentaId generado:', VentaId);
+    
     const subtotal = pedido.Total || 0;
     const IVA = subtotal * 0.19;
     const total = subtotal + IVA;
+    
+    console.log('💰 Totales calculados:', { subtotal, IVA, total });
     
     let clienteId = null;
     let clienteNombre = pedido.ClienteNombre || null;
@@ -361,8 +292,11 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
     
     if (pedido.TipoCliente === 'registrado' && pedido.ClienteId) {
       clienteId = pedido.ClienteId;
+      console.log('👤 Cliente registrado ID:', clienteId);
     }
     
+    // Insertar la venta
+    console.log('💾 Insertando venta en base de datos...');
     await connection.execute(
       `INSERT INTO ventas (
         VentaId, Origen, PedidoClienteId, ClienteId, ClienteNombre,
@@ -375,9 +309,14 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
         subtotal, IVA, total
       ]
     );
+    console.log('✅ Venta insertada correctamente');
     
-    for (const detalle of detallesRows) {
+    // Insertar detalles
+    console.log('💾 Insertando detalles de venta...');
+    for (let i = 0; i < detallesRows.length; i++) {
+      const detalle = detallesRows[i];
       const DetalleVentaId = uuidv4();
+      
       let tipoItem = null;
       let productoId = null;
       let servicioId = null;
@@ -427,11 +366,20 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
           detalle.Descripcion || null, detalle.UrlImagen || null
         ]
       );
+      
+      console.log(`  ✅ Detalle ${i+1} insertado: ${nombreSnapshot} x ${detalle.Cantidad}`);
     }
     
     await connection.commit();
+    console.log('✅ Transacción completada exitosamente');
     
     const ventaCreada = await getVentaByIdModel(VentaId);
+    
+    console.log('🎉 [VENTAS] Venta creada exitosamente:', {
+      VentaId,
+      total,
+      estado: 'pagado'
+    });
     
     return {
       success: true,
@@ -442,7 +390,9 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
     
   } catch (error) {
     if (connection) await connection.rollback();
-    console.error("Error en crearVentaDesdePedidoId:", error);
+    console.error('❌ [VENTAS] ERROR EN crearVentaDesdePedidoId:');
+    console.error('❌ Mensaje:', error.message);
+    console.error('❌ Stack:', error.stack);
     throw error;
   } finally {
     if (connection) connection.release();
