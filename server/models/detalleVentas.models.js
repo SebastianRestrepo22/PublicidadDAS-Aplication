@@ -1,11 +1,10 @@
 import { v4 as uuidv4 } from "uuid";
-import connectDB from "../lib/db.js";
+import { dbPool } from "../lib/db.js";
 
 // Obtener detalles por venta
 export const getDetalleVentaByVentaIdModel = async (ventaId) => {
-  const connection = await connectDB();
   try {
-    const [rows] = await connection.execute(
+    const [rows] = await dbPool.query(
       `SELECT 
         dv.*,
         p.Nombre AS ProductoNombre,
@@ -25,8 +24,6 @@ export const getDetalleVentaByVentaIdModel = async (ventaId) => {
   } catch (error) {
     console.error("Error en getDetalleVentaByVentaIdModel:", error);
     throw error;
-  } finally {
-    connection.release?.();
   }
 };
 
@@ -38,7 +35,6 @@ export const createDetallesVentaFromPedidoModel = async (connection, VentaId, de
     for (const detalle of detallesPedido) {
       const DetalleVentaId = uuidv4();
       
-      // Determinar tipo de item y nombres
       let tipoItem = null;
       let productoId = null;
       let servicioId = null;
@@ -51,8 +47,7 @@ export const createDetallesVentaFromPedidoModel = async (connection, VentaId, de
         tipoItem = 'producto';
         productoId = detalle.ProductoId;
         
-        // Obtener nombre del producto
-        const [productoRows] = await connection.execute(
+        const [productoRows] = await connection.query(
           "SELECT Nombre FROM productos WHERE ProductoId = ?",
           [detalle.ProductoId]
         );
@@ -62,16 +57,14 @@ export const createDetallesVentaFromPedidoModel = async (connection, VentaId, de
         tipoItem = 'servicio';
         servicioId = detalle.ServicioId;
         
-        // Obtener nombre del servicio
-        const [servicioRows] = await connection.execute(
+        const [servicioRows] = await connection.query(
           "SELECT Nombre FROM servicios WHERE ServicioId = ?",
           [detalle.ServicioId]
         );
         nombreSnapshot = servicioRows.length > 0 ? servicioRows[0].Nombre : "Servicio";
         
-        // Si tiene tamaño, obtener el ID del tamaño
         if (detalle.Tamaño) {
-          const [tamanoRows] = await connection.execute(
+          const [tamanoRows] = await connection.query(
             "SELECT ServicioTamanoId FROM servicio_tamanos WHERE ServicioId = ? AND NombreTamano = ?",
             [detalle.ServicioId, detalle.Tamaño]
           );
@@ -83,7 +76,7 @@ export const createDetallesVentaFromPedidoModel = async (connection, VentaId, de
       
       const subtotal = detalle.Cantidad * detalle.Precio;
       
-      await connection.execute(
+      await connection.query(
         `INSERT INTO detalleventas (
           DetalleVentaId, VentaId, TipoItem, ProductoId, ServicioId,
           ServicioTamanoId, NombreSnapshot, Cantidad, PrecioUnitario,
@@ -120,7 +113,7 @@ export const createDetallesVentaFromPedidoModel = async (connection, VentaId, de
 
 // Crear detalle de venta manual
 export const createDetalleVentaManualModel = async (detalleData) => {
-  const connection = await connectDB();
+  const connection = await dbPool.getConnection();
   
   try {
     const DetalleVentaId = uuidv4();
@@ -140,7 +133,7 @@ export const createDetalleVentaManualModel = async (detalleData) => {
       UrlImagenPersonalizada
     } = detalleData;
     
-    await connection.execute(
+    await connection.query(
       `INSERT INTO detalleventas (
         DetalleVentaId, VentaId, TipoItem, ProductoId, ServicioId,
         ServicioTamanoId, NombreSnapshot, Cantidad, PrecioUnitario,
@@ -170,14 +163,14 @@ export const createDetalleVentaManualModel = async (detalleData) => {
     console.error("Error en createDetalleVentaManualModel:", error);
     throw error;
   } finally {
-    connection.release?.();
+    connection.release();
   }
 };
 
 // Eliminar detalles de venta (solo usado al anular)
 export const deleteDetallesByVentaIdModel = async (connection, ventaId) => {
   try {
-    const [result] = await connection.execute(
+    const [result] = await connection.query(
       "DELETE FROM detalleventas WHERE VentaId = ?",
       [ventaId]
     );

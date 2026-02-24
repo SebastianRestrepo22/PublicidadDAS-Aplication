@@ -685,7 +685,6 @@ export const Ventas = () => {
 
               <div className="flex items-center gap-2 text-slate-600 ml-2">
                 <Filter size={18} />
-                <span className="text-sm font-medium">Filtros:</span>
               </div>
 
               {campoFiltro === "Estado" ? (
