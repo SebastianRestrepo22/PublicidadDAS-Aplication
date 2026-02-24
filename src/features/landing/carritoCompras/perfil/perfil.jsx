@@ -46,7 +46,7 @@ export const Perfil = () => {
         return <Navigate to="/login" />;
     }
 
-    // 📚 Tipos de documento
+    // Tipos de documento
     useEffect(() => {
         const fetchTiposDocumento = async () => {
             try {
@@ -59,19 +59,26 @@ export const Perfil = () => {
         fetchTiposDocumento();
     }, []);
 
-    // 👤 Perfil del usuario
+    // Perfil del usuario
     useEffect(() => {
         if (!authUser?.CedulaId) return;
 
         const fetchPerfil = async () => {
             try {
+                const token = localStorage.getItem("token");
+
                 const response = await axios.get(
-                    `http://localhost:3000/user/${authUser.CedulaId}`
+                    `http://localhost:3000/user/${authUser.CedulaId}`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    }
                 );
 
                 setProfile(response.data);
                 setFormData({
-                    TipoDocumentoId: response.data.TipoDocumentoId,
+                    TipoDocumentoId: String(response.data.TipoDocumentoId),
                     NombreCompleto: response.data.NombreCompleto,
                     Telefono: response.data.Telefono,
                     CorreoElectronico: response.data.CorreoElectronico,
@@ -87,14 +94,13 @@ export const Perfil = () => {
 
     const handleChanges = (e) => {
         const { name, value } = e.target;
+
         setFormData(prev => ({ ...prev, [name]: value }));
-        
-        // Validación en tiempo real para campos básicos
+
         if (touched[name]) {
             validateField(name, value);
         }
-        
-        // Validación en tiempo real para correo y teléfono
+
         if (name === 'CorreoElectronico' && value.trim()) {
             debouncedValidateCorreo(value);
         }
@@ -111,14 +117,14 @@ export const Perfil = () => {
 
     const validateField = (name, value) => {
         let error = '';
-        
-        switch(name) {
+
+        switch (name) {
             case 'TipoDocumentoId':
                 error = !value ? "Seleccione un tipo de documento" : '';
                 break;
             case 'NombreCompleto':
-                error = !value.trim() ? "El nombre es obligatorio" : 
-                       value.trim().length < 3 ? "El nombre debe tener al menos 3 caracteres" : '';
+                error = !value.trim() ? "El nombre es obligatorio" :
+                    value.trim().length < 3 ? "El nombre debe tener al menos 3 caracteres" : '';
                 break;
             case 'CorreoElectronico':
                 if (!value.trim()) {
@@ -128,8 +134,8 @@ export const Perfil = () => {
                 }
                 break;
             case 'Direccion':
-                error = !value.trim() ? "La dirección es obligatoria" : 
-                       value.trim().length < 5 ? "La dirección debe tener al menos 5 caracteres" : '';
+                error = !value.trim() ? "La dirección es obligatoria" :
+                    value.trim().length < 5 ? "La dirección debe tener al menos 5 caracteres" : '';
                 break;
             case 'Telefono':
                 if (!value.trim()) {
@@ -139,7 +145,7 @@ export const Perfil = () => {
                 }
                 break;
         }
-        
+
         setErrors(prev => ({ ...prev, [name]: error }));
         return !error;
     };
@@ -152,7 +158,7 @@ export const Perfil = () => {
         }
 
         setValidating(prev => ({ ...prev, correo: true }));
-        
+
         try {
             const response = await axios.get(
                 `http://localhost:3000/auth/validar-correo?correo=${correo}`
@@ -178,7 +184,7 @@ export const Perfil = () => {
         }
 
         setValidating(prev => ({ ...prev, telefono: true }));
-        
+
         try {
             const response = await axios.get(
                 `http://localhost:3000/auth/validar-telefono?telefono=${telefono}`
@@ -220,7 +226,7 @@ export const Perfil = () => {
         });
 
         setErrors(newErrors);
-        
+
         // Marcar todos como tocados para mostrar errores
         setTouched({
             TipoDocumentoId: true,
@@ -242,23 +248,36 @@ export const Perfil = () => {
         }
 
         try {
+            const token = localStorage.getItem("token");
+
             const payload = {
-                ...profile,
-                ...formData
+                TipoDocumentoId: Number(formData.TipoDocumentoId),
+                NombreCompleto: formData.NombreCompleto,
+                Telefono: formData.Telefono,
+                CorreoElectronico: formData.CorreoElectronico,
+                Direccion: formData.Direccion
             };
 
             const response = await axios.put(
                 `http://localhost:3000/user/${profile.CedulaId}`,
-                payload
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
             );
 
             if (response.status === 200) {
                 toast.success("Perfil actualizado correctamente");
-                setProfile(payload);
+                setProfile(prev => ({ ...prev, ...payload }));
             }
         } catch (error) {
             console.error(error);
-            if (error.response?.status === 409) {
+
+            if (error.response?.status === 403) {
+                toast.error("No tienes permisos para actualizar este perfil");
+            } else if (error.response?.status === 409) {
                 toast.error("El correo o teléfono ya están registrados");
             } else {
                 toast.error("Error al actualizar el perfil");
@@ -279,16 +298,16 @@ export const Perfil = () => {
 
     // Función para determinar la clase del input basado en errores
     const getInputClass = (fieldName) => {
-        const hasError = errors[fieldName] || 
-                       (fieldName === 'CorreoElectronico' && correoError) ||
-                       (fieldName === 'Telefono' && telefonoError);
-        
+        const hasError = errors[fieldName] ||
+            (fieldName === 'CorreoElectronico' && correoError) ||
+            (fieldName === 'Telefono' && telefonoError);
+
         const baseClass = "w-full px-5 py-4 border-2 rounded-xl transition-all duration-200 outline-none shadow-sm";
-        
+
         if (hasError) {
             return `${baseClass} border-red-500 bg-red-50 focus:border-red-600 focus:ring-2 focus:ring-red-200`;
         }
-        
+
         return `${baseClass} border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200`;
     };
 
@@ -327,7 +346,7 @@ export const Perfil = () => {
     return (
         <>
             <Navbar />
-            
+
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 pt-24 pb-16">
 
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -347,7 +366,7 @@ export const Perfil = () => {
 
                         <form onSubmit={handleSubmit} className="p-8 md:p-10">
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-10">
-                                
+
                                 {/* Columna izquierda */}
                                 <div className="space-y-8">
                                     {/* Tipo Documento */}
@@ -564,7 +583,7 @@ export const Perfil = () => {
                 </div>
             </div>
 
-            <ToastContainer 
+            <ToastContainer
                 position="top-right"
                 autoClose={3000}
                 theme="colored"

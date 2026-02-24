@@ -1,21 +1,16 @@
 import { Router } from "express";
 import {
   getDetallesByVenta,
-  createDetalle,
-  updateDetalle,
-  deleteDetalle
+  createDetalle
 } from "../controllers/detalleVentas.controller.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
-const router = Router();
+const router = Router({ mergeParams: true });
 
-// Obtener detalles de una venta específica
-router.get("/:id", authMiddleware, getDetallesByVenta);
+router.use(authMiddleware);
 
-// CRUD de detalle
+router.get("/", getDetallesByVenta);
 router.post("/", createDetalle);
-router.put("/:id", updateDetalle);
-router.delete("/:id", deleteDetalle);
 
-console.log("Rutas de detalle de ventas registradas");
+console.log("✅ Rutas de detalle de ventas registradas");
 export default router;

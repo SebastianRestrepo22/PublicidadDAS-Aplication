@@ -6,12 +6,14 @@ import {
   X,
   ArrowLeft,
   Save,
+  Package,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Navbar } from "../../components/Navbar";
 import { Footer } from "../../components/footer";
 import { useCart } from "../../../../context/CartContext";
+import { getTamanosByServicio } from "../../../dashboard/servicios/services/services.servicios";
 
 export const EditarCarritoServicio = () => {
   const location = useLocation();
@@ -21,11 +23,13 @@ export const EditarCarritoServicio = () => {
   const { item } = location.state || {};
   
   const [descripcion, setDescripcion] = useState("");
-  const [tamano, setTamano] = useState("Mediana");
+  const [tamano, setTamano] = useState("");
+  const [tamanosDisponibles, setTamanosDisponibles] = useState([]);
   const [archivosAdjuntos, setArchivosAdjuntos] = useState([]);
   const [imagenPreview, setImagenPreview] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [servicioOriginal, setServicioOriginal] = useState(null);
+  const [tipoServicio, setTipoServicio] = useState("UNICO");
 
   useEffect(() => {
     if (!item) {
@@ -43,23 +47,39 @@ export const EditarCarritoServicio = () => {
     }
 
     setServicioOriginal(currentItem);
+    setTipoServicio(currentItem.TipoPrecio || "UNICO");
     
     // Cargar datos existentes
     const customization = currentItem.customization || {};
     
     setDescripcion(customization.Descripcion || customization.descripcion || "");
-    setTamano(customization.Tamaño || customization.tamaño || "Mediana");
+    setTamano(customization.Tamaño || customization.tamaño || "");
     setImagenPreview(customization.UrlImagen || currentItem.Imagen || currentItem.UrlImagen || "");
     
-    // Cargar archivos adjuntos si existen - Asegurar que sea un array
+    // Cargar archivos adjuntos si existen
     if (customization.archivosAdjuntos) {
-      // Verificar si ya es un array, si no, convertirlo
       const archivos = Array.isArray(customization.archivosAdjuntos) 
         ? customization.archivosAdjuntos 
         : [];
       setArchivosAdjuntos(archivos);
     }
+
+    // Si es POR_TAMANO, cargar los tamaños disponibles
+    if (currentItem.TipoPrecio === 'POR_TAMANO' && currentItem.ServicioId) {
+      cargarTamanos(currentItem.ServicioId);
+    }
   }, [item, cart, navigate]);
+
+  const cargarTamanos = async (servicioId) => {
+    try {
+      const tamanos = await getTamanosByServicio(servicioId);
+      if (tamanos && tamanos.length > 0) {
+        setTamanosDisponibles(tamanos);
+      }
+    } catch (error) {
+      console.error("Error cargando tamaños:", error);
+    }
+  };
 
   const handleFileUpload = (e) => {
     const files = Array.from(e.target.files);
@@ -69,16 +89,9 @@ export const EditarCarritoServicio = () => {
       tipo: file.type,
       tamaño: file.size,
       url: URL.createObjectURL(file),
-      file: file // Guardar el archivo original
     }));
 
     setArchivosAdjuntos((prev) => [...prev, ...nuevosArchivos]);
-
-    // Si se sube una imagen, actualizar el preview
-    const imagen = files.find((f) => f.type.startsWith("image/"));
-    if (imagen) {
-      setImagenPreview(URL.createObjectURL(imagen));
-    }
   };
 
   const eliminarArchivo = (archivoId) => {
@@ -96,32 +109,29 @@ export const EditarCarritoServicio = () => {
       toast.error("Por favor, describe lo que necesitas");
       return;
     }
+
+    // Validar tamaño si es POR_TAMANO
+    if (tipoServicio === 'POR_TAMANO' && !tamano) {
+      toast.error("Por favor selecciona un tamaño");
+      return;
+    }
     
     setIsSubmitting(true);
 
     try {
       // Preparar los cambios para actualizar en el carrito
       const cambios = {
-        // Actualizar la descripción principal del item
         Descripcion: descripcion,
-        
-        // Actualizar la imagen
         Imagen: imagenPreview || servicioOriginal.Imagen,
         UrlImagen: imagenPreview || servicioOriginal.UrlImagen,
-        
-        // Actualizar la personalización completa
         customization: {
-          ...servicioOriginal.customization,
           Descripcion: descripcion,
           Tamaño: tamano,
           UrlImagen: imagenPreview,
-          // Solo guardar información básica de archivos (sin el objeto File)
           archivosAdjuntos: archivosAdjuntos.map(f => ({
-            id: f.id,
             nombre: f.nombre,
             tipo: f.tipo,
-            tamaño: f.tamaño,
-            url: f.url || null // Solo guardar si es una URL local
+            tamaño: f.tamaño
           }))
         }
       };
@@ -132,8 +142,6 @@ export const EditarCarritoServicio = () => {
       updateItem(servicioOriginal.id, cambios);
       
       toast.success("Servicio actualizado correctamente");
-      
-      // Redirigir inmediatamente al carrito
       navigate("/carritodecompras");
 
     } catch (error) {
@@ -185,11 +193,12 @@ export const EditarCarritoServicio = () => {
         </button>
 
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-white">
+          {/* Encabezado sin degradado */}
+          <div className="border-b border-gray-200 p-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
               Editar Servicio: {servicioOriginal.Nombre}
             </h1>
-            <p className="text-purple-100 mt-2">
+            <p className="text-gray-600 mt-2">
               Modifica los detalles de personalización según tus necesidades
             </p>
           </div>
@@ -199,7 +208,7 @@ export const EditarCarritoServicio = () => {
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-slate-800">Editar Personalización</h2>
 
-              {/* Vista previa actual */}
+              {/* Vista previa actual - Solo informativo */}
               <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                 <h3 className="font-semibold text-slate-700 mb-2">Configuración actual:</h3>
                 {servicioOriginal.customization?.Descripcion && (
@@ -216,12 +225,12 @@ export const EditarCarritoServicio = () => {
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Nueva descripción del servicio *
+                  Descripción del servicio *
                 </label>
                 <textarea
                   value={descripcion}
                   onChange={(e) => setDescripcion(e.target.value)}
-                  placeholder="Describe en detalle lo que necesitas. Ej: Necesito un diseño moderno para un restaurante de comida italiana, con colores rojo y blanco..."
+                  placeholder="Describe en detalle lo que necesitas..."
                   rows="5"
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
@@ -229,72 +238,30 @@ export const EditarCarritoServicio = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Tamaño
-                </label>
-                <select
-                  value={tamano}
-                  onChange={(e) => setTamano(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={isSubmitting}
-                >
-                  <option value="Pequeña">Pequeña (hasta A5)</option>
-                  <option value="Mediana">Mediana (A4)</option>
-                  <option value="Grande">Grande (A3 o mayor)</option>
-                  <option value="Personalizado">Personalizado</option>
-                </select>
-              </div>
-
-              {/* Imagen actual */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Imagen de referencia
-                </label>
-                {imagenPreview && (
-                  <div className="mb-4">
-                    <p className="text-sm text-slate-500 mb-2">Imagen actual:</p>
-                    <div className="relative inline-block">
-                      <img
-                        src={imagenPreview}
-                        alt="Preview"
-                        className="w-48 h-48 object-cover rounded-lg border border-slate-300"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setImagenPreview("")}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                <label className="flex flex-col items-center justify-center w-full px-4 py-6 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors">
-                  <Upload className="w-8 h-8 text-slate-400 mb-2" />
-                  <span className="text-sm text-slate-600 mb-1">
-                    {imagenPreview ? "Cambiar imagen" : "Subir imagen de referencia"}
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    JPG, PNG, GIF (Max 5MB)
-                  </span>
-                  <input
-                    type="file"
-                    onChange={(e) => {
-                      const file = e.target.files[0];
-                      if (file && file.type.startsWith("image/")) {
-                        setImagenPreview(URL.createObjectURL(file));
-                      }
-                    }}
-                    className="hidden"
-                    accept="image/*"
+              {/* Selector de Tamaño - SOLO si el servicio es POR_TAMANO */}
+              {tipoServicio === 'POR_TAMANO' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Tamaño *
+                  </label>
+                  <select
+                    value={tamano}
+                    onChange={(e) => setTamano(e.target.value)}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     disabled={isSubmitting}
-                  />
-                </label>
-              </div>
+                    required
+                  >
+                    <option value="">Selecciona un tamaño</option>
+                    {tamanosDisponibles.map((t) => (
+                      <option key={t.TamanoId || t.NombreTamano} value={t.NombreTamano}>
+                        {t.NombreTamano} - {formatPrice(t.Precio)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-              {/* Adjuntar archivos */}
+              {/* Adjuntar archivos - IGUAL que en crear */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Archivos de Referencia
@@ -360,19 +327,22 @@ export const EditarCarritoServicio = () => {
 
             {/* Columna Derecha - Resumen y Precio */}
             <div className="space-y-6">
-              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-100">
-                <h3 className="font-bold text-purple-900 text-xl mb-4">Resumen del Servicio</h3>
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+                <h3 className="font-bold text-blue-900 text-xl mb-4">Resumen del Servicio</h3>
 
                 <div className="space-y-4">
                   <div>
                     <h4 className="font-semibold text-slate-700 mb-2">Servicio Base</h4>
                     <p className="text-slate-800 font-medium">{servicioOriginal.Nombre}</p>
-                    <p className="text-sm text-slate-600 mt-1">
-                      {servicioOriginal.customization?.Descripcion || "Servicio personalizado"}
-                    </p>
+                    {tipoServicio === 'POR_TAMANO' && (
+                      <div className="flex items-center gap-1 mt-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full w-fit">
+                        <Package className="w-3 h-3" />
+                        <span>Precio por tamaño</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="border-t border-purple-200 pt-4">
+                  <div className="border-t border-blue-200 pt-4">
                     <h4 className="font-semibold text-slate-700 mb-3">Detalles de Precio</h4>
                     <div className="space-y-2">
                       <div className="flex justify-between">
@@ -388,52 +358,39 @@ export const EditarCarritoServicio = () => {
                               -{formatPrice(servicioOriginal.Precio * (servicioOriginal.Descuento / 100))}
                             </span>
                           </div>
-                          <div className="flex justify-between text-lg font-bold pt-2 border-t border-purple-200">
+                          <div className="flex justify-between text-lg font-bold pt-2 border-t border-blue-200">
                             <span className="text-slate-800">Precio final:</span>
-                            <span className="text-purple-600">{formatPrice(precioConDescuento)}</span>
+                            <span className="text-blue-600">{formatPrice(precioConDescuento)}</span>
                           </div>
                         </>
+                      )}
+
+                      {servicioOriginal.Descuento === 0 && (
+                        <div className="flex justify-between text-lg font-bold pt-2 border-t border-blue-200">
+                          <span className="text-slate-800">Precio final:</span>
+                          <span className="text-blue-600">{formatPrice(servicioOriginal.Precio)}</span>
+                        </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="border-t border-purple-200 pt-4">
+                  <div className="border-t border-blue-200 pt-4">
                     <h4 className="font-semibold text-slate-700 mb-3">Tu Nueva Personalización</h4>
                     <div className="space-y-2 text-sm">
                       {descripcion && (
                         <div>
                           <span className="font-medium">Descripción:</span>
-                          <p className="text-slate-600 mt-1 line-clamp-3">{descripcion}</p>
+                          <p className="text-slate-600 mt-1">{descripcion}</p>
                         </div>
                       )}
-                      <p><span className="font-medium">Tamaño:</span> {tamano}</p>
+                      {tamano && tipoServicio === 'POR_TAMANO' && (
+                        <p><span className="font-medium">Tamaño:</span> {tamano}</p>
+                      )}
                       {archivosAdjuntos.length > 0 && (
                         <p><span className="font-medium">Archivos adjuntos:</span> {archivosAdjuntos.length}</p>
                       )}
                     </div>
                   </div>
-                </div>
-
-                <div className="mt-8 p-4 bg-white rounded-lg border border-purple-200">
-                  <h4 className="font-bold text-slate-800 mb-3">¿Qué puedes modificar?</h4>
-                  <ul className="space-y-2 text-sm text-slate-600">
-                    <li className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full mt-1.5"></div>
-                      <span>Descripción detallada del proyecto</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full mt-1.5"></div>
-                      <span>Tamaño y dimensiones requeridas</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full mt-1.5"></div>
-                      <span>Imágenes y archivos de referencia</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full mt-1.5"></div>
-                      <span>El precio se mantiene igual</span>
-                    </li>
-                  </ul>
                 </div>
 
                 <div className="flex gap-3 mt-6">
@@ -448,11 +405,11 @@ export const EditarCarritoServicio = () => {
                   
                   <button
                     type="submit"
-                    disabled={isSubmitting || !descripcion.trim()}
+                    disabled={isSubmitting || !descripcion.trim() || (tipoServicio === 'POR_TAMANO' && !tamano)}
                     className={`flex-1 text-white py-3 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl ${
-                      isSubmitting || !descripcion.trim()
+                      isSubmitting || !descripcion.trim() || (tipoServicio === 'POR_TAMANO' && !tamano)
                         ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed" 
-                        : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+                        : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                     }`}
                   >
                     {isSubmitting ? (
@@ -468,10 +425,6 @@ export const EditarCarritoServicio = () => {
                     )}
                   </button>
                 </div>
-
-                <p className="text-xs text-slate-500 text-center mt-3">
-                  Los cambios se aplicarán inmediatamente a tu carrito de compras.
-                </p>
               </div>
             </div>
           </form>

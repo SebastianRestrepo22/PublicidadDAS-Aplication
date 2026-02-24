@@ -8,40 +8,33 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useAuth } from '../../../context/AuthContext';
 
 const MisPedidos = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [clienteId, setClienteId] = useState(null);
+    const { user, loading: authLoading } = useAuth(); 
 
-  useEffect(() => {
-    const usuarioLocal = JSON.parse(localStorage.getItem("usuario"));
-    console.log('Usuario local:', usuarioLocal);
-    
-    if (usuarioLocal?.CedulaId) {
-      console.log('CedulaId:', usuarioLocal.CedulaId);
-      const loadUser = async () => {
-        try {
-          const token = localStorage.getItem("token");
-          console.log('Token:', token);
-          
-          const response = await axios.get(
-            `http://localhost:3000/user/${usuarioLocal.CedulaId}`,
-            {
-              headers: { Authorization: `Bearer ${token}` }
-            }
-          );
-          console.log('Respuesta usuario:', response.data);
-          setClienteId(String(response.data.CedulaId));
-        } catch (err) {
-          console.error("Error al cargar usuario:", err);
-          console.error("Error details:", err.response?.data);
-        }
-      };
-      loadUser();
-    }
-  }, []);
+ useEffect(() => {
+  // Usar user del contexto (ya tiene CedulaId del token decodificado)
+  if (user?.CedulaId) {
+    const loadUser = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          `http://localhost:3000/user/${user.CedulaId}`, //user.CedulaId sí existe
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setClienteId(String(response.data.CedulaId));
+      } catch (err) {
+        console.error("Error al cargar usuario:", err);
+      }
+    };
+    loadUser();
+  }
+}, [user]); // agregar 'user' como dependencia
 
   const { pedidos, loading, refetch } = useMisPedidos(clienteId);
 
@@ -134,7 +127,16 @@ const MisPedidos = () => {
     o.Estado !== 'entregado' && o.Estado !== 'cancelado'
   );
 
-  if (!clienteId) {
+  if (authLoading) {
+    return (
+      <>
+        <Navbar />
+        <div className="text-center mt-20">Cargando sesión...</div>
+      </>
+    );
+  }
+
+  if (!user) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />

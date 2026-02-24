@@ -130,3 +130,16 @@ export const getProductoByIdService = async (id) => {
     return { status: false, message: "No se pudo obtener el producto", error };
   }
 };
+
+// Función para obtener colores de un producto específico
+export const getColoresByProductoId = async (productoId) => {
+  try {
+    // Usar la misma URL que en tu servicio getColoresProducto
+    const response = await fetch(`http://localhost:3000/producto/${productoId}/colores`);
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error(`Error cargando colores para producto ${productoId}:`, error);
+    return [];
+  }
+};

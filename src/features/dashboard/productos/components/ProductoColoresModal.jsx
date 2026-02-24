@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import Modal from "../../components/modals/modal.jsx";
-import { Search, Check, X, Palette, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, Check, X, Palette, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
 
 export const ProductoColoresModal = ({
   open,
@@ -10,8 +10,9 @@ export const ProductoColoresModal = ({
   setColoresConStock,
 }) => {
   const [busqueda, setBusqueda] = useState("");
-  const [activeTab, setActiveTab] = useState("todos"); // 'todos' o 'seleccionados'
+  const [activeTab, setActiveTab] = useState("todos");
   const [expandirResumen, setExpandirResumen] = useState(false);
+  const [errorStock, setErrorStock] = useState("");
 
   // Colores filtrados por búsqueda
   const coloresFiltrados = useMemo(() => {
@@ -45,7 +46,28 @@ export const ProductoColoresModal = ({
       }));
   }, [colores, coloresConStock]);
 
+  // Validar que todos los colores seleccionados tengan stock > 0
+  const validarStocks = () => {
+    if (coloresConStock.length === 0) {
+      setErrorStock("Debes seleccionar al menos un color");
+      return false;
+    }
+
+    const coloresSinStock = coloresConStock.filter(c => parseInt(c.Stock) === 0);
+    if (coloresSinStock.length > 0) {
+      setErrorStock(`Los siguientes colores deben tener stock mínimo 1: ${
+        coloresSinStock.map(c => c.Nombre).join(", ")
+      }`);
+      return false;
+    }
+
+    setErrorStock("");
+    return true;
+  };
+
   const handleStockChange = (colorId, nuevoStock) => {
+    setErrorStock(""); // Limpiar error al cambiar stock
+    
     // Permitir vacío o números
     if (nuevoStock === "") {
       setColoresConStock(prev =>
@@ -80,11 +102,12 @@ export const ProductoColoresModal = ({
   };
 
   const seleccionarColor = (color) => {
+    setErrorStock(""); // Limpiar error al seleccionar
     setColoresConStock(prev => [
       ...prev,
       {
         ColorId: color.ColorId,
-        Stock: 0,
+        Stock: 1, // CAMBIADO: Ahora por defecto es 1 en lugar de 0
         Nombre: color.Nombre,
         Hex: color.Hex
       }
@@ -92,6 +115,7 @@ export const ProductoColoresModal = ({
   };
 
   const deseleccionarColor = (colorId) => {
+    setErrorStock(""); // Limpiar error al deseleccionar
     setColoresConStock(prev =>
       prev.filter(c => c.ColorId !== colorId)
     );
@@ -104,6 +128,12 @@ export const ProductoColoresModal = ({
   const coloresSinStock = useMemo(() => {
     return coloresConStock.filter(c => parseInt(c.Stock) === 0).length;
   }, [coloresConStock]);
+
+  const handleGuardar = () => {
+    if (validarStocks()) {
+      onClose();
+    }
+  };
 
   return (
     <Modal open={open} onClose={onClose}>
@@ -119,7 +149,7 @@ export const ProductoColoresModal = ({
                 Gestión de Colores
               </h3>
               <p className="text-sm text-gray-500">
-                Asigna stock por color
+                Asigna stock por color (mínimo 1 por color)
               </p>
             </div>
           </div>
@@ -183,6 +213,14 @@ export const ProductoColoresModal = ({
           </div>
         )}
 
+        {/* Mensaje de error */}
+        {errorStock && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <p className="text-sm text-red-600">{errorStock}</p>
+          </div>
+        )}
+
         {/* Lista de colores */}
         <div className="flex-1 overflow-y-auto pr-1 -mr-1">
           {activeTab === "todos" ? (
@@ -232,12 +270,14 @@ export const ProductoColoresModal = ({
                               <span className="text-sm text-gray-600">Stock:</span>
                               <input
                                 type="number"
-                                min="0"
+                                min="1" // CAMBIADO: mínimo 1
                                 value={stockActual}
                                 onChange={(e) => handleStockChange(color.ColorId, e.target.value)}
                                 onBlur={() => handleBlurStock(color.ColorId)}
-                                className="w-20 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="0"
+                                className={`w-20 px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                  parseInt(stockActual) === 0 ? "border-red-300 bg-red-50" : "border-gray-200"
+                                }`}
+                                placeholder="1"
                               />
                             </div>
                             <button
@@ -260,9 +300,9 @@ export const ProductoColoresModal = ({
                       </div>
 
                       {colorSeleccionado && parseInt(stockActual) === 0 && (
-                        <div className="mt-2 text-xs text-yellow-600 bg-yellow-50 p-2 rounded-lg flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
-                          Stock en 0 - No disponible para venta
+                        <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          Debe tener al menos 1 unidad de stock
                         </div>
                       )}
                     </div>
@@ -313,12 +353,14 @@ export const ProductoColoresModal = ({
                             <span className="text-sm text-gray-600">Stock:</span>
                             <input
                               type="number"
-                              min="0"
+                              min="1" // CAMBIADO: mínimo 1
                               value={stockActual}
                               onChange={(e) => handleStockChange(color.ColorId, e.target.value)}
                               onBlur={() => handleBlurStock(color.ColorId)}
-                              className="w-20 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="0"
+                              className={`w-20 px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                parseInt(stockActual) === 0 ? "border-red-300 bg-red-50" : "border-gray-200"
+                              }`}
+                              placeholder="1"
                             />
                           </div>
                           <button
@@ -330,6 +372,12 @@ export const ProductoColoresModal = ({
                           </button>
                         </div>
                       </div>
+                      {parseInt(stockActual) === 0 && (
+                        <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          Debe tener al menos 1 unidad de stock
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -367,7 +415,7 @@ export const ProductoColoresModal = ({
               </div>
               {coloresSinStock > 0 && (
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div> {/* CAMBIADO: amarillo a rojo */}
                   <span className="text-sm text-gray-600">
                     <span className="font-semibold text-gray-900">{coloresSinStock}</span> sin stock
                   </span>
@@ -380,6 +428,7 @@ export const ProductoColoresModal = ({
                 onClick={() => {
                   if (window.confirm("¿Estás seguro de eliminar todos los colores asignados?")) {
                     setColoresConStock([]);
+                    setErrorStock("");
                   }
                 }}
                 className="text-sm text-red-600 hover:text-red-700 px-3 py-1.5 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1"
@@ -430,13 +479,7 @@ export const ProductoColoresModal = ({
             <button
               type="button"
               className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm hover:shadow flex items-center justify-center gap-2"
-              onClick={() => {
-                // Si no hay colores seleccionados, forzar cambio a stock general
-                if (coloresConStock.length === 0) {
-                  // Esto lo manejará el useEffect del ProductoForm
-                }
-                onClose();
-              }}
+              onClick={handleGuardar} // CAMBIADO: ahora usa handleGuardar con validación
             >
               <Check className="w-4 h-4" />
               Guardar cambios
