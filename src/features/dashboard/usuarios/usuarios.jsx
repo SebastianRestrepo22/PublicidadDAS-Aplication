@@ -161,6 +161,8 @@ setRoles(activos);
   // Nuevos estados para validaciones de formato
   const [cedulaFormatoError, setCedulaFormatoError] = useState("");
   const [telefonoFormatoError, setTelefonoFormatoError] = useState("");
+  // Estado para validación del nombre
+  const [nombreError, setNombreError] = useState("");
 
   // Obtener usuarios al cargar
   useEffect(() => {
@@ -170,6 +172,25 @@ setRoles(activos);
     };
     fetchUsers();
   }, []);
+
+  // Función para validar que el nombre solo contenga letras y espacios
+  const validateNombre = (nombre) => {
+    if (!nombre) {
+      setNombreError("");
+      return true;
+    }
+    
+    // Expresión regular: solo letras (incluyendo tildes y ñ) y espacios
+    const nombreRegex = /^[A-Za-zÁáÉéÍíÓóÚúÑñ\s]+$/;
+    
+    if (!nombreRegex.test(nombre)) {
+      setNombreError("El nombre solo puede contener letras y espacios");
+      return false;
+    }
+    
+    setNombreError("");
+    return true;
+  };
 
   // Manejo de cambios en inputs con validación de solo números
   const handleChanges = (e) => {
@@ -199,7 +220,15 @@ setRoles(activos);
       } else if (name === "Telefono") {
         validateTelefonoFormat(limitedValue);
       }
-    } else {
+    } 
+    // Validación para el nombre (solo letras y espacios)
+    else if (name === "NombreCompleto") {
+      // Permitir letras, espacios y eliminar cualquier carácter no deseado
+      const nombreValue = value.replace(/[^A-Za-zÁáÉéÍíÓóÚúÑñ\s]/g, '');
+      setValues({ ...values, [name]: nombreValue });
+      validateNombre(nombreValue);
+    }
+    else {
       setValues({ ...values, [name]: value });
     }
   };
@@ -318,6 +347,7 @@ setRoles(activos);
     // Validar formatos antes de enviar
     validateCedulaFormat(values.CedulaId);
     validateTelefonoFormat(values.Telefono);
+    validateNombre(values.NombreCompleto);
 
     // Validación campos obligatorios - AHORA INCLUYE RoleId SIEMPRE
     const camposObligatorios = [
@@ -346,6 +376,12 @@ setRoles(activos);
     // Validar formato de teléfono antes de enviar
     if (values.Telefono.length !== 10) {
       toast.warning("El teléfono debe tener exactamente 10 dígitos");
+      return;
+    }
+
+    // Validar formato del nombre
+    if (nombreError) {
+      toast.warning("El nombre contiene caracteres no válidos");
       return;
     }
 
@@ -406,6 +442,7 @@ setRoles(activos);
     setTelefonoError("");
     setCedulaFormatoError("");
     setTelefonoFormatoError("");
+    setNombreError("");
     setSubmitted(false); // esto evita que muestre validaciones al abrir
   };
 
@@ -469,6 +506,7 @@ setRoles(activos);
     setTelefonoError('');
     setCedulaFormatoError('');
     setTelefonoFormatoError('');
+    setNombreError('');
     setOpenEditar(true);
   };
 
@@ -546,23 +584,29 @@ setRoles(activos);
           </div>
         </div>
 
-        {/* Nombre completo */}
+        {/* Nombre completo - CON VALIDACIÓN */}
         <div className="flex flex-col">
-          <label className="mb-1">Nombre completo</label>
+          <label className="mb-1">Nombre completo *</label>
           <input
             type="text"
             name="NombreCompleto"
             value={values.NombreCompleto}
-            placeholder="Ingrese su nombre"
+            placeholder="Ingrese su nombre (solo letras)"
             readOnly={isReadOnly}
             onChange={handleChanges}
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${submitted && !values.NombreCompleto.trim() ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
+      ${(submitted && !values.NombreCompleto.trim()) || nombreError ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
-          <div className="min-h-[16px] mt-0.5">
-            {(!values.NombreCompleto.trim() && submitted) && (
+          <div className="min-h-[32px] mt-0.5">
+            {(!values.NombreCompleto.trim() && submitted) ? (
               <p className="text-red-500 text-[12px] leading-4">Ingrese su nombre completo</p>
-            )}
+            ) : nombreError ? (
+              <p className="text-red-500 text-[12px] leading-4">{nombreError}</p>
+            ) : values.NombreCompleto ? (
+              <p className="text-gray-500 text-[11px] leading-4">
+                {values.NombreCompleto.length} caracteres • Solo letras permitidas
+              </p>
+            ) : null}
           </div>
         </div>
 

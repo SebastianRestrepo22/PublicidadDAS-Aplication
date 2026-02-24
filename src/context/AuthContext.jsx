@@ -1,3 +1,4 @@
+// context/AuthContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { jwtDecode } from "jwt-decode";
 import axios from "axios";
@@ -28,6 +29,7 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem("token");
           localStorage.removeItem("userData");
           localStorage.removeItem("userId");
+          localStorage.removeItem("lastPath"); // AÑADIDO
           setUser(null);
           setPermissions([]);
           setLoading(false);
@@ -53,6 +55,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem("token");
         localStorage.removeItem("userData");
         localStorage.removeItem("userId");
+        localStorage.removeItem("lastPath"); // AÑADIDO
         setUser(null);
         setPermissions([]);
       } finally {
@@ -111,6 +114,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("token");
     localStorage.removeItem("userData");
     localStorage.removeItem("userId");
+    localStorage.removeItem("lastPath"); // AÑADIDO
     delete axios.defaults.headers.common["Authorization"];
     setUser(null);
     setPermissions([]);

@@ -4,12 +4,24 @@ const API_URL = "http://localhost:3000/api";
 
 export const createVentaManual = async (ventaData) => {
   try {
-    const response = await axios.post(`${API_URL}/ventas/manual`, ventaData, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Authorization': `Bearer ${token}`
+    };
+    
+    let config = { headers };
+    
+    // Si ventaData es FormData, axios automáticamente establece
+    // el Content-Type correcto con boundary
+    if (ventaData instanceof FormData) {
+      console.log("Enviando FormData...");
+      // No establecer Content-Type, axios lo hará automáticamente
+    } else {
+      headers['Content-Type'] = 'application/json';
+      console.log("Enviando JSON:", ventaData);
+    }
+    
+    const response = await axios.post(`${API_URL}/ventas/manual`, ventaData, config);
     return response.data;
   } catch (error) {
     console.error("Error en createVentaManual:", error.response?.data || error);

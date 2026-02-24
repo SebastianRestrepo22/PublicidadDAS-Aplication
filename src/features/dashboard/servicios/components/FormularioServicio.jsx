@@ -27,6 +27,60 @@ export const FormularioServicio = ({
 
     const handleEstadoChange = (e) => setEstadoEdit(e.target.value);
 
+    // Función para manejar el cambio en el descuento
+    const handleDescuentoChange = (e) => {
+        const { value } = e.target;
+        
+        // Si el valor está vacío, enviar cadena vacía
+        // El backend debería interpretar cadena vacía como 0
+        if (value === "") {
+            handleChanges({
+                target: {
+                    name: "Descuento",
+                    value: ""
+                }
+            });
+        } else {
+            // Si tiene valor, convertirlo a número y validar
+            const numValue = parseFloat(value);
+            if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
+                handleChanges({
+                    target: {
+                        name: "Descuento",
+                        value: numValue.toString()
+                    }
+                });
+            }
+        }
+    };
+
+    // Función para manejar el blur del descuento
+    const handleDescuentoBlur = (e) => {
+        const { value } = e.target;
+        
+        // Si está vacío o es 0, dejar como cadena vacía
+        if (value === "" || parseFloat(value) === 0) {
+            handleChanges({
+                target: {
+                    name: "Descuento",
+                    value: ""
+                }
+            });
+        } else {
+            // Asegurar que tenga máximo 2 decimales
+            const numValue = parseFloat(value);
+            if (!isNaN(numValue)) {
+                const formattedValue = Math.min(100, Math.max(0, numValue)).toFixed(2);
+                handleChanges({
+                    target: {
+                        name: "Descuento",
+                        value: formattedValue
+                    }
+                });
+            }
+        }
+    };
+
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
             {/* Información básica */}
@@ -110,7 +164,7 @@ export const FormularioServicio = ({
                         )}
                     </div>
 
-                    {/* Descuento */}
+                    {/* Descuento - MODIFICADO para funcionar como en productos */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Descuento (%)</label>
                         <div className="relative">
@@ -118,16 +172,27 @@ export const FormularioServicio = ({
                                 type="number"
                                 name="Descuento"
                                 value={values.Descuento || ""}
-                                onChange={handleChanges}
+                                onChange={handleDescuentoChange}
+                                onBlur={handleDescuentoBlur}
                                 min="0"
                                 max="100"
                                 step="0.01"
-                                placeholder="0"
+                                placeholder="0 (dejar vacío para 0%)"
                                 className="w-full h-10 px-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 disabled={isSubmitting}
                             />
                             <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
                         </div>
+                        {values.Descuento === "" ? (
+                            <p className="text-gray-400 text-xs mt-1">Sin descuento (0%)</p>
+                        ) : parseFloat(values.Descuento) > 0 && (
+                            <p className="text-green-600 text-xs mt-1">
+                                Descuento del {values.Descuento}% aplicado
+                                {values.TipoPrecio === 'UNICO' && values.Precio && (
+                                    <span> - Precio final: ${(parseFloat(values.Precio) * (1 - parseFloat(values.Descuento) / 100)).toFixed(2)}</span>
+                                )}
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>
@@ -200,7 +265,10 @@ export const FormularioServicio = ({
                             )}
                         </div>
 
-                        <PreviewPrecio precio={values.Precio} descuento={values.Descuento} />
+                        <PreviewPrecio 
+                            precio={values.Precio} 
+                            descuento={values.Descuento === "" ? 0 : values.Descuento} 
+                        />
                     </div>
                 </div>
             ) : (
