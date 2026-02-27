@@ -112,9 +112,7 @@ export const createDetallesVentaFromPedidoModel = async (connection, VentaId, de
 };
 
 // Crear detalle de venta manual
-export const createDetalleVentaManualModel = async (detalleData) => {
-  const connection = await dbPool.getConnection();
-  
+export const createDetalleVentaManualModel = async (connection, detalleData) => {
   try {
     const DetalleVentaId = uuidv4();
     const {
@@ -162,8 +160,6 @@ export const createDetalleVentaManualModel = async (detalleData) => {
   } catch (error) {
     console.error("Error en createDetalleVentaManualModel:", error);
     throw error;
-  } finally {
-    connection.release();
   }
 };
 

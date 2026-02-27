@@ -28,6 +28,7 @@ import {
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Pagination } from "../../components/paginacion/pagination.jsx";
+import { TiempoRestanteAnulacion } from '../venta/components/TiempoRestanteAnulacion.jsx';
 import { getVentas, getVentaById, anularVenta } from "../venta/services/service.ventas.js";
 import Modal from "../../components/modals/modal.jsx";
 
@@ -53,10 +54,17 @@ const shortenId = (id) => {
 };
 
 // Formatear precio
-const formatPrice = (value) => {
-  if (value === null || value === undefined) return "$0.00";
-  const num = typeof value === 'string' ? parseFloat(value) : Number(value);
-  return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
+export const formatPrice = (value, currency = '$') => {
+  if (value === null || value === undefined || value === '') return `${currency}0.00`;
+
+  // Convertir a número si es string
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+
+  // Verificar si es un número válido
+  if (isNaN(num)) return `${currency}0.00`;
+
+  // Formatear con separador de miles y 2 decimales
+  return `${currency}${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 };
 
 // Badge de estado
@@ -168,9 +176,8 @@ const DetallesProductosAcordeon = ({ detalles }) => {
                   {item.ServicioId && <div className="text-xs text-gray-500">ID: {shortenId(item.ServicioId)}</div>}
                 </div>
                 <div className="col-span-1 text-center">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    item.TipoItem === 'producto' ? 'bg-green-100 text-green-800' : 'bg-purple-100 text-purple-800'
-                  }`}>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.TipoItem === 'producto' ? 'bg-green-100 text-green-800' : 'bg-purple-100 text-purple-800'
+                    }`}>
                     {item.TipoItem === 'producto' ? 'P' : 'S'}
                   </span>
                 </div>
@@ -189,7 +196,7 @@ const DetallesProductosAcordeon = ({ detalles }) => {
                       <span className="font-medium">{item.ColorNombre || `Color ID: ${shortenId(item.ColorId)}`}</span>
                     </div>
                   )}
-                  
+
                   {/* Mostrar tamaño */}
                   {item.ServicioTamanoId && (
                     <div className="mb-1">
@@ -198,23 +205,23 @@ const DetallesProductosAcordeon = ({ detalles }) => {
                       </span>
                     </div>
                   )}
-                  
+
                   {/* Descripción personalizada */}
                   {item.DescripcionPersonalizada && (
                     <div className="text-gray-600 mb-1 italic" title={item.DescripcionPersonalizada}>
-                      "{item.DescripcionPersonalizada.length > 20 
-                        ? item.DescripcionPersonalizada.substring(0, 20) + '...' 
+                      "{item.DescripcionPersonalizada.length > 20
+                        ? item.DescripcionPersonalizada.substring(0, 20) + '...'
                         : item.DescripcionPersonalizada}"
                     </div>
                   )}
-                  
+
                   {/* Imagen personalizada - mostrada como miniatura */}
                   {item.UrlImagenPersonalizada && (
                     <div className="mt-2 flex justify-center">
                       <div className="relative group">
-                        <img 
-                          src={item.UrlImagenPersonalizada} 
-                          alt="Personalizada" 
+                        <img
+                          src={item.UrlImagenPersonalizada}
+                          alt="Personalizada"
                           className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-500 transition-all"
                           onClick={() => setImagenAmpliada(item.UrlImagenPersonalizada)}
                           onError={(e) => {
@@ -251,16 +258,16 @@ const DetallesProductosAcordeon = ({ detalles }) => {
         <Modal open={true} onClose={() => setImagenAmpliada(null)}>
           <div className="p-4 max-w-3xl max-h-[90vh] overflow-auto">
             <div className="flex justify-end mb-2">
-              <button 
+              <button
                 onClick={() => setImagenAmpliada(null)}
                 className="p-1 hover:bg-gray-100 rounded-full"
               >
                 <X size={20} />
               </button>
             </div>
-            <img 
-              src={imagenAmpliada} 
-              alt="Imagen ampliada" 
+            <img
+              src={imagenAmpliada}
+              alt="Imagen ampliada"
               className="w-full h-auto object-contain rounded-lg"
             />
           </div>
@@ -318,28 +325,28 @@ const ModalVerVenta = ({ open, onClose, venta }) => {
   if (!venta) return null;
 
   // Extraer información del vendedor
-  const vendedorNombre = venta.UsuarioVendedor?.NombreCompleto || 
-                        venta.vendedor?.NombreCompleto || 
-                        venta.UsuarioVendedorNombre || 
-                        'No especificado';
-  
-  const vendedorId = venta.UsuarioVendedor?.CedulaId || 
-                    venta.vendedor?.CedulaId || 
-                    venta.UsuarioVendedorId || 
-                    '-';
+  const vendedorNombre = venta.UsuarioVendedor?.NombreCompleto ||
+    venta.vendedor?.NombreCompleto ||
+    venta.UsuarioVendedorNombre ||
+    'No especificado';
+
+  const vendedorId = venta.UsuarioVendedor?.CedulaId ||
+    venta.vendedor?.CedulaId ||
+    venta.UsuarioVendedorId ||
+    '-';
 
   // Extraer información del pedido asociado
-  const pedidoId = venta.PedidoCliente?.PedidoClienteId || 
-                  venta.pedido?.PedidoClienteId || 
-                  venta.PedidoClienteId;
+  const pedidoId = venta.PedidoCliente?.PedidoClienteId ||
+    venta.pedido?.PedidoClienteId ||
+    venta.PedidoClienteId;
 
-  const fechaPedido = venta.PedidoCliente?.FechaRegistro || 
-                     venta.pedido?.FechaRegistro || 
-                     venta.FechaPedido;
+  const fechaPedido = venta.PedidoCliente?.FechaRegistro ||
+    venta.pedido?.FechaRegistro ||
+    venta.FechaPedido;
 
-  const estadoPedido = venta.PedidoCliente?.Estado || 
-                      venta.pedido?.Estado || 
-                      venta.EstadoPedido;
+  const estadoPedido = venta.PedidoCliente?.Estado ||
+    venta.pedido?.Estado ||
+    venta.EstadoPedido;
 
   return (
     <Modal open={open} onClose={onClose}>
@@ -433,13 +440,12 @@ const ModalVerVenta = ({ open, onClose, venta }) => {
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Estado Pedido</p>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    estadoPedido === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                    estadoPedido === 'aprobado' ? 'bg-blue-100 text-blue-800' :
-                    estadoPedido === 'entregado' ? 'bg-green-100 text-green-800' :
-                    estadoPedido === 'cancelado' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${estadoPedido === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                      estadoPedido === 'aprobado' ? 'bg-blue-100 text-blue-800' :
+                        estadoPedido === 'entregado' ? 'bg-green-100 text-green-800' :
+                          estadoPedido === 'cancelado' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                    }`}>
                     {estadoPedido || '-'}
                   </span>
                 </div>
@@ -460,9 +466,9 @@ const ModalVerVenta = ({ open, onClose, venta }) => {
                 <p className="text-xs text-slate-500">IVA (19%)</p>
                 <p className="text-lg font-semibold">{formatPrice(venta.IVA)}</p>
               </div>
-              <div className="bg-white p-3 rounded-lg border border-green-200">
-                <p className="text-xs text-green-600">Total</p>
-                <p className="text-xl font-bold text-green-600">{formatPrice(venta.Total)}</p>
+              <div className="bg-white p-3 rounded-lg border border-blue-200">
+                <p className="text-xs text-blue-600">Total</p>
+                <p className="text-xl font-bold text-blue-600">{formatPrice(venta.Total)}</p>
               </div>
             </div>
           </div>
@@ -661,65 +667,52 @@ export const Ventas = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold text-slate-800">Gestión de Ventas</h1>
-            <button
-              onClick={cargarVentas}
-              className="p-2 bg-white rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
-              title="Actualizar"
-            >
-              <RefreshCw size={20} className="text-slate-600" />
-            </button>
-          </div>
+          <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Ventas</h1>
 
-          {/* FILTROS Y BOTÓN DE CREAR */}
+          {/* FILTROS Y BOTÓN DE CREAR - IGUAL QUE EN PEDIDOS */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               {/* BOTÓN DE CREAR VENTA */}
               <button
                 onClick={() => navigate("/dashboard/ventas/crear")}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow"
+                className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap text-sm"
               >
                 <Plus size={18} /> Nueva venta
               </button>
 
-              <div className="flex items-center gap-2 text-slate-600 ml-2">
-                <Filter size={18} />
-              </div>
-
-              {campoFiltro === "Estado" ? (
-                <select
-                  value={filtroValor}
-                  onChange={(e) => setFiltroValor(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-4 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[160px]"
-                >
-                  <option value="">Todos los estados</option>
-                  <option value="pagado">Pagado</option>
-                  <option value="anulado">Anulado</option>
-                </select>
-              ) : campoFiltro === "Origen" ? (
-                <select
-                  value={filtroValor}
-                  onChange={(e) => setFiltroValor(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-4 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[160px]"
-                >
-                  <option value="">Todos los orígenes</option>
-                  <option value="pedido">Desde Pedido</option>
-                  <option value="manual">Venta Manual</option>
-                </select>
-              ) : (
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                {campoFiltro === "Estado" ? (
+                  <select
+                    value={filtroValor}
+                    onChange={(e) => setFiltroValor(e.target.value)}
+                    className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700"
+                  >
+                    <option value="">Todos los estados</option>
+                    <option value="pagado">Pagado</option>
+                    <option value="anulado">Anulado</option>
+                  </select>
+                ) : campoFiltro === "Origen" ? (
+                  <select
+                    value={filtroValor}
+                    onChange={(e) => setFiltroValor(e.target.value)}
+                    className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700"
+                  >
+                    <option value="">Todos los orígenes</option>
+                    <option value="pedido">Desde Pedido</option>
+                    <option value="manual">Venta Manual</option>
+                  </select>
+                ) : (
                   <input
                     value={filtroValor}
                     onChange={(e) => setFiltroValor(e.target.value)}
                     type="text"
                     placeholder={campoFiltro ? `Buscar por ${campoFiltro}` : "Seleccione un campo para buscar"}
                     disabled={!campoFiltro}
-                    className="border border-slate-300 rounded-lg pl-9 pr-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-700 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                    className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700 disabled:bg-gray-50 disabled:cursor-not-allowed"
                   />
-                </div>
-              )}
+                )}
+              </div>
 
               <select
                 value={campoFiltro}
@@ -727,9 +720,9 @@ export const Ventas = () => {
                   setCampoFiltro(e.target.value);
                   setFiltroValor('');
                 }}
-                className="border border-slate-300 rounded-lg px-4 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[140px]"
+                className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]"
               >
-                <option value="">Filtrar por</option>
+                <option value="">Filtrar por Campo</option>
                 <option value="VentaId">ID Venta</option>
                 <option value="PedidoClienteId">ID Pedido</option>
                 <option value="ClienteNombre">Cliente</option>
@@ -740,7 +733,7 @@ export const Ventas = () => {
               {(campoFiltro || filtroValor) && (
                 <button
                   onClick={handleLimpiarFiltros}
-                  className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1"
+                  className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1 whitespace-nowrap"
                 >
                   <X size={16} />
                   Limpiar filtros
@@ -762,114 +755,99 @@ export const Ventas = () => {
             venta={ventaSeleccionada}
           />
 
+          {/* TABLA DE VENTAS - IGUAL QUE EN PEDIDOS */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
+            <table className="min-w-full">
+              <thead className="bg-slate-800">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-white">ID</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-white">Cliente</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-white">Fecha</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-white">Total</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-white">Items</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-white">Origen</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-white">Estado</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-white">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {cargando ? (
                   <tr>
-                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-left">ID</th>
-                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-left">Cliente</th>
-                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-left">Fecha</th>
-                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-left">Total</th>
-                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-left">Items</th>
-                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-left">Origen</th>
-                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-left">Estado</th>
-                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-center">Acciones</th>
+                    <td colSpan="8" className="px-6 py-8 text-center text-slate-500">
+                      <div className="flex justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                      </div>
+                      <p className="mt-2">Cargando ventas...</p>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {cargando ? (
-                    <tr>
-                      <td colSpan="8" className="py-12 text-center">
-                        <div className="flex justify-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                        </div>
-                        <p className="mt-2 text-slate-500">Cargando ventas...</p>
+                ) : paginatedData.length > 0 ? (
+                  paginatedData.map((venta) => (
+                    <tr key={venta.VentaId} className="hover:bg-slate-50">
+                      <td className="px-6 py-4 text-sm text-slate-700 font-mono font-bold">
+                        {shortenId(venta.VentaId)}
                       </td>
-                    </tr>
-                  ) : paginatedData.length > 0 ? (
-                    paginatedData.map((venta) => (
-                      <tr key={venta.VentaId} className="hover:bg-slate-50 transition-colors duration-150">
-                        <td className="py-4 px-6">
-                          <div className="font-mono font-bold text-sm">{shortenId(venta.VentaId)}</div>
-                          <div className="text-xs text-slate-500">{venta.VentaId.substring(0, 8)}...</div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="font-medium">{venta.ClienteNombre || 'Walk-in'}</div>
-                          {venta.ClienteTelefono && (
-                            <div className="text-xs text-slate-500">{venta.ClienteTelefono}</div>
-                          )}
-                          {venta.ClienteCorreo && (
-                            <div className="text-xs text-slate-500 truncate max-w-[150px]">{venta.ClienteCorreo}</div>
-                          )}
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="text-sm">{formatDate(venta.FechaVenta)}</div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="font-semibold text-blue-600">{formatPrice(venta.Total)}</div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="text-sm">
-                            <span className="font-medium">{venta.detalle?.length || 0}</span> items
+                      <td className="px-6 py-4 text-sm font-medium">
+                        <div>{venta.ClienteNombre || 'Walk-in'}</div>
+                        {venta.ClienteTelefono && (
+                          <div className="text-xs text-slate-500">{venta.ClienteTelefono}</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm">{formatDate(venta.FechaVenta)}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-blue-600">
+                        {formatPrice(venta.Total)}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <div className="font-medium">{venta.detalle?.length || 0} items</div>
+                        {venta.detalle && (
+                          <div className="text-xs text-slate-500">
+                            {venta.detalle.filter(d => d.TipoItem === 'producto').length} prod /
+                            {venta.detalle.filter(d => d.TipoItem === 'servicio').length} serv
                           </div>
-                          {venta.detalle && (
-                            <div className="text-xs text-slate-500">
-                              {venta.detalle.filter(d => d.TipoItem === 'producto').length} prod / 
-                              {venta.detalle.filter(d => d.TipoItem === 'servicio').length} serv
-                            </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <OrigenBadge origen={venta.Origen} />
+                      </td>
+                      <td className="px-6 py-4">
+                        <EstadoBadge estado={venta.Estado} />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleVerClick(venta)}
+                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                          >
+                            <Eye size={18} />
+                          </button>
+
+                          {venta.Estado === 'pagado' && (
+                            <TiempoRestanteAnulacion
+                              fechaVenta={venta.FechaVenta}
+                              onAnular={() => handleAnularClick(venta)}
+                            />
                           )}
-                        </td>
-                        <td className="py-4 px-6">
-                          <OrigenBadge origen={venta.Origen} />
-                        </td>
-                        <td className="py-4 px-6">
-                          <EstadoBadge estado={venta.Estado} />
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="flex justify-center gap-2">
-                            <button
-                              onClick={() => handleVerClick(venta)}
-                              disabled={cargandoVenta}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
-                              title="Ver detalles"
-                            >
-                              <Eye size={16} />
-                            </button>
-                            {venta.Estado === 'pagado' && (
-                              <button
-                                onClick={() => handleAnularClick(venta)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Anular venta"
-                              >
-                                <X size={16} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="8" className="py-12 text-center">
-                        <div className="text-slate-500">
-                          <ShoppingBag size={48} className="mx-auto mb-3 text-slate-300" />
-                          <p className="text-lg font-medium">No hay ventas registradas</p>
-                          <p className="text-sm mt-1">
-                            {campoFiltro || filtroValor
-                              ? "Intenta con otros filtros"
-                              : "Las ventas se generan automáticamente desde los pedidos aprobados"}
-                          </p>
                         </div>
                       </td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="8" className="px-6 py-8 text-center text-slate-500">
+                      <ShoppingBag size={48} className="mx-auto mb-3 text-slate-300" />
+                      <p className="text-lg font-medium">No hay ventas registradas</p>
+                      <p className="text-sm mt-1">
+                        {campoFiltro || filtroValor
+                          ? "Intenta con otros filtros"
+                          : "Las ventas se generan automáticamente desde los pedidos aprobados"}
+                      </p>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
 
             {paginatedData.length > 0 && (
-              <div className="border-t border-slate-200">
+              <div className="px-6 py-4 border-t">
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}

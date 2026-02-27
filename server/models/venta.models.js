@@ -170,8 +170,11 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
 };
 
 // Crear venta manual
-export const createVentaManualModel = async (ventaData) => {
-  const connection = await dbPool.getConnection();
+export const createVentaManualModel = async (ventaData, connection) => {
+  // Si no recibimos connection, significa que es llamado desde fuera
+  // y debemos manejar la transacción aquí
+  const usarConnection = connection || await dbPool.getConnection();
+  const liberarConnection = !connection; // Solo liberar si creamos la conexión
   
   try {
     const VentaId = uuidv4();
@@ -187,7 +190,7 @@ export const createVentaManualModel = async (ventaData) => {
       Estado = 'pagado'
     } = ventaData;
     
-    // 🔥 Limpiar y formatear valores numéricos
+    // Limpiar y formatear valores numéricos
     const limpiarNumero = (valor) => {
       if (typeof valor === 'string') {
         valor = valor.replace(/\./g, '').replace(',', '.');
@@ -199,7 +202,8 @@ export const createVentaManualModel = async (ventaData) => {
     IVA = limpiarNumero(IVA || (Subtotal * 0.19));
     Total = limpiarNumero(Total || (Subtotal + IVA));
     
-    await connection.query(
+    // Insertar venta
+    await usarConnection.query(
       `INSERT INTO ventas (
         VentaId, Origen, ClienteId, ClienteNombre, ClienteTelefono, 
         ClienteCorreo, UsuarioVendedorId, FechaVenta, Subtotal, IVA, Total, Estado
@@ -221,12 +225,14 @@ export const createVentaManualModel = async (ventaData) => {
     return VentaId;
     
   } catch (error) {
-    console.error("Error en createVentaManualModel:", error);
     throw error;
   } finally {
-    connection.release();
+    if (liberarConnection) {
+      usarConnection.release();
+    }
   }
 };
+
 // Actualizar estado de venta (solo a ANULADO)
 export const anularVentaModel = async (ventaId) => {
   try {
@@ -289,4 +295,124 @@ export const getVentaByPedidoIdModel = async (pedidoClienteId) => {
     console.error("Error en getVentaByPedidoIdModel:", error);
     throw error;
   }
+};
+
+// models/venta.models.js
+export const validarYDescontarStockModel = async (connection, detalles) => {
+  const erroresStock = [];
+
+  for (const detalle of detalles) {
+    // Solo procesar productos
+    if (detalle.TipoItem !== 'producto' || !detalle.ProductoId) continue;
+
+    // Verificar si el producto usa colores
+    const [productoRows] = await connection.query(
+      `SELECT ProductoId, Nombre, Stock, UsaColores 
+       FROM productos 
+       WHERE ProductoId = ? FOR UPDATE`, 
+      [detalle.ProductoId]
+    );
+
+    if (productoRows.length === 0) {
+      erroresStock.push(`Producto no encontrado: ${detalle.ProductoId}`);
+      continue;
+    }
+
+    const producto = productoRows[0];
+
+    if (producto.UsaColores === 1) {
+      // Producto con colores - validar en productocolores_stock
+      if (!detalle.ColorId) {
+        erroresStock.push(`El producto ${producto.Nombre} requiere seleccionar un color`);
+        continue;
+      }
+
+      const [colorRows] = await connection.query(
+        `SELECT Stock 
+         FROM productocolores_stock 
+         WHERE ProductoId = ? AND ColorId = ? FOR UPDATE`, // 🔒 BLOQUEO
+        [detalle.ProductoId, detalle.ColorId]
+      );
+
+      if (colorRows.length === 0) {
+        erroresStock.push(`Color no disponible para el producto ${producto.Nombre}`);
+        continue;
+      }
+
+      const stockDisponible = colorRows[0].Stock;
+
+      if (stockDisponible < detalle.Cantidad) {
+        erroresStock.push(
+          `Stock insuficiente para ${producto.Nombre} (Color seleccionado). ` +
+          `Disponible: ${stockDisponible}, Solicitado: ${detalle.Cantidad}`
+        );
+        continue;
+      }
+
+      // DESCONTAR STOCK
+      await connection.query(
+        `UPDATE productocolores_stock 
+         SET Stock = Stock - ? 
+         WHERE ProductoId = ? AND ColorId = ?`,
+        [detalle.Cantidad, detalle.ProductoId, detalle.ColorId]
+      );
+
+    } else {
+      // Producto sin colores - validar stock directo
+      if (producto.Stock < detalle.Cantidad) {
+        erroresStock.push(
+          `Stock insuficiente para ${producto.Nombre}. ` +
+          `Disponible: ${producto.Stock}, Solicitado: ${detalle.Cantidad}`
+        );
+        continue;
+      }
+
+      // DESCONTAR STOCK
+      await connection.query(
+        `UPDATE productos 
+         SET Stock = Stock - ? 
+         WHERE ProductoId = ?`,
+        [detalle.Cantidad, detalle.ProductoId]
+      );
+    }
+  }
+
+  if (erroresStock.length > 0) {
+    throw new Error(erroresStock.join(' | '));
+  }
+
+  return true;
+};
+
+export const revertirStockVentaModel = async (connection, ventaId) => {
+  // Obtener los detalles de productos de la venta
+  const [detalles] = await connection.query(
+    `SELECT dv.ProductoId, dv.Cantidad, dv.ColorId, p.UsaColores
+     FROM detalleventas dv
+     LEFT JOIN productos p ON dv.ProductoId = p.ProductoId
+     WHERE dv.VentaId = ? AND dv.TipoItem = 'producto'`,
+    [ventaId]
+  );
+
+  for (const detalle of detalles) {
+    if (detalle.UsaColores === 1) {
+      // Producto con colores - devolver stock
+      await connection.query(
+        `UPDATE productocolores_stock 
+         SET Stock = Stock + ? 
+         WHERE ProductoId = ? AND ColorId = ?`,
+        [detalle.Cantidad, detalle.ProductoId, detalle.ColorId]
+      );
+    } else if (detalle.ProductoId) {
+      // Producto sin colores - devolver stock
+      await connection.query(
+        `UPDATE productos 
+         SET Stock = Stock + ? 
+         WHERE ProductoId = ?`,
+        [detalle.Cantidad, detalle.ProductoId]
+      );
+    }
+  }
+
+  return true;
 };

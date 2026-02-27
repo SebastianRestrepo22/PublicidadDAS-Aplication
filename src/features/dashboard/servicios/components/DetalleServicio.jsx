@@ -8,6 +8,21 @@ export const DetalleServicio = ({
     onDelete,
     onBack
 }) => {
+     // Formatear precio
+    const formatPrice = (value, currency = '$') => {
+        if (value === null || value === undefined || value === '') return `${currency}0.00`;
+
+        // Convertir a número si es string
+        const num = typeof value === 'string' ? parseFloat(value) : value;
+
+        // Verificar si es un número válido
+        if (isNaN(num)) return `${currency}0.00`;
+
+        // Formatear con separador de miles y 2 decimales
+        return `${currency}${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+    };
+
+
     if (!editData) {
         return (
             <div className="text-center py-12">
@@ -96,13 +111,13 @@ export const DetalleServicio = ({
                     <dl>
                         <div>
                             <dt className="text-sm text-gray-500">Precio base</dt>
-                            <dd className="text-xl font-bold text-gray-900">${parseFloat(editData.Precio || 0).toFixed(2)}</dd>
+                            <dd className="text-xl font-bold text-blue-900">{formatPrice(editData.Precio || 0)}</dd>
                         </div>
                         {editData.Descuento > 0 && (
                             <div className="mt-4 bg-green-50 p-4 rounded-lg">
                                 <dt className="text-sm text-gray-600">Precio final con descuento</dt>
                                 <dd className="text-2xl font-bold text-green-600">
-                                    ${(parseFloat(editData.Precio) * (1 - editData.Descuento / 100)).toFixed(2)}
+                                    {(formatPrice(editData.Precio) * (1 - editData.Descuento / 100))}
                                 </dd>
                                 <dd className="text-xs text-gray-500">Descuento del {editData.Descuento}% aplicado</dd>
                             </div>
@@ -122,15 +137,15 @@ export const DetalleServicio = ({
                                         {editData.Descuento > 0 ? (
                                             <>
                                                 <span className="text-gray-400 line-through text-sm mr-2">
-                                                    ${parseFloat(tamano.Precio).toFixed(2)}
+                                                    {formatPrice(tamano.Precio)}
                                                 </span>
-                                                <span className="text-green-600 font-bold">
-                                                    ${(parseFloat(tamano.Precio) * (1 - editData.Descuento / 100)).toFixed(2)}
+                                                <span className="text-blue-600 font-bold">
+                                                    {(formatPrice(tamano.Precio) * (1 - editData.Descuento / 100))}
                                                 </span>
                                             </>
                                         ) : (
-                                            <span className="text-green-600 font-bold">
-                                                ${parseFloat(tamano.Precio).toFixed(2)}
+                                            <span className="text-blue-600 font-bold">
+                                                {formatPrice(tamano.Precio)}
                                             </span>
                                         )}
                                     </div>
