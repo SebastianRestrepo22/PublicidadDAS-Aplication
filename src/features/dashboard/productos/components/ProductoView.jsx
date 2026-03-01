@@ -13,6 +13,20 @@ export const ProductoView = ({
   const stockTotal = coloresConStock.reduce((sum, c) => sum + (c.Stock || 0), 0);
   const estado = editData.Estado || 'Activo';
 
+   // Formatear precio
+    const formatPrice = (value, currency = '$') => {
+        if (value === null || value === undefined || value === '') return `${currency}0.00`;
+
+        // Convertir a número si es string
+        const num = typeof value === 'string' ? parseFloat(value) : value;
+
+        // Verificar si es un número válido
+        if (isNaN(num)) return `${currency}0.00`;
+
+        // Formatear con separador de miles y 2 decimales
+        return `${currency}${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+    };
+
   return (
     <div className="text-left space-y-4 p-4 bg-white rounded-lg shadow-md">
       <h3 className="text-lg font-black text-gray-800 mb-4">Detalles del Producto</h3>
@@ -20,7 +34,7 @@ export const ProductoView = ({
         <div><strong>ID:</strong> {editData.ProductoId}</div>
         <div><strong>Nombre:</strong> {editData.Nombre}</div>
         <div><strong>Descripción:</strong> {editData.Descripcion || "—"}</div>
-        <div><strong>Precio:</strong> ${parseFloat(editData.Precio || 0).toFixed(2)}</div>
+        <div><strong>Precio:</strong> {formatPrice(editData.Precio || 0)}</div>
         {editData.Descuento > 0 && (
           <div><strong>Descuento:</strong> {editData.Descuento}%</div>
         )}

@@ -7,13 +7,16 @@ import {
   createVentaManualModel,
   anularVentaModel,
   existeVentaParaPedidoModel,
-  getVentaByPedidoIdModel
+  getVentaByPedidoIdModel,
+  validarYDescontarStockModel,
+  revertirStockVentaModel
 } from "../models/venta.models.js";
 import {
   getDetalleVentaByVentaIdModel,
   createDetallesVentaFromPedidoModel,
   createDetalleVentaManualModel
 } from "../models/detalleVentas.models.js";
+import { sendVentaFacturaEmail, sendVentaAnuladaEmail } from "../utils/email.js";
 
 export const getVentas = async (req, res) => {
   try {
@@ -46,19 +49,19 @@ export const createVentaDesdePedido = async (req, res) => {
   const connection = await dbPool.getConnection();
   try {
     const { PedidoClienteId, UsuarioVendedorId } = req.body;
-    
+
     if (!PedidoClienteId) {
       return res.status(400).json({ error: "PedidoClienteId es obligatorio" });
     }
-    
+
     await connection.beginTransaction();
-    
+
     const existe = await existeVentaParaPedidoModel(PedidoClienteId);
     if (existe) {
       await connection.rollback();
       return res.status(400).json({ error: "Ya existe una venta para este pedido" });
     }
-    
+
     const [pedidoRows] = await connection.query(
       `SELECT * FROM pedidosclientes WHERE PedidoClienteId = ?`,
       [PedidoClienteId]
@@ -68,7 +71,7 @@ export const createVentaDesdePedido = async (req, res) => {
       return res.status(404).json({ error: "Pedido no encontrado" });
     }
     const pedido = pedidoRows[0];
-    
+
     const [detallesRows] = await connection.query(
       `SELECT * FROM detallepedidosclientes WHERE PedidoClienteId = ?`,
       [PedidoClienteId]
@@ -77,31 +80,50 @@ export const createVentaDesdePedido = async (req, res) => {
       await connection.rollback();
       return res.status(400).json({ error: "El pedido no tiene detalles" });
     }
-    
+
     // Usar el modelo para crear la venta (UsuarioVendedorId puede ser null)
     const result = await createVentaFromPedidoModel(pedido, UsuarioVendedorId || null);
-    
+
     if (!result.success) {
       await connection.rollback();
       return res.status(400).json({ error: "Error al crear la venta" });
     }
-    
+
     const VentaId = result.VentaId;
-    
+
     // Crear los detalles usando el modelo
     await createDetallesVentaFromPedidoModel(connection, VentaId, detallesRows);
-    
+
     await connection.commit();
-    
+
     const ventaCreada = await getVentaByIdModel(VentaId);
-    ventaCreada.detalle = await getDetalleVentaByVentaIdModel(VentaId);
-    
+    const detallesCompletos = await getDetalleVentaByVentaIdModel(VentaId);
+    ventaCreada.detalle = detallesCompletos;
+
+    // ✅ ENVIAR CORREO DE FACTURA
+    if (ventaCreada.ClienteCorreo) {
+      try {
+        console.log("📧 Enviando factura a:", ventaCreada.ClienteCorreo);
+        console.log("📦 Detalles a enviar:", detallesCompletos.length);
+        
+        await sendVentaFacturaEmail(
+          ventaCreada.ClienteCorreo,
+          ventaCreada.ClienteNombre || 'Cliente',
+          ventaCreada.VentaId,
+          ventaCreada.Total,
+          detallesCompletos  // Usar detallesCompletos, no ventaCreada.detalle
+        );
+      } catch (emailError) {
+        console.error("❌ Error enviando correo de factura:", emailError);
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: "Venta creada exitosamente desde el pedido",
       venta: ventaCreada
     });
-    
+
   } catch (error) {
     await connection.rollback();
     console.error("Error al crear venta desde pedido:", error);
@@ -113,64 +135,118 @@ export const createVentaDesdePedido = async (req, res) => {
 
 export const createVentaManual = async (req, res) => {
   const connection = await dbPool.getConnection();
+  
   try {
     let ventaData;
     
-    if (req.body.ventaData) {
-      ventaData = JSON.parse(req.body.ventaData);
-      console.log("Datos desde FormData:", ventaData);
+    // Procesar datos según el tipo de contenido
+    if (req.is('multipart/form-data')) {
+      if (!req.body.ventaData) {
+        return res.status(400).json({ 
+          success: false,
+          error: "No se recibieron datos de la venta" 
+        });
+      }
+      
+      try {
+        ventaData = JSON.parse(req.body.ventaData);
+        console.log("Datos desde FormData (parseados):", ventaData);
+      } catch (parseError) {
+        console.error("Error parseando ventaData:", parseError);
+        return res.status(400).json({ 
+          success: false,
+          error: "Error al parsear los datos de la venta" 
+        });
+      }
     } else {
       ventaData = req.body;
       console.log("Datos desde JSON:", ventaData);
     }
 
-    const {
-      ClienteId, ClienteNombre, ClienteTelefono, ClienteCorreo,
-      UsuarioVendedorId, Subtotal, IVA, Total, detalles
-    } = ventaData;
+    // Validar datos básicos
+    if (!ventaData) {
+      return res.status(400).json({ 
+        success: false,
+        error: "No se recibieron datos de la venta" 
+      });
+    }
 
-    // Para ventas manuales, UsuarioVendedorId SÍ es obligatorio
+    const { detalles, UsuarioVendedorId, ClienteCorreo, ClienteNombre } = ventaData;
+
     if (!UsuarioVendedorId) {
-      return res.status(400).json({ error: "UsuarioVendedorId es obligatorio" });
+      return res.status(400).json({ 
+        success: false,
+        error: "UsuarioVendedorId es obligatorio" 
+      });
     }
-    if (!detalles || detalles.length === 0) {
-      return res.status(400).json({ error: "Debe incluir al menos un detalle" });
+    
+    if (!detalles || !Array.isArray(detalles) || detalles.length === 0) {
+      return res.status(400).json({ 
+        success: false,
+        error: "Debe incluir al menos un detalle" 
+      });
     }
 
+    // INICIAR TRANSACCIÓN
     await connection.beginTransaction();
 
-    // Usar el modelo para crear la venta
-    const VentaId = await createVentaManualModel({
-      ClienteId,
-      ClienteNombre,
-      ClienteTelefono,
-      ClienteCorreo,
-      UsuarioVendedorId,
-      Subtotal,
-      IVA,
-      Total
-    });
+    // PASO 1: Crear la venta PRIMERO
+    const VentaId = await createVentaManualModel(ventaData, connection);
 
-    // Crear los detalles usando el modelo
-    for (const detalle of detalles) {
-      await createDetalleVentaManualModel({
+    // PASO 2: Crear los detalles (TODOS los inserts)
+    for (let i = 0; i < detalles.length; i++) {
+      const detalle = detalles[i];
+      
+      // Determinar la URL de la imagen para servicios
+      let urlImagen = detalle.UrlImagenPersonalizada;
+      if (urlImagen === 'pendiente' && req.files && req.files.length > 0) {
+        const fileIndex = i < req.files.length ? i : req.files.length - 1;
+        const archivo = req.files[fileIndex];
+        urlImagen = `http://localhost:3000/uploads/${archivo.filename}`;
+        console.log(`Asignando URL ${urlImagen} al detalle ${i}`);
+      }
+      
+      await createDetalleVentaManualModel(connection, {
         VentaId,
         TipoItem: detalle.TipoItem,
         ProductoId: detalle.ProductoId,
         ServicioId: detalle.ServicioId,
         ServicioTamanoId: detalle.ServicioTamanoId,
         NombreSnapshot: detalle.NombreSnapshot,
-        Cantidad: detalle.Cantidad,
-        PrecioUnitario: detalle.PrecioUnitario,
-        Descuento: detalle.Descuento,
-        Subtotal: (detalle.Cantidad || 0) * (detalle.PrecioUnitario || 0),
+        Cantidad: parseInt(detalle.Cantidad) || 1,
+        PrecioUnitario: parseFloat(detalle.PrecioUnitario) || 0,
+        Descuento: detalle.Descuento || 0,
+        Subtotal: parseFloat(detalle.Subtotal) || 0,
         ColorId: detalle.ColorId,
         DescripcionPersonalizada: detalle.DescripcionPersonalizada,
-        UrlImagenPersonalizada: detalle.UrlImagenPersonalizada
+        UrlImagenPersonalizada: urlImagen
       });
     }
 
+    // PASO 3: AHORA SÍ, validar y descontar stock (JUSTO ANTES DEL COMMIT)
+    await validarYDescontarStockModel(connection, detalles);
+
+    // PASO 4: Confirmar TODO
     await connection.commit();
+
+    // ENVIAR CORREO DE FACTURA
+    if (ClienteCorreo) {
+      try {
+        // Obtener los detalles completos con nombres
+        const detallesCompletos = await getDetalleVentaByVentaIdModel(VentaId);
+        
+        await sendVentaFacturaEmail(
+          ClienteCorreo,
+          ClienteNombre || 'Cliente',
+          VentaId,
+          ventaData.Total,
+          detallesCompletos
+        );
+      } catch (emailError) {
+        console.error("Error enviando correo de factura:", emailError);
+        // No interrumpir el flujo si falla el correo
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -179,9 +255,27 @@ export const createVentaManual = async (req, res) => {
     });
 
   } catch (error) {
+    // SI ALGO FALLA, REVERTIR TODO
     await connection.rollback();
     console.error("Error en createVentaManual:", error);
-    res.status(500).json({ error: error.message || "Error al crear venta" });
+    
+    // Mensaje de error más amigable
+    let mensajeError = error.message;
+    if (error.message.includes('Stock insuficiente')) {
+      mensajeError = error.message;
+    } else if (error.code === 'ER_LOCK_WAIT_TIMEOUT') {
+      mensajeError = 'La operación tomó demasiado tiempo. Por favor intenta de nuevo.';
+    } else if (error.code === 'ER_SIGNAL_EXCEPTION') {
+      mensajeError = 'Error de integridad en la base de datos';
+    } else {
+      mensajeError = "Error al crear la venta";
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      error: mensajeError
+    });
+    
   } finally {
     connection.release();
   }
@@ -189,30 +283,90 @@ export const createVentaManual = async (req, res) => {
 
 export const anularVenta = async (req, res) => {
   const { id } = req.params;
+  const connection = await dbPool.getConnection();
+  
   try {
+    // Verificar que la venta existe
     const venta = await getVentaByIdModel(id);
     if (!venta) {
       return res.status(404).json({ error: "Venta no encontrada" });
     }
+    
     if (venta.Estado === 'anulado') {
       return res.status(400).json({ error: "La venta ya está anulada" });
     }
+
+    // VALIDAR TIEMPO DESDE CREACIÓN (1 HORA)
+    const fechaVenta = new Date(venta.FechaVenta);
+    const ahora = new Date();
+    const diferenciaMs = ahora - fechaVenta;
+    const diferenciaHoras = diferenciaMs / (1000 * 60 * 60);
     
-    const result = await anularVentaModel(id);
-    if (result.success) {
-      const ventaAnulada = await getVentaByIdModel(id);
-      ventaAnulada.detalle = await getDetalleVentaByVentaIdModel(id);
-      res.status(200).json({
-        success: true,
-        message: "Venta anulada exitosamente",
-        venta: ventaAnulada
+    const TIEMPO_LIMITE_HORAS = 1; // 1 hora para anular
+    
+    if (diferenciaHoras > TIEMPO_LIMITE_HORAS) {
+      return res.status(400).json({ 
+        success: false,
+        error: `Ya no es posible anular esta venta. Han pasado más de ${TIEMPO_LIMITE_HORAS} hora desde su creación.`,
+        codigo: 'TIEMPO_EXCEDIDO',
+        tiempoLimiteHoras: TIEMPO_LIMITE_HORAS,
+        fechaVenta: venta.FechaVenta,
+        horasTranscurridas: Math.round(diferenciaHoras * 10) / 10
       });
-    } else {
-      res.status(500).json({ error: result.message || "Error al anular venta" });
     }
+
+    // INICIAR TRANSACCIÓN
+    await connection.beginTransaction();
+
+    // PASO 1: Revertir el stock
+    await revertirStockVentaModel(connection, id);
+
+    // PASO 2: Actualizar estado
+    const [result] = await connection.query(
+      "UPDATE ventas SET Estado = 'anulado' WHERE VentaId = ?",
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      throw new Error("No se pudo actualizar el estado de la venta");
+    }
+
+    await connection.commit();
+
+    const ventaAnulada = await getVentaByIdModel(id);
+    ventaAnulada.detalle = await getDetalleVentaByVentaIdModel(id);
+
+    // ENVIAR CORREO DE ANULACIÓN
+    if (ventaAnulada.ClienteCorreo) {
+      try {
+        await sendVentaAnuladaEmail(
+          ventaAnulada.ClienteCorreo,
+          ventaAnulada.ClienteNombre || 'Cliente',
+          ventaAnulada.VentaId,
+          ventaAnulada.Total
+        );
+      } catch (emailError) {
+        console.error("Error enviando correo de anulación:", emailError);
+        // No interrumpir el flujo si falla el correo
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Venta anulada correctamente",
+      venta: ventaAnulada,
+      tiempoTranscurrido: Math.round(diferenciaHoras * 10) / 10 + " horas"
+    });
+
   } catch (error) {
+    await connection.rollback();
     console.error("Error al anular venta:", error);
-    res.status(500).json({ error: "Error al anular venta" });
+    res.status(500).json({ 
+      success: false,
+      error: error.message || "Error al anular venta" 
+    });
+  } finally {
+    connection.release();
   }
 };
 
@@ -230,7 +384,7 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
   const connection = await dbPool.getConnection();
   try {
     if (!PedidoClienteId) throw new Error("PedidoClienteId es obligatorio");
-    
+
     await connection.beginTransaction();
 
     const [ventaExistente] = await connection.query(
@@ -241,7 +395,7 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
       await connection.rollback();
       return { success: false, alreadyExists: true, VentaId: ventaExistente[0].VentaId };
     }
-    
+
     const [pedidoRows] = await connection.query(
       `SELECT * FROM pedidosclientes WHERE PedidoClienteId = ?`,
       [PedidoClienteId]
@@ -251,7 +405,7 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
       throw new Error("Pedido no encontrado");
     }
     const pedido = pedidoRows[0];
-    
+
     const [detallesRows] = await connection.query(
       `SELECT * FROM detallepedidosclientes WHERE PedidoClienteId = ?`,
       [PedidoClienteId]
@@ -260,31 +414,31 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
       await connection.rollback();
       throw new Error("El pedido no tiene detalles");
     }
-    
+
     // Usar el modelo para crear la venta (UsuarioVendedorId puede ser null)
     const result = await createVentaFromPedidoModel(pedido, UsuarioVendedorId);
-    
+
     if (!result.success) {
       await connection.rollback();
       return result;
     }
-    
+
     const VentaId = result.VentaId;
-    
+
     // Crear los detalles usando el modelo
     await createDetallesVentaFromPedidoModel(connection, VentaId, detallesRows);
-    
+
     await connection.commit();
-    
+
     const ventaCreada = await getVentaByIdModel(VentaId);
-    
+
     return {
       success: true,
       VentaId: VentaId,
       venta: ventaCreada,
       alreadyExists: false
     };
-    
+
   } catch (error) {
     await connection.rollback();
     console.error("Error en crearVentaDesdePedidoId:", error);

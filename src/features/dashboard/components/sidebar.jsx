@@ -103,84 +103,6 @@ const menuItems = [
   }
 ];
 
-// const menuItems = [
-//   {
-//     icon: BarChart3,
-//     label: "Dashboard",
-//     to: "/dashboard/graficosEstadisticos",
-//     requiredPermission: "ver_dashboard"
-//   },
-//   {
-//     icon: UserCheck,
-//     label: "Roles",
-//     to: "/dashboard/roles",
-//     requiredPermission: "ver_roles"
-//   },
-//   {
-//     icon: Users,
-//     label: "Usuarios",
-//     to: "/dashboard/usuarios",
-//     requiredPermission: "ver_usuarios"
-//   },
-//   {
-//     icon: Palette,
-//     label: "Categorías",
-//     to: "/dashboard/categorias",
-//     requiredPermission: "ver_categorias"
-//   },
-//   {
-//     icon: Package,
-//     label: "Productos",
-//     to: "/dashboard/producto",
-//     requiredPermission: "ver_productos"
-//   },
-//   {
-//     icon: Printer,
-//     label: "Servicios",
-//     to: "/dashboard/servicio",
-//     requiredPermission: "ver_servicios"
-//   },
-//   {
-//     icon: Boxes,
-//     label: "Control Insumos",
-//     hasSubmenu: true,
-//     submenu: [
-//       {
-//         label: "Proveedores",
-//         to: "/dashboard/proveedores",
-//         requiredPermission: "ver_proveedores"
-//       },
-//       {
-//         label: "Compras",
-//         to: "/dashboard/compras",
-//         requiredPermission: "ver_compras"
-//       },
-//       {
-//         label: "Insumos",
-//         to: "/dashboard/insumos",
-//         requiredPermission: "ver_insumos"
-//       }
-//     ]
-//   },
-//   {
-//     icon: ShoppingCart,
-//     label: "Ventas",
-//     hasSubmenu: true,
-//     submenu: [
-//       {
-//         label: "Pedidos",
-//         to: "/dashboard/pedidosClientes",
-//         requiredPermission: "ver_pedidos"
-//       },
-//       {
-//         label: "Ventas",
-//         to: "/dashboard/ventas",
-//         requiredPermission: "ver_ventas"
-//       }
-//     ]
-//   }
-// ];
-
 const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
   const [isAnimating, setIsAnimating] = useState(false);
 
@@ -247,7 +169,7 @@ const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
         </div>
         <div className="px-8 py-4 bg-gray-900/50 border-t border-gray-800 text-center">
           <p className="text-xs text-gray-400">
-            Panel v2.0 • {new Date().getFullYear()}
+            PublicidadDAS • {new Date().getFullYear()}
           </p>
         </div>
       </div>

@@ -12,6 +12,20 @@ export const ProductosTable = ({
     // Agregar console.log para debug
     console.log('ProductosTable data:', data);
 
+    // Formatear precio
+    const formatPrice = (value, currency = '$') => {
+        if (value === null || value === undefined || value === '') return `${currency}0.00`;
+
+        // Convertir a número si es string
+        const num = typeof value === 'string' ? parseFloat(value) : value;
+
+        // Verificar si es un número válido
+        if (isNaN(num)) return `${currency}0.00`;
+
+        // Formatear con separador de miles y 2 decimales
+        return `${currency}${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+    };
+
     return (
         <table className="w-full table-auto">
             <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
@@ -85,8 +99,8 @@ export const ProductosTable = ({
                                         <span className="text-gray-400 text-sm">—</span>
                                     )}
                                 </td>
-                                <td className="py-3 px-4 text-sm font-medium text-gray-900">
-                                    ${parseFloat(p.Precio || 0).toFixed(2)}
+                                <td className="py-3 px-4 text-sm font-medium text-blue-900">
+                                    {formatPrice(p.Precio || 0)}
                                 </td>
                                 <td className="py-3 px-4">
                                     {p.Descuento ? (
@@ -99,16 +113,16 @@ export const ProductosTable = ({
                                 </td>
                                 <td className="py-3 px-4">
                                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${parseInt(p.UsaColores) === 0  // ← Convertir a número antes de comparar
-                                            ? (p.Stock > 10 ? 'bg-green-100 text-green-800' :
-                                                p.Stock > 0 ? 'bg-yellow-100 text-yellow-800' :
-                                                    'bg-red-100 text-red-800')
-                                            : (p.Colores && Array.isArray(p.Colores) && p.Colores.length > 0
-                                                ? p.Colores.reduce((sum, c) => sum + (c.Stock || 0), 0) > 10
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : p.Colores.reduce((sum, c) => sum + (c.Stock || 0), 0) > 0
-                                                        ? 'bg-yellow-100 text-yellow-800'
-                                                        : 'bg-red-100 text-red-800'
-                                                : 'bg-gray-100 text-gray-800')
+                                        ? (p.Stock > 10 ? 'bg-green-100 text-green-800' :
+                                            p.Stock > 0 ? 'bg-yellow-100 text-yellow-800' :
+                                                'bg-red-100 text-red-800')
+                                        : (p.Colores && Array.isArray(p.Colores) && p.Colores.length > 0
+                                            ? p.Colores.reduce((sum, c) => sum + (c.Stock || 0), 0) > 10
+                                                ? 'bg-green-100 text-green-800'
+                                                : p.Colores.reduce((sum, c) => sum + (c.Stock || 0), 0) > 0
+                                                    ? 'bg-yellow-100 text-yellow-800'
+                                                    : 'bg-red-100 text-red-800'
+                                            : 'bg-gray-100 text-gray-800')
                                         }`}>
                                         {parseInt(p.UsaColores) === 0  // Convertir a número
                                             ? (p.Stock !== null && p.Stock !== undefined ? p.Stock : 0)
