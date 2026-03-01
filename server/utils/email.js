@@ -294,3 +294,187 @@ export const sendVoucherEmail = async (to, nombreCliente, pedidoId, total) => {
     console.error("❌ Error al enviar voucher por correo:", error.message);
   }
 };
+
+// ENVÍA FACTURA DE VENTA
+export const sendVentaFacturaEmail = async (to, nombreCliente, ventaId, total, detalles) => {
+  const totalFormateado = new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 0
+  }).format(total);
+
+  // Generar HTML de los detalles con VARIANTES (colores y tamaños)
+  const detallesHtml = detalles.map(det => {
+    // Determinar variante (color o tamaño)
+    let varianteTexto = '';
+    let varianteColor = '';
+    
+    if (det.TipoItem === 'producto' && det.ColorId) {
+      // Es producto con color
+      const colorNombre = det.ColorNombre || 'Color no especificado';
+      const colorHex = det.ColorHex || '#ccc';
+      varianteTexto = `<span style="display: inline-flex; align-items: center; gap: 5px; margin-left: 10px; font-size: 0.9em; color: #666;">
+        <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: ${colorHex}; border: 1px solid #ddd;"></span>
+        ${colorNombre}
+      </span>`;
+    } else if (det.TipoItem === 'servicio' && det.ServicioTamanoId) {
+      // Es servicio con tamaño
+      const tamanoNombre = det.NombreTamano || 'Tamaño no especificado';
+      varianteTexto = `<span style="display: inline-flex; align-items: center; gap: 5px; margin-left: 10px; font-size: 0.9em; color: #666;">
+        <span style="background-color: #e3f2fd; color: #1976d2; padding: 2px 8px; border-radius: 12px; font-size: 0.8em;">${tamanoNombre}</span>
+      </span>`;
+    }
+
+    // Descripción personalizada si existe
+    const descripcionExtra = det.DescripcionPersonalizada 
+      ? `<div style="font-size: 0.8em; color: #888; margin-top: 5px; font-style: italic;">📝 ${det.DescripcionPersonalizada}</div>` 
+      : '';
+
+    // Imagen si existe
+    const imagenHtml = det.UrlImagenPersonalizada
+      ? `<div style="margin-top: 8px;"><img src="${det.UrlImagenPersonalizada}" alt="Imagen del servicio" style="max-width: 80px; max-height: 80px; border-radius: 4px; border: 1px solid #ddd;"></div>`
+      : '';
+
+    return `
+    <tr>
+      <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">
+        <div style="font-weight: 500;">${det.NombreSnapshot || det.Nombre}</div>
+        ${varianteTexto}
+        ${descripcionExtra}
+        ${imagenHtml}
+      </td>
+      <td style="padding: 12px; border-bottom: 1px solid #e0e0e0; text-align: center;">${det.Cantidad}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e0e0e0; text-align: right;">${new Intl.NumberFormat("es-CO", {style: "currency", currency: "COP", minimumFractionDigits: 0}).format(det.PrecioUnitario)}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e0e0e0; text-align: right; font-weight: 500;">${new Intl.NumberFormat("es-CO", {style: "currency", currency: "COP", minimumFractionDigits: 0}).format(det.Subtotal)}</td>
+    </tr>
+  `}).join('');
+
+  const subject = `🧾 Factura de venta #${ventaId}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
+      <div style="text-align: center; padding: 20px 0; border-bottom: 2px solid #2ecc71;">
+        <h1 style="color: #2d3748; margin: 0;">Tu Empresa</h1>
+        <p style="color: #666; margin-top: 5px;">Factura de venta</p>
+      </div>
+      
+      <div style="padding: 30px; background: white; border-radius: 10px; margin-top: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 25px;">
+          <h2 style="color: #27ae60;">¡Pago confirmado!</h2>
+          <p style="color: #666;">Gracias por tu compra, ${nombreCliente}</p>
+        </div>
+
+        <div style="background-color: #f9f9f9; padding: 20px; border-radius: 10px; margin-bottom: 25px;">
+          <h3 style="margin-top: 0; color: #222;">Detalles de la venta</h3>
+          <p><strong>Factura No.:</strong> ${ventaId}</p>
+          <p><strong>Fecha:</strong> ${new Date().toLocaleDateString("es-CO")}</p>
+          <p><strong>Cliente:</strong> ${nombreCliente}</p>
+        </div>
+
+        <h3 style="color: #222;">Productos/Servicios</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+          <thead>
+            <tr style="background-color: #34495e; color: white;">
+              <th style="padding: 12px; text-align: left;">Producto/Servicio</th>
+              <th style="padding: 12px; text-align: center;">Cant.</th>
+              <th style="padding: 12px; text-align: right;">Precio Unit.</th>
+              <th style="padding: 12px; text-align: right;">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${detallesHtml}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" style="padding: 15px; text-align: right; font-weight: bold; border-top: 2px solid #ddd;">TOTAL:</td>
+              <td style="padding: 15px; text-align: right; font-weight: bold; color: #27ae60; font-size: 1.3em; border-top: 2px solid #ddd;">${totalFormateado}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 20px; text-align: center;">
+          <p style="margin: 0; color: #2e7d32;">✅ Esta factura ya fue cancelada</p>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 30px; color: #718096; font-size: 14px;">
+        <p>Este es un mensaje automático. No respondas a este correo.</p>
+        <p>© ${new Date().getFullYear()} Tu Empresa. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"Tu Empresa" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    });
+    console.log(`✅ Factura enviada a ${to} para venta ${ventaId}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error al enviar factura por correo:", error.message);
+    return false;
+  }
+};
+
+// ENVÍA NOTIFICACIÓN DE ANULACIÓN
+export const sendVentaAnuladaEmail = async (to, nombreCliente, ventaId, total) => {
+  const totalFormateado = new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 0
+  }).format(total);
+
+  const subject = `⚠️ Venta anulada #${ventaId}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
+      <div style="text-align: center; padding: 20px 0; border-bottom: 2px solid #e74c3c;">
+        <h1 style="color: #2d3748; margin: 0;">Tu Empresa</h1>
+        <p style="color: #666; margin-top: 5px;">Notificación de anulación</p>
+      </div>
+      
+      <div style="padding: 30px; background: white; border-radius: 10px; margin-top: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 25px;">
+          <h2 style="color: #c0392b;">Venta anulada</h2>
+          <p style="color: #666;">Hola, ${nombreCliente}</p>
+        </div>
+
+        <div style="background-color: #fdeded; padding: 20px; border-radius: 10px; margin-bottom: 25px; border-left: 4px solid #e74c3c;">
+          <h3 style="margin-top: 0; color: #c0392b;">Información importante</h3>
+          <p><strong>Factura No.:</strong> ${ventaId}</p>
+          <p><strong>Monto:</strong> ${totalFormateado}</p>
+          <p><strong>Fecha de anulación:</strong> ${new Date().toLocaleDateString("es-CO")}</p>
+        </div>
+
+        <div style="background-color: #fef9e7; padding: 15px; border-radius: 8px;">
+          <p style="margin: 0; color: #7d6608;">
+            <strong>⚠️ La factura anterior No. ${ventaId} ha sido anulada y no es válida para ningún efecto legal o contable.</strong>
+          </p>
+          <p style="margin-top: 10px; color: #666;">
+            Si realizaste algún pago, será reembolsado en los próximos días hábiles.
+          </p>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 30px; color: #718096; font-size: 14px;">
+        <p>Este es un mensaje automático.</p>
+        <p>© ${new Date().getFullYear()} Tu Empresa.</p>
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"Tu Empresa" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    });
+    console.log(`✅ Anulación enviada a ${to} para venta ${ventaId}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error al enviar anulación:", error.message);
+    return false;
+  }
+};

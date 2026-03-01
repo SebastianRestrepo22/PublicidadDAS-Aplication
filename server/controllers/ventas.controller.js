@@ -16,6 +16,7 @@ import {
   createDetallesVentaFromPedidoModel,
   createDetalleVentaManualModel
 } from "../models/detalleVentas.models.js";
+import { sendVentaFacturaEmail, sendVentaAnuladaEmail } from "../utils/email.js";
 
 export const getVentas = async (req, res) => {
   try {
@@ -96,7 +97,26 @@ export const createVentaDesdePedido = async (req, res) => {
     await connection.commit();
 
     const ventaCreada = await getVentaByIdModel(VentaId);
-    ventaCreada.detalle = await getDetalleVentaByVentaIdModel(VentaId);
+    const detallesCompletos = await getDetalleVentaByVentaIdModel(VentaId);
+    ventaCreada.detalle = detallesCompletos;
+
+    // ✅ ENVIAR CORREO DE FACTURA
+    if (ventaCreada.ClienteCorreo) {
+      try {
+        console.log("📧 Enviando factura a:", ventaCreada.ClienteCorreo);
+        console.log("📦 Detalles a enviar:", detallesCompletos.length);
+        
+        await sendVentaFacturaEmail(
+          ventaCreada.ClienteCorreo,
+          ventaCreada.ClienteNombre || 'Cliente',
+          ventaCreada.VentaId,
+          ventaCreada.Total,
+          detallesCompletos  // Usar detallesCompletos, no ventaCreada.detalle
+        );
+      } catch (emailError) {
+        console.error("❌ Error enviando correo de factura:", emailError);
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -151,7 +171,7 @@ export const createVentaManual = async (req, res) => {
       });
     }
 
-    const { detalles, UsuarioVendedorId } = ventaData;
+    const { detalles, UsuarioVendedorId, ClienteCorreo, ClienteNombre } = ventaData;
 
     if (!UsuarioVendedorId) {
       return res.status(400).json({ 
@@ -204,11 +224,29 @@ export const createVentaManual = async (req, res) => {
     }
 
     // PASO 3: AHORA SÍ, validar y descontar stock (JUSTO ANTES DEL COMMIT)
-    // Esto minimiza el tiempo entre el bloqueo y el commit
     await validarYDescontarStockModel(connection, detalles);
 
     // PASO 4: Confirmar TODO
     await connection.commit();
+
+    // ENVIAR CORREO DE FACTURA
+    if (ClienteCorreo) {
+      try {
+        // Obtener los detalles completos con nombres
+        const detallesCompletos = await getDetalleVentaByVentaIdModel(VentaId);
+        
+        await sendVentaFacturaEmail(
+          ClienteCorreo,
+          ClienteNombre || 'Cliente',
+          VentaId,
+          ventaData.Total,
+          detallesCompletos
+        );
+      } catch (emailError) {
+        console.error("Error enviando correo de factura:", emailError);
+        // No interrumpir el flujo si falla el correo
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -297,6 +335,21 @@ export const anularVenta = async (req, res) => {
 
     const ventaAnulada = await getVentaByIdModel(id);
     ventaAnulada.detalle = await getDetalleVentaByVentaIdModel(id);
+
+    // ENVIAR CORREO DE ANULACIÓN
+    if (ventaAnulada.ClienteCorreo) {
+      try {
+        await sendVentaAnuladaEmail(
+          ventaAnulada.ClienteCorreo,
+          ventaAnulada.ClienteNombre || 'Cliente',
+          ventaAnulada.VentaId,
+          ventaAnulada.Total
+        );
+      } catch (emailError) {
+        console.error("Error enviando correo de anulación:", emailError);
+        // No interrumpir el flujo si falla el correo
+      }
+    }
 
     res.status(200).json({
       success: true,
