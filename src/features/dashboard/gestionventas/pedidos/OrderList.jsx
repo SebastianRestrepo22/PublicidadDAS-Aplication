@@ -1,4 +1,3 @@
-// OrderList.jsx
 import React from "react";
 import { Eye, Plus, Search, Trash2 } from "lucide-react";
 import { Pagination } from "../../components/paginacion/pagination";
