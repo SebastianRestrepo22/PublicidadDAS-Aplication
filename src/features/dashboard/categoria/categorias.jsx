@@ -114,7 +114,7 @@ export const Categorias = () => {
     }
 
     try {
-      console.log("📤 Actualizando categoría ID:", selectedCategoria.CategoriaId);
+      console.log(" Actualizando categoría ID:", selectedCategoria.CategoriaId);
       await axios.put(
         `http://localhost:3000/api/categorias/${selectedCategoria.CategoriaId}`,
         formEditar
@@ -123,7 +123,7 @@ export const Categorias = () => {
       fetchCategorias();
       setOpenEditar(false);
     } catch (error) {
-      console.error("❌ Error al actualizar:", error);
+      console.error(" Error al actualizar:", error);
       const errorMsg = error.response?.data?.message || error.response?.data?.error || "Error al actualizar la categoría";
       toast.error(errorMsg);
     } finally {
@@ -139,7 +139,7 @@ export const Categorias = () => {
 
     setLoading(true);
     try {
-      console.log("🗑️ Eliminando categoría ID:", selectedCategoria.CategoriaId);
+      console.log(" Eliminando categoría ID:", selectedCategoria.CategoriaId);
       await axios.delete(
         `http://localhost:3000/api/categorias/${selectedCategoria.CategoriaId}`
       );
@@ -148,8 +148,8 @@ export const Categorias = () => {
       setSelectedCategoria(null);
       fetchCategorias();
     } catch (err) {
-      console.error("❌ Error al eliminar:", err);
-      console.error("❌ Detalles:", err.response?.data);
+      console.error(" Error al eliminar categoria:", err);
+      console.error(" Detalles:", err.response?.data);
       const errorMsg = err.response?.data?.message || err.response?.data?.error || "Error al eliminar la categoría. Puede estar en uso.";
       toast.error(errorMsg);
     } finally {
