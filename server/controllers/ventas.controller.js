@@ -296,23 +296,29 @@ export const anularVenta = async (req, res) => {
       return res.status(400).json({ error: "La venta ya está anulada" });
     }
 
-    // VALIDAR TIEMPO DESDE CREACIÓN (1 HORA)
-    const fechaVenta = new Date(venta.FechaVenta);
-    const ahora = new Date();
-    const diferenciaMs = ahora - fechaVenta;
-    const diferenciaHoras = diferenciaMs / (1000 * 60 * 60);
-    
-    const TIEMPO_LIMITE_HORAS = 1; // 1 hora para anular
-    
-    if (diferenciaHoras > TIEMPO_LIMITE_HORAS) {
-      return res.status(400).json({ 
-        success: false,
-        error: `Ya no es posible anular esta venta. Han pasado más de ${TIEMPO_LIMITE_HORAS} hora desde su creación.`,
-        codigo: 'TIEMPO_EXCEDIDO',
-        tiempoLimiteHoras: TIEMPO_LIMITE_HORAS,
-        fechaVenta: venta.FechaVenta,
-        horasTranscurridas: Math.round(diferenciaHoras * 10) / 10
-      });
+    // 🔥 SOLO VALIDAR TIEMPO PARA VENTAS MANUALES
+    // Las ventas desde pedido NO tienen límite de tiempo
+    if (venta.Origen === 'manual') {
+      // VALIDAR TIEMPO DESDE CREACIÓN (1 HORA)
+      const fechaVenta = new Date(venta.FechaVenta);
+      const ahora = new Date();
+      const diferenciaMs = ahora - fechaVenta;
+      const diferenciaHoras = diferenciaMs / (1000 * 60 * 60);
+      
+      const TIEMPO_LIMITE_HORAS = 1; // 1 hora para anular ventas manuales
+      
+      if (diferenciaHoras > TIEMPO_LIMITE_HORAS) {
+        return res.status(400).json({ 
+          success: false,
+          error: `Ya no es posible anular esta venta manual. Han pasado más de ${TIEMPO_LIMITE_HORAS} hora desde su creación.`,
+          codigo: 'TIEMPO_EXCEDIDO',
+          tiempoLimiteHoras: TIEMPO_LIMITE_HORAS,
+          fechaVenta: venta.FechaVenta,
+          horasTranscurridas: Math.round(diferenciaHoras * 10) / 10
+        });
+      }
+    } else {
+      console.log(`🕒 Venta desde pedido ${id} - Sin límite de tiempo para anular`);
     }
 
     // INICIAR TRANSACCIÓN
@@ -355,7 +361,9 @@ export const anularVenta = async (req, res) => {
       success: true,
       message: "Venta anulada correctamente",
       venta: ventaAnulada,
-      tiempoTranscurrido: Math.round(diferenciaHoras * 10) / 10 + " horas"
+      tiempoTranscurrido: venta.Origen === 'manual' 
+        ? Math.round(((new Date() - new Date(venta.FechaVenta)) / (1000 * 60 * 60)) * 10) / 10 + " horas"
+        : "Sin límite de tiempo"
     });
 
   } catch (error) {
