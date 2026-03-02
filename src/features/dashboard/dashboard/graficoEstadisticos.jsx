@@ -15,11 +15,11 @@ import {
   Pie,
   Cell,
   Tooltip,
+  ResponsiveContainer,
 } from "recharts";
-import { Users, ShoppingCart, Package, TrendingUp } from "lucide-react";
+import { Users, ShoppingCart, Package, TrendingUp, Star } from "lucide-react";
 
 export const GraficosEstadisticos = () => {
-  // Estados para manejar los datos
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -33,7 +33,6 @@ export const GraficosEstadisticos = () => {
     try {
       setCargando(true);
 
-      // Ajusta la URL según tu backend
       const response = await fetch('http://localhost:3000/api/dashboard/stats', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
@@ -52,6 +51,106 @@ export const GraficosEstadisticos = () => {
       setError("No se pudieron cargar los datos");
       setCargando(false);
     }
+  };
+
+  // ➕ Tooltip personalizado para Ventas Mensuales (muestra top productos del mes)
+  const CustomTooltipMensual = ({ active, payload, label }) => {
+    if (active && payload?.length) {
+      // Filtrar productos que coincidan con el mes mostrado (por nombre abreviado)
+      const productosDelMes = datos?.topProductosMensuales?.filter(p => {
+        // Aquí podrías agregar lógica más precisa si el backend incluye el mes por producto
+        return true; // Por ahora mostramos los tops generales
+      }).slice(0, 3);
+
+      return (
+        <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-100 min-w-[280px]">
+          <p className="font-bold text-gray-900 mb-2 text-sm">{label}</p>
+          <p className="text-blue-600 font-semibold mb-3">
+            💰 Ventas: ${payload[0].value?.toLocaleString()}
+          </p>
+          
+          {productosDelMes?.length > 0 && (
+            <>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                <span className="text-xs font-semibold text-gray-700">Top productos</span>
+              </div>
+              <div className="space-y-1.5">
+                {productosDelMes.map((prod, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-4 h-4 rounded bg-gray-100 text-gray-600 flex items-center justify-center text-[10px] font-medium flex-shrink-0">
+                        {idx + 1}
+                      </span>
+                      <span className="text-gray-700 truncate max-w-[120px]" title={prod.nombre}>
+                        {prod.nombre}
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
+                        prod.tipo === 'producto' 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-purple-100 text-purple-700'
+                      }`}>
+                        {prod.tipo}
+                      </span>
+                    </div>
+                    <span className="text-gray-500 font-medium">{prod.cantidad} un.</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // ➕ Tooltip personalizado para Ventas Semanales
+  const CustomTooltipSemanal = ({ active, payload, label }) => {
+    if (active && payload?.length) {
+      const productosSemana = datos?.topProductosSemanales?.slice(0, 3);
+
+      return (
+        <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-100 min-w-[280px]">
+          <p className="font-bold text-gray-900 mb-2 text-sm">{label}</p>
+          <p className="text-blue-600 font-semibold mb-3">
+            💰 Ventas: ${payload[0].value?.toLocaleString()}
+          </p>
+          
+          {productosSemana?.length > 0 && (
+            <>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                <span className="text-xs font-semibold text-gray-700">Top productos</span>
+              </div>
+              <div className="space-y-1.5">
+                {productosSemana.map((prod, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-4 h-4 rounded bg-gray-100 text-gray-600 flex items-center justify-center text-[10px] font-medium flex-shrink-0">
+                        {idx + 1}
+                      </span>
+                      <span className="text-gray-700 truncate max-w-[120px]" title={prod.nombre}>
+                        {prod.nombre}
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
+                        prod.tipo === 'producto' 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-purple-100 text-purple-700'
+                      }`}>
+                        {prod.tipo}
+                      </span>
+                    </div>
+                    <span className="text-gray-500 font-medium">{prod.cantidad} un.</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+    return null;
   };
 
   // Mostrar cargando mientras obtenemos datos
@@ -92,8 +191,16 @@ export const GraficosEstadisticos = () => {
     );
   }
 
-  // Extraemos los datos para usarlos en los gráficos
-  const { ventasMensuales, ventasSemanales, pedidosSemanales, usuariosActivos, totales } = datos;
+  // Extraemos los datos incluyendo los top productos
+  const { 
+    ventasMensuales, 
+    ventasSemanales, 
+    pedidosSemanales, 
+    usuariosActivos, 
+    totales,
+    topProductosMensuales,
+    topProductosSemanales
+  } = datos;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -159,34 +266,75 @@ export const GraficosEstadisticos = () => {
 
         {/* Gráficos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Gráfico de Ventas Mensuales */}
+          
+          {/* ➕ Gráfico de Ventas Mensuales con Tooltip personalizado */}
           <div className="bg-white rounded-xl shadow p-4">
             <h2 className="text-lg font-bold">Ventas mensuales</h2>
             <p className="text-sm text-gray-500 mb-4">
-              Ventas por mes en el último semestre
+              Ventas por mes en el último semestre • <span className="text-blue-600">Hover para ver productos</span>
             </p>
-            <BarChart width={400} height={300} data={ventasMensuales}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="mes" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="ventas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-            </BarChart>
+            <div className="overflow-x-auto">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={ventasMensuales}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="mes" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#64748b', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#64748b', fontSize: 12 }}
+                    tickFormatter={(value) => `$${value/1000}k`}
+                  />
+                  <Tooltip content={<CustomTooltipMensual />} cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }} />
+                  <Bar 
+                    dataKey="ventas" 
+                    fill="#3b82f6" 
+                    radius={[4, 4, 0, 0]}
+                    activeBar={{ fill: '#2563eb', filter: 'drop-shadow(0 4px 6px rgba(59, 130, 246, 0.3))' }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
-          {/* Gráfico de Ventas Semanales */}
+          {/* ➕ Gráfico de Ventas Semanales con Tooltip personalizado */}
           <div className="bg-white rounded-xl shadow p-4">
             <h2 className="text-lg font-bold">Ventas semanales</h2>
             <p className="text-sm text-gray-500 mb-4">
-              Tendencia de ventas por semana
+              Tendencia de ventas por semana • <span className="text-blue-600">Hover para ver productos</span>
             </p>
-            <LineChart width={400} height={300} data={ventasSemanales}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="semana" />
-              <YAxis />
-              <Tooltip />
-              <Line type="monotone" dataKey="ventas" stroke="#3b82f6" strokeWidth={3} dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }} />
-            </LineChart>
+            <div className="overflow-x-auto">
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={ventasSemanales}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="semana" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#64748b', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#64748b', fontSize: 12 }}
+                    tickFormatter={(value) => `$${value/1000}k`}
+                  />
+                  <Tooltip content={<CustomTooltipSemanal />} />
+                  <Line 
+                    type="monotone" 
+                    dataKey="ventas" 
+                    stroke="#3b82f6" 
+                    strokeWidth={3} 
+                    dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4, stroke: "#fff" }}
+                    activeDot={{ r: 6, stroke: "#2563eb", strokeWidth: 2, fill: "#fff" }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           {/* Gráfico de Pedidos Semanales */}
@@ -195,19 +343,25 @@ export const GraficosEstadisticos = () => {
             <p className="text-sm text-gray-500 mb-4">
               Volumen de pedidos por semana
             </p>
-            <AreaChart width={400} height={300} data={pedidosSemanales}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="semana" />
-              <YAxis />
-              <Tooltip />
-              <Area
-                type="monotone"
-                dataKey="pedidos"
-                stroke="#10b981"
-                fill="#10b981"
-                fillOpacity={0.3}
-              />
-            </AreaChart>
+            <div className="overflow-x-auto">
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={pedidosSemanales}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="semana" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="pedidos"
+                    stroke="#10b981"
+                    fill="#10b981"
+                    fillOpacity={0.3}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           {/* Gráfico de Usuarios */}
@@ -216,23 +370,30 @@ export const GraficosEstadisticos = () => {
             <p className="text-sm text-gray-500 mb-4">
               Distribucion de usuarios por estado
             </p>
-            <PieChart width={400} height={300}>
-              <Pie
-                data={usuariosActivos}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={100}
-                paddingAngle={5}
-                dataKey="value"
-              >
-                {usuariosActivos.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-            </PieChart>
+            <div className="overflow-x-auto">
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={usuariosActivos}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {usuariosActivos.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
 
-            <div className="flex justify-center gap-4 mt-4">
+            <div className="flex justify-center gap-4 mt-4 flex-wrap">
               {usuariosActivos.map((entry, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <div

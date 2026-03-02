@@ -89,6 +89,40 @@ router.get('/dashboard/stats', async (req, res) => {
          AND FechaRegistro < DATE_SUB(NOW(), INTERVAL 1 MONTH)) as usuarios_anterior
     `);
 
+    // ➕ 7. NUEVO: Top productos/servicios - Últimos 6 meses (para gráfico mensual)
+    const [topProductosMensuales] = await pool.query(`
+      SELECT 
+        dv.NombreSnapshot as nombre,
+        dv.TipoItem as tipo,
+        DATE_FORMAT(v.FechaVenta, '%Y-%m') as periodo,
+        SUM(dv.Cantidad) as cantidad_vendida,
+        SUM(dv.Subtotal) as ingresos
+      FROM detalleventas dv
+      INNER JOIN ventas v ON dv.VentaId = v.VentaId
+      WHERE v.FechaVenta >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+        AND v.Estado = 'pagado'
+      GROUP BY dv.ProductoId, dv.ServicioId, dv.NombreSnapshot, dv.TipoItem
+      ORDER BY cantidad_vendida DESC
+      LIMIT 5
+    `);
+
+    // ➕ 8. NUEVO: Top productos/servicios - Últimas 6 semanas (para gráfico semanal)
+    const [topProductosSemanales] = await pool.query(`
+      SELECT 
+        dv.NombreSnapshot as nombre,
+        dv.TipoItem as tipo,
+        WEEK(v.FechaVenta) as periodo,
+        SUM(dv.Cantidad) as cantidad_vendida,
+        SUM(dv.Subtotal) as ingresos
+      FROM detalleventas dv
+      INNER JOIN ventas v ON dv.VentaId = v.VentaId
+      WHERE v.FechaVenta >= DATE_SUB(NOW(), INTERVAL 6 WEEK)
+        AND v.Estado = 'pagado'
+      GROUP BY dv.ProductoId, dv.ServicioId, dv.NombreSnapshot, dv.TipoItem
+      ORDER BY cantidad_vendida DESC
+      LIMIT 5
+    `);
+
     // Calcular porcentajes de variación
     const variacionVentas = variaciones[0].mes_anterior_ventas > 0 
       ? ((variaciones[0].mes_actual_ventas - variaciones[0].mes_anterior_ventas) / variaciones[0].mes_anterior_ventas * 100).toFixed(1)
@@ -102,10 +136,10 @@ router.get('/dashboard/stats', async (req, res) => {
       ? ((variaciones[0].usuarios_actual - variaciones[0].usuarios_anterior) / variaciones[0].usuarios_anterior * 100).toFixed(1)
       : 100;
 
-    // Calcular crecimiento total (puedes ajustar esta fórmula)
+    // Calcular crecimiento total
     const crecimiento = ((variaciones[0].mes_actual_ventas - variaciones[0].mes_anterior_ventas) / variaciones[0].mes_anterior_ventas * 100).toFixed(1);
 
-    // Estructurar la respuesta
+    // ➕ Estructurar la respuesta COMPLETA con los nuevos campos
     const dashboardData = {
       ventasMensuales: ventasMensuales.map(item => ({
         mes: item.mes,
@@ -144,8 +178,21 @@ router.get('/dashboard/stats', async (req, res) => {
         variacionVentas: Number(variacionVentas || 0),
         variacionPedidos: Number(variacionPedidos || 0),
         variacionUsuarios: Number(variacionUsuarios || 0),
-        variacionCrecimiento: Number(variacionVentas || 0) // O puedes calcular otro indicador
-      }
+        variacionCrecimiento: Number(variacionVentas || 0)
+      },
+      // ➕ NUEVOS CAMPOS: Top productos/servicios
+      topProductosMensuales: topProductosMensuales.map(item => ({
+        nombre: item.nombre,
+        tipo: item.tipo,
+        cantidad: Number(item.cantidad_vendida),
+        ingresos: Number(item.ingresos)
+      })),
+      topProductosSemanales: topProductosSemanales.map(item => ({
+        nombre: item.nombre,
+        tipo: item.tipo,
+        cantidad: Number(item.cantidad_vendida),
+        ingresos: Number(item.ingresos)
+      }))
     };
 
     res.json(dashboardData);

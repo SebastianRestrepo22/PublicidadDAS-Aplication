@@ -21,6 +21,9 @@ import { v4 as uuidv4 } from "uuid";
 import fs from 'fs';
 import { dbPool } from "../lib/db.js";
 
+// ========================================
+// 📎 SUBIR VOUCHER A PEDIDO
+// ========================================
 export const uploadVoucherToPedido = async (req, res) => {
   try {
     const { id } = req.params;
@@ -37,12 +40,9 @@ export const uploadVoucherToPedido = async (req, res) => {
     const pedidoExistente = await getPedidoClienteByIdModel(id);
     if (!pedidoExistente) {
       console.log('❌ Pedido no encontrado:', id);
-
-      // Eliminar el archivo subido si el pedido no existe
       fs.unlink(file.path, (err) => {
         if (err) console.error('Error eliminando archivo huérfano:', err);
       });
-
       return res.status(404).json({ error: 'Pedido no encontrado' });
     }
 
@@ -94,7 +94,6 @@ export const uploadVoucherToPedido = async (req, res) => {
   } catch (error) {
     console.error('❌ Error al subir voucher:', error);
 
-    // Eliminar el archivo si hubo error
     if (req.file) {
       fs.unlink(req.file.path, (err) => {
         if (err) console.error('Error eliminando archivo tras error:', err);
@@ -122,7 +121,6 @@ export const createPedidoCliente = async (req, res) => {
     // 🔄 Detectar si viene como FormData (con archivo) o JSON puro
     let pedidoData;
     if (typeof req.body.pedido === 'string') {
-      // Caso 1: FormData con archivo → req.body.pedido es string JSON
       try {
         pedidoData = JSON.parse(req.body.pedido);
       } catch (error) {
@@ -133,7 +131,6 @@ export const createPedidoCliente = async (req, res) => {
         });
       }
     } else {
-      // Caso 2: JSON puro (sin archivo) → req.body es el objeto directamente
       pedidoData = req.body;
     }
 
@@ -154,10 +151,12 @@ export const createPedidoCliente = async (req, res) => {
       detalle = []
     } = pedidoData;
 
-    // Validación básica
-    if (Total === undefined || Total <= 0) {
-      return res.status(400).json({ error: "Total inválido" });
+    // 🔥 CORRECCIÓN: Validar y sanitizar el Total
+    const totalLimpio = parseFloat(Total);
+    if (isNaN(totalLimpio) || totalLimpio <= 0) {
+      return res.status(400).json({ error: "Total inválido o no numérico" });
     }
+
     if (!Array.isArray(detalle) || detalle.length === 0) {
       return res.status(400).json({ error: "El pedido debe contener al menos un producto" });
     }
@@ -176,10 +175,11 @@ export const createPedidoCliente = async (req, res) => {
       ? FechaRegistro.split("T")[0]
       : new Date().toISOString().split("T")[0];
 
+    // 🔥 CORRECCIÓN: Usar totalLimpio ya validado
     nuevoPedido = await createPedidoClienteModel({
       ClienteId: ClienteId || null,
       FechaRegistro: fechaProcesada,
-      Total: parseFloat(Total),
+      Total: totalLimpio,  // ✅ Valor ya parseado y validado
       MetodoPago,
       Voucher: voucherUrl || null,
       NombreRecibe: NombreRecibe || null,
@@ -203,7 +203,10 @@ export const createPedidoCliente = async (req, res) => {
       const ProductoId = item.ProductoId || null;
       const ServicioId = item.ServicioId || null;
       const Cantidad = item.Cantidad ? parseInt(item.Cantidad) : 1;
-      const Precio = item.PrecioUnitario || item.Precio || 0;
+      
+      // 🔥 CORRECCIÓN: Sanitizar precio del detalle
+      const Precio = parseFloat(item.PrecioUnitario || item.Precio || 0);
+      
       const ColorId = item.ColorId || null;
       const Tamaño = ServicioId
         ? (item.Tamaño ?? item.DimensionesId ?? "Mediana")
@@ -219,7 +222,7 @@ export const createPedidoCliente = async (req, res) => {
       if (Cantidad <= 0) {
         throw new Error(`Detalle ${i + 1}: Cantidad inválida (${Cantidad})`);
       }
-      if (Precio <= 0) {
+      if (isNaN(Precio) || Precio <= 0) {
         throw new Error(`Detalle ${i + 1}: Precio inválido (${Precio})`);
       }
 
@@ -229,7 +232,7 @@ export const createPedidoCliente = async (req, res) => {
         ProductoId,
         ServicioId,
         Cantidad,
-        Precio,
+        Precio,  // ✅ Ya es número válido
         ColorId,
         Tamaño,
         Descripcion,
@@ -260,6 +263,7 @@ export const createPedidoCliente = async (req, res) => {
 
     console.log("🎉 Pedido completado exitosamente");
     res.status(201).json(pedidoCompleto);
+    
   } catch (error) {
     console.error("❌ Error al crear pedido:", error.message);
 
@@ -277,7 +281,6 @@ export const createPedidoCliente = async (req, res) => {
       }
     }
 
-    // Si hay un archivo subido, eliminarlo
     if (req.file) {
       fs.unlink(req.file.path, (err) => {
         if (err) console.error('Error eliminando archivo:', err);
@@ -292,7 +295,7 @@ export const createPedidoCliente = async (req, res) => {
 };
 
 // ========================================
-// ✅ ACTUALIZAR PEDIDO - VERSIÓN CORREGIDA (USA PedidoClienteId)
+// ✅ ACTUALIZAR PEDIDO - CON MEJOR TRAZABILIDAD
 // ========================================
 export const updatePedidoCliente = async (req, res) => {
   const { id } = req.params;
@@ -325,8 +328,18 @@ export const updatePedidoCliente = async (req, res) => {
       id: pedidoActual.PedidoClienteId,
       estado: pedidoActual.Estado,
       total: pedidoActual.Total,
+      tipoTotal: typeof pedidoActual.Total,
       tipoCliente: pedidoActual.TipoCliente
     });
+
+    // 🔥 CORRECCIÓN: Si se está actualizando el Total, sanitizarlo
+    if (updates.Total !== undefined) {
+      const totalLimpio = parseFloat(updates.Total);
+      if (!isNaN(totalLimpio)) {
+        updates.Total = totalLimpio;
+        console.log('🔧 Total sanitizado:', updates.Total);
+      }
+    }
 
     // Actualizar el pedido
     const result = await updatePedidoClienteModel(id, updates);
@@ -339,7 +352,8 @@ export const updatePedidoCliente = async (req, res) => {
     console.log('📦 Pedido actualizado:', {
       id: updated.PedidoClienteId,
       nuevoEstado: updated.Estado,
-      total: updated.Total
+      total: updated.Total,
+      tipoTotal: typeof updated.Total
     });
 
     // ===== SI EL ESTADO ES "aprobado", CREAR VENTA =====
@@ -351,10 +365,19 @@ export const updatePedidoCliente = async (req, res) => {
         const usuarioVendedorId = null;
         console.log('👤 UsuarioVendedorId será null (se asignará después en el módulo de ventas)');
 
+        // 🔥 DEBUG: Log del total antes de crear la venta
+        console.log('💰 [DEBUG] Total que se pasará a crear venta:', {
+          pedidoId: updated.PedidoClienteId,
+          totalPedido: updated.Total,
+          tipoTotal: typeof updated.Total,
+          detallesCount: updated.detalle?.length || 0,
+          sumaDetalles: updated.detalle?.reduce((acc, d) => acc + (Number(d.Cantidad) * Number(d.Precio)), 0)
+        });
+
         // Verificar si ya existe una venta para este pedido
         const [ventaExistente] = await dbPool.execute(
           "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
-          [id] // ✅ Usamos id que es el PedidoClienteId
+          [id]
         );
 
         if (ventaExistente.length > 0) {
@@ -408,6 +431,9 @@ export const updatePedidoCliente = async (req, res) => {
   }
 };
 
+// ========================================
+// 📋 OBTENER TODOS LOS PEDIDOS
+// ========================================
 export const getPedidosClientes = async (req, res) => {
   try {
     console.log('🔍 [CONTROLLER] Obteniendo todos los pedidos...');
@@ -423,7 +449,7 @@ export const getPedidosClientes = async (req, res) => {
         console.log(`   📋 Pedido ${p.PedidoClienteId}: ${p.detalle.length} detalles`);
       } catch (detalleError) {
         console.error(`   ⚠️ Error obteniendo detalles para pedido ${p.PedidoClienteId}:`, detalleError.message);
-        p.detalle = []; // Asignar array vacío si hay error
+        p.detalle = [];
       }
     }
 
@@ -438,6 +464,9 @@ export const getPedidosClientes = async (req, res) => {
   }
 };
 
+// ========================================
+// 🔍 OBTENER PEDIDO POR ID
+// ========================================
 export const getPedidoClienteById = async (req, res) => {
   try {
     const pedido = await getPedidoClienteByIdModel(req.params.id);
@@ -452,6 +481,9 @@ export const getPedidoClienteById = async (req, res) => {
   }
 };
 
+// ========================================
+// 🗑️ ELIMINAR PEDIDO
+// ========================================
 export const deletePedidoCliente = async (req, res) => {
   try {
     const detalles = await getDetallePedidoByPedidoIdModel(req.params.id);
@@ -469,7 +501,9 @@ export const deletePedidoCliente = async (req, res) => {
   }
 };
 
-// Solo si usas autenticación en rutas privadas
+// ========================================
+// 👤 OBTENER MIS PEDIDOS (AUTENTICADO)
+// ========================================
 export const getMisPedidos = async (req, res) => {
   try {
     const clienteId = req.user?.CedulaId;

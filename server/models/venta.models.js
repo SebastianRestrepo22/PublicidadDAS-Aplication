@@ -55,7 +55,7 @@ export const getVentaByIdModel = async (ventaId) => {
   }
 };
 
-// Crear venta desde pedido
+// 🔥 CORREGIDO: Crear venta desde pedido
 export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) => {
   const connection = await dbPool.getConnection();
   
@@ -80,18 +80,10 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
     
     const VentaId = uuidv4();
     
-    // 🔥 SOLUCIÓN: Limpiar y formatear correctamente el Total
-    let subtotal = pedidoData.Total || 0;
-    
-    // Si es string, limpiar formato
-    if (typeof subtotal === 'string') {
-      // Eliminar puntos de miles y convertir coma a punto si es necesario
-      subtotal = subtotal.replace(/\./g, '').replace(',', '.');
-    }
-    
-    // Convertir a número y redondear a 2 decimales
-    subtotal = parseFloat(subtotal).toFixed(2);
-    subtotal = parseFloat(subtotal); // Volver a número para cálculos
+    // 🔥 CORRECCIÓN: Limpiar y formatear correctamente el Total
+    // ✅ Usar parseFloat directo que maneja "64.80", "1500", etc. correctamente
+    let subtotal = parseFloat(pedidoData.Total) || 0;
+    subtotal = parseFloat(subtotal.toFixed(2)); // Redondear a 2 decimales
     
     // Calcular IVA (19%) con 2 decimales
     const IVA = parseFloat((subtotal * 0.19).toFixed(2));
@@ -169,7 +161,7 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
   }
 };
 
-// Crear venta manual
+// 🔥 CORREGIDO: Crear venta manual
 export const createVentaManualModel = async (ventaData, connection) => {
   // Si no recibimos connection, significa que es llamado desde fuera
   // y debemos manejar la transacción aquí
@@ -190,12 +182,20 @@ export const createVentaManualModel = async (ventaData, connection) => {
       Estado = 'pagado'
     } = ventaData;
     
-    // Limpiar y formatear valores numéricos
+    // 🔥 CORRECCIÓN: Helper seguro para limpiar números
     const limpiarNumero = (valor) => {
       if (typeof valor === 'string') {
-        valor = valor.replace(/\./g, '').replace(',', '.');
+        // Solo aplicar limpieza especial si es formato europeo (ej: "1.234,56")
+        if (valor.includes(',') && valor.match(/\.\d{3},/)) {
+          // Formato europeo: eliminar puntos de miles, convertir coma a punto
+          valor = valor.replace(/\./g, '').replace(',', '.');
+        } else {
+          // Formato estándar (ej: "64.80" o "1500"): eliminar solo caracteres no numéricos excepto punto y guion
+          valor = valor.replace(/[^0-9.-]/g, '');
+        }
       }
-      return parseFloat(parseFloat(valor).toFixed(2));
+      const num = parseFloat(valor);
+      return isNaN(num) ? 0 : parseFloat(num.toFixed(2));
     };
     
     Subtotal = limpiarNumero(Subtotal || 0);
@@ -297,7 +297,7 @@ export const getVentaByPedidoIdModel = async (pedidoClienteId) => {
   }
 };
 
-// models/venta.models.js
+// Validar y descontar stock
 export const validarYDescontarStockModel = async (connection, detalles) => {
   const erroresStock = [];
 
@@ -330,7 +330,7 @@ export const validarYDescontarStockModel = async (connection, detalles) => {
       const [colorRows] = await connection.query(
         `SELECT Stock 
          FROM productocolores_stock 
-         WHERE ProductoId = ? AND ColorId = ? FOR UPDATE`, // 🔒 BLOQUEO
+         WHERE ProductoId = ? AND ColorId = ? FOR UPDATE`,
         [detalle.ProductoId, detalle.ColorId]
       );
 
