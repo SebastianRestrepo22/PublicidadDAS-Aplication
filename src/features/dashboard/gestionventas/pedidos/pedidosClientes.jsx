@@ -97,23 +97,33 @@ export const PedidosClientes = () => {
 
   // ===== CARGAR CATÁLOGOS INICIALES =====
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [p, s, c] = await Promise.all([
-          getAllProductos(), 
-          getAllServicios(), 
-          getAllColores()
-        ]);
-        setProductos(Array.isArray(p) ? p : []);
-        setServicios(Array.isArray(s) ? s : []);
-        setColores(Array.isArray(c) ? c : []);
-      } catch (err) {
-        console.error("Error cargando catálogos:", err);
-        toast.error("Error cargando datos iniciales");
-      }
-    };
-    fetchData();
-  }, []);
+  const fetchData = async () => {
+    try {
+      const [p, s, c] = await Promise.all([
+        getAllProductos(), 
+        getAllServicios(), 
+        getAllColores()
+      ]);
+      
+      // 👇 DEBUG: Revisa los precios que llegan
+      console.log('📦 Productos recibidos (primeros 3):', p.slice(0, 3).map(x => ({
+        id: x.ProductoId,
+        nombre: x.Nombre,
+        precio: x.Precio,
+        tipoPrecio: typeof x.Precio,
+        precioString: String(x.Precio)
+      })));
+      
+      setProductos(Array.isArray(p) ? p : []);
+      setServicios(Array.isArray(s) ? s : []);
+      setColores(Array.isArray(c) ? c : []);
+    } catch (err) {
+      console.error("Error cargando catálogos:", err);
+      toast.error("Error cargando datos iniciales");
+    }
+  };
+  fetchData();
+}, []);
 
   // ===== CALCULAR TOTAL EN CREACIÓN =====
   useEffect(() => {
