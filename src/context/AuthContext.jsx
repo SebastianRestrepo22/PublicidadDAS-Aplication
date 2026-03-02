@@ -1,7 +1,7 @@
-// context/AuthContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { jwtDecode } from "jwt-decode";
 import axios from "axios";
+import { toast } from "react-toastify";
 
 const AuthContext = createContext();
 
@@ -9,6 +9,50 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  //  Interceptor para manejar token expirado
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        // Si el error es 401 (No autorizado) o 403 (Prohibido)
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          // Verificar si el mensaje indica token expirado
+          const errorMsg = error.response?.data?.message?.toLowerCase() || '';
+          
+          if (errorMsg.includes('expirado') || errorMsg.includes('token') || errorMsg.includes('inválido')) {
+            // Mostrar mensaje
+            toast.error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.', {
+              autoClose: 5000,
+              position: "top-center",
+            });
+            
+            // Limpiar todo
+            localStorage.removeItem("token");
+            localStorage.removeItem("userData");
+            localStorage.removeItem("userId");
+            localStorage.removeItem("lastPath");
+            delete axios.defaults.headers.common["Authorization"];
+            
+            // Actualizar estado
+            setUser(null);
+            setPermissions([]);
+            
+            // Redirigir después de 1.5 segundos
+            setTimeout(() => {
+              window.location.href = '/login';
+            }, 1500);
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    // Limpiar interceptor cuando el componente se desmonte
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, []); // Solo se ejecuta una vez
 
   useEffect(() => {
     const initAuth = () => {
@@ -25,11 +69,19 @@ export const AuthProvider = ({ children }) => {
       try {
         const decoded = jwtDecode(token);
 
+        // VERIFICAR EXPIRACIÓN
         if (decoded.exp * 1000 < Date.now()) {
+          // Token expirado - limpiar y mostrar mensaje
           localStorage.removeItem("token");
           localStorage.removeItem("userData");
           localStorage.removeItem("userId");
-          localStorage.removeItem("lastPath"); // AÑADIDO
+          localStorage.removeItem("lastPath");
+          
+          toast.info('Tu sesión ha expirado. Inicia sesión nuevamente.', {
+            autoClose: 3000,
+            position: "top-center",
+          });
+          
           setUser(null);
           setPermissions([]);
           setLoading(false);
@@ -55,7 +107,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem("token");
         localStorage.removeItem("userData");
         localStorage.removeItem("userId");
-        localStorage.removeItem("lastPath"); // AÑADIDO
+        localStorage.removeItem("lastPath");
         setUser(null);
         setPermissions([]);
       } finally {
@@ -114,7 +166,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("token");
     localStorage.removeItem("userData");
     localStorage.removeItem("userId");
-    localStorage.removeItem("lastPath"); // AÑADIDO
+    localStorage.removeItem("lastPath");
     delete axios.defaults.headers.common["Authorization"];
     setUser(null);
     setPermissions([]);

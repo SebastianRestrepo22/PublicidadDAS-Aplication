@@ -100,7 +100,7 @@ const OrigenBadge = ({ origen }) => {
   );
 };
 
-// Componente de detalles expandibles - MEJORADO con nombres de colores e imágenes
+// Componente de detalles expandibles 
 const DetallesProductosAcordeon = ({ detalles }) => {
   const [mostrarDetalles, setMostrarDetalles] = useState(false);
   const [imagenAmpliada, setImagenAmpliada] = useState(null);
@@ -112,148 +112,137 @@ const DetallesProductosAcordeon = ({ detalles }) => {
   const totalProductos = detalles.length;
   const totalCantidad = detalles.reduce((sum, d) => sum + (d.Cantidad || 0), 0);
   const totalSubtotal = detalles.reduce((sum, d) => sum + ((d.Subtotal ? parseFloat(d.Subtotal) : 0) || 0), 0);
-  const productosCount = detalles.filter(d => d.TipoItem === 'producto').length;
-  const serviciosCount = detalles.filter(d => d.TipoItem === 'servicio').length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      {/* Header resumen - más compacto */}
       <div
-        className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow"
+        className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 cursor-pointer hover:shadow-sm transition-shadow"
         onClick={() => setMostrarDetalles(!mostrarDetalles)}
       >
         <div className="flex justify-between items-center">
-          <div className="flex-1">
-            <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
-              <Package size={16} />
-              Detalle de productos ({totalProductos} items)
+          <div className="flex items-center gap-4 flex-wrap">
+            <h4 className="font-semibold text-blue-800 flex items-center gap-1 text-sm">
+              <Package size={14} />
+              Detalle ({totalProductos} items)
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-sm">
-              <div className="bg-white p-2 rounded shadow-sm">
-                <div className="text-gray-600">Items diferentes</div>
-                <div className="font-bold text-lg">{totalProductos}</div>
-              </div>
-              <div className="bg-white p-2 rounded shadow-sm">
-                <div className="text-gray-600">Unidades totales</div>
-                <div className="font-bold text-lg">{totalCantidad}</div>
-              </div>
-              <div className="bg-white p-2 rounded shadow-sm">
-                <div className="text-gray-600">Productos</div>
-                <div className="font-bold text-lg">{productosCount}</div>
-              </div>
-              <div className="bg-white p-2 rounded shadow-sm">
-                <div className="text-gray-600">Servicios</div>
-                <div className="font-bold text-lg">{serviciosCount}</div>
-              </div>
-              <div className="bg-white p-2 rounded shadow-sm">
-                <div className="text-gray-600">Subtotal</div>
-                <div className="font-bold text-lg">{formatPrice(totalSubtotal)}</div>
-              </div>
+            <div className="flex gap-3 text-xs">
+              <span className="bg-white px-2 py-1 rounded shadow-sm">
+                <span className="text-gray-600">Unidades:</span>
+                <span className="font-bold ml-1">{totalCantidad}</span>
+              </span>
+              <span className="bg-white px-2 py-1 rounded shadow-sm">
+                <span className="text-gray-600">Subtotal:</span>
+                <span className="font-bold ml-1 text-blue-600">{formatPrice(totalSubtotal)}</span>
+              </span>
             </div>
           </div>
-          <button className="ml-4 p-2 bg-white rounded-full shadow-sm hover:bg-gray-50">
-            {mostrarDetalles ? <ChevronUp size={20} className="text-blue-600" /> : <ChevronDown size={20} className="text-blue-600" />}
+          <button className="p-1.5 bg-white rounded-full shadow-sm hover:bg-gray-50">
+            {mostrarDetalles ? <ChevronUp size={16} className="text-blue-600" /> : <ChevronDown size={16} className="text-blue-600" />}
           </button>
         </div>
       </div>
 
       {mostrarDetalles && (
-        <div className="border rounded-lg overflow-hidden shadow-sm">
-          <div className="bg-gray-100 p-3 border-b grid grid-cols-12 text-sm font-medium text-gray-700">
-            <div className="col-span-4">Producto/Servicio</div>
+        <div className="border rounded-lg overflow-hidden shadow-sm text-sm">
+          {/* Encabezado más compacto */}
+          <div className="bg-gray-100 p-2 border-b grid grid-cols-12 text-xs font-medium text-gray-700">
+            <div className="col-span-5">Producto/Servicio</div>
             <div className="col-span-1 text-center">Tipo</div>
             <div className="col-span-1 text-center">Cant.</div>
-            <div className="col-span-2 text-center">Precio Unit.</div>
-            <div className="col-span-2 text-center">Subtotal</div>
-            <div className="col-span-2 text-center">Detalles</div>
+            <div className="col-span-2 text-right">P.Unit</div>
+            <div className="col-span-2 text-right">Subtotal</div>
+            <div className="col-span-1 text-center"></div>
           </div>
 
-          <div className="max-h-96 overflow-y-auto divide-y">
+          {/* Filas más compactas */}
+          <div className="max-h-80 overflow-y-auto divide-y">
             {detalles.map((item, index) => (
-              <div key={item.DetalleVentaId || index} className="p-3 hover:bg-gray-50 grid grid-cols-12 text-sm items-center">
-                <div className="col-span-4">
-                  <div className="font-medium">{item.NombreSnapshot}</div>
-                  {item.ProductoId && <div className="text-xs text-gray-500">ID: {shortenId(item.ProductoId)}</div>}
-                  {item.ServicioId && <div className="text-xs text-gray-500">ID: {shortenId(item.ServicioId)}</div>}
+              <div key={item.DetalleVentaId || index} className="p-2 hover:bg-gray-50 grid grid-cols-12 text-xs items-center">
+                {/* Producto/Servicio con variantes inline */}
+                <div className="col-span-5">
+                  <div className="font-medium flex items-center gap-1">
+                    {item.NombreSnapshot}
+                    {/* Color como badge pequeño */}
+                    {item.ColorId && (
+                      <span className="inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.ColorHex || '#ccc' }}></span>
+                        <span>{item.ColorNombre || 'Color'}</span>
+                      </span>
+                    )}
+                    {/* Tamaño como badge */}
+                    {item.ServicioTamanoId && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium">
+                        {item.NombreTamano || 'Tamaño'}
+                      </span>
+                    )}
+                  </div>
+                  {/* Descripción en línea si es corta */}
+                  {item.DescripcionPersonalizada && item.DescripcionPersonalizada.length < 30 && (
+                    <div className="text-[10px] text-gray-500 italic truncate max-w-[200px]">
+                      📝 {item.DescripcionPersonalizada}
+                    </div>
+                  )}
+                  {/* Descripción en tooltip si es larga */}
+                  {item.DescripcionPersonalizada && item.DescripcionPersonalizada.length >= 30 && (
+                    <div className="text-[10px] text-gray-500 italic truncate max-w-[200px]" title={item.DescripcionPersonalizada}>
+                      📝 {item.DescripcionPersonalizada.substring(0, 25)}...
+                    </div>
+                  )}
                 </div>
+                
+                {/* Tipo */}
                 <div className="col-span-1 text-center">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.TipoItem === 'producto' ? 'bg-green-100 text-green-800' : 'bg-purple-100 text-purple-800'
-                    }`}>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                    item.TipoItem === 'producto' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'
+                  }`}>
                     {item.TipoItem === 'producto' ? 'P' : 'S'}
                   </span>
                 </div>
+                
+                {/* Cantidad */}
                 <div className="col-span-1 text-center font-medium">{item.Cantidad || 0}</div>
-                <div className="col-span-2 text-center">{formatPrice(item.PrecioUnitario)}</div>
-                <div className="col-span-2 text-center font-semibold">{formatPrice(item.Subtotal)}</div>
-                <div className="col-span-2 text-center text-xs">
-                  {/* Mostrar color con nombre y muestra visual */}
-                  {item.ColorId && (
-                    <div className="flex items-center justify-center gap-1 mb-1">
-                      {item.ColorHex ? (
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.ColorHex }}></span>
-                      ) : (
-                        <span className="w-3 h-3 rounded-full bg-gray-300"></span>
-                      )}
-                      <span className="font-medium">{item.ColorNombre || `Color ID: ${shortenId(item.ColorId)}`}</span>
-                    </div>
-                  )}
-
-                  {/* Mostrar tamaño */}
-                  {item.ServicioTamanoId && (
-                    <div className="mb-1">
-                      <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">
-                        {item.NombreTamano || `Tamaño ID: ${shortenId(item.ServicioTamanoId)}`}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Descripción personalizada */}
-                  {item.DescripcionPersonalizada && (
-                    <div className="text-gray-600 mb-1 italic" title={item.DescripcionPersonalizada}>
-                      "{item.DescripcionPersonalizada.length > 20
-                        ? item.DescripcionPersonalizada.substring(0, 20) + '...'
-                        : item.DescripcionPersonalizada}"
-                    </div>
-                  )}
-
-                  {/* Imagen personalizada - mostrada como miniatura */}
+                
+                {/* Precio Unitario */}
+                <div className="col-span-2 text-right font-medium">{formatPrice(item.PrecioUnitario)}</div>
+                
+                {/* Subtotal */}
+                <div className="col-span-2 text-right font-semibold text-blue-600">{formatPrice(item.Subtotal)}</div>
+                
+                {/* Icono de imagen si existe */}
+                <div className="col-span-1 text-center">
                   {item.UrlImagenPersonalizada && (
-                    <div className="mt-2 flex justify-center">
-                      <div className="relative group">
-                        <img
-                          src={item.UrlImagenPersonalizada}
-                          alt="Personalizada"
-                          className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-500 transition-all"
-                          onClick={() => setImagenAmpliada(item.UrlImagenPersonalizada)}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.parentElement.innerHTML = '<span class="text-xs text-red-500">Error al cargar</span>';
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 rounded-lg transition-all flex items-center justify-center">
-                          <Eye size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                      </div>
-                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setImagenAmpliada(item.UrlImagenPersonalizada);
+                      }}
+                      className="p-1 hover:bg-gray-200 rounded"
+                      title="Ver imagen"
+                    >
+                      <Eye size={12} className="text-gray-500" />
+                    </button>
                   )}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="bg-gray-50 p-3 border-t">
-            <div className="flex justify-end gap-4 text-sm">
-              <span className="font-medium">Total items:</span>
-              <span>{totalProductos}</span>
-              <span className="font-medium ml-4">Total unidades:</span>
-              <span>{totalCantidad}</span>
-              <span className="font-medium ml-4">Subtotal:</span>
-              <span className="font-bold">{formatPrice(totalSubtotal)}</span>
+          {/* Footer compacto */}
+          <div className="bg-gray-50 p-2 border-t text-xs">
+            <div className="flex justify-end gap-4">
+              <span className="text-gray-600">Total items:</span>
+              <span className="font-medium">{totalProductos}</span>
+              <span className="text-gray-600 ml-2">Total unidades:</span>
+              <span className="font-medium">{totalCantidad}</span>
+              <span className="text-gray-600 ml-2 font-medium">Total:</span>
+              <span className="font-bold text-blue-600">{formatPrice(totalSubtotal)}</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal para ver imagen ampliada */}
+      {/* Modal para ver imagen ampliada (igual que antes) */}
       {imagenAmpliada && (
         <Modal open={true} onClose={() => setImagenAmpliada(null)}>
           <div className="p-4 max-w-3xl max-h-[90vh] overflow-auto">
@@ -441,10 +430,10 @@ const ModalVerVenta = ({ open, onClose, venta }) => {
                 <div>
                   <p className="text-xs text-slate-500">Estado Pedido</p>
                   <span className={`px-2 py-1 rounded text-xs font-medium ${estadoPedido === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                      estadoPedido === 'aprobado' ? 'bg-blue-100 text-blue-800' :
-                        estadoPedido === 'entregado' ? 'bg-green-100 text-green-800' :
-                          estadoPedido === 'cancelado' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
+                    estadoPedido === 'aprobado' ? 'bg-blue-100 text-blue-800' :
+                      estadoPedido === 'entregado' ? 'bg-green-100 text-green-800' :
+                        estadoPedido === 'cancelado' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
                     }`}>
                     {estadoPedido || '-'}
                   </span>
@@ -816,11 +805,13 @@ export const Ventas = () => {
                           <button
                             onClick={() => handleVerClick(venta)}
                             className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                            title="Ver detalles"
                           >
                             <Eye size={18} />
                           </button>
 
-                          {venta.Estado === 'pagado' && (
+                          {/* SOLO mostrar botón de anular si es venta MANUAL y está PAGADA */}
+                          {venta.Estado === 'pagado' && venta.Origen === 'manual' && (
                             <TiempoRestanteAnulacion
                               fechaVenta={venta.FechaVenta}
                               onAnular={() => handleAnularClick(venta)}
