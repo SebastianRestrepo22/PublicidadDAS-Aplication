@@ -31,6 +31,7 @@ import { Pagination } from "../../components/paginacion/pagination.jsx";
 import { TiempoRestanteAnulacion } from '../venta/components/TiempoRestanteAnulacion.jsx';
 import { getVentas, getVentaById, anularVenta } from "../venta/services/service.ventas.js";
 import Modal from "../../components/modals/modal.jsx";
+import { generarFacturaPDF } from "../../../../utils/generarFacturaPDF.js";
 
 // Función para formatear fecha
 const formatDate = (dateString) => {
@@ -190,25 +191,24 @@ const DetallesProductosAcordeon = ({ detalles }) => {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Tipo */}
                 <div className="col-span-1 text-center">
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                    item.TipoItem === 'producto' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'
-                  }`}>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${item.TipoItem === 'producto' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'
+                    }`}>
                     {item.TipoItem === 'producto' ? 'P' : 'S'}
                   </span>
                 </div>
-                
+
                 {/* Cantidad */}
                 <div className="col-span-1 text-center font-medium">{item.Cantidad || 0}</div>
-                
+
                 {/* Precio Unitario */}
                 <div className="col-span-2 text-right font-medium">{formatPrice(item.PrecioUnitario)}</div>
-                
+
                 {/* Subtotal */}
                 <div className="col-span-2 text-right font-semibold text-blue-600">{formatPrice(item.Subtotal)}</div>
-                
+
                 {/* Icono de imagen si existe */}
                 <div className="col-span-1 text-center">
                   {item.UrlImagenPersonalizada && (
@@ -312,6 +312,10 @@ const ModalAnular = ({ open, onClose, onConfirm, venta }) => {
 // Modal de ver detalles - MEJORADO
 const ModalVerVenta = ({ open, onClose, venta }) => {
   if (!venta) return null;
+
+  const handleDescargarPDF = () => {
+    generarFacturaPDF(venta);
+  };
 
   // Extraer información del vendedor
   const vendedorNombre = venta.UsuarioVendedor?.NombreCompleto ||
@@ -469,7 +473,14 @@ const ModalVerVenta = ({ open, onClose, venta }) => {
           )}
         </div>
 
-        <div className="mt-6 pt-4 border-t flex justify-end">
+        <div className="mt-6 pt-4 border-t flex justify-between items-center">
+          <button
+            onClick={handleDescargarPDF}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <Download size={18} />
+            Descargar Factura PDF
+          </button>
           <button
             className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
             onClick={onClose}
