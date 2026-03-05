@@ -373,6 +373,7 @@ export const Routers = () => {
               </RequirePermission>
             } 
           />
+          
 
           {/* Compras */}
           <Route

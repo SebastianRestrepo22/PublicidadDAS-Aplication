@@ -222,3 +222,14 @@ export const uploadVoucher = async (file) => {
     throw error;
   }
 };
+
+export const getAllClientes = async () => {
+  try {
+    // Usar la misma ruta que en ClientSelector
+    const response = await axios.get('http://localhost:3000/client');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching clientes:', error);
+    return [];
+  }
+};

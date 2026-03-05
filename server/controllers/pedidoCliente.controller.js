@@ -1,4 +1,3 @@
-// src/controllers/pedidoCliente.controller.js
 import { sendPedidoEstadoEmail, sendVoucherEmail } from "../utils/email.js";
 import {
   getAllPedidosClientesModel,
@@ -294,8 +293,8 @@ export const createPedidoCliente = async (req, res) => {
   }
 };
 
-// ========================================
-// ✅ ACTUALIZAR PEDIDO - CON MEJOR TRAZABILIDAD
+
+// ✅ ACTUALIZAR PEDIDO - CON ENVÍO DE CORREO AUTOMÁTICO
 // ========================================
 export const updatePedidoCliente = async (req, res) => {
   const { id } = req.params;
@@ -309,7 +308,7 @@ export const updatePedidoCliente = async (req, res) => {
 
     // Validar que el estado sea uno de los permitidos
     if (updates.Estado) {
-      const estadosPermitidos = ['pendiente', 'aprobado', 'cancelado'];
+      const estadosPermitidos = ['pendiente', 'aprobado', 'cancelado', 'entregado'];
       if (!estadosPermitidos.includes(updates.Estado)) {
         return res.status(400).json({
           message: `Estado no válido. Debe ser: ${estadosPermitidos.join(', ')}`
@@ -317,7 +316,7 @@ export const updatePedidoCliente = async (req, res) => {
       }
     }
 
-    // Obtener el pedido actual
+    // Obtener el pedido actual ANTES de actualizar
     const pedidoActual = await getPedidoClienteByIdModel(id);
     if (!pedidoActual) {
       console.log('❌ [PEDIDOS] Pedido no encontrado');
@@ -328,9 +327,12 @@ export const updatePedidoCliente = async (req, res) => {
       id: pedidoActual.PedidoClienteId,
       estado: pedidoActual.Estado,
       total: pedidoActual.Total,
-      tipoTotal: typeof pedidoActual.Total,
       tipoCliente: pedidoActual.TipoCliente
     });
+
+    // Guardar el estado anterior para comparar
+    const estadoAnterior = pedidoActual.Estado;
+    const nuevoEstado = updates.Estado;
 
     // 🔥 CORRECCIÓN: Si se está actualizando el Total, sanitizarlo
     if (updates.Total !== undefined) {
@@ -352,9 +354,60 @@ export const updatePedidoCliente = async (req, res) => {
     console.log('📦 Pedido actualizado:', {
       id: updated.PedidoClienteId,
       nuevoEstado: updated.Estado,
-      total: updated.Total,
-      tipoTotal: typeof updated.Total
+      total: updated.Total
     });
+
+    // ===== ENVIAR CORREO AL CLIENTE SI EL ESTADO CAMBIÓ =====
+    if (nuevoEstado && estadoAnterior !== nuevoEstado) {
+      console.log(`📧 [EMAIL] Estado cambió de "${estadoAnterior}" a "${nuevoEstado}". Enviando correo...`);
+
+      try {
+        // Determinar el destinatario del correo
+        let destinatario = null;
+        let nombreCliente = 'Cliente';
+
+        // Caso 1: Cliente registrado
+        if (updated.ClienteId) {
+          const cliente = await getClienteByIdModel(updated.ClienteId);
+          if (cliente) {
+            destinatario = cliente.CorreoElectronico;
+            nombreCliente = cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`;
+          }
+        } 
+        // Caso 2: Cliente walk-in con correo
+        else if (updated.ClienteCorreo) {
+          destinatario = updated.ClienteCorreo;
+          nombreCliente = updated.ClienteNombre || 'Cliente';
+        }
+        // Caso 3: Correo en datos de entrega (si existe)
+        else if (updated.CorreoEntrega) {
+          destinatario = updated.CorreoEntrega;
+          nombreCliente = updated.NombreRecibe || 'Cliente';
+        }
+
+        console.log('📧 Destinatario:', destinatario);
+        console.log('📧 Nombre cliente:', nombreCliente);
+
+        // Enviar correo si tenemos destinatario
+        if (destinatario) {
+          // Enviar de forma asíncrona (no esperar)
+          sendPedidoEstadoEmail(
+            destinatario,
+            nombreCliente,
+            id,
+            nuevoEstado,
+            updates.motivo || '' // Para cancelación u otros estados que requieran motivo
+          ).catch(err => console.error('Error en envío de correo:', err));
+          
+          console.log(`📧 Correo encolado para ${destinatario}`);
+        } else {
+          console.log('⚠️ No se pudo determinar destinatario para el correo');
+        }
+      } catch (emailError) {
+        console.error('⚠️ Error preparando envío de correo:', emailError);
+        // No interrumpimos el flujo principal si falla el correo
+      }
+    }
 
     // ===== SI EL ESTADO ES "aprobado", CREAR VENTA =====
     if (updated.Estado === 'aprobado') {
@@ -401,6 +454,27 @@ export const updatePedidoCliente = async (req, res) => {
             estado: 'pagado',
             mensaje: 'Venta generada automáticamente'
           };
+
+          // También enviar factura por correo si se creó la venta
+          if (destinatario) {
+            try {
+              const { sendVentaFacturaEmail } = await import('../utils/email.js');
+              sendVentaFacturaEmail(
+                destinatario,
+                nombreCliente,
+                resultadoVenta.VentaId,
+                updated.Total,
+                updated.detalle.map(d => ({
+                  ...d,
+                  NombreSnapshot: d.ProductoId ? 
+                    (productos.find(p => p.ProductoId === d.ProductoId)?.Nombre || 'Producto') :
+                    (servicios.find(s => s.ServicioId === d.ServicioId)?.Nombre || 'Servicio')
+                }))
+              ).catch(err => console.error('Error enviando factura:', err));
+            } catch (facturaError) {
+              console.error('Error enviando factura:', facturaError);
+            }
+          }
         }
 
       } catch (ventaError) {
@@ -418,7 +492,13 @@ export const updatePedidoCliente = async (req, res) => {
     }
 
     console.log('✅ [PEDIDOS] ===== ACTUALIZACIÓN COMPLETADA =====');
-    res.json(updated);
+    res.json({
+      ...updated,
+      correoEnviado: destinatario ? true : false,
+      mensajeCorreo: destinatario ? 
+        `Notificación enviada a ${destinatario}` : 
+        'No se pudo enviar notificación (cliente sin correo)'
+    });
 
   } catch (error) {
     console.error('❌ [PEDIDOS] ERROR GENERAL:');
@@ -521,3 +601,4 @@ export const getMisPedidos = async (req, res) => {
     res.status(500).json({ error: "Error al obtener tus pedidos" });
   }
 };
+

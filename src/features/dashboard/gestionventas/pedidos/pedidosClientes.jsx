@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
@@ -10,6 +10,7 @@ import {
   getAllProductos,
   getAllServicios,
   getAllColores,
+  getAllClientes,
 } from "./services/services.pedidosClientes";
 
 // Componentes hijos
@@ -31,6 +32,14 @@ export const PedidosClientes = () => {
   const [selectedPedido, setSelectedPedido] = useState(null);
   const [returnTo, setReturnTo] = useState(null);
   const navigate = useNavigate();
+  const [updating, setUpdating] = useState(false);
+
+  // ===== REFS PARA CONTROL DE SCROLL ✅ =====
+  const scrollPositionRef = useRef(0);
+  const isReturningFromPickerRef = useRef(false);
+  const formContainerRef = useRef(null);
+  const activeDetailIndexRef = useRef(-1);
+  const scrollLockRef = useRef(false); // 👇 Nuevo: para bloquear scroll no deseado
 
   // ===== FILTROS =====
   const [campoFiltro, setCampoFiltro] = useState("");
@@ -40,40 +49,41 @@ export const PedidosClientes = () => {
   const [productos, setProductos] = useState([]);
   const [servicios, setServicios] = useState([]);
   const [colores, setColores] = useState([]);
+  const [clientes, setClientes] = useState([]); 
   const [errores, setErrores] = useState([]);
 
   // ===== FORMULARIO =====
   const [formPedido, setFormPedido] = useState({
-    ClienteId: "", 
+    ClienteId: "",
     NombreCliente: "",
     FechaRegistro: new Date().toISOString().split('T')[0],
-    Total: 0, 
-    Estado: "pendiente", 
+    Total: 0,
+    Estado: "pendiente",
     MetodoPago: "transferencia",
-    NombreRecibe: "", 
-    TelefonoEntrega: "", 
+    NombreRecibe: "",
+    TelefonoEntrega: "",
     DireccionEntrega: "",
-    Voucher: "", 
+    Voucher: "",
     VoucherPreview: ""
   });
 
   const [detallesPedido, setDetallesPedido] = useState([{
-    _tempId: generateTempId(), 
-    ProductoId: "", 
+    _tempId: generateTempId(),
+    ProductoId: "",
     ServicioId: "",
-    Cantidad: 1, 
-    Tamaño: "Mediana", 
+    Cantidad: 1,
+    Tamaño: "Mediana",
     Descripcion: "",
-    UrlImagen: "", 
-    Precio: 0, 
+    UrlImagen: "",
+    Precio: 0,
     ColorId: ""
   }]);
 
   // ===== TIPO DE CLIENTE =====
   const [tipoCliente, setTipoCliente] = useState('registrado');
   const [clienteWalkin, setClienteWalkin] = useState({
-    Nombre: "", 
-    Telefono: "", 
+    Nombre: "",
+    Telefono: "",
     Correo: ""
   });
 
@@ -97,33 +107,26 @@ export const PedidosClientes = () => {
 
   // ===== CARGAR CATÁLOGOS INICIALES =====
   useEffect(() => {
-  const fetchData = async () => {
-    try {
-      const [p, s, c] = await Promise.all([
-        getAllProductos(), 
-        getAllServicios(), 
-        getAllColores()
-      ]);
-      
-      // 👇 DEBUG: Revisa los precios que llegan
-      console.log('📦 Productos recibidos (primeros 3):', p.slice(0, 3).map(x => ({
-        id: x.ProductoId,
-        nombre: x.Nombre,
-        precio: x.Precio,
-        tipoPrecio: typeof x.Precio,
-        precioString: String(x.Precio)
-      })));
-      
-      setProductos(Array.isArray(p) ? p : []);
-      setServicios(Array.isArray(s) ? s : []);
-      setColores(Array.isArray(c) ? c : []);
-    } catch (err) {
-      console.error("Error cargando catálogos:", err);
-      toast.error("Error cargando datos iniciales");
-    }
-  };
-  fetchData();
-}, []);
+    const fetchData = async () => {
+      try {
+        const [p, s, c, cl] = await Promise.all([
+          getAllProductos(),
+          getAllServicios(),
+          getAllColores(),
+          getAllClientes()
+        ]);
+
+        setProductos(Array.isArray(p) ? p : []);
+        setServicios(Array.isArray(s) ? s : []);
+        setColores(Array.isArray(c) ? c : []);
+        setClientes(Array.isArray(cl) ? cl : []);
+      } catch (err) {
+        console.error("Error cargando catálogos:", err);
+        toast.error("Error cargando datos iniciales");
+      }
+    };
+    fetchData();
+  }, []);
 
   // ===== CALCULAR TOTAL EN CREACIÓN =====
   useEffect(() => {
@@ -137,11 +140,11 @@ export const PedidosClientes = () => {
   const fetchPedidos = async () => {
     try {
       const base = await getAllPedidosClientes();
-      if (!Array.isArray(base)) { 
-        setPedidos([]); 
-        return; 
+      if (!Array.isArray(base)) {
+        setPedidos([]);
+        return;
       }
-      
+
       const conDetalles = await Promise.all(
         base.map(async (p) => {
           try {
@@ -149,14 +152,14 @@ export const PedidosClientes = () => {
             return {
               ...p,
               detalle: Array.isArray(det)
-                ? det.map(item => ({ 
-                    ...item, 
-                    _tempId: item.DetallePedidoClienteId || generateTempId() 
-                  }))
+                ? det.map(item => ({
+                  ...item,
+                  _tempId: item.DetallePedidoClienteId || generateTempId()
+                }))
                 : []
             };
-          } catch { 
-            return { ...p, detalle: [] }; 
+          } catch {
+            return { ...p, detalle: [] };
           }
         })
       );
@@ -167,8 +170,8 @@ export const PedidosClientes = () => {
     }
   };
 
-  useEffect(() => { 
-    fetchPedidos(); 
+  useEffect(() => {
+    fetchPedidos();
   }, []);
 
   // ===== FILTRADO Y PAGINACIÓN =====
@@ -198,16 +201,102 @@ export const PedidosClientes = () => {
     }
   }, [itemsPerPage, currentPage, allData]);
 
+  // 👇 EFECTO 1: FORZAR SCROLL RESTORATION MANUAL AL MONTAR
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    // Lock inicial para prevenir scroll al primer render
+    scrollLockRef.current = true;
+    const timer = setTimeout(() => {
+      scrollLockRef.current = false;
+    }, 300);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 👇 EFECTO 2: PREVENIR SCROLL AUTOMÁTICO EN FOCUS
+  useEffect(() => {
+    const handleFocus = (e) => {
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) {
+        e.target.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+      }
+    };
+    document.addEventListener('focusin', handleFocus, true);
+    return () => document.removeEventListener('focusin', handleFocus, true);
+  }, []);
+
+  // 👇 EFECTO 3: RESTAURAR SCROLL AL REGRESAR DE PICKERS (FUNCIONA DESDE EL PRIMER ITEM)
+  useEffect(() => {
+    if (isReturningFromPickerRef.current && (viewMode === "create" || viewMode === "edit")) {
+      // Bloquear scroll externo mientras restauramos
+      scrollLockRef.current = true;
+      
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // Restaurar posición EXACTA (incluso si es 0 - primer item)
+          window.scrollTo({ top: scrollPositionRef.current, behavior: 'auto' });
+          
+          // Highlight visual opcional en la fila actualizada
+          if (activeDetailIndexRef.current >= 0) {
+            const detalleEl = document.getElementById(`detalle-${activeDetailIndexRef.current}`);
+            if (detalleEl) {
+              detalleEl.classList.add('ring-2', 'ring-blue-400', 'bg-blue-50/30');
+              setTimeout(() => {
+                detalleEl.classList.remove('ring-2', 'ring-blue-400', 'bg-blue-50/30');
+              }, 1500);
+            }
+          }
+          
+          // Resetear flags
+          isReturningFromPickerRef.current = false;
+          activeDetailIndexRef.current = -1;
+          
+          // Desbloquear después de un breve delay
+          setTimeout(() => {
+            scrollLockRef.current = false;
+          }, 100);
+        });
+      });
+    }
+  }, [viewMode, detallesPedido, selectedPedido?.detalle]);
+
+  // 👇 EFECTO 4: INTERCEPTAR SCROLL NO DESEADO (PROTECCIÓN EXTRA)
+  useEffect(() => {
+    if (viewMode !== 'create' && viewMode !== 'edit') return;
+    
+    const originalScrollTo = window.scrollTo;
+    const originalScroll = window.scroll;
+    
+    // Override para interceptar scrolls automáticos no deseados
+    window.scrollTo = function(...args) {
+      // Permitir scroll si:
+      // 1. Estamos bloqueando activamente (scrollLockRef)
+      // 2. Es un scroll manual del usuario (no programático)
+      if (scrollLockRef.current) {
+        // Ignorar scroll programático no deseado
+        return;
+      }
+      return originalScrollTo.apply(this, args);
+    };
+    
+    window.scroll = window.scrollTo;
+    
+    return () => {
+      window.scrollTo = originalScrollTo;
+      window.scroll = originalScroll;
+    };
+  }, [viewMode]);
+
   // ===== NAVEGACIÓN =====
-  const goToList = () => { 
-    setViewMode("list"); 
-    setSelectedPedido(null); 
-    setErrores([]); 
+  const goToList = () => {
+    setViewMode("list");
+    setSelectedPedido(null);
+    setErrores([]);
   };
 
-  const goToCreate = () => { 
-    resetForm(); 
-    setViewMode("create"); 
+  const goToCreate = () => {
+    resetForm();
+    setViewMode("create");
   };
 
   const goToView = async (pedido) => {
@@ -216,15 +305,15 @@ export const PedidosClientes = () => {
       setSelectedPedido({
         ...pedido,
         detalle: Array.isArray(det)
-          ? det.map(item => ({ 
-              ...item, 
-              _tempId: item.DetallePedidoClienteId || generateTempId() 
-            }))
+          ? det.map(item => ({
+            ...item,
+            _tempId: item.DetallePedidoClienteId || generateTempId()
+          }))
           : []
       });
       setViewMode("view");
-    } catch { 
-      toast.error("Error al cargar detalles"); 
+    } catch {
+      toast.error("Error al cargar detalles");
     }
   };
 
@@ -234,49 +323,49 @@ export const PedidosClientes = () => {
       setSelectedPedido({
         ...pedido,
         detalle: Array.isArray(det)
-          ? det.map(item => ({ 
-              ...item, 
-              _tempId: item.DetallePedidoClienteId || generateTempId() 
-            }))
+          ? det.map(item => ({
+            ...item,
+            _tempId: item.DetallePedidoClienteId || generateTempId()
+          }))
           : []
       });
       setErrores([]);
       setViewMode("edit");
-    } catch { 
-      toast.error("Error al cargar para editar"); 
+    } catch {
+      toast.error("Error al cargar para editar");
     }
   };
 
   // ===== RESET FORM =====
   const resetForm = () => {
     setFormPedido({
-      ClienteId: "", 
+      ClienteId: "",
       NombreCliente: "",
       FechaRegistro: new Date().toISOString().split('T')[0],
-      Total: 0, 
-      Estado: "pendiente", 
+      Total: 0,
+      Estado: "pendiente",
       MetodoPago: "transferencia",
-      NombreRecibe: "", 
-      TelefonoEntrega: "", 
+      NombreRecibe: "",
+      TelefonoEntrega: "",
       DireccionEntrega: "",
-      Voucher: "", 
+      Voucher: "",
       VoucherPreview: ""
     });
     setDetallesPedido([{
-      _tempId: generateTempId(), 
-      ProductoId: "", 
+      _tempId: generateTempId(),
+      ProductoId: "",
       ServicioId: "",
-      Cantidad: 1, 
-      Tamaño: "Mediana", 
+      Cantidad: 1,
+      Tamaño: "Mediana",
       Descripcion: "",
-      UrlImagen: "", 
-      Precio: 0, 
+      UrlImagen: "",
+      Precio: 0,
       ColorId: ""
     }]);
-    setClienteWalkin({ 
-      Nombre: "", 
-      Telefono: "", 
-      Correo: "" 
+    setClienteWalkin({
+      Nombre: "",
+      Telefono: "",
+      Correo: ""
     });
     setTipoCliente('registrado');
     setVoucherFile(null);
@@ -284,13 +373,21 @@ export const PedidosClientes = () => {
     setShowVoucher(false);
   };
 
-  // ===== SELECCIÓN =====
+  // ===== SELECCIÓN - CON PREVENCIÓN DE SCROLL ✅ =====
+  
   const goToSelectCliente = (from) => {
+    scrollPositionRef.current = window.scrollY;
+    isReturningFromPickerRef.current = true;
     setClienteSearchFrom(from);
     setViewMode("select-cliente");
   };
 
   const goToSelectProducto = (from, index) => {
+    // Guardar posición ACTUAL (funciona incluso si es 0 - primer item)
+    scrollPositionRef.current = window.scrollY;
+    isReturningFromPickerRef.current = true;
+    activeDetailIndexRef.current = index;
+    
     setReturnTo(from);
     setCurrentDetailIndex(index);
     setSelectionType("producto");
@@ -298,6 +395,10 @@ export const PedidosClientes = () => {
   };
 
   const goToSelectColor = (from, index) => {
+    scrollPositionRef.current = window.scrollY;
+    isReturningFromPickerRef.current = true;
+    activeDetailIndexRef.current = index;
+    
     setReturnTo(from);
     setCurrentDetailIndex(index);
     setSelectionType("color");
@@ -350,40 +451,75 @@ export const PedidosClientes = () => {
         });
       }
     }
+    
+    // El useEffect se encargará de restaurar scroll después del re-render
     setViewMode(returnTo);
   };
 
   // ===== DETALLES =====
   const añadirDetalle = (mode) => {
+    const scrollPosition = window.scrollY;
+    const activeElement = document.activeElement;
+    const activeElementId = activeElement?.id;
+
     const nuevo = {
-      _tempId: generateTempId(), 
-      ProductoId: "", 
+      _tempId: generateTempId(),
+      ProductoId: "",
       ServicioId: "",
-      Cantidad: 1, 
-      Tamaño: "Mediana", 
+      Cantidad: 1,
+      Tamaño: "Mediana",
       Descripcion: "",
-      UrlImagen: "", 
-      Precio: 0, 
+      UrlImagen: "",
+      Precio: 0,
       ColorId: ""
     };
+
     if (mode === "create") {
-      setDetallesPedido(prev => [...prev, nuevo]);
+      setDetallesPedido(prev => {
+        const nuevos = [...prev, nuevo];
+        setTimeout(() => {
+          window.scrollTo({ top: scrollPosition, behavior: 'auto' });
+          if (activeElementId) {
+            const elementToFocus = document.getElementById(activeElementId);
+            if (elementToFocus) elementToFocus.focus();
+          }
+        }, 0);
+        return nuevos;
+      });
     } else if (mode === "edit" && selectedPedido) {
-      setSelectedPedido(prev => ({
-        ...prev, 
-        detalle: [...prev.detalle, nuevo]
-      }));
+      setSelectedPedido(prev => {
+        const nuevos = { ...prev, detalle: [...prev.detalle, nuevo] };
+        setTimeout(() => {
+          window.scrollTo({ top: scrollPosition, behavior: 'auto' });
+          if (activeElementId) {
+            const elementToFocus = document.getElementById(activeElementId);
+            if (elementToFocus) elementToFocus.focus();
+          }
+        }, 0);
+        return nuevos;
+      });
     }
   };
 
   const eliminarDetalle = (index, mode) => {
+    const scrollPosition = window.scrollY;
+
     if (mode === "create" && detallesPedido.length > 1) {
-      setDetallesPedido(prev => prev.filter((_, i) => i !== index));
+      setDetallesPedido(prev => {
+        const nuevos = prev.filter((_, i) => i !== index);
+        setTimeout(() => {
+          window.scrollTo({ top: scrollPosition, behavior: 'auto' });
+        }, 0);
+        return nuevos;
+      });
     } else if (mode === "edit" && selectedPedido?.detalle?.length > 1) {
-      setSelectedPedido(prev => ({
-        ...prev, 
-        detalle: prev.detalle.filter((_, i) => i !== index)
-      }));
+      setSelectedPedido(prev => {
+        const nuevos = { ...prev, detalle: prev.detalle.filter((_, i) => i !== index) };
+        setTimeout(() => {
+          window.scrollTo({ top: scrollPosition, behavior: 'auto' });
+        }, 0);
+        return nuevos;
+      });
     }
   };
 
@@ -419,16 +555,15 @@ export const PedidosClientes = () => {
   // ===== CREAR =====
   const handleCreate = async () => {
     const errs = validarFormulario(formPedido, detallesPedido, "create");
-    if (errs.length) { 
-      setErrores(errs); 
-      toast.error("Corrija los errores"); 
-      return; 
+    if (errs.length) {
+      setErrores(errs);
+      toast.error("Corrija los errores");
+      return;
     }
 
     try {
       setUploading(true);
 
-      // Preparar datos del pedido
       const detallesLimpios = detallesPedido.map(d => ({
         ProductoId: d.ProductoId?.trim() || null,
         ServicioId: d.ServicioId?.trim() || null,
@@ -440,10 +575,7 @@ export const PedidosClientes = () => {
         ColorId: d.ColorId || null
       }));
 
-      // Crear FormData
       const formData = new FormData();
-
-      // Agregar los datos del pedido como JSON string
       const pedidoString = JSON.stringify({
         ClienteId: tipoCliente === 'registrado' ? formPedido.ClienteId?.trim() || null : null,
         FechaRegistro: formPedido.FechaRegistro,
@@ -461,24 +593,17 @@ export const PedidosClientes = () => {
       });
 
       formData.append('pedido', pedidoString);
-
-      // Agregar el voucher si existe
       if (formPedido.MetodoPago === "transferencia" && voucherFile) {
         formData.append('voucher', voucherFile);
       }
 
-      // Enviar petición
       const response = await axios.post('http://localhost:3000/api/pedidos-clientes', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      console.log('✅ Respuesta del servidor:', response.data);
       toast.success("Pedido creado correctamente");
       goToList();
       fetchPedidos();
-
     } catch (err) {
       console.error('❌ Error:', err);
       toast.error(`Error: ${err.response?.data?.error || err.message}`);
@@ -490,12 +615,12 @@ export const PedidosClientes = () => {
   // ===== EDITAR =====
   const handleEdit = async () => {
     if (!selectedPedido) return;
-    
+
     const errs = validarFormulario(selectedPedido, selectedPedido.detalle, "edit");
-    if (errs.length) { 
-      setErrores(errs); 
-      toast.error("Corrija los errores"); 
-      return; 
+    if (errs.length) {
+      setErrores(errs);
+      toast.error("Corrija los errores");
+      return;
     }
 
     try {
@@ -531,22 +656,19 @@ export const PedidosClientes = () => {
 
       const formData = new FormData();
       formData.append('pedido', JSON.stringify(pedidoData));
-
       if (selectedPedido.MetodoPago === "transferencia" && voucherFile) {
         formData.append('voucher', voucherFile);
       }
 
-      const response = await axios.put(
+      await axios.put(
         `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
 
-      console.log('✅ Pedido actualizado:', response.data);
       toast.success("Pedido actualizado");
       goToList();
       fetchPedidos();
-
     } catch (err) {
       console.error('❌ Error:', err);
       toast.error(`Error: ${err.response?.data?.error || err.message}`);
@@ -555,73 +677,40 @@ export const PedidosClientes = () => {
     }
   };
 
-  // ===== ACTUALIZAR ESTADO (CORREGIDO) =====
-  const handleUpdateEstado = async (estado) => {
+  // ===== ACTUALIZAR ESTADO =====
+  const handleUpdateEstado = async (estado, motivo = "") => {
     if (!selectedPedido) return;
 
     try {
-      console.log(' Enviando actualización de estado:', {
-        id: selectedPedido.PedidoClienteId,
-        estado
-      });
+      setUpdating(true);
+      const payload = { Estado: estado };
+      if (estado === 'cancelado' && motivo) payload.motivo = motivo;
 
-      const response = await axios.put(
+      await axios.put(
         `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
-        { Estado: estado },
-        { headers: { 'Content-Type': 'application/json' } }
+        payload,
+        { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
       );
 
-      console.log(' Respuesta completa del servidor:', response.data);
+      setSelectedPedido(prev => ({
+        ...prev,
+        Estado: estado,
+        MotivoCancelacion: estado === 'cancelado' ? motivo : prev.MotivoCancelacion
+      }));
 
-      if (estado === 'aprobado') {
-        // Verificar si se creó la venta
-        if (response.data.ventaCreada) {
-          const ventaInfo = response.data.ventaCreada;
-          const ventaId = ventaInfo.id || ventaInfo.VentaId || '';
-          
-          toast.success(
-            ` Pedido aprobado. Venta #${ventaId.toString().slice(-3)} generada`,
-            {
-              onClick: () => navigate(`/ventas/${ventaId}`),
-              closeOnClick: true
-            }
-          );
-        } 
-        else if (response.data.errorVenta) {
-          const errorMsg = typeof response.data.errorVenta === 'object' 
-            ? response.data.errorVenta.mensaje || 'Error desconocido'
-            : response.data.errorVenta;
-          
-          toast.warning(` Pedido aprobado, pero la venta falló: ${errorMsg}`);
-          console.error(' Error en creación de venta:', response.data.errorVenta);
-        } 
-        else {
-          toast.success(" Pedido aprobado correctamente");
-        }
-      } else {
-        toast.success(`Estado actualizado a ${estado}`);
-      }
-
-      goToList();
+      toast.success(`✅ Pedido ${estado === 'cancelado' ? 'cancelado' : 'actualizado'} correctamente`);
       await fetchPedidos();
-
     } catch (err) {
-      console.error(' Error en la petición:', err);
-      
-      let errorMessage = "No se pudo actualizar el estado";
-      if (err.response?.data) {
-        errorMessage = err.response.data.error || 
-                       err.response.data.message || 
-                       JSON.stringify(err.response.data);
-      }
-      
-      toast.error(` Error: ${errorMessage}`);
+      console.error('❌ Error:', err);
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message;
+      toast.error(`❌ Error: ${errorMsg}`);
+    } finally {
+      setUpdating(false);
     }
   };
 
   // ===== HANDLERS DE PAGINACIÓN =====
   const handlePageChange = (page) => setCurrentPage(page);
-
   const handleItemsPerPageChange = (newItems) => {
     setItemsPerPage(newItems);
     setCurrentPage(1);
@@ -629,7 +718,14 @@ export const PedidosClientes = () => {
 
   // ===== RENDER =====
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+    <div 
+      className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6" 
+      ref={formContainerRef}
+      // 👇 Prevenir scroll externo cuando estamos en formulario
+      style={{ 
+        overflow: (viewMode === 'create' || viewMode === 'edit') ? 'auto' : 'auto' 
+      }}
+    >
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Pedidos</h1>
 
@@ -701,7 +797,7 @@ export const PedidosClientes = () => {
           />
         )}
 
-        {/* SELECT CLIENTE */}
+        {/* SELECT CLIENTE INTERNO */}
         {viewMode === "select-cliente" && (
           <ClientSelector
             goToBack={() => setViewMode(clienteSearchFrom)}
@@ -709,14 +805,15 @@ export const PedidosClientes = () => {
               if (clienteSearchFrom === "create") {
                 setFormPedido({
                   ...formPedido,
-                  ClienteId: cliente.CedulaId || "",
-                  NombreCliente: cliente.NombreCompleto || "Cliente",
-                  NombreRecibe: cliente.NombreCompleto || "",
+                  ClienteId: cliente.CedulaId || cliente.ClienteId || "",
+                  NombreCliente: cliente.NombreCompleto || cliente.Nombre || "Cliente",
+                  NombreRecibe: cliente.NombreCompleto || cliente.Nombre || "",
                   TelefonoEntrega: cliente.Telefono || ""
                 });
               }
               setViewMode(clienteSearchFrom);
             }}
+            clientes={clientes}
           />
         )}
 

@@ -1,7 +1,5 @@
-// backend/utils/email.js
 import nodemailer from "nodemailer";
 
-// ✅ CONFIGURACIÓN ÚNICA Y ESTABLE PARA GMAIL (PUERTO 465)
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,
@@ -10,19 +8,19 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,  // tuemail@gmail.com
     pass: process.env.EMAIL_PASS,  // ¡CONTRASEÑA DE APLICACIÓN DE 16 DÍGITOS!
   },
-  pool: true,      // ✅ Reutiliza conexiones (evita "socket close")
+  pool: true,      //  Reutiliza conexiones (evita "socket close")
   maxConnections: 5,
-  rateLimit: true, // ✅ Evita bloqueos por exceso de envíos
+  rateLimit: true, //  Evita bloqueos por exceso de envíos
   rateDelta: 1000,
   rateLimit: 10,
 });
 
-// ✅ Verificar conexión al iniciar la app (opcional pero recomendado)
+//  Verificar conexión al iniciar la app (opcional pero recomendado)
 transporter.verify(function (error, success) {
   if (error) {
     console.error("⚠️ Error de conexión SMTP:", error);
   } else {
-    console.log("✅ Servidor SMTP listo para enviar correos");
+    console.log(" Servidor SMTP listo para enviar correos");
   }
 });
 
@@ -153,7 +151,7 @@ Si no solicitaste crear una cuenta, puedes ignorar este mensaje con seguridad.
       `,
     });
 
-    console.log("✅ Correo de bienvenida enviado a:", correo);
+    console.log(" Correo de bienvenida enviado a:", correo);
     return true;
   } catch (error) {
     console.error("❌ Error enviando correo de bienvenida:", error.message);
@@ -163,72 +161,177 @@ Si no solicitaste crear una cuenta, puedes ignorar este mensaje con seguridad.
 };
 
 // NUEVA FUNCIÓN: notificar cambio de estado de pedido
+// src/utils/email.js - Mejorar la función sendPedidoEstadoEmail
+
 export const sendPedidoEstadoEmail = async (to, nombreCliente, pedidoId, nuevoEstado, motivo = "") => {
-  let subject = "";
-  let html = "";
+  // Configuración de mensajes según el estado
+  const estadoConfig = {
+    pendiente: {
+      emoji: "📄",
+      titulo: "¡Hemos recibido tu pedido!",
+      color: "#f39c12",
+      mensaje: "Tu pedido ha sido recibido y está siendo revisado por nuestro equipo.",
+      siguiente: "Te notificaremos cuando sea aprobado.",
+      accion: "Seguir pedido"
+    },
+    aprobado: {
+      emoji: "",
+      titulo: "¡Pedido aprobado!",
+      color: "#27ae60",
+      mensaje: "¡Buenas noticias! Tu pedido ha sido aprobado y pasará a producción.",
+      siguiente: "Pronto recibirás noticias sobre su progreso.",
+      accion: "Ver detalles"
+    },
+    entregado: {
+      emoji: "📦",
+      titulo: "¡Pedido entregado!",
+      color: "#2980b9",
+      mensaje: "Tu pedido ha sido entregado satisfactoriamente.",
+      siguiente: "Esperamos que disfrutes tu compra. ¡Gracias por confiar en nosotros!",
+      accion: "Calificar servicio"
+    },
+    cancelado: {
+      emoji: "❌",
+      titulo: "Pedido cancelado",
+      color: "#c0392b",
+      mensaje: "Lamentamos informarte que tu pedido ha sido cancelado.",
+      siguiente: motivo ? `Motivo: ${motivo}` : "Si tienes dudas, contáctanos.",
+      accion: "Contactar soporte"
+    }
+  };
 
-  switch (nuevoEstado) {
-    case "pendiente":
-      subject = `📄 Pedido #${pedidoId} recibido`;
-      html = `
-        <p>Hola ${nombreCliente} 👋,</p>
-        <p>Hemos recibido tu pedido <strong>#${pedidoId}</strong> y está en revisión.</p>
-        <p>Te notificaremos cuando sea aprobado.</p>
-      `;
-      break;
-    case "aprobado":
-      subject = `✅ Pedido #${pedidoId} aprobado`;
-      html = `
-        <p>¡Hola ${nombreCliente}!</p>
-        <p>Tu pedido <strong>#${pedidoId}</strong> ha sido aprobado.</p>
-        <p>Ahora pasará a producción.</p>
-      `;
-      break;
-    case "entregado":
-      subject = `📦 Pedido #${pedidoId} entregado`;
-      html = `
-        <p>¡Gracias por tu confianza, ${nombreCliente}!</p>
-        <p>Tu pedido <strong>#${pedidoId}</strong> ha sido entregado satisfactoriamente.</p>
-        <p>Esperamos verte pronto nuevamente.</p>
-      `;
-      break;
-    case "cancelado":
-      subject = `❌ Pedido #${pedidoId} cancelado`;
-      html = `
-        <p>Hola ${nombreCliente},</p>
-        <p>Informamos que tu pedido <strong>#${pedidoId}</strong> ha sido cancelado.</p>
-        ${motivo ? `<p><strong>Motivo:</strong> ${motivo}</p>` : ""}
-        <p>Si tienes dudas, contáctanos.</p>
-      `;
-      break;
-    default:
-      return; // No enviar para estados no manejados
-  }
+  const config = estadoConfig[nuevoEstado] || estadoConfig.pendiente;
 
-  try {
-    await transporter.sendMail({
-      from: `"Tu Empresa" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
-          <div style="text-align: center; padding: 20px 0; border-bottom: 2px solid #e2e8f0;">
-            <h1 style="color: #2d3748; margin: 0;">Tu Empresa</h1>
+  // URL para ver el pedido (ajusta según tu frontend)
+  const pedidoUrl = `http://localhost:5173/pedidos/${pedidoId}`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Actualización de pedido #${pedidoId}</title>
+    </head>
+    <body style="font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9;">
+      <div style="max-width: 600px; margin: 20px auto; background-color: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        
+        <!-- Header con color según estado -->
+        <div style="background: ${config.color}; padding: 30px 20px; text-align: center;">
+          <div style="font-size: 48px; margin-bottom: 10px;">${config.emoji}</div>
+          <h1 style="color: white; margin: 0; font-size: 28px;">${config.titulo}</h1>
+          <p style="color: white; margin: 10px 0 0 0; opacity: 0.9;">Pedido #${pedidoId}</p>
+        </div>
+        
+        <!-- Contenido -->
+        <div style="padding: 30px;">
+          <p style="font-size: 18px; color: #333; margin-bottom: 20px;">Hola <strong>${nombreCliente}</strong>,</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 16px; color: #555; line-height: 1.6;">
+              ${config.mensaje}
+            </p>
           </div>
-          <div style="padding: 30px; background: white; border-radius: 10px; margin-top: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-            ${html}
+          
+          <p style="color: #666; margin: 20px 0; font-size: 16px;">${config.siguiente}</p>
+          
+          <!-- Botón de acción -->
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${pedidoUrl}" 
+               style="background-color: ${config.color}; color: white; padding: 14px 35px; 
+                      text-decoration: none; border-radius: 50px; font-weight: bold; 
+                      font-size: 16px; display: inline-block; box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                      transition: transform 0.2s;">
+              ${config.accion} →
+            </a>
           </div>
-          <div style="text-align: center; margin-top: 30px; color: #718096; font-size: 14px;">
-            <p>Este es un mensaje automático. No respondas a este correo.</p>
-            <p>© ${new Date().getFullYear()} Tu Empresa. Todos los derechos reservados.</p>
+          
+          <!-- Resumen del pedido -->
+          <div style="border-top: 2px solid #eee; padding-top: 20px; margin-top: 20px;">
+            <h3 style="color: #333; margin-bottom: 15px;">Resumen del pedido</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; color: #666;">Número de pedido:</td>
+                <td style="padding: 8px 0; text-align: right; font-weight: bold;">#${pedidoId}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #666;">Fecha:</td>
+                <td style="padding: 8px 0; text-align: right;">${new Date().toLocaleDateString('es-CO')}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #666;">Estado actual:</td>
+                <td style="padding: 8px 0; text-align: right;">
+                  <span style="background-color: ${config.color}20; color: ${config.color}; 
+                               padding: 4px 12px; border-radius: 20px; font-weight: bold;">
+                    ${nuevoEstado.toUpperCase()}
+                  </span>
+                </td>
+              </tr>
+            </table>
+          </div>
+          
+          <!-- Nota de ayuda -->
+          <div style="background-color: #f0f7ff; padding: 15px; border-radius: 8px; margin-top: 20px;">
+            <p style="margin: 0; color: #2c3e50; font-size: 14px;">
+              <strong>💡 ¿Necesitas ayuda?</strong><br>
+              Si tienes alguna pregunta, responde a este correo o contáctanos al 
+              <a href="tel:+573001234567" style="color: ${config.color}; text-decoration: none;">+57 300 123 4567</a>
+            </p>
           </div>
         </div>
-      `,
+        
+        <!-- Footer -->
+        <div style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #eee;">
+          <p style="color: #999; font-size: 12px; margin: 0;">
+            Este es un mensaje automático. Por favor no respondas a este correo.<br>
+            © ${new Date().getFullYear()} Tu Empresa. Todos los derechos reservados.<br>
+            <a href="#" style="color: #999; text-decoration: none;">Términos y condiciones</a> | 
+            <a href="#" style="color: #999; text-decoration: none;">Política de privacidad</a>
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Versión texto plano para clientes de correo que no soportan HTML
+  const text = `
+    Actualización de pedido #${pedidoId}
+    
+    Hola ${nombreCliente},
+    
+    ${config.mensaje}
+    
+    ${config.siguiente}
+    
+    Para ver los detalles de tu pedido, visita: ${pedidoUrl}
+    
+    Número de pedido: #${pedidoId}
+    Fecha: ${new Date().toLocaleDateString('es-CO')}
+    Estado: ${nuevoEstado.toUpperCase()}
+    
+    ¿Necesitas ayuda? Contáctanos al +57 300 123 4567
+    
+    ---
+    Este es un mensaje automático. Por favor no respondas a este correo.
+    © ${new Date().getFullYear()} Tu Empresa
+  `;
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"Tu Empresa" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: `${config.emoji} Actualización de pedido #${pedidoId} - ${nuevoEstado}`,
+      html,
+      text
     });
-    console.log(`✅ Correo de estado '${nuevoEstado}' enviado a ${to} para pedido ${pedidoId}`);
+
+    console.log(` Correo de estado '${nuevoEstado}' enviado a ${to} para pedido ${pedidoId}`);
+    console.log('📧 Message ID:', info.messageId);
+    return true;
   } catch (error) {
     console.error(`❌ Error al enviar correo de estado '${nuevoEstado}':`, error.message);
-    // No detener la app si falla el correo
+    return false;
   }
 };
 
@@ -289,7 +392,7 @@ export const sendVoucherEmail = async (to, nombreCliente, pedidoId, total) => {
       subject,
       html,
     });
-    console.log(`✅ Voucher de pago enviado a ${to} para pedido ${pedidoId}`);
+    console.log(` Voucher de pago enviado a ${to} para pedido ${pedidoId}`);
   } catch (error) {
     console.error("❌ Error al enviar voucher por correo:", error.message);
   }
@@ -392,7 +495,7 @@ export const sendVentaFacturaEmail = async (to, nombreCliente, ventaId, total, d
         </table>
 
         <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 20px; text-align: center;">
-          <p style="margin: 0; color: #2e7d32;">✅ Esta factura ya fue cancelada</p>
+          <p style="margin: 0; color: #2e7d32;"> Esta factura ya fue cancelada</p>
         </div>
       </div>
 
@@ -410,7 +513,7 @@ export const sendVentaFacturaEmail = async (to, nombreCliente, ventaId, total, d
       subject,
       html,
     });
-    console.log(`✅ Factura enviada a ${to} para venta ${ventaId}`);
+    console.log(` Factura enviada a ${to} para venta ${ventaId}`);
     return true;
   } catch (error) {
     console.error("❌ Error al enviar factura por correo:", error.message);
@@ -471,7 +574,7 @@ export const sendVentaAnuladaEmail = async (to, nombreCliente, ventaId, total) =
       subject,
       html,
     });
-    console.log(`✅ Anulación enviada a ${to} para venta ${ventaId}`);
+    console.log(` Anulación enviada a ${to} para venta ${ventaId}`);
     return true;
   } catch (error) {
     console.error("❌ Error al enviar anulación:", error.message);

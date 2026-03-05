@@ -6,6 +6,7 @@ import { correoExiste, createByAdmin, deleteDataUser, getAllDataClientes, getCli
 import { sendResetPasswordEmail } from '../utils/email.js';
 import { getRoleIdByName } from '../models/role.model.js';
 
+
 export const createClient = async (req, res) => {
     const {
         CedulaId,
@@ -219,6 +220,93 @@ export const deleteCliente = async (req, res) => {
         console.error('Error al eliminar cliente:', error);
         res.status(500).json({ message: 'Error interno del servidor' });
     }
+};
+
+// Elimina esta línea:
+// import { searchClientesModel } from '../models/pedidoCliente.model.js';
+
+// Y modifica la función para usar dbPool directamente:
+export const searchClientesForPedidos = async (req, res) => {
+  try {
+    const { search = "", page = 1, limit = 5 } = req.query;
+    
+    console.log('🔍 Buscando clientes para pedidos:', { search, page, limit });
+
+    // Consulta directa a la base de datos
+    const offset = (page - 1) * limit;
+    
+    let query = `
+      SELECT 
+        u.CedulaId,
+        u.NombreCompleto,
+        u.Telefono,
+        u.CorreoElectronico
+      FROM usuarios u
+      JOIN roles r ON u.RoleId = r.RoleId
+      WHERE r.Nombre = 'cliente'
+    `;
+    
+    const params = [];
+    
+    if (search && search.trim() !== "") {
+      query += ` AND (
+        u.CedulaId LIKE ? OR 
+        u.NombreCompleto LIKE ? OR 
+        u.Telefono LIKE ? OR 
+        u.CorreoElectronico LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+    
+    query += ` ORDER BY u.NombreCompleto ASC LIMIT ? OFFSET ?`;
+    params.push(parseInt(limit), parseInt(offset));
+    
+    console.log('📝 Query:', query);
+    console.log('📝 Params:', params);
+    
+    const [rows] = await dbPool.query(query, params);
+    
+    // Obtener total
+    let countQuery = `
+      SELECT COUNT(*) as total 
+      FROM usuarios u
+      JOIN roles r ON u.RoleId = r.RoleId
+      WHERE r.Nombre = 'cliente'
+    `;
+    
+    const countParams = [];
+    
+    if (search && search.trim() !== "") {
+      countQuery += ` AND (
+        u.CedulaId LIKE ? OR 
+        u.NombreCompleto LIKE ? OR 
+        u.Telefono LIKE ? OR 
+        u.CorreoElectronico LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+    
+    const [countResult] = await dbPool.query(countQuery, countParams);
+    const total = countResult[0]?.total || 0;
+    
+    console.log(`✅ Clientes encontrados: ${rows.length}`);
+    
+    res.status(200).json({
+      clientes: rows,
+      total,
+      pages: Math.ceil(total / limit),
+      currentPage: parseInt(page)
+    });
+
+  } catch (error) {
+    console.error('❌ Error al buscar clientes:', error);
+    res.status(500).json({ 
+      message: 'Error al buscar clientes',
+      error: error.message 
+    });
+  }
 };
 
 

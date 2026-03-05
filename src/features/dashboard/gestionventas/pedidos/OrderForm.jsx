@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft, User, CreditCard,
   FileText, Check, X, Plus, Trash2, ChevronRight,
@@ -48,8 +48,14 @@ export const OrderForm = ({
   const isEdit = viewMode === "edit";
   const formData = isEdit ? selectedPedido : formPedido;
   const setFormData = isEdit ? setSelectedPedido : setFormPedido;
+  
+  // 👇 REFS PARA MANEJO DE SCROLL
+  const detallesContainerRef = useRef(null);
+  const scrollPositionRef = useRef(0);
+  const activeDetailIndexRef = useRef(null); // 👈 Trackea qué fila se está editando
+  const isReturningFromPickerRef = useRef(false);
 
-  // Establecer fecha automática
+  // Establecer fecha automática solo en creación
   useEffect(() => {
     if (!isEdit && !formData.FechaRegistro) {
       const hoy = new Date().toISOString().split('T')[0];
@@ -57,13 +63,55 @@ export const OrderForm = ({
     }
   }, []);
 
+  // 👇 EFECTO PRINCIPAL: RESTAURAR SCROLL DESPUÉS DE SELECCIONAR
+  useEffect(() => {
+    // Solo actuar si venimos de un picker Y tenemos un índice activo
+    if (isReturningFromPickerRef.current && activeDetailIndexRef.current !== null) {
+      // Esperar a que React termine de pintar los cambios
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (detallesContainerRef.current) {
+            // Restaurar scroll del contenedor interno
+            detallesContainerRef.current.scrollTop = scrollPositionRef.current;
+            
+            // 👇 Opcional: Highlight visual en la fila actualizada
+            const detalleEl = document.getElementById(`detalle-${activeDetailIndexRef.current}`);
+            if (detalleEl) {
+              detalleEl.classList.add('ring-2', 'ring-blue-400', 'bg-blue-50/30');
+              setTimeout(() => {
+                detalleEl.classList.remove('ring-2', 'ring-blue-400', 'bg-blue-50/30');
+              }, 1500);
+            }
+          }
+          // Resetear flags
+          isReturningFromPickerRef.current = false;
+          activeDetailIndexRef.current = null;
+        });
+      });
+    }
+  }, [detallesPedido, selectedPedido?.detalle, viewMode]);
+
+  // 👇 Prevenir scroll automático del navegador al enfocar inputs
+  useEffect(() => {
+    const handleFocus = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+        e.target.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+      }
+    };
+    document.addEventListener('focusin', handleFocus, true);
+    return () => document.removeEventListener('focusin', handleFocus, true);
+  }, []);
+
+  // Cambiar tipo de detalle (producto ↔ servicio)
   const cambiarTipoDetalle = (index, nuevoTipo, modo) => {
     const detalles = modo === "edit" ? selectedPedido?.detalle : detallesPedido;
     const setDetalles = modo === "edit" ? setSelectedPedido : setDetallesPedido;
-    
+
+    if (!detalles) return;
+
     const detalleActual = detalles[index];
     const nuevosDetalles = [...detalles];
-    
+
     if (nuevoTipo === 'producto') {
       nuevosDetalles[index] = {
         ...detalleActual,
@@ -71,6 +119,7 @@ export const OrderForm = ({
         ServicioId: null,
         ServicioTamanoId: null,
         Tamaño: null,
+        ColorId: null,
         TipoItem: 'producto'
       };
     } else {
@@ -79,41 +128,66 @@ export const OrderForm = ({
         ServicioId: detalleActual.ServicioId || "",
         ProductoId: null,
         ColorId: null,
+        Tamaño: detalleActual.Tamaño || "Mediana",
         TipoItem: 'servicio'
       };
     }
-    
+
     setDetalles(nuevosDetalles);
+  };
+
+  // 👇 WRAPPERS QUE GUARDAN CONTEXTO ANTES DE ABRIR PICKERS
+  const handleGoToSelectProducto = (index, isService) => {
+    // 1. Guardar posición de scroll del contenedor
+    if (detallesContainerRef.current) {
+      scrollPositionRef.current = detallesContainerRef.current.scrollTop;
+    }
+    // 2. Recordar qué fila estamos editando
+    activeDetailIndexRef.current = index;
+    // 3. Marcar que venimos de picker para restaurar después
+    isReturningFromPickerRef.current = true;
+    // 4. Navegar al picker
+    goToSelectProducto(isEdit ? "edit" : "create", index, isService ? 'servicio' : 'producto');
+  };
+
+  const handleGoToSelectColor = (index) => {
+    if (detallesContainerRef.current) {
+      scrollPositionRef.current = detallesContainerRef.current.scrollTop;
+    }
+    activeDetailIndexRef.current = index;
+    isReturningFromPickerRef.current = true;
+    goToSelectColor(isEdit ? "edit" : "create", index);
   };
 
   return (
     <div className="bg-white rounded-xl shadow-sm border p-6">
-      {/* Header */}
+      {/* ===== HEADER ===== */}
       <div className="flex items-center gap-3 mb-6">
         <button
           type="button"
           onClick={goToList}
           className="p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition-colors"
+          aria-label="Volver"
         >
           <ArrowLeft size={18} />
         </button>
-        <h3 className="text-lg font-bold">
+        <h3 className="text-lg font-bold text-slate-800">
           {isEdit ? "Editar Pedido" : "Nuevo Pedido"}
         </h3>
       </div>
 
-      {/* Errores */}
+      {/* ===== ERRORES DE VALIDACIÓN ===== */}
       {errores.length > 0 && (
-        <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
-          <ul className="list-disc pl-5">
+        <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm border border-red-200">
+          <ul className="list-disc pl-5 space-y-1">
             {errores.map((e, i) => <li key={i}>{e}</li>)}
           </ul>
         </div>
       )}
 
       <div className="space-y-6">
-        {/* Información del Cliente */}
-        <div className="bg-slate-50 p-6 rounded-xl">
+        {/* ===== INFORMACIÓN DEL CLIENTE ===== */}
+        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
           <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
             <User size={20} /> Información del Cliente
           </h4>
@@ -124,14 +198,16 @@ export const OrderForm = ({
                 Tipo de Cliente *
               </label>
               <div className="flex gap-4">
+                {/* CLIENTE REGISTRADO */}
                 <button
                   type="button"
                   onClick={() => {
                     setTipoCliente('registrado');
                     setFormData({ ...formData, ClienteId: "", NombreCliente: "" });
                     setClienteWalkin({ Nombre: "", Telefono: "", Correo: "" });
+                    goToSelectCliente("create");
                   }}
-                  className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${
+                  className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center cursor-pointer ${
                     tipoCliente === 'registrado'
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
                       : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
@@ -139,8 +215,10 @@ export const OrderForm = ({
                 >
                   <UserCheck size={24} className="mb-2" />
                   <div className="font-medium">Cliente Registrado</div>
-                  <div className="text-sm mt-1">Ya existe en el sistema</div>
+                  <div className="text-sm text-center mt-1">Ya existe en el sistema</div>
                 </button>
+
+                {/* CLIENTE WALK-IN */}
                 <button
                   type="button"
                   onClick={() => {
@@ -148,7 +226,7 @@ export const OrderForm = ({
                     setFormData({ ...formData, ClienteId: "", NombreCliente: "" });
                     setClienteWalkin({ Nombre: "", Telefono: "", Correo: "" });
                   }}
-                  className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${
+                  className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center cursor-pointer ${
                     tipoCliente === 'walkin'
                       ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                       : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
@@ -156,40 +234,13 @@ export const OrderForm = ({
                 >
                   <Store size={24} className="mb-2" />
                   <div className="font-medium">Cliente Walk-in</div>
-                  <div className="text-sm mt-1">Cliente ocasional/tienda física</div>
+                  <div className="text-sm text-center mt-1">Cliente ocasional</div>
                 </button>
               </div>
             </div>
           )}
 
-          {tipoCliente === 'registrado' ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Cliente Registrado *
-                </label>
-                <div
-                  onClick={() => goToSelectCliente(isEdit ? "edit" : "create")}
-                  className="w-full px-4 py-3 border-2 border-dashed border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-left flex items-center justify-between cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <UserCheck size={20} className="text-blue-600" />
-                    </div>
-                    <div>
-                      <div className="font-medium">
-                        {formData.NombreCliente || "Buscar cliente registrado"}
-                      </div>
-                      <div className="text-sm text-slate-500">
-                        {formData.ClienteId || "Cédula del cliente"}
-                      </div>
-                    </div>
-                  </div>
-                  <ChevronRight size={20} className="text-slate-400" />
-                </div>
-              </div>
-            </div>
-          ) : (
+          {tipoCliente === 'walkin' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -199,8 +250,8 @@ export const OrderForm = ({
                   type="text"
                   value={clienteWalkin.Nombre}
                   onChange={(e) => setClienteWalkin({ ...clienteWalkin, Nombre: e.target.value })}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                  placeholder="Nombre completo del cliente"
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                  placeholder="Nombre completo"
                 />
               </div>
               <div>
@@ -210,18 +261,37 @@ export const OrderForm = ({
                 <input
                   type="tel"
                   value={clienteWalkin.Telefono}
-                  onChange={(e) => setClienteWalkin({
-                    ...clienteWalkin,
-                    Telefono: formatearTelefono(e.target.value)
-                  })}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${
-                    clienteWalkin.Telefono && !validarTelefono(clienteWalkin.Telefono)
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '');
+                    if (value && value[0] !== '3') {
+                      toast.warning('El teléfono debe comenzar con 3');
+                      return;
+                    }
+                    setClienteWalkin({ ...clienteWalkin, Telefono: value });
+                  }}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 outline-none transition ${
+                    clienteWalkin.Telefono && (
+                      clienteWalkin.Telefono.length !== 10 ||
+                      !clienteWalkin.Telefono.startsWith('3')
+                    )
                       ? 'border-red-500 focus:ring-red-500'
                       : 'border-slate-300 focus:ring-emerald-500'
                   }`}
-                  placeholder="10 dígitos"
+                  placeholder="3XXXXXXXXX"
                   maxLength="10"
                 />
+                {clienteWalkin.Telefono && (
+                  <p className={`text-xs mt-1 ${
+                    clienteWalkin.Telefono.length === 10 && clienteWalkin.Telefono.startsWith('3')
+                      ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {clienteWalkin.Telefono.length === 10 && clienteWalkin.Telefono.startsWith('3')
+                      ? '✓ Número válido'
+                      : clienteWalkin.Telefono.length !== 10
+                        ? 'Debe tener 10 dígitos'
+                        : 'Debe comenzar con 3'}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -231,7 +301,7 @@ export const OrderForm = ({
                   type="email"
                   value={clienteWalkin.Correo}
                   onChange={(e) => setClienteWalkin({ ...clienteWalkin, Correo: e.target.value })}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                   placeholder="cliente@ejemplo.com"
                 />
               </div>
@@ -239,12 +309,12 @@ export const OrderForm = ({
           )}
         </div>
 
-        {/* Método de Pago */}
-        <div className="bg-slate-50 p-6 rounded-xl">
+        {/* ===== MÉTODO DE PAGO ===== */}
+        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
           <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
             <CreditCard size={20} /> Método de Pago
           </h4>
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -253,11 +323,9 @@ export const OrderForm = ({
               <select
                 value={formData.MetodoPago}
                 onChange={(e) => setFormData({ ...formData, MetodoPago: e.target.value })}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
               >
-                {tipoCliente === 'walkin' && (
-                  <option value="efectivo">Efectivo</option>
-                )}
+                {tipoCliente === 'walkin' && <option value="efectivo">Efectivo</option>}
                 <option value="transferencia">Transferencia Bancaria</option>
                 <option value="contra_entrega">Contra Entrega</option>
               </select>
@@ -268,7 +336,6 @@ export const OrderForm = ({
                 <label className="block text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
                   <FileText size={16} /> Comprobante de Pago
                 </label>
-                
                 <div className="p-4 bg-white rounded-lg border border-slate-200 space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -287,17 +354,17 @@ export const OrderForm = ({
                         }
                         setVoucherFile(file);
                       }}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm file:mr-4 file:py-2 file:px-4 file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                     />
                   </div>
-
                   {voucherFile && (
                     <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                      <span className="text-sm text-green-800 truncate">{voucherFile.name}</span>
+                      <span className="text-sm text-green-800 truncate flex-1 mr-2">{voucherFile.name}</span>
                       <button
                         type="button"
                         onClick={() => setVoucherFile(null)}
-                        className="text-red-600 hover:text-red-800"
+                        className="text-red-600 hover:text-red-800 p-1 hover:bg-red-100 rounded"
+                        aria-label="Eliminar archivo"
                       >
                         <X size={16} />
                       </button>
@@ -317,7 +384,7 @@ export const OrderForm = ({
                     type="text"
                     value={formData.NombreRecibe || ""}
                     onChange={(e) => setFormData({ ...formData, NombreRecibe: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     placeholder="Nombre completo"
                   />
                 </div>
@@ -332,7 +399,7 @@ export const OrderForm = ({
                       ...formData,
                       TelefonoEntrega: formatearTelefono(e.target.value)
                     })}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     placeholder="10 dígitos"
                     maxLength="10"
                   />
@@ -344,7 +411,7 @@ export const OrderForm = ({
                   <textarea
                     value={formData.DireccionEntrega || ""}
                     onChange={(e) => setFormData({ ...formData, DireccionEntrega: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
                     rows="2"
                     placeholder="Dirección completa"
                   />
@@ -354,23 +421,29 @@ export const OrderForm = ({
           </div>
         </div>
 
-        {/* Productos y Servicios */}
-        <div className="bg-slate-50 p-6 rounded-xl">
-          <div className="flex justify-between items-center mb-6">
+        {/* ===== PRODUCTOS Y SERVICIOS - CON SCROLL PERSISTENTE ✅ ===== */}
+        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+          <div className="flex justify-between items-center mb-4">
             <h4 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
               <Package size={20} /> Productos y Servicios
             </h4>
             <button
               type="button"
               onClick={() => añadirDetalle(isEdit ? "edit" : "create")}
-              className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium"
+              className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium transition-colors"
             >
               <Plus size={18} /> Agregar Ítem
             </button>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50 border-b border-slate-200 text-sm font-semibold text-slate-700">
+          {/* 👇 CONTENEDOR CON SCROLL INTERNO CONTROLADO */}
+          <div 
+            ref={detallesContainerRef}
+            className="bg-white border border-slate-200 rounded-xl overflow-hidden max-h-[500px] overflow-y-auto"
+            style={{ scrollBehavior: 'auto' }}
+          >
+            {/* Cabecera sticky */}
+            <div className="sticky top-0 z-10 hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50 border-b border-slate-200 text-sm font-semibold text-slate-700">
               <div className="col-span-1">TIPO</div>
               <div className="col-span-3">PRODUCTO/SERVICIO</div>
               <div className="col-span-2">COLOR/TAMAÑO</div>
@@ -380,6 +453,7 @@ export const OrderForm = ({
               <div className="col-span-1 text-right">ACCIÓN</div>
             </div>
 
+            {/* Lista de detalles */}
             <div className="divide-y divide-slate-200">
               {(isEdit ? selectedPedido?.detalle : detallesPedido)?.map((d, index) => {
                 const isService = !!d.ServicioId || d.TipoItem === 'servicio';
@@ -388,7 +462,11 @@ export const OrderForm = ({
                 const subtotal = (d.Cantidad || 0) * (d.Precio || 0);
 
                 return (
-                  <div key={d._tempId || index} className="p-4 md:p-6">
+                  <div 
+                    key={d._tempId || index} 
+                    id={`detalle-${index}`}
+                    className="p-4 md:p-6 scroll-mt-4 transition-all duration-200"
+                  >
                     {/* Vista Desktop */}
                     <div className="hidden md:grid grid-cols-12 gap-4 items-center">
                       {/* Tipo */}
@@ -397,10 +475,10 @@ export const OrderForm = ({
                           <button
                             type="button"
                             onClick={() => cambiarTipoDetalle(index, 'producto', isEdit ? "edit" : "create")}
-                            className={`px-2 py-1 rounded text-[10px] font-medium border ${
-                              !isService 
-                                ? 'bg-blue-100 border-blue-300 text-blue-700' 
-                                : 'bg-white border-slate-300 text-slate-500'
+                            className={`px-2 py-1 rounded text-[10px] font-medium border transition ${
+                              !isService
+                                ? 'bg-blue-100 border-blue-300 text-blue-700'
+                                : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'
                             }`}
                           >
                             Prod
@@ -408,10 +486,10 @@ export const OrderForm = ({
                           <button
                             type="button"
                             onClick={() => cambiarTipoDetalle(index, 'servicio', isEdit ? "edit" : "create")}
-                            className={`px-2 py-1 rounded text-[10px] font-medium border ${
-                              isService 
-                                ? 'bg-purple-100 border-purple-300 text-purple-700' 
-                                : 'bg-white border-slate-300 text-slate-500'
+                            className={`px-2 py-1 rounded text-[10px] font-medium border transition ${
+                              isService
+                                ? 'bg-purple-100 border-purple-300 text-purple-700'
+                                : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'
                             }`}
                           >
                             Serv
@@ -419,43 +497,44 @@ export const OrderForm = ({
                         </div>
                       </div>
 
-                      {/* Producto/Servicio */}
+                      {/* Selector Producto */}
                       <div className="col-span-3">
                         <div
-                          onClick={() => goToSelectProducto(isEdit ? "edit" : "create", index, isService ? 'servicio' : 'producto')}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-left flex items-center gap-2 cursor-pointer"
+                          onClick={() => handleGoToSelectProducto(index, isService)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-left flex items-center gap-2 cursor-pointer transition"
                         >
                           {imagenUrl ? (
                             <img src={imagenUrl} alt="Producto" className="w-8 h-8 object-cover rounded" />
                           ) : (
-                            <div className="w-8 h-8 bg-slate-100 rounded flex items-center justify-center">
+                            <div className="w-8 h-8 bg-slate-100 rounded flex items-center justify-center flex-shrink-0">
                               <Package size={16} className="text-slate-400" />
                             </div>
                           )}
-                          <span className="flex-1 truncate text-sm">
+                          <span className="flex-1 truncate text-sm text-slate-700">
                             {productoId
                               ? getProductoNombre(productoId, productos, servicios)
                               : `Seleccionar ${isService ? 'servicio' : 'producto'}...`}
                           </span>
-                          <ChevronRight size={14} className="text-slate-400" />
+                          <ChevronRight size={14} className="text-slate-400 flex-shrink-0" />
                         </div>
                       </div>
 
-                      {/* Color/Tamaño */}
+                      {/* Selector Color */}
                       <div className="col-span-2">
                         <div
-                          onClick={() => goToSelectColor(isEdit ? "edit" : "create", index)}
-                          className={`w-full px-3 py-2 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-left flex items-center gap-2 text-sm ${
-                            !productoId ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                          onClick={() => handleGoToSelectColor(index)}
+                          className={`w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-left flex items-center gap-2 text-sm transition ${
+                            !productoId ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50 cursor-pointer'
                           }`}
                         >
                           {d.ColorId && (
                             <div
-                              className="w-5 h-5 rounded-full border border-slate-300"
+                              className="w-5 h-5 rounded-full border border-slate-300 flex-shrink-0"
                               style={{ backgroundColor: getColorById(d.ColorId, colores)?.CodigoHex || '#e5e7eb' }}
+                              title={getColorName(d.ColorId, colores)}
                             />
                           )}
-                          <span className="truncate">
+                          <span className="truncate text-slate-700">
                             {d.ColorId ? getColorName(d.ColorId, colores) : "Sin color"}
                             {isService && d.Tamaño && ` / ${d.Tamaño}`}
                           </span>
@@ -469,7 +548,7 @@ export const OrderForm = ({
                           min="1"
                           value={d.Cantidad}
                           onChange={(e) => actualizarDetalle(index, "Cantidad", e.target.value, isEdit ? "edit" : "create")}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-center"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-center focus:ring-2 focus:ring-blue-500 outline-none"
                           disabled={!productoId}
                         />
                       </div>
@@ -479,9 +558,10 @@ export const OrderForm = ({
                         <input
                           type="number"
                           step="0.01"
+                          min="0"
                           value={d.Precio}
                           onChange={(e) => actualizarDetalle(index, "Precio", e.target.value, isEdit ? "edit" : "create")}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                           disabled={!productoId}
                         />
                       </div>
@@ -493,17 +573,82 @@ export const OrderForm = ({
                         </div>
                       </div>
 
-                      {/* Acción */}
+                      {/* Eliminar */}
                       <div className="col-span-1 text-right">
                         <button
                           type="button"
                           onClick={() => eliminarDetalle(index, isEdit ? "edit" : "create")}
-                          className="text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded-lg"
-                          title="Eliminar"
+                          className="text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded-lg transition"
+                          title="Eliminar ítem"
+                          aria-label="Eliminar"
                         >
                           <Trash2 size={18} />
                         </button>
                       </div>
+                    </div>
+
+                    {/* Vista Mobile */}
+                    <div className="md:hidden space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-slate-500">
+                          {isService ? 'Servicio' : 'Producto'}:
+                        </span>
+                        <span className="text-sm text-slate-700 truncate flex-1">
+                          {productoId
+                            ? getProductoNombre(productoId, productos, servicios)
+                            : `Seleccionar ${isService ? 'servicio' : 'producto'}...`}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleGoToSelectProducto(index, isService)}
+                          className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm text-left hover:bg-slate-50"
+                        >
+                          {productoId ? '✓ Seleccionado' : 'Seleccionar item'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleGoToSelectColor(index)}
+                          className={`flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm text-left ${
+                            !productoId ? 'opacity-50' : 'hover:bg-slate-50'
+                          }`}
+                          disabled={!productoId}
+                        >
+                          {d.ColorId ? getColorName(d.ColorId, colores) : 'Color'}
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          value={d.Cantidad}
+                          onChange={(e) => actualizarDetalle(index, "Cantidad", e.target.value, isEdit ? "edit" : "create")}
+                          className="px-3 py-2 border border-slate-300 rounded-lg text-sm text-center"
+                          placeholder="Cant."
+                          disabled={!productoId}
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={d.Precio}
+                          onChange={(e) => actualizarDetalle(index, "Precio", e.target.value, isEdit ? "edit" : "create")}
+                          className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          placeholder="Precio"
+                          disabled={!productoId}
+                        />
+                        <div className="px-3 py-2 bg-blue-50 rounded-lg text-sm font-semibold text-blue-700 text-center">
+                          {formatPrice(subtotal)}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => eliminarDetalle(index, isEdit ? "edit" : "create")}
+                        className="text-red-600 text-sm hover:text-red-800 flex items-center gap-1"
+                      >
+                        <Trash2 size={14} /> Eliminar
+                      </button>
                     </div>
                   </div>
                 );
@@ -512,28 +657,28 @@ export const OrderForm = ({
           </div>
         </div>
 
-        {/* Resumen */}
+        {/* ===== RESUMEN DEL PEDIDO ===== */}
         <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h4 className="font-semibold text-slate-800 mb-3">Resumen del Pedido</h4>
+              <h4 className="font-semibold text-slate-800 mb-3">Resumen</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-600">Tipo de cliente:</span>
-                  <span className="font-medium">
+                  <span className="font-medium text-slate-800">
                     {tipoCliente === 'registrado' ? 'Cliente Registrado' : 'Cliente Walk-in'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">Método de pago:</span>
-                  <span className="font-medium capitalize">
+                  <span className="font-medium text-slate-800 capitalize">
                     {formData.MetodoPago?.replace('_', ' ')}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">Total de items:</span>
-                  <span className="font-medium">
-                    {(isEdit ? selectedPedido?.detalle : detallesPedido)?.length}
+                  <span className="font-medium text-slate-800">
+                    {(isEdit ? selectedPedido?.detalle : detallesPedido)?.length || 0}
                   </span>
                 </div>
               </div>
@@ -547,14 +692,14 @@ export const OrderForm = ({
           </div>
         </div>
 
-        {/* Botones */}
+        {/* ===== BOTONES DE ACCIÓN ===== */}
         <div className="flex gap-4 pt-4">
           <button
             type="button"
             onClick={isEdit ? handleEdit : handleCreate}
             disabled={uploading}
             className={`flex-1 ${
-              uploading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'
+              uploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
             } text-white py-3.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors`}
           >
             {uploading ? (
