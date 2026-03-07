@@ -316,7 +316,6 @@ export const Login = () => {
         Permisos: response.data.permisos || response.data.Permisos || []
       };
 
-      // Guardar en localStorage
       localStorage.setItem('token', token);
       localStorage.setItem('userId', userData.CedulaId || response.data.userId || response.data.id || '');
       localStorage.setItem('userName', userData.NombreCompleto || '');
@@ -326,17 +325,14 @@ export const Login = () => {
 
       const userRole = (userData.Role || "").toLowerCase();
 
-      // Obtener la ruta a redirigir (NUEVO)
       const redirectAfterLogin = localStorage.getItem('redirectAfterLogin');
       const lastPath = localStorage.getItem('lastPath');
 
-      // Limpiar las rutas guardadas (NUEVO)
       localStorage.removeItem('redirectAfterLogin');
 
       if (userRole === "cliente") {
         navigate("/cliente/productos");
       } else {
-        // Priorizar: redirectAfterLogin > lastPath > dashboard (NUEVO)
         if (redirectAfterLogin && redirectAfterLogin !== '/login') {
           navigate(redirectAfterLogin);
         } else if (lastPath && lastPath !== '/login' && !lastPath.includes('/login')) {
@@ -349,7 +345,16 @@ export const Login = () => {
     } catch (error) {
       console.error("Error en login:", error);
 
-      if (error.response?.status === 401) {
+      // 🔥 NUEVO: Manejar error específico de contraseña no establecida
+      if (error.response?.status === 403 && error.response?.data?.codigo === 'PASSWORD_NOT_SET') {
+        setLoginErrors({
+          general: error.response.data.message
+        });
+
+        // Opcional: Mostrar un toast más amigable
+        toast.info("Revisa tu correo electrónico para activar tu cuenta");
+
+      } else if (error.response?.status === 401) {
         if (error.response?.data?.message?.includes("no existe")) {
           setLoginErrors({
             general: "El usuario no existe"

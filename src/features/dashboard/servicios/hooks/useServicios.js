@@ -202,7 +202,7 @@ export const useServicios = (mode, id) => {
             if (response.status === 200) {
                 toast.success(`Servicio ${nuevoEstado === 'Activo' ? 'activado' : 'desactivado'} correctamente`);
 
-                setAllData(prevData => 
+                setAllData(prevData =>
                     prevData.map(servicio =>
                         servicio.ServicioId === servicioId
                             ? { ...servicio, Estado: nuevoEstado }
@@ -264,7 +264,7 @@ export const useServicios = (mode, id) => {
                 hasErrors = true;
             } else {
                 // Validar cada tamaño individualmente (los mensajes específicos los maneja TamanosManager)
-                const tamanoInvalido = tamanos.some(t => 
+                const tamanoInvalido = tamanos.some(t =>
                     !t.NombreTamano?.trim() || !t.Precio || parseFloat(t.Precio) <= 0
                 );
                 if (tamanoInvalido) {
@@ -403,7 +403,7 @@ export const useServicios = (mode, id) => {
             }
         } catch (error) {
             console.error("Error al procesar la solicitud:", error);
-            
+
             // Manejo detallado de errores
             if (error.response) {
                 console.error("Error response data:", error.response.data);
@@ -421,15 +421,29 @@ export const useServicios = (mode, id) => {
         }
     };
 
+    // En useServicios.js, reemplaza la función handleDelete completa:
+
     const handleDelete = async (id) => {
         try {
             const response = await deleteDataservicio(id);
+
             if (response.status === 200 || response.status === 201) {
                 toast.success(response.data.message);
 
-                setAllData(prevData => 
-                    prevData.filter(servicio => servicio.ServicioId !== id)
-                );
+                // Recargar todos los servicios después de eliminar
+                const serviciosResponse = await GetDataservicios();
+                const nuevosServicios = serviciosResponse?.data || [];
+
+                // Actualizar el estado con los nuevos datos
+                setAllData(nuevosServicios);
+
+                // Si estamos en modo vista/edición, volver a la lista
+                if (mode !== "list") {
+                    goToBackToList();
+                } else {
+                    // Forzar una actualización de la paginación
+                    // El useEffect de usePaginacion se encargará de recalcular
+                }
 
                 setOpenEliminar(false);
                 setEditData(null);
@@ -437,7 +451,15 @@ export const useServicios = (mode, id) => {
                 toast.error(response.message || "No se pudo eliminar el servicio");
             }
         } catch (error) {
-            toast.error(error.response?.data?.message || "Error al eliminar");
+            console.error("Error al eliminar servicio:", error);
+
+            if (error.response?.status === 400) {
+                toast.error(error.response.data?.message || "No se puede eliminar el servicio porque tiene ventas asociadas");
+            } else if (error.response?.data?.message) {
+                toast.error(error.response.data.message);
+            } else {
+                toast.error("Error al eliminar el servicio");
+            }
         }
     };
 

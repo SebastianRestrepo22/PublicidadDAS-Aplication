@@ -13,6 +13,9 @@ import {
   Minus,
   Palette,
   ChevronLeft,
+  ImageIcon,
+  CheckCircle,
+  FileText,
   X
 } from "lucide-react";
 
@@ -35,6 +38,7 @@ export const CarritoCompras = () => {
   const [productColors, setProductColors] = useState({});
   const [loadingColors, setLoadingColors] = useState({});
   const [colorsLoaded, setColorsLoaded] = useState(false);
+  const [imagenAmpliada, setImagenAmpliada] = useState(null);
 
   // Función para cargar colores - MEMOIZADA
   const loadColorsForProducts = useCallback(async () => {
@@ -511,8 +515,8 @@ export const CarritoCompras = () => {
                                 <button
                                   onClick={() => handleIncrease(item)}
                                   className={`w-8 h-8 flex items-center justify-center border rounded-full transition-all ${getStockDisponible(item) !== null && item.quantity >= getStockDisponible(item)
-                                      ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
-                                      : 'border-blue-300 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-400'
+                                    ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                                    : 'border-blue-300 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-400'
                                     }`}
                                   disabled={getStockDisponible(item) !== null && item.quantity >= getStockDisponible(item)}
                                   title={
@@ -559,6 +563,8 @@ export const CarritoCompras = () => {
             )}
 
             {/* Servicios */}
+           // En CarritoCompras.jsx, busca la sección de servicios y reemplázala con esta:
+
             {servicios.length > 0 && (
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <h2 className="text-xl font-bold text-slate-800 mb-4 border-b pb-3">
@@ -566,8 +572,11 @@ export const CarritoCompras = () => {
                 </h2>
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                   {servicios.map((item) => {
-                    // Determinar la imagen a mostrar
-                    const imagenSrc =
+                    const imagenAdjunta = item.customization?.archivosAdjuntos?.find(
+                      f => f.esImagen && f.base64
+                    );
+
+                    const imagenSrc = imagenAdjunta?.base64 ||
                       item.customization?.UrlImagen ||
                       item.UrlImagen ||
                       item.Imagen ||
@@ -576,7 +585,6 @@ export const CarritoCompras = () => {
                     return (
                       <div key={item.id} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors">
                         <div className="flex gap-4">
-                          {/* Imagen - CORREGIDA */}
                           <div className="relative">
                             <img
                               src={imagenSrc}
@@ -592,12 +600,10 @@ export const CarritoCompras = () => {
                             </span>
                           </div>
 
-                          {/* Información */}
                           <div className="flex-1">
                             <h3 className="font-bold text-slate-800">{item.Nombre}</h3>
                             <p className="text-sm text-slate-600 line-clamp-2">{item.Descripcion}</p>
 
-                            {/* Detalles de personalización */}
                             {item.customization && (
                               <div className="mt-3 space-y-1">
                                 <h4 className="text-sm font-semibold text-slate-700">Detalles de personalización:</h4>
@@ -609,14 +615,50 @@ export const CarritoCompras = () => {
                                     <p className="mb-1"><span className="font-medium">Tamaño:</span> {item.customization.Tamaño}</p>
                                   )}
                                   {item.customization.archivosAdjuntos && item.customization.archivosAdjuntos.length > 0 && (
-                                    <p className="mb-1"><span className="font-medium">Archivos:</span> {item.customization.archivosAdjuntos.length}</p>
+                                    <div className="mb-1">
+                                      <span className="font-medium">Archivos adjuntos:</span>
+                                      <div className="grid grid-cols-3 gap-2 mt-2">
+                                        {item.customization.archivosAdjuntos.map((archivo, idx) => (
+                                          <div
+                                            key={idx}
+                                            className="border border-slate-200 rounded-lg p-1 hover:border-blue-300 transition-all group relative cursor-pointer"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (archivo.esImagen && archivo.base64) {
+                                                setImagenAmpliada(archivo.base64);
+                                              }
+                                            }}
+                                          >
+                                            {archivo.esImagen ? (
+                                              <div className="relative">
+                                                <img
+                                                  src={archivo.base64}
+                                                  alt={archivo.nombre}
+                                                  className="w-full h-16 object-cover rounded"
+                                                />
+                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all rounded flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                                  👁️
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <div className="flex items-center justify-center p-2 bg-slate-50 rounded h-16">
+                                                <FileText className="h-6 w-6 text-red-500" />
+                                              </div>
+                                            )}
+                                            <p className="text-[10px] truncate mt-1 text-center">{archivo.nombre}</p>
+                                            {archivo.pendiente && (
+                                              <span className="absolute top-0 right-0 bg-amber-500 text-white text-[8px] px-1 rounded-bl">!</span>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
                                   )}
                                 </div>
                               </div>
                             )}
                           </div>
 
-                          {/* Precio y acciones */}
                           <div className="flex flex-col items-end justify-between">
                             <div className="text-right">
                               <div className="font-bold text-lg text-purple-600">
@@ -651,6 +693,29 @@ export const CarritoCompras = () => {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* Agrega este modal al final del componente, justo antes de cerrar el div principal */}
+            {imagenAmpliada && (
+              <div
+                className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+                onClick={() => setImagenAmpliada(null)}
+              >
+                <div className="relative max-w-4xl max-h-[90vh]">
+                  <img
+                    src={imagenAmpliada}
+                    alt="Imagen ampliada"
+                    className="max-w-full max-h-[90vh] object-contain rounded-lg"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <button
+                    onClick={() => setImagenAmpliada(null)}
+                    className="absolute -top-4 -right-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
                 </div>
               </div>
             )}
