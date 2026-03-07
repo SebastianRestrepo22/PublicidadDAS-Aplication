@@ -28,6 +28,7 @@ const generateTempId = () => 'temp_' + Math.random().toString(36).substr(2, 9);
 export const CrearVenta = () => {
     const navigate = useNavigate();
 
+    // Estados existentes
     const [productos, setProductos] = useState([]);
     const [servicios, setServicios] = useState([]);
     const [colores, setColores] = useState([]);
@@ -52,8 +53,15 @@ export const CrearVenta = () => {
         correo: ''
     });
 
+    // En la sección de estados, después de paginaTamano, agrega:
+    const [paginaProducto, setPaginaProducto] = useState(1);
+
     // Estados para validación de detalles
     const [erroresDetalle, setErroresDetalle] = useState({});
+
+    // *** NUEVOS ESTADOS PARA PAGINACIÓN DE MODALES ***
+    const [paginaColor, setPaginaColor] = useState(1);
+    const [paginaTamano, setPaginaTamano] = useState(1);
 
     const [formData, setFormData] = useState({
         ClienteNombre: "",
@@ -96,7 +104,9 @@ export const CrearVenta = () => {
 
     const validarUrlImagen = (url) => {
         if (!url) return true;
-        if (url.length > 255) return "La URL de la imagen no puede tener más de 255 caracteres";
+        if (url.length > 255) {
+            return "La URL de la imagen no puede tener más de 255 caracteres";
+        }
         try {
             new URL(url);
             return true;
@@ -196,6 +206,7 @@ export const CrearVenta = () => {
         validarTodosLosDetalles();
     }, [detalles]);
 
+    // En el useEffect de cargarDatos, modifica la parte donde cargas los colores:
     useEffect(() => {
         const cargarDatos = async () => {
             setCargandoDatos(true);
@@ -221,13 +232,24 @@ export const CrearVenta = () => {
                     if (producto.UsaColores === 1) {
                         try {
                             const coloresProducto = await getColoresByProductoId(producto.ProductoId);
-                            coloresMap[producto.ProductoId] = Array.isArray(coloresProducto) ? coloresProducto : [];
-                            if (Array.isArray(coloresProducto)) {
-                                coloresProducto.forEach(c => {
-                                    const key = `${producto.ProductoId}_${c.ColorId}`;
-                                    stockMap[key] = c.Stock || 0;
-                                });
-                            }
+
+                            // Combinar con la información global de colores para obtener el Hex
+                            const coloresCompletos = (Array.isArray(coloresProducto) ? coloresProducto : []).map(colorProducto => {
+                                // Buscar el color en la lista global de colores para obtener su código hexadecimal
+                                const colorGlobal = Array.isArray(coloresData) ? coloresData.find(c => c.ColorId === colorProducto.ColorId) : null;
+                                return {
+                                    ...colorProducto,
+                                    // IMPORTANTE: Usar 'Hex' en lugar de 'CodigoHex'
+                                    Hex: colorProducto.Hex || colorGlobal?.Hex || '#e5e7eb' // Fallback a gris si no encuentra
+                                };
+                            });
+
+                            coloresMap[producto.ProductoId] = coloresCompletos;
+
+                            coloresCompletos.forEach(c => {
+                                const key = `${producto.ProductoId}_${c.ColorId}`;
+                                stockMap[key] = c.Stock || 0;
+                            });
                         } catch (error) {
                             console.error(`Error cargando colores para producto ${producto.ProductoId}:`, error);
                             coloresMap[producto.ProductoId] = [];
@@ -374,19 +396,31 @@ export const CrearVenta = () => {
             toast.error(fileValidation);
             return;
         }
+
         const nuevos = [...detalles];
-        const imageUrl = URL.createObjectURL(file);
+        //  Solo crear URL temporal para VISTA PREVIA
+        const previewUrl = URL.createObjectURL(file);
+
         nuevos[index] = {
             ...nuevos[index],
             ImagenFile: file,
-            UrlImagenPersonalizada: imageUrl,
-            ImagenUrl: ""
+            //  IMPORTANTE: Para vista previa usamos previewUrl
+            //  Para BD guardamos 'pendiente' (el servidor generará la URL real)
+            UrlImagenPersonalizada: 'pendiente', // Cambiado: ya no guardamos blob
+            previewUrl: previewUrl, // Nueva propiedad SOLO para vista previa
+            ImagenUrl: "",
+            isLocalFile: true
         };
         setDetalles(nuevos);
         setModoImagen(prev => ({ ...prev, [detalles[index]._tempId]: 'file' }));
     };
-
     const handleImageUrlChange = (index, url) => {
+        // Validar longitud
+        if (url && url.length > 255) {
+            toast.error("La URL no puede tener más de 255 caracteres");
+            return;
+        }
+
         if (url && url.trim() !== '') {
             const urlValidation = validarUrlImagen(url);
             if (urlValidation !== true) {
@@ -394,6 +428,7 @@ export const CrearVenta = () => {
                 return;
             }
         }
+
         const nuevos = [...detalles];
         nuevos[index] = {
             ...nuevos[index],
@@ -566,8 +601,12 @@ export const CrearVenta = () => {
         setCargando(true);
         try {
             const vendedorId = localStorage.getItem("userId");
-            const tieneArchivos = detalles.some(d => d.TipoItem === 'servicio' && d.ImagenFile);
 
+            // 🔥 IMPORTANTE: Identificar qué detalles TIENEN archivos
+            const detallesConArchivos = detalles.filter(d => d.ImagenFile instanceof File);
+            const tieneArchivos = detallesConArchivos.length > 0;
+
+            // Preparar detalles para enviar
             const detallesParaEnviar = detalles.map((d) => {
                 const detalleBase = {
                     TipoItem: d.TipoItem,
@@ -576,6 +615,7 @@ export const CrearVenta = () => {
                     PrecioUnitario: parseFloat(d.PrecioUnitario) || 0,
                     Subtotal: (parseInt(d.Cantidad) || 1) * (parseFloat(d.PrecioUnitario) || 0)
                 };
+
                 if (d.TipoItem === "producto") {
                     return {
                         ...detalleBase,
@@ -588,6 +628,8 @@ export const CrearVenta = () => {
                         ServicioId: d.ItemId,
                         ServicioTamanoId: d.TamanoId || null,
                         DescripcionPersonalizada: d.DescripcionPersonalizada || null,
+                        //  Si TIENE archivo, enviamos 'pendiente'
+                        //  Si NO, enviamos la URL o null
                         UrlImagenPersonalizada: d.ImagenFile ? 'pendiente' : (d.ImagenUrl || null)
                     };
                 }
@@ -607,34 +649,56 @@ export const CrearVenta = () => {
             };
 
             let response;
+
             if (tieneArchivos) {
                 const formDataToSend = new FormData();
                 formDataToSend.append('ventaData', JSON.stringify(ventaData));
+
+                // 🔥 IMPORTANTE: Enviar archivos en el MISMO ORDEN que aparecen en detalles
+                // y SOLO los que tienen archivo
                 detalles.forEach((d) => {
-                    if (d.TipoItem === 'servicio' && d.ImagenFile) {
+                    if (d.ImagenFile instanceof File) {
+                        console.log(`📸 Adjuntando archivo: ${d.ImagenFile.name}`);
                         formDataToSend.append('imagenes', d.ImagenFile);
                     }
                 });
+
+                // Verificar qué se está enviando
+                console.log("📦 FormData a enviar:");
+                for (let pair of formDataToSend.entries()) {
+                    if (pair[0] === 'ventaData') {
+                        console.log('ventaData:', JSON.parse(pair[1]));
+                    } else {
+                        console.log(pair[0], pair[1] instanceof File ? pair[1].name : pair[1]);
+                    }
+                }
+
                 response = await createVentaManual(formDataToSend);
             } else {
                 response = await createVentaManual(ventaData);
             }
 
+            console.log("📥 Respuesta del servidor:", response);
+
             if (response && response.success) {
-                toast.success("Venta creada exitosamente");
-                navigate("/dashboard/ventas");
+                toast.success(" Venta creada exitosamente");
+
+                // Limpiar URLs de objeto creadas con URL.createObjectURL
+                detalles.forEach(d => {
+                    if (d.previewUrl && d.previewUrl.startsWith('blob:')) {
+                        URL.revokeObjectURL(d.previewUrl);
+                    }
+                });
+
+                setTimeout(() => {
+                    navigate("/dashboard/ventas");
+                }, 1500);
             } else {
                 toast.error(response?.message || response?.error || "Error al crear la venta");
             }
         } catch (error) {
-            console.error("Error completo:", error);
-            if (error.response) {
-                toast.error(error.response.data?.message || error.response.data?.error || `Error ${error.response.status}`);
-            } else if (error.request) {
-                toast.error("No se pudo conectar con el servidor");
-            } else {
-                toast.error(error.message || "Error al crear la venta");
-            }
+            console.error("❌ Error completo:", error);
+            toast.error(error.message || "Error al crear la venta");
         } finally {
             setCargando(false);
         }
@@ -952,12 +1016,40 @@ export const CrearVenta = () => {
                                                         {detalle.ColorId && (
                                                             <div
                                                                 className="w-5 h-5 rounded-full border border-slate-300 flex-shrink-0"
-                                                                style={{ backgroundColor: colores.find(c => c.ColorId === detalle.ColorId)?.CodigoHex || '#e5e7eb' }}
+                                                                style={{
+                                                                    backgroundColor: (() => {
+                                                                        // Buscar en coloresPorProducto primero
+                                                                        const coloresProducto = coloresPorProducto[detalle.ItemId] || [];
+                                                                        const colorEnProducto = coloresProducto.find(c => c.ColorId === detalle.ColorId);
+
+                                                                        if (colorEnProducto?.Hex) {
+                                                                            return colorEnProducto.Hex;
+                                                                        }
+
+                                                                        // Buscar en colores globales
+                                                                        const colorGlobal = colores.find(c => c.ColorId === detalle.ColorId);
+
+                                                                        if (colorGlobal?.Hex) {
+                                                                            return colorGlobal.Hex;
+                                                                        }
+
+                                                                        // Fallback
+                                                                        console.warn('Color no encontrado:', detalle.ColorId, detalle.NombreSnapshot);
+                                                                        return '#e5e7eb';
+                                                                    })()
+                                                                }}
                                                             ></div>
                                                         )}
                                                         <span className="truncate">
                                                             {detalle.ColorId
-                                                                ? colores.find(c => c.ColorId === detalle.ColorId)?.Nombre || "Color"
+                                                                ? (() => {
+                                                                    // Buscar el nombre del color
+                                                                    const coloresProducto = coloresPorProducto[detalle.ItemId] || [];
+                                                                    const colorEncontrado = coloresProducto.find(c => c.ColorId === detalle.ColorId);
+                                                                    return colorEncontrado?.Nombre ||
+                                                                        colores.find(c => c.ColorId === detalle.ColorId)?.Nombre ||
+                                                                        "Color";
+                                                                })()
                                                                 : (!detalle.ItemId || !tieneColores) ? "Sin colores" : "Seleccionar color"}
                                                         </span>
                                                     </button>
@@ -976,14 +1068,22 @@ export const CrearVenta = () => {
                                             {/* Cantidad */}
                                             <div className="lg:col-span-1">
                                                 <span className="lg:hidden text-xs font-medium text-slate-500 block mb-1">Cant.:</span>
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    max={esProducto ? maxStock : undefined}
-                                                    value={detalle.Cantidad}
-                                                    onChange={(e) => handleCantidadChange(indexReal, e.target.value)}
-                                                    className={`w-full text-sm border rounded-lg px-3 py-2.5 h-[42px] ${errores.cantidad || errores.stock ? 'border-red-500' : 'border-slate-300'}`}
-                                                />
+                                                {esProducto ? (
+                                                    // PRODUCTO: input editable con validación de stock
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        max={maxStock}
+                                                        value={detalle.Cantidad}
+                                                        onChange={(e) => handleCantidadChange(indexReal, e.target.value)}
+                                                        className={`w-full text-sm border rounded-lg px-3 py-2.5 h-[42px] ${errores.cantidad || errores.stock ? 'border-red-500' : 'border-slate-300'}`}
+                                                    />
+                                                ) : (
+                                                    // SERVICIO: cantidad fija en 1, no editable
+                                                    <div className="w-full text-sm bg-slate-100 border border-slate-300 rounded-lg px-3 py-2.5 text-slate-700 h-[42px] flex items-center">
+                                                        1
+                                                    </div>
+                                                )}
                                                 {esProducto && maxStock < 999999 && (
                                                     <div className="text-xs text-slate-500 mt-1">Stock: {maxStock}</div>
                                                 )}
@@ -998,10 +1098,14 @@ export const CrearVenta = () => {
                                             </div>
 
                                             {/* Subtotal */}
+                                            {/* Subtotal */}
                                             <div className="lg:col-span-2">
                                                 <span className="lg:hidden text-xs font-medium text-slate-500 block mb-1">Subtotal:</span>
                                                 <div className="text-sm bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 font-semibold text-blue-700 h-[42px] flex items-center">
-                                                    {formatPrice((detalle.Cantidad || 1) * detalle.PrecioUnitario)}
+                                                    {esProducto
+                                                        ? formatPrice((detalle.Cantidad || 1) * detalle.PrecioUnitario)
+                                                        : formatPrice(detalle.PrecioUnitario) // Para servicios, subtotal = precio unitario
+                                                    }
                                                 </div>
                                             </div>
 
@@ -1073,14 +1177,12 @@ export const CrearVenta = () => {
                                                                     <Upload size={16} />
                                                                     Seleccionar archivo
                                                                 </label>
-                                                                {detalle.UrlImagenPersonalizada && (
-                                                                    <div className="mt-3">
-                                                                        <img
-                                                                            src={detalle.UrlImagenPersonalizada}
-                                                                            alt="Preview"
-                                                                            className="w-20 h-20 object-cover rounded-lg border"
-                                                                        />
-                                                                    </div>
+                                                                {(detalle.previewUrl || detalle.UrlImagenPersonalizada) && (
+                                                                    <img
+                                                                        src={detalle.previewUrl || detalle.UrlImagenPersonalizada}
+                                                                        alt="Preview"
+                                                                        className="w-20 h-20 object-cover rounded-lg border"
+                                                                    />
                                                                 )}
                                                             </div>
                                                         )}
@@ -1092,8 +1194,22 @@ export const CrearVenta = () => {
                                                                     value={detalle.ImagenUrl || ''}
                                                                     onChange={(e) => handleImageUrlChange(indexReal, e.target.value)}
                                                                     placeholder="https://ejemplo.com/imagen.jpg"
-                                                                    className="w-full text-sm border border-slate-300 rounded-lg px-4 py-2 h-[38px]"
+                                                                    className={`w-full text-sm border rounded-lg px-4 py-2 h-[38px] ${detalle.ImagenUrl && detalle.ImagenUrl.length > 255
+                                                                        ? 'border-red-500 bg-red-50'
+                                                                        : 'border-slate-300'
+                                                                        }`}
+                                                                    maxLength="255"
                                                                 />
+                                                                {detalle.ImagenUrl && detalle.ImagenUrl.length > 255 && (
+                                                                    <p className="text-red-500 text-xs mt-1">
+                                                                        ⚠️ La URL no puede tener más de 255 caracteres (actual: {detalle.ImagenUrl.length})
+                                                                    </p>
+                                                                )}
+                                                                {detalle.ImagenUrl && detalle.ImagenUrl.length <= 255 && (
+                                                                    <p className="text-xs text-gray-500 mt-1">
+                                                                        {detalle.ImagenUrl.length}/255 caracteres
+                                                                    </p>
+                                                                )}
                                                                 {detalle.ImagenUrl && (
                                                                     <img
                                                                         src={detalle.ImagenUrl}
@@ -1276,188 +1392,436 @@ export const CrearVenta = () => {
                     </div>
                 </Modal>
 
-                <Modal open={modalAbierto === 'productos'} onClose={() => setModalAbierto(null)}>
+                <Modal open={modalAbierto === 'productos'} onClose={() => {
+                    setModalAbierto(null);
+                    setPaginaProducto(1);
+                    setBusqueda('');
+                }}>
                     <div className="w-[600px] p-6">
                         <h3 className="text-lg font-bold mb-4">
                             Seleccionar {detalles[itemSeleccionado]?.TipoItem === 'producto' ? 'Producto' : 'Servicio'}
                         </h3>
-                        <div className="relative mb-4">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Buscar por nombre..."
-                                value={busqueda}
-                                onChange={(e) => setBusqueda(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                autoFocus
-                            />
-                        </div>
-                        <div className="max-h-96 overflow-y-auto space-y-2">
-                            {detalles[itemSeleccionado]?.TipoItem === 'producto' ? (
-                                productosFiltrados.length > 0 ? (
-                                    productosFiltrados.map(p => {
-                                        const tieneColores = coloresPorProducto[p.ProductoId]?.length > 0;
-                                        return (
-                                            <button
-                                                key={p.ProductoId}
-                                                onClick={() => seleccionarProducto({ ...p, tipo: 'producto' })}
-                                                className="w-full p-4 border border-slate-200 rounded-lg hover:bg-slate-50 text-left flex justify-between items-center"
-                                            >
-                                                <div className="flex-1">
-                                                    <span className="font-medium">{p.Nombre}</span>
-                                                    {tieneColores ? (
-                                                        <span className="ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
-                                                            {coloresPorProducto[p.ProductoId].length} colores
-                                                        </span>
-                                                    ) : (
-                                                        p.Stock > 0 ? (
-                                                            <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
-                                                                Stock: {p.Stock}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">
-                                                                Sin stock
-                                                            </span>
-                                                        )
-                                                    )}
-                                                </div>
-                                                <span className="text-blue-600 font-medium">{formatPrice(p.Precio)}</span>
-                                            </button>
-                                        );
-                                    })
-                                ) : (
-                                    <p className="text-center text-slate-500 py-4">No hay productos disponibles</p>
-                                )
-                            ) : (
-                                serviciosFiltrados.length > 0 ? (
-                                    serviciosFiltrados.map(s => (
-                                        <button
-                                            key={s.ServicioId}
-                                            onClick={() => seleccionarProducto({ ...s, tipo: 'servicio' })}
-                                            className="w-full p-4 border border-slate-200 rounded-lg hover:bg-slate-50 text-left"
-                                        >
-                                            <div className="flex justify-between items-center">
-                                                <div>
-                                                    <span className="font-medium">{s.Nombre}</span>
-                                                    {tamanos[s.ServicioId]?.length > 0 && (
-                                                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                                                            {tamanos[s.ServicioId].length} tamaños
-                                                        </span>
-                                                    )}
-                                                    {s.RequiereImagen === 1 && (
-                                                        <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
-                                                            Requiere imagen
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <span className="text-blue-600 font-medium">{formatPrice(s.Precio)}</span>
-                                            </div>
-                                            {s.Descripcion && (
-                                                <p className="text-xs text-slate-500 mt-1">{s.Descripcion}</p>
-                                            )}
-                                        </button>
-                                    ))
-                                ) : (
-                                    <p className="text-center text-slate-500 py-4">No hay servicios disponibles</p>
-                                )
-                            )}
-                        </div>
-                    </div>
-                </Modal>
 
-                <Modal open={modalAbierto === 'colores'} onClose={() => setModalAbierto(null)}>
-                    <div className="w-[400px] p-6">
-                        <h3 className="text-lg font-bold mb-4">Seleccionar Color</h3>
-                        <div className="relative mb-4">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Buscar color..."
-                                value={busqueda}
-                                onChange={(e) => setBusqueda(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                autoFocus
-                            />
-                        </div>
-                        <div className="max-h-96 overflow-y-auto grid grid-cols-2 gap-2">
+                        {/* Barra de búsqueda y contador */}
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por nombre..."
+                                    value={busqueda}
+                                    onChange={(e) => {
+                                        setBusqueda(e.target.value);
+                                        setPaginaProducto(1);
+                                    }}
+                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    autoFocus
+                                />
+                            </div>
                             {(() => {
-                                const productoActual = detalles[itemSeleccionado];
-                                if (!productoActual?.ItemId) {
-                                    return <p className="text-center text-slate-500 py-4 col-span-2">Seleccione un producto primero</p>;
+                                const itemsFiltrados = detalles[itemSeleccionado]?.TipoItem === 'producto'
+                                    ? productosFiltrados
+                                    : serviciosFiltrados;
+                                return (
+                                    <span className="text-sm text-slate-500 bg-slate-100 px-3 py-2 rounded-lg whitespace-nowrap">
+                                        {itemsFiltrados.length} {itemsFiltrados.length === 1 ? 'resultado' : 'resultados'}
+                                    </span>
+                                );
+                            })()}
+                        </div>
+
+                        {/* Lista de items con scroll y paginación */}
+                        <div className="max-h-[400px] overflow-y-auto border border-slate-200 rounded-lg p-2">
+                            {(() => {
+                                const esProducto = detalles[itemSeleccionado]?.TipoItem === 'producto';
+                                const itemsFiltrados = esProducto ? productosFiltrados : serviciosFiltrados;
+
+                                const itemsPorPagina = 8;
+                                const totalPaginas = Math.ceil(itemsFiltrados.length / itemsPorPagina);
+                                const inicio = (paginaProducto - 1) * itemsPorPagina;
+                                const itemsPaginados = itemsFiltrados.slice(inicio, inicio + itemsPorPagina);
+
+                                if (itemsFiltrados.length === 0) {
+                                    return (
+                                        <div className="text-center py-12">
+                                            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                                                <Search className="w-6 h-6 text-gray-400" />
+                                            </div>
+                                            <p className="text-gray-600 font-medium">
+                                                {esProducto ? "No hay productos disponibles" : "No hay servicios disponibles"}
+                                            </p>
+                                            <p className="text-sm text-gray-500 mt-1">
+                                                {busqueda ? "Intenta con otra búsqueda" : ""}
+                                            </p>
+                                        </div>
+                                    );
                                 }
 
-                                const coloresDelProducto = coloresPorProducto[productoActual.ItemId] || [];
-                                const coloresFiltrados = coloresDelProducto.filter(c =>
-                                    c.Nombre?.toLowerCase().includes(busqueda.toLowerCase())
-                                );
+                                return (
+                                    <>
+                                        <div className="space-y-2">
+                                            {itemsPaginados.map(item => {
+                                                if (esProducto) {
+                                                    const p = item;
+                                                    const tieneColores = coloresPorProducto[p.ProductoId]?.length > 0;
+                                                    return (
+                                                        <button
+                                                            key={p.ProductoId}
+                                                            onClick={() => seleccionarProducto({ ...p, tipo: 'producto' })}
+                                                            className="w-full p-4 border border-slate-200 rounded-lg hover:bg-slate-50 text-left flex justify-between items-center transition-all hover:border-blue-300 hover:shadow-sm"
+                                                        >
+                                                            <div className="flex-1">
+                                                                <span className="font-medium">{p.Nombre}</span>
+                                                                {tieneColores ? (
+                                                                    <span className="ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
+                                                                        {coloresPorProducto[p.ProductoId].length} colores
+                                                                    </span>
+                                                                ) : (
+                                                                    p.Stock > 0 ? (
+                                                                        <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
+                                                                            Stock: {p.Stock}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">
+                                                                            Sin stock
+                                                                        </span>
+                                                                    )
+                                                                )}
+                                                            </div>
+                                                            <span className="text-blue-600 font-medium">{formatPrice(p.Precio)}</span>
+                                                        </button>
+                                                    );
+                                                } else {
+                                                    const s = item;
+                                                    return (
+                                                        <button
+                                                            key={s.ServicioId}
+                                                            onClick={() => seleccionarProducto({ ...s, tipo: 'servicio' })}
+                                                            className="w-full p-4 border border-slate-200 rounded-lg hover:bg-slate-50 text-left transition-all hover:border-blue-300 hover:shadow-sm"
+                                                        >
+                                                            <div className="flex justify-between items-center">
+                                                                <div>
+                                                                    <span className="font-medium">{s.Nombre}</span>
+                                                                    <div className="flex gap-1 mt-1">
+                                                                        {tamanos[s.ServicioId]?.length > 0 && (
+                                                                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                                                                                {tamanos[s.ServicioId].length} tamaños
+                                                                            </span>
+                                                                        )}
+                                                                        {s.RequiereImagen === 1 && (
+                                                                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
+                                                                                Requiere imagen
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <span className="text-blue-600 font-medium">{formatPrice(s.Precio)}</span>
+                                                            </div>
+                                                            {s.Descripcion && (
+                                                                <p className="text-xs text-slate-500 mt-2 line-clamp-2">{s.Descripcion}</p>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                }
+                                            })}
+                                        </div>
 
-                                return coloresFiltrados.length > 0 ? (
-                                    coloresFiltrados.map(c => {
-                                        const key = `${productoActual.ItemId}_${c.ColorId}`;
-                                        const stockColor = stockColores[key] || 0;
-
-                                        return (
-                                            <button
-                                                key={c.ColorId}
-                                                onClick={() => seleccionarColor(c)}
-                                                className={`p-3 border rounded-lg hover:bg-slate-50 flex items-center gap-2 relative ${stockColor === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                disabled={stockColor === 0}
-                                            >
-                                                <div className="w-6 h-6 rounded-full border" style={{ backgroundColor: c.CodigoHex }}></div>
-                                                <span className="text-sm">{c.Nombre}</span>
-                                                {stockColor > 0 ? (
-                                                    <span className="ml-auto text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded">
-                                                        {stockColor}
+                                        {/* Paginación */}
+                                        {totalPaginas > 1 && (
+                                            <div className="mt-4 flex items-center justify-between border-t pt-3">
+                                                <div className="text-xs text-slate-500">
+                                                    Mostrando {inicio + 1} - {Math.min(inicio + itemsPorPagina, itemsFiltrados.length)} de {itemsFiltrados.length}
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPaginaProducto(p => Math.max(1, p - 1))}
+                                                        disabled={paginaProducto === 1}
+                                                        className="px-3 py-1 border rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                                    >
+                                                        Anterior
+                                                    </button>
+                                                    <span className="px-3 py-1 text-sm">
+                                                        {paginaProducto} / {totalPaginas}
                                                     </span>
-                                                ) : (
-                                                    <span className="ml-auto text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded">
-                                                        Agotado
-                                                    </span>
-                                                )}
-                                            </button>
-                                        );
-                                    })
-                                ) : (
-                                    <p className="text-center text-slate-500 py-4 col-span-2">
-                                        {busqueda ? "No hay colores que coincidan" : "Este producto no tiene colores disponibles"}
-                                    </p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPaginaProducto(p => Math.min(totalPaginas, p + 1))}
+                                                        disabled={paginaProducto === totalPaginas}
+                                                        className="px-3 py-1 border rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                                    >
+                                                        Siguiente
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
                                 );
                             })()}
                         </div>
                     </div>
                 </Modal>
 
-                <Modal open={modalAbierto === 'tamanos'} onClose={() => setModalAbierto(null)}>
-                    <div className="w-[400px] p-6">
+                {/* MODAL DE COLORES */}
+                <Modal open={modalAbierto === 'colores'} onClose={() => {
+                    setModalAbierto(null);
+                    setPaginaColor(1); // Resetear paginación al cerrar
+                    setBusqueda(''); // Opcional: resetear búsqueda
+                }}>
+                    <div className="w-[700px] p-6">
+                        <h3 className="text-lg font-bold mb-4">Seleccionar Color</h3>
+
+                        {/* Barra de búsqueda y contador */}
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar color..."
+                                    value={busqueda}
+                                    onChange={(e) => {
+                                        setBusqueda(e.target.value);
+                                        setPaginaColor(1); // Resetear a primera página al buscar
+                                    }}
+                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    autoFocus
+                                />
+                            </div>
+                            {(() => {
+                                const productoActual = detalles[itemSeleccionado];
+                                const coloresDelProducto = productoActual?.ItemId ? coloresPorProducto[productoActual.ItemId] || [] : [];
+                                const coloresFiltrados = coloresDelProducto.filter(c =>
+                                    c.Nombre?.toLowerCase().includes(busqueda.toLowerCase())
+                                );
+                                return (
+                                    <span className="text-sm text-slate-500 bg-slate-100 px-3 py-2 rounded-lg">
+                                        {coloresFiltrados.length} {coloresFiltrados.length === 1 ? 'color' : 'colores'}
+                                    </span>
+                                );
+                            })()}
+                        </div>
+
+                        {/* Grid de colores con altura fija y scroll */}
+                        <div className="h-[400px] overflow-y-auto border border-slate-200 rounded-lg p-3">
+                            {(() => {
+                                const productoActual = detalles[itemSeleccionado];
+                                if (!productoActual?.ItemId) {
+                                    return (
+                                        <div className="flex items-center justify-center h-full">
+                                            <p className="text-center text-slate-500">Seleccione un producto primero</p>
+                                        </div>
+                                    );
+                                }
+
+                                const coloresDelProducto = coloresPorProducto[productoActual.ItemId] || [];
+
+                                const coloresFiltrados = coloresDelProducto.filter(c =>
+                                    c.Nombre?.toLowerCase().includes(busqueda.toLowerCase())
+                                );
+
+                                const coloresPorPagina = 12; // 3 filas de 4 columnas
+                                const totalPaginasColores = Math.ceil(coloresFiltrados.length / coloresPorPagina);
+                                const inicioColor = (paginaColor - 1) * coloresPorPagina;
+                                const coloresPaginados = coloresFiltrados.slice(inicioColor, inicioColor + coloresPorPagina);
+
+                                if (coloresFiltrados.length === 0) {
+                                    return (
+                                        <div className="flex items-center justify-center h-full">
+                                            <p className="text-center text-slate-500">
+                                                {busqueda ? "No hay colores que coincidan" : "Este producto no tiene colores disponibles"}
+                                            </p>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <>
+                                        {/* Grid de colores */}
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                            {coloresPaginados.map(c => {
+                                                const key = `${productoActual.ItemId}_${c.ColorId}`;
+                                                const stockColor = stockColores[key] || 0;
+
+                                                return (
+                                                    <button
+                                                        key={c.ColorId}
+                                                        onClick={() => {
+                                                            seleccionarColor(c);
+                                                            setPaginaColor(1); // Resetear al seleccionar
+                                                        }}
+                                                        className={`p-4 border rounded-lg hover:bg-slate-50 flex flex-col items-center text-center relative transition-all hover:shadow-md ${stockColor === 0 ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''
+                                                            } ${productoActual.ColorId === c.ColorId ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-slate-200'
+                                                            }`}
+                                                        disabled={stockColor === 0}
+                                                    >
+                                                        <div
+                                                            className="w-12 h-12 rounded-full border-2 border-slate-200 mb-2 shadow-sm"
+                                                            style={{ backgroundColor: c.Hex }}
+                                                        ></div>
+                                                        <span className="text-sm font-medium truncate w-full">{c.Nombre}</span>
+                                                        {stockColor > 0 ? (
+                                                            <span className="mt-1 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                                                                Stock: {stockColor}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="mt-1 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
+                                                                Agotado
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Paginación para colores */}
+                                        {totalPaginasColores > 1 && (
+                                            <div className="mt-4 flex items-center justify-between border-t pt-3">
+                                                <div className="text-xs text-slate-500">
+                                                    Mostrando {inicioColor + 1} - {Math.min(inicioColor + coloresPorPagina, coloresFiltrados.length)} de {coloresFiltrados.length}
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPaginaColor(p => Math.max(1, p - 1))}
+                                                        disabled={paginaColor === 1}
+                                                        className="px-3 py-1 border rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                                    >
+                                                        Anterior
+                                                    </button>
+                                                    <span className="px-3 py-1 text-sm">
+                                                        {paginaColor} / {totalPaginasColores}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPaginaColor(p => Math.min(totalPaginasColores, p + 1))}
+                                                        disabled={paginaColor === totalPaginasColores}
+                                                        className="px-3 py-1 border rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                                    >
+                                                        Siguiente
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </Modal>
+
+                {/* MODAL DE TAMAÑOS */}
+                <Modal open={modalAbierto === 'tamanos'} onClose={() => {
+                    setModalAbierto(null);
+                    setPaginaTamano(1); // Resetear paginación al cerrar
+                    setBusqueda(''); // Opcional: resetear búsqueda
+                }}>
+                    <div className="w-[600px] p-6">
                         <h3 className="text-lg font-bold mb-4">Seleccionar Tamaño</h3>
+
+                        {/* Barra de búsqueda */}
                         <div className="relative mb-4">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                             <input
                                 type="text"
                                 placeholder="Buscar tamaño..."
                                 value={busqueda}
-                                onChange={(e) => setBusqueda(e.target.value)}
+                                onChange={(e) => {
+                                    setBusqueda(e.target.value);
+                                    setPaginaTamano(1); // Resetear a primera página al buscar
+                                }}
                                 className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                 autoFocus
                             />
                         </div>
-                        <div className="max-h-96 overflow-y-auto space-y-2">
-                            {tamanosFiltrados.length > 0 ? (
-                                tamanosFiltrados.map(t => (
-                                    <button
-                                        key={t.ServicioTamanoId}
-                                        onClick={() => seleccionarTamano(t)}
-                                        className="w-full p-4 border border-slate-200 rounded-lg hover:bg-slate-50 text-left flex justify-between items-center"
-                                    >
-                                        <span className="font-medium">{t.NombreTamano}</span>
-                                        <span className="text-blue-600 font-medium">{formatPrice(t.Precio)}</span>
-                                    </button>
-                                ))
-                            ) : (
-                                <p className="text-center text-slate-500 py-4">
-                                    No hay tamaños disponibles para este servicio
-                                </p>
-                            )}
+
+                        {/* Grid de tamaños */}
+                        <div className="h-[400px] overflow-y-auto border border-slate-200 rounded-lg p-3">
+                            {(() => {
+                                const tamanosPorPagina = 8; // 2 columnas de 4 filas
+
+                                const tamanosFiltrados = servicioSeleccionado
+                                    ? (tamanos[servicioSeleccionado] || []).filter(t =>
+                                        t.NombreTamano?.toLowerCase().includes(busqueda.toLowerCase())
+                                    )
+                                    : [];
+
+                                const totalPaginasTamanos = Math.ceil(tamanosFiltrados.length / tamanosPorPagina);
+                                const iniciaTamano = (paginaTamano - 1) * tamanosPorPagina;
+                                const tamanosPaginados = tamanosFiltrados.slice(iniciaTamano, iniciaTamano + tamanosPorPagina);
+
+                                if (tamanosFiltrados.length === 0) {
+                                    return (
+                                        <div className="flex items-center justify-center h-full">
+                                            <p className="text-center text-slate-500">
+                                                No hay tamaños disponibles para este servicio
+                                            </p>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {tamanosPaginados.map(t => {
+                                                const servicioActual = detalles[itemSeleccionado];
+                                                const estaSeleccionado = servicioActual?.TamanoId === t.ServicioTamanoId;
+
+                                                return (
+                                                    <button
+                                                        key={t.ServicioTamanoId}
+                                                        onClick={() => {
+                                                            seleccionarTamano(t);
+                                                            setPaginaTamano(1); // Resetear al seleccionar
+                                                        }}
+                                                        className={`p-4 border rounded-lg hover:bg-slate-50 text-left transition-all hover:shadow-md flex justify-between items-center ${estaSeleccionado ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-slate-200'
+                                                            }`}
+                                                    >
+                                                        <div>
+                                                            <span className="font-medium block">{t.NombreTamano}</span>
+                                                            {t.Descripcion && (
+                                                                <span className="text-xs text-slate-500 mt-1 block">{t.Descripcion}</span>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-blue-600 font-semibold text-lg">
+                                                            {formatPrice(t.Precio)}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Paginación para tamaños */}
+                                        {totalPaginasTamanos > 1 && (
+                                            <div className="mt-4 flex items-center justify-between border-t pt-3">
+                                                <div className="text-xs text-slate-500">
+                                                    Mostrando {iniciaTamano + 1} - {Math.min(iniciaTamano + tamanosPorPagina, tamanosFiltrados.length)} de {tamanosFiltrados.length}
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPaginaTamano(p => Math.max(1, p - 1))}
+                                                        disabled={paginaTamano === 1}
+                                                        className="px-3 py-1 border rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                                    >
+                                                        Anterior
+                                                    </button>
+                                                    <span className="px-3 py-1 text-sm">
+                                                        {paginaTamano} / {totalPaginasTamanos}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPaginaTamano(p => Math.min(totalPaginasTamanos, p + 1))}
+                                                        disabled={paginaTamano === totalPaginasTamanos}
+                                                        className="px-3 py-1 border rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                                    >
+                                                        Siguiente
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 </Modal>
