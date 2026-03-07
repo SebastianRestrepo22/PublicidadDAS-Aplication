@@ -1,56 +1,64 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { Clock } from 'lucide-react';
 
 export const TiempoRestanteAnulacion = ({ fechaVenta, onAnular }) => {
   const [tiempoRestante, setTiempoRestante] = useState('');
-  const [expirado, setExpirado] = useState(false);
+  const [puedeAnular, setPuedeAnular] = useState(true);
 
   useEffect(() => {
     const calcularTiempo = () => {
-      const fecha = new Date(fechaVenta);
+      const fechaVentaDate = new Date(fechaVenta);
       const ahora = new Date();
-      const limite = new Date(fecha.getTime() + 60 * 60 * 1000);
-
-      if (ahora >= limite) {
-        setExpirado(true);
-        setTiempoRestante('00:00');
-        return;
+      const diferenciaMs = ahora - fechaVentaDate;
+      const diferenciaHoras = diferenciaMs / (1000 * 60 * 60);
+      
+      const TIEMPO_LIMITE_HORAS = 1;
+      
+      if (diferenciaHoras > TIEMPO_LIMITE_HORAS) {
+        setTiempoRestante('Expirado');
+        setPuedeAnular(false);
+      } else {
+        const minutosRestantes = Math.floor((TIEMPO_LIMITE_HORAS * 60 - (diferenciaMs / (1000 * 60))));
+        const horas = Math.floor(minutosRestantes / 60);
+        const minutos = minutosRestantes % 60;
+        
+        if (horas > 0) {
+          setTiempoRestante(`${horas}h ${minutos}m`);
+        } else {
+          setTiempoRestante(`${minutos}m`);
+        }
+        setPuedeAnular(true);
       }
-
-      const diffMs = limite - ahora;
-      const diffMinutos = Math.floor(diffMs / (1000 * 60));
-      const diffSegundos = Math.floor((diffMs % (1000 * 60)) / 1000);
-
-      setTiempoRestante(
-        `${diffMinutos}:${diffSegundos.toString().padStart(2, '0')}`
-      );
     };
 
     calcularTiempo();
-    const interval = setInterval(calcularTiempo, 1000);
-    return () => clearInterval(interval);
+    const intervalo = setInterval(calcularTiempo, 60000);
+
+    return () => clearInterval(intervalo);
   }, [fechaVenta]);
 
-  if (expirado) {
+  if (!puedeAnular) {
     return (
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-gray-400 italic">Expirado</span>
-      </div>
+      <button
+        disabled
+        className="p-2 text-gray-400 cursor-not-allowed"
+        title="Tiempo de anulación expirado (1 hora)"
+      >
+        <Clock size={18} />
+      </button>
     );
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-green-600 font-mono">
-        ⏱️ {tiempoRestante}
-      </span>
-      <button
-        onClick={onAnular}
-        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-        title="Anular venta"
-      >
-        <X size={18} />
-      </button>
-    </div>
+    <button
+      onClick={onAnular}
+      className="p-2 text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-1"
+      title={`Tiempo restante: ${tiempoRestante}`}
+    >
+      <Clock size={18} />
+      {tiempoRestante && (
+        <span className="text-xs font-medium">{tiempoRestante}</span>
+      )}
+    </button>
   );
 };

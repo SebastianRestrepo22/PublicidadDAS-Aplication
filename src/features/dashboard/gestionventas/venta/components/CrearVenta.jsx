@@ -640,12 +640,21 @@ export const CrearVenta = () => {
         }
     };
 
-    const productosFiltrados = productos.filter(p =>
-        p.Nombre?.toLowerCase().includes(busqueda.toLowerCase())
-    );
-    const serviciosFiltrados = servicios.filter(s =>
-        s.Nombre?.toLowerCase().includes(busqueda.toLowerCase())
-    );
+    //  Solo mostrar productos/servicios ACTIVOS
+    const productosFiltrados = productos.filter(p => {
+        const nombreCoincide = p.Nombre?.toLowerCase().includes(busqueda.toLowerCase());
+        // Comparar con 'Activo' (string)
+        const estaActivo = p.Estado === 'Activo';
+        return nombreCoincide && estaActivo;
+    });
+
+    const serviciosFiltrados = servicios.filter(s => {
+        const nombreCoincide = s.Nombre?.toLowerCase().includes(busqueda.toLowerCase());
+        // Comparar con 'Activo' (string)
+        const estaActivo = s.Estado === 'Activo';
+        return nombreCoincide && estaActivo;
+    });
+
     const coloresFiltrados = colores.filter(c =>
         c.Nombre?.toLowerCase().includes(busqueda.toLowerCase())
     );
@@ -696,7 +705,7 @@ export const CrearVenta = () => {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* SECCIÓN CLIENTE - IGUAL QUE EN PEDIDOS */}
+                    {/* SECCIÓN CLIENTE */}
                     <div className="bg-slate-50 p-6 rounded-xl">
                         <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
                             <User size={20} /> Información del Cliente
@@ -711,8 +720,8 @@ export const CrearVenta = () => {
                                     type="button"
                                     onClick={() => handleTipoClienteChange('walkin')}
                                     className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${tipoCliente === 'walkin'
-                                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                                            : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                                         }`}
                                 >
                                     <Store size={24} className="mb-2" />
@@ -723,8 +732,8 @@ export const CrearVenta = () => {
                                     type="button"
                                     onClick={() => handleTipoClienteChange('registrado')}
                                     className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${tipoCliente === 'registrado'
-                                            ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                            : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                                         }`}
                                 >
                                     <UserCheck size={24} className="mb-2" />
@@ -853,7 +862,7 @@ export const CrearVenta = () => {
                             </button>
                         </div>
 
-                        {/* ENCABEZADOS DE COLUMNAS - con los mismos tamaños que los inputs */}
+                        {/* ENCABEZADOS DE COLUMNAS */}
                         <div className="hidden lg:grid grid-cols-12 gap-3 mb-2 px-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
                             <div className="col-span-1">Tipo</div>
                             <div className="col-span-3">Producto/Servicio</div>
@@ -880,7 +889,7 @@ export const CrearVenta = () => {
                                         id={`detalle-${indexReal}`}
                                         className={`bg-white border ${Object.keys(errores).length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200'} rounded-xl p-4 hover:shadow-md transition-shadow`}
                                     >
-                                        {/* Línea principal - misma estructura que los encabezados */}
+                                        {/* Línea principal */}
                                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
                                             {/* Tipo */}
                                             <div className="lg:col-span-1">
@@ -1024,8 +1033,8 @@ export const CrearVenta = () => {
                                                                 type="button"
                                                                 onClick={() => setModoImagen(prev => ({ ...prev, [detalle._tempId]: 'file' }))}
                                                                 className={`flex-1 px-3 py-2 rounded-lg border text-sm flex items-center justify-center gap-2 h-[38px] ${modoImagen[detalle._tempId] === 'file'
-                                                                        ? 'bg-blue-50 border-blue-500 text-blue-700'
-                                                                        : 'bg-white border-slate-300 hover:bg-slate-50'
+                                                                    ? 'bg-blue-50 border-blue-500 text-blue-700'
+                                                                    : 'bg-white border-slate-300 hover:bg-slate-50'
                                                                     }`}
                                                             >
                                                                 <Upload size={16} />
@@ -1035,8 +1044,8 @@ export const CrearVenta = () => {
                                                                 type="button"
                                                                 onClick={() => setModoImagen(prev => ({ ...prev, [detalle._tempId]: 'url' }))}
                                                                 className={`flex-1 px-3 py-2 rounded-lg border text-sm flex items-center justify-center gap-2 h-[38px] ${modoImagen[detalle._tempId] === 'url'
-                                                                        ? 'bg-blue-50 border-blue-500 text-blue-700'
-                                                                        : 'bg-white border-slate-300 hover:bg-slate-50'
+                                                                    ? 'bg-blue-50 border-blue-500 text-blue-700'
+                                                                    : 'bg-white border-slate-300 hover:bg-slate-50'
                                                                     }`}
                                                             >
                                                                 <Link size={16} />
@@ -1169,7 +1178,7 @@ export const CrearVenta = () => {
                         )}
                     </div>
 
-                    {/* RESUMEN FINAL - IGUAL QUE EN PEDIDOS */}
+                    {/* RESUMEN FINAL */}
                     <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="md:col-span-2">
@@ -1228,7 +1237,7 @@ export const CrearVenta = () => {
                     </div>
                 </form>
 
-                {/* MODALES - IGUALES QUE ANTES PERO CON DISEÑO MEJORADO */}
+                {/* MODALES */}
                 <Modal open={modalClientesAbierto} onClose={() => setModalClientesAbierto(false)}>
                     <div className="w-[600px] p-6">
                         <h3 className="text-lg font-bold mb-4">Seleccionar Cliente</h3>

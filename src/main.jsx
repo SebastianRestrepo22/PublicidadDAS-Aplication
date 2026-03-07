@@ -6,17 +6,10 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import { CartProvider } from './context/CartContext.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
-import { createBrowserHistory } from 'history'
-
-const history = createBrowserHistory({
-  window,
-  scrollRestoration: 'manual'
-});
-
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter history={history}>
+    <BrowserRouter>
       <AuthProvider>
         <CartProvider>
           <App />
