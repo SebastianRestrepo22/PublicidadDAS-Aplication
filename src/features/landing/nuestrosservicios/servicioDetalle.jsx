@@ -7,14 +7,13 @@ import {
   ArrowLeft,
   Save,
   Package,
-  Ruler,
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { GetDataservicios, getTamanosByServicio } from "../../dashboard/servicios/services/services.servicios";
 import { toast } from "react-toastify";
+import { useCart } from "../../../context/CartContext";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer";
-import { useCart } from "../../../context/CartContext";
 
 export const ServicioDetalle = () => {
   const { id } = useParams();
@@ -29,6 +28,7 @@ export const ServicioDetalle = () => {
   const [imagenPreview, setImagenPreview] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [precioSeleccionado, setPrecioSeleccionado] = useState(0);
+  const [imagenAmpliada, setImagenAmpliada] = useState(null);
 
   useEffect(() => {
     const fetchServicio = async () => {
@@ -47,13 +47,11 @@ export const ServicioDetalle = () => {
         setServicio(servicioEncontrado);
         setImagenPreview(servicioEncontrado.Imagen || servicioEncontrado.UrlImagen || "");
 
-        // Si es POR_TAMANO, cargar los tamaños disponibles
         if (servicioEncontrado.TipoPrecio === 'POR_TAMANO') {
           try {
             const tamanos = await getTamanosByServicio(id);
             if (tamanos && tamanos.length > 0) {
               setTamanosDisponibles(tamanos);
-              // Seleccionar el primer tamaño por defecto
               setTamano(tamanos[0].NombreTamano);
               setPrecioSeleccionado(tamanos[0].Precio);
             }
@@ -62,7 +60,6 @@ export const ServicioDetalle = () => {
             toast.error("Error al cargar los tamaños disponibles");
           }
         } else {
-          // Si es UNICO, usar el precio del servicio
           setPrecioSeleccionado(servicioEncontrado.Precio);
         }
       } catch (err) {
@@ -82,13 +79,15 @@ export const ServicioDetalle = () => {
       nombre: file.name,
       tipo: file.type,
       tamaño: file.size,
+      archivo: file,
       url: URL.createObjectURL(file),
+      esImagen: file.type.startsWith("image/")
     }));
 
     setArchivosAdjuntos((prev) => [...prev, ...nuevosArchivos]);
 
     const imagen = files.find((f) => f.type.startsWith("image/"));
-    if (imagen) {
+    if (imagen && !imagenPreview) {
       setImagenPreview(URL.createObjectURL(imagen));
     }
   };
@@ -99,11 +98,22 @@ export const ServicioDetalle = () => {
     );
   };
 
+  const verImagenCompleta = (archivo, e) => {
+    e.stopPropagation();
+    if (archivo.url) {
+      setImagenAmpliada(archivo.url);
+    }
+  };
+
+  const cerrarImagenAmpliada = (e) => {
+    e.stopPropagation();
+    setImagenAmpliada(null);
+  };
+
   const handleTamanoChange = (e) => {
     const nombreTamano = e.target.value;
     setTamano(nombreTamano);
-    
-    // Actualizar el precio según el tamaño seleccionado
+
     const tamanoSeleccionado = tamanosDisponibles.find(t => t.NombreTamano === nombreTamano);
     if (tamanoSeleccionado) {
       setPrecioSeleccionado(tamanoSeleccionado.Precio);
@@ -115,7 +125,6 @@ export const ServicioDetalle = () => {
 
     if (isSubmitting) return;
 
-    // Validar que se haya seleccionado un tamaño si es POR_TAMANO
     if (servicio.TipoPrecio === 'POR_TAMANO' && !tamano) {
       toast.error("Debes seleccionar un tamaño");
       return;
@@ -124,25 +133,34 @@ export const ServicioDetalle = () => {
     setIsSubmitting(true);
 
     try {
-      // 🔥 Crear objeto de personalización para el carrito
       const customizacion = {
         Descripcion: descripcion,
         Tamaño: tamano,
-        UrlImagen: imagenPreview,
         archivosAdjuntos: archivosAdjuntos.map(f => ({
+          id: f.id,
           nombre: f.nombre,
           tipo: f.tipo,
-          tamaño: f.tamaño
+          tamaño: f.tamaño,
+          archivo: f.archivo,
+          esImagen: f.esImagen
         }))
       };
 
-      // Si es por tamaño, incluir el precio seleccionado
+      if (imagenPreview && archivosAdjuntos.length > 0) {
+        const imagenPrincipal = archivosAdjuntos.find(f =>
+          f.tipo.startsWith("image/") && f.url === imagenPreview
+        );
+        if (imagenPrincipal) {
+          customizacion.UrlImagen = imagenPrincipal.nombre;
+          customizacion.imagenPrincipal = imagenPrincipal.archivo;
+        }
+      }
+
       if (servicio.TipoPrecio === 'POR_TAMANO' && tamano) {
         customizacion.precioSeleccionado = precioSeleccionado;
         customizacion.tamanoSeleccionado = tamano;
       }
 
-      // 🔥 Agregar al carrito
       addToCart(servicio, customizacion, 1);
 
       toast.success(`"${servicio.Nombre}" agregado al carrito`);
@@ -200,7 +218,6 @@ export const ServicioDetalle = () => {
         </button>
 
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          {/* Encabezado */}
           <div className="border-b border-gray-200 p-6">
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
               {servicio.Nombre}
@@ -211,7 +228,6 @@ export const ServicioDetalle = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6 md:p-8">
-            {/* Columna Izquierda - Formulario de personalización */}
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-slate-800">Detalles de Personalización</h2>
 
@@ -230,12 +246,11 @@ export const ServicioDetalle = () => {
                 />
               </div>
 
-              {/* Selector de Tamaño */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Tamaño {servicio.TipoPrecio === 'POR_TAMANO' && '*'}
                 </label>
-                
+
                 {servicio.TipoPrecio === 'POR_TAMANO' ? (
                   <div className="space-y-3">
                     <select
@@ -261,7 +276,6 @@ export const ServicioDetalle = () => {
                 )}
               </div>
 
-              {/* Adjuntar archivos */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Adjuntar Archivos de Referencia
@@ -284,35 +298,66 @@ export const ServicioDetalle = () => {
 
               {archivosAdjuntos.length > 0 && (
                 <div className="space-y-3">
-                  {archivosAdjuntos.map((archivo) => (
-                    <div
-                      key={archivo.id}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
-                    >
-                      <div className="flex items-center space-x-3">
-                        {archivo.tipo.startsWith("image/") ? (
-                          <ImageIcon className="w-5 h-5 text-blue-500" />
-                        ) : (
-                          <FileText className="w-5 h-5 text-red-500" />
-                        )}
-                        <div>
-                          <p className="text-sm font-medium text-slate-800">{archivo.nombre}</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => eliminarArchivo(archivo.id)}
-                        className="text-red-500 hover:text-red-700 p-1"
+                  <h3 className="font-semibold text-slate-700">Archivos adjuntos:</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {archivosAdjuntos.map((archivo) => (
+                      <div
+                        key={archivo.id}
+                        className="border border-slate-200 rounded-lg p-2 hover:border-blue-300 transition-all group relative"
                       >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                  ))}
+                        {archivo.esImagen ? (
+                          <div className="relative">
+                            <img
+                              src={archivo.url}
+                              alt={archivo.nombre}
+                              className="w-full h-32 object-cover rounded-lg cursor-pointer"
+                              onClick={(e) => verImagenCompleta(archivo, e)}
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                              <button
+                                onClick={(e) => verImagenCompleta(archivo, e)}
+                                className="bg-white/90 p-2 rounded-full shadow-lg hover:bg-white"
+                              >
+                                👁️
+                              </button>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                eliminarArchivo(archivo.id);
+                              }}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 transition-colors"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                            <FileText className="h-8 w-8 text-red-500 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium truncate">{archivo.nombre}</p>
+                              <p className="text-xs text-slate-500">
+                                {(archivo.tamaño / 1024).toFixed(2)} KB
+                              </p>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                eliminarArchivo(archivo.id);
+                              }}
+                              className="text-red-500 hover:text-red-700 p-1 flex-shrink-0"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Columna Derecha - Resumen y Precio */}
             <div className="space-y-6">
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
                 <h3 className="font-bold text-blue-900 text-xl mb-4">Resumen del Servicio</h3>
@@ -329,7 +374,7 @@ export const ServicioDetalle = () => {
                       <div className="flex justify-between">
                         <span className="text-slate-600">Precio base:</span>
                         <span className="font-medium">
-                          {servicio.TipoPrecio === 'POR_TAMANO' && tamano 
+                          {servicio.TipoPrecio === 'POR_TAMANO' && tamano
                             ? `${tamano}: ${formatPrice(precioSeleccionado)}`
                             : formatPrice(precioSeleccionado)
                           }
@@ -371,15 +416,14 @@ export const ServicioDetalle = () => {
                 <button
                   type="submit"
                   disabled={
-                    isSubmitting || 
-                    !descripcion.trim() || 
+                    isSubmitting ||
+                    !descripcion.trim() ||
                     (servicio.TipoPrecio === 'POR_TAMANO' && !tamano)
                   }
-                  className={`w-full mt-6 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl ${
-                    isSubmitting || !descripcion.trim() || (servicio.TipoPrecio === 'POR_TAMANO' && !tamano)
+                  className={`w-full mt-6 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl ${isSubmitting || !descripcion.trim() || (servicio.TipoPrecio === 'POR_TAMANO' && !tamano)
                       ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed"
                       : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                  }`}
+                    }`}
                 >
                   {isSubmitting ? (
                     <>
@@ -398,6 +442,28 @@ export const ServicioDetalle = () => {
           </form>
         </div>
       </div>
+
+      {imagenAmpliada && (
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={cerrarImagenAmpliada}
+        >
+          <div className="relative max-w-4xl max-h-[90vh]">
+            <img
+              src={imagenAmpliada}
+              alt="Imagen ampliada"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={cerrarImagenAmpliada}
+              className="absolute -top-4 -right-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

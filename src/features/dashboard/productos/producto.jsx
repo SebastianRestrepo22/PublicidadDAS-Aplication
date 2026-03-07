@@ -182,19 +182,24 @@ export const ProductosDashboard = () => {
     }
   }, [filtroCampo, filtroValor]);
 
-  useEffect(() => {
-    if (allData.length > 0 && mode === "list") {
-      const totalPages = Math.ceil(allData.length / itemsPerPage);
-      setTotalPages(totalPages > 0 ? totalPages : 1);
+useEffect(() => {
+  if (allData.length > 0 && mode === "list") {
+    const totalPages = Math.ceil(allData.length / itemsPerPage);
+    setTotalPages(totalPages > 0 ? totalPages : 1);
 
-      if (currentPage > totalPages && totalPages > 0) {
-        setCurrentPage(totalPages);
-      }
-
-      const paginatedData = paginateData(allData);
-      setPaginatedData(paginatedData);
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
     }
-  }, [itemsPerPage, currentPage, allData, mode]);
+
+    const paginatedData = paginateData(allData);
+    setPaginatedData(paginatedData);
+  } else if (mode === "list") {
+    // Si no hay datos, limpiar la tabla
+    setPaginatedData([]);
+    setTotalPages(1);
+    setCurrentPage(1);
+  }
+}, [itemsPerPage, currentPage, allData, mode]);
 
   useEffect(() => {
     if (mode === "view" || mode === "edit") {
@@ -560,33 +565,72 @@ export const ProductosDashboard = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    try {
-      const response = await deleteDataproducto(id);
+// En ProductosDashboard.jsx, reemplaza la función handleDelete completa:
 
-      if (response.status === 200 || response.status === 201) {
-        toast.success(response.data.message);
-        const updatedList = await GetDataproductos();
-        if (updatedList?.data) {
-          setAllData(updatedList.data);
-          setTotalItems(updatedList.data.length);
-        }
-        setOpenEliminar(false);
-      } else {
-        // Mostrar mensaje del backend si existe
-        toast.error(response.data?.message || "No se pudo eliminar el producto");
+const handleDelete = async (id) => {
+  try {
+    const response = await deleteDataproducto(id);
+
+    if (response.status === 200 || response.status === 201) {
+      toast.success(response.data.message);
+      
+      // 🔥 CORRECCIÓN: Actualizar la lista después de eliminar
+      const todos = await GetDataproductos(false); // false para traer todos
+      const nuevosDatos = Array.isArray(todos?.data) ? todos.data : [];
+      
+      // Aplicar filtros actuales
+      let datosFiltrados = [...nuevosDatos];
+      
+      // Aplicar filtro de estado si existe
+      if (filtroEstado) {
+        datosFiltrados = datosFiltrados.filter(p => p.Estado === filtroEstado);
       }
-    } catch (error) {
-      // Acceder al mensaje específico del backend
-      if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      } else if (error.response?.status === 404) {
-        toast.error("Producto no encontrado");
-      } else {
-        toast.error("Error al eliminar el producto");
+      
+      // Aplicar filtro de búsqueda si existe
+      if (filtroCampo && filtroValor) {
+        // Aquí deberías aplicar el filtro específico según el campo
+        // Por simplicidad, filtramos por nombre
+        datosFiltrados = datosFiltrados.filter(p => 
+          p.Nombre?.toLowerCase().includes(filtroValor.toLowerCase())
+        );
       }
+      
+      setAllData(datosFiltrados);
+      setTotalItems(datosFiltrados.length);
+      
+      // Calcular nuevas páginas
+      const nuevasPaginas = Math.ceil(datosFiltrados.length / itemsPerPage);
+      setTotalPages(nuevasPaginas > 0 ? nuevasPaginas : 1);
+      
+      // Si la página actual es mayor que el total de páginas, ajustar
+      if (currentPage > nuevasPaginas && nuevasPaginas > 0) {
+        setCurrentPage(nuevasPaginas);
+      } else if (datosFiltrados.length === 0) {
+        // Si no hay datos, resetear a página 1
+        setCurrentPage(1);
+      }
+      
+      // Forzar actualización de la tabla
+      setPaginatedData(prev => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return datosFiltrados.slice(startIndex, endIndex);
+      });
+      
+      setOpenEliminar(false);
+    } else {
+      toast.error(response.data?.message || "No se pudo eliminar el producto");
     }
-  };
+  } catch (error) {
+    if (error.response?.data?.message) {
+      toast.error(error.response.data.message);
+    } else if (error.response?.status === 404) {
+      toast.error("Producto no encontrado");
+    } else {
+      toast.error("Error al eliminar el producto");
+    }
+  }
+};
 
   const handleDeleteClick = (producto) => {
     setEditData(producto);

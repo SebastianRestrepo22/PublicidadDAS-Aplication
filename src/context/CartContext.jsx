@@ -22,21 +22,16 @@ export const CartProvider = ({ children }) => {
     }
   }, [cart]);
 
-  // Obtener stock según el tipo de producto
   const obtenerStockProducto = (producto) => {
-    // Si usa colores (UsaColores === 1 o "1")
     if (producto.UsaColores === 1 || producto.UsaColores === "1") {
-      // Stock total de todos los colores
       return producto.Colores && Array.isArray(producto.Colores) 
         ? producto.Colores.reduce((sum, color) => sum + (color.Stock || 0), 0)
         : 0;
     } else {
-      // Stock general
       return producto.Stock || 0;
     }
   };
 
-  // Validar stock de color específico
   const validarStockColor = (producto, colorId, cantidadSolicitada, cantidadEnCarrito = 0) => {
     if (!producto.Colores || !Array.isArray(producto.Colores)) {
       return { valido: false, mensaje: "Producto sin colores disponibles" };
@@ -67,7 +62,6 @@ export const CartProvider = ({ children }) => {
     return { valido: true, color: colorSeleccionado };
   };
 
-  // Validar stock general
   const validarStockGeneral = (producto, cantidadSolicitada, cantidadEnCarrito = 0) => {
     const stockDisponible = producto.Stock || 0;
     const nuevaCantidadTotal = cantidadEnCarrito + cantidadSolicitada;
@@ -86,32 +80,38 @@ export const CartProvider = ({ children }) => {
     return { valido: true };
   };
 
-  const addToCart = (product, customization = {}, quantity = 1) => {
-    // CORREGIDO: Identificar si es servicio (tiene ServicioId)
+  // Función para convertir File a Base64
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const addToCart = async (product, customization = {}, quantity = 1) => {
     const isServicio = !!product.ServicioId;
     const productId = product.ProductoId || product.ServicioId || product.id;
     const usaColores = !isServicio && (product.UsaColores === 1 || product.UsaColores === "1");
     
-    console.log("🛒 [CART] Agregando item:", {
+    console.log("Agregando item:", {
       productId,
       isServicio,
       usaColores,
-      customization
+      customization,
+      tieneArchivos: customization.archivosAdjuntos?.length > 0
     });
 
-    // Procesar color de manera consistente (solo para productos)
     let colorData = null;
     let colorIdSeleccionado = null;
 
     if (!isServicio && customization.color) {
-      // Si es un string (puede ser UUID o nombre)
       if (typeof customization.color === 'string') {
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         
         if (uuidRegex.test(customization.color)) {
-          // Es un UUID
           colorIdSeleccionado = customization.color;
-          // Buscar el color en el producto si existe
           if (product.Colores && Array.isArray(product.Colores)) {
             const foundColor = product.Colores.find(c => c.ColorId === customization.color);
             if (foundColor) {
@@ -129,7 +129,6 @@ export const CartProvider = ({ children }) => {
             }
           }
         } else {
-          // Es solo un nombre de color
           colorData = {
             ColorId: null,
             Nombre: customization.color,
@@ -137,7 +136,6 @@ export const CartProvider = ({ children }) => {
           };
         }
       }
-      // Si es un objeto color completo
       else if (typeof customization.color === 'object') {
         colorData = {
           ColorId: customization.color.ColorId || null,
@@ -148,19 +146,14 @@ export const CartProvider = ({ children }) => {
       }
     }
 
-    // Buscar item existente en el carrito
     const existingItemIndex = cart.findIndex(item => {
-      // Para servicios, comparar por ServicioId
       if (isServicio) {
         if (item.ServicioId !== product.ServicioId) return false;
-        // Si es servicio personalizado, comparar toda la personalización
         return JSON.stringify(item.customization) === JSON.stringify(customization);
       }
       
-      // Para productos
       if (item.ProductoId !== product.ProductoId) return false;
 
-      // Si el producto usa colores, verificar el color
       if (usaColores) {
         const itemColorId = item.customization?.color?.ColorId;
         if (colorIdSeleccionado) {
@@ -169,11 +162,9 @@ export const CartProvider = ({ children }) => {
         return false;
       }
 
-      // Stock general, cualquier item sin color
       return !item.customization?.color;
     });
 
-    // Validar stock antes de agregar (solo para productos)
     if (!isServicio) {
       const cantidadExistente = existingItemIndex !== -1 ? cart[existingItemIndex].quantity : 0;
 
@@ -195,7 +186,6 @@ export const CartProvider = ({ children }) => {
       }
     }
 
-    // Si existe, actualizar cantidad
     if (existingItemIndex !== -1) {
       const updatedCart = [...cart];
       updatedCart[existingItemIndex] = {
@@ -207,18 +197,14 @@ export const CartProvider = ({ children }) => {
       return;
     }
 
-    // Si no existe, crear nuevo item
     const discount = product.Descuento || product.descuento || 0;
     const originalPrice = product.Precio || product.precio || 0;
     
-    // CORREGIDO: Para servicios, usar el precio base o el del tamaño seleccionado
     let finalPrice = originalPrice;
     if (isServicio) {
-      // Si viene un precio en la personalización (para servicios por tamaño), usarlo
       if (customization.precioSeleccionado) {
         finalPrice = customization.precioSeleccionado;
       }
-      // Aplicar descuento si existe
       if (discount > 0) {
         finalPrice = finalPrice * (1 - discount / 100);
       }
@@ -227,6 +213,30 @@ export const CartProvider = ({ children }) => {
     }
 
     const itemType = isServicio ? "servicio" : "producto";
+
+    // Convertir archivos a Base64 para guardarlos en localStorage
+    const archivosBase64 = [];
+    if (customization.archivosAdjuntos) {
+      for (const f of customization.archivosAdjuntos) {
+        if (f.archivo) {
+          try {
+            const base64 = await fileToBase64(f.archivo);
+            archivosBase64.push({
+              id: f.id,
+              nombre: f.nombre,
+              tipo: f.tipo,
+              tamaño: f.tamaño,
+              base64: base64,
+              esImagen: f.tipo.startsWith('image/')
+            });
+          } catch (error) {
+            console.error("Error convirtiendo archivo a Base64:", error);
+          }
+        } else if (f.base64) {
+          archivosBase64.push(f);
+        }
+      }
+    }
 
     const cartLine = {
       id: uuidv4(),
@@ -245,15 +255,22 @@ export const CartProvider = ({ children }) => {
       Tipo: itemType,
       EsPersonalizado: product.EsPersonalizado || false,
       customization: {
-        ...customization
+        ...customization,
+        archivosAdjuntos: archivosBase64,
+        tieneArchivosPendientes: archivosBase64.length > 0
       },
       CategoriaId: product.CategoriaId,
       createdAt: new Date().toISOString()
     };
 
     setCart((prev) => [...prev, cartLine]);
-    console.log("🛒 [CART] Item agregado exitosamente:", cartLine);
-    toast.success(`${product.Nombre} agregado al carrito`);
+    console.log("Item agregado exitosamente:", cartLine);
+    
+    if (archivosBase64.length > 0) {
+      toast.success(`${product.Nombre} agregado al carrito.`);
+    } else {
+      toast.success(`${product.Nombre} agregado al carrito`);
+    }
   };
 
   const removeFromCart = (lineId) => {
@@ -265,13 +282,11 @@ export const CartProvider = ({ children }) => {
       prev.map((l) => {
         if (l.id !== lineId) return l;
 
-        // Validar stock según el tipo (solo para productos)
         const validatedQuantity = Math.max(1, newQuantity);
         const usaColores = l.UsaColores === 1;
 
         if (l.Tipo === 'producto') {
           if (usaColores && l.customization?.color?.ColorId) {
-            // Crear un objeto producto simulado para la validación
             const productoSimulado = {
               UsaColores: 1,
               Colores: [{
@@ -308,11 +323,6 @@ export const CartProvider = ({ children }) => {
   };
 
   const updateItemColor = (lineId, colorData) => {
-    console.log("🎨 [CART CONTEXT] updateItemColor llamado:", {
-      lineId,
-      colorData
-    });
-
     setCart(prev => prev.map(item => {
       if (item.id === lineId) {
         let newColorObj = null;
@@ -358,9 +368,21 @@ export const CartProvider = ({ children }) => {
   };
 
   const updateItem = (lineId, updatedData) => {
-    setCart(prev => prev.map(item => 
-      item.id === lineId ? { ...item, ...updatedData } : item
-    ));
+    setCart(prev => prev.map(item => {
+      if (item.id === lineId) {
+        const updatedItem = { ...item, ...updatedData };
+        
+        if (updatedData.customization) {
+          updatedItem.customization = {
+            ...item.customization,
+            ...updatedData.customization
+          };
+        }
+        
+        return updatedItem;
+      }
+      return item;
+    }));
   };
 
   const clearCart = () => setCart([]);

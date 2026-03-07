@@ -37,52 +37,98 @@ export const usePaginacion = (mode, externalData = null, setExternalData = null)
                     resultados = Array.isArray(todos?.data) ? todos.data : [];
                 }
 
+                // Aplicar filtro de estado
                 if (filtroEstado) {
                     resultados = resultados.filter(s => s.Estado === filtroEstado);
                 }
 
                 setDataToUse(resultados);
-                setTotalItems(resultados.length);
 
-                const totalPages = Math.ceil(resultados.length / itemsPerPage);
-                setTotalPages(totalPages > 0 ? totalPages : 1);
+                // Manejar caso sin resultados
+                if (resultados.length === 0) {
+                    setPaginatedData([]);
+                    setTotalItems(0);
+                    setTotalPages(1);
+                    setCurrentPage(1); // Resetear a página 1
+                } else {
+                    setTotalItems(resultados.length);
+                    const totalPages = Math.ceil(resultados.length / itemsPerPage);
+                    setTotalPages(totalPages);
 
-                if (currentPage > totalPages && totalPages > 0) {
-                    setCurrentPage(totalPages);
+                    if (currentPage > totalPages) {
+                        setCurrentPage(totalPages);
+                    } else {
+                        setPaginatedData(paginateData(resultados));
+                    }
                 }
-
-                setPaginatedData(paginateData(resultados));
             } catch (error) {
                 console.error(error);
+                // En caso de error, limpiar todo
                 setPaginatedData([]);
                 setDataToUse([]);
                 setTotalItems(0);
                 setTotalPages(1);
+                setCurrentPage(1);
             }
         };
+
         cargarservicio();
-    }, [filtroCampo, filtroValor, filtroEstado, mode]);
+    }, [filtroCampo, filtroValor, filtroEstado, mode]); // Removemos dependencias innecesarias
+
 
     // Efecto para actualizar paginación cuando cambian los datos o la página
     useEffect(() => {
-        if (dataToUse.length > 0 && mode === "list") {
+        if (mode === "list") {
             // Aplicar filtro de estado si existe
+            let datosFiltrados = dataToUse;
+
+            if (filtroEstado) {
+                datosFiltrados = dataToUse.filter(s => s.Estado === filtroEstado);
+            }
+
+            // Calcular total de páginas incluso cuando no hay datos
+            const totalItemsCount = datosFiltrados.length;
+            setTotalItems(totalItemsCount);
+
+            const nuevasPaginas = totalItemsCount > 0
+                ? Math.ceil(totalItemsCount / itemsPerPage)
+                : 1;
+
+            setTotalPages(nuevasPaginas);
+
+            // Ajustar página actual si es necesario
+            if (totalItemsCount === 0) {
+                // Si no hay datos, resetear a página 1
+                setCurrentPage(1);
+                setPaginatedData([]);
+            } else {
+                // Ajustar si la página actual es mayor que el total de páginas
+                if (currentPage > nuevasPaginas) {
+                    setCurrentPage(nuevasPaginas);
+                } else {
+                    // Calcular datos paginados normalmente
+                    const paginated = paginateData(datosFiltrados);
+                    setPaginatedData(paginated);
+                }
+            }
+        }
+    }, [dataToUse, itemsPerPage, currentPage, mode, filtroEstado]);
+
+    // fecto para manejar cambios de página
+    useEffect(() => {
+        if (mode === "list" && dataToUse.length > 0) {
+            // Aplicar filtros
             let datosFiltrados = dataToUse;
             if (filtroEstado) {
                 datosFiltrados = dataToUse.filter(s => s.Estado === filtroEstado);
             }
 
-            const totalPages = Math.ceil(datosFiltrados.length / itemsPerPage);
-            setTotalPages(totalPages > 0 ? totalPages : 1);
-            setTotalItems(datosFiltrados.length);
-
-            if (currentPage > totalPages && totalPages > 0) {
-                setCurrentPage(totalPages);
+            if (datosFiltrados.length > 0) {
+                const paginated = paginateData(datosFiltrados);
+                setPaginatedData(paginated);
             }
-
-            setPaginatedData(paginateData(datosFiltrados));
         }
-    }, [dataToUse, itemsPerPage, currentPage, mode, filtroEstado]);
+    }, [currentPage, dataToUse, filtroEstado, itemsPerPage, mode]);
 
     // Efecto para resetear página cuando cambian los filtros
     useEffect(() => {

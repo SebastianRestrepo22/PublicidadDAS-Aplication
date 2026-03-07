@@ -10,7 +10,6 @@ import {
     contarAdmins
 } from '../models/user.model.js';
 
-
 // Crear usuario
 export const createUser = async (req, res) => {
     const {
@@ -25,7 +24,6 @@ export const createUser = async (req, res) => {
     } = req.body;
 
     try {
-
         const existente = await correoExiste(CorreoElectronico);
 
         if (existente) {
@@ -37,11 +35,38 @@ export const createUser = async (req, res) => {
             const resetToken = crypto.randomBytes(32).toString("hex");
             const resetTokenExpire = dayjs().add(1, "hour").toDate();
 
-            await createByAdmin({ CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, RoleId, resetToken, resetTokenExpire });
+            await createByAdmin({ 
+                CedulaId, 
+                TipoDocumentoId, 
+                NombreCompleto, 
+                Telefono, 
+                CorreoElectronico, 
+                Direccion, 
+                RoleId, 
+                resetToken, 
+                resetTokenExpire 
+            });
+            
             // Enviar correo con link al frontend   
             await sendResetPasswordEmail(CorreoElectronico, resetToken);
 
+            return res.status(201).json({ 
+                message: 'Usuario creado exitosamente. Se ha enviado un correo para establecer la contraseña.' 
+            });
         }
+
+        // Si tiene contraseña (registro normal), crear usuario con contraseña
+        const hashedPassword = await bcrypt.hash(Contrasena, 10);
+        await createUsuario({
+            CedulaId,
+            TipoDocumentoId,
+            NombreCompleto,
+            Telefono,
+            CorreoElectronico,
+            Direccion,
+            Contrasena: hashedPassword,
+            RoleId
+        });
 
         res.status(201).json({ message: 'Usuario creado exitosamente' });
 

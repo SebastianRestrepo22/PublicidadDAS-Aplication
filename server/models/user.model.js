@@ -130,25 +130,35 @@ export const rolCliente = async () => {
   return roles;
 };
 
-export const createByAdmin = async ({ CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, RoleId, resetToken, resetTokenExpire }) => {
-  await dbPool.query(
-    `INSERT INTO usuarios 
-                     (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId, resetToken, resetTokenExpire)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      CedulaId,
-      TipoDocumentoId,
-      NombreCompleto,
-      Telefono,
-      CorreoElectronico,
-      Direccion,
-      null,
-      RoleId,
-      resetToken,
-      resetTokenExpire
-    ]
-  )
-}
+export const createByAdmin = async ({ 
+    CedulaId, 
+    TipoDocumentoId, 
+    NombreCompleto, 
+    Telefono, 
+    CorreoElectronico, 
+    Direccion, 
+    RoleId, 
+    resetToken, 
+    resetTokenExpire 
+}) => {
+    await dbPool.query(
+        `INSERT INTO usuarios 
+         (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId, resetToken, resetTokenExpire)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            CedulaId,
+            TipoDocumentoId,
+            NombreCompleto,
+            Telefono,
+            CorreoElectronico,
+            Direccion,
+            null, //Contrasena NULL
+            RoleId,
+            resetToken,
+            resetTokenExpire
+        ]
+    );
+};
 
 export const updateDataUser = async ({ id, updatedUser }) => {
   await dbPool.query(

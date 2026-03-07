@@ -5,11 +5,7 @@ import {
   getVentaByIdModel,
   createVentaFromPedidoModel,
   createVentaManualModel,
-  anularVentaModel,
   existeVentaParaPedidoModel,
-  getVentaByPedidoIdModel,
-  validarYDescontarStockModel,
-  revertirStockVentaModel
 } from "../models/venta.models.js";
 import {
   getDetalleVentaByVentaIdModel,
@@ -100,7 +96,7 @@ export const createVentaDesdePedido = async (req, res) => {
     const detallesCompletos = await getDetalleVentaByVentaIdModel(VentaId);
     ventaCreada.detalle = detallesCompletos;
 
-    // ✅ ENVIAR CORREO DE FACTURA
+    // ENVIAR CORREO DE FACTURA
     if (ventaCreada.ClienteCorreo) {
       try {
         console.log("📧 Enviando factura a:", ventaCreada.ClienteCorreo);
@@ -252,10 +248,7 @@ export const createVentaManual = async (req, res) => {
       });
     }
 
-    // PASO 4: Validar y descontar stock
-    await validarYDescontarStockModel(connection, detalles);
-
-    // PASO 5: Confirmar TODO
+    // PASO 4: Confirmar TODO
     await connection.commit();
 
     // ENVIAR CORREO DE FACTURA
@@ -320,7 +313,7 @@ export const anularVenta = async (req, res) => {
       return res.status(400).json({ error: "La venta ya está anulada" });
     }
 
-    // 🔥 SOLO VALIDAR TIEMPO PARA VENTAS MANUALES
+    // SOLO VALIDAR TIEMPO PARA VENTAS MANUALES
     // Las ventas desde pedido NO tienen límite de tiempo
     if (venta.Origen === 'manual') {
       // VALIDAR TIEMPO DESDE CREACIÓN (1 HORA)
@@ -347,9 +340,6 @@ export const anularVenta = async (req, res) => {
 
     // INICIAR TRANSACCIÓN
     await connection.beginTransaction();
-
-    // PASO 1: Revertir el stock
-    await revertirStockVentaModel(connection, id);
 
     // PASO 2: Actualizar estado
     const [result] = await connection.query(
