@@ -31,6 +31,7 @@ import { Pagination } from "../../components/paginacion/pagination.jsx";
 import { TiempoRestanteAnulacion } from '../venta/components/TiempoRestanteAnulacion.jsx';
 import { getVentas, getVentaById, anularVenta } from "../venta/services/service.ventas.js";
 import Modal from "../../components/modals/modal.jsx";
+import { generarFacturaPDF } from "../../../../utils/generarFacturaPDF.js";
 
 // Función para formatear fecha
 const formatDate = (dateString) => {
@@ -103,7 +104,39 @@ const OrigenBadge = ({ origen }) => {
 // Componente de detalles expandibles 
 const DetallesProductosAcordeon = ({ detalles }) => {
   const [mostrarDetalles, setMostrarDetalles] = useState(false);
-  const [imagenAmpliada, setImagenAmpliada] = useState(null);
+  const [archivoAmpliado, setArchivoAmpliado] = useState(null);
+  const [tipoArchivo, setTipoArchivo] = useState(null);
+  const [imagenesCache, setImagenesCache] = useState({});
+
+  useEffect(() => {
+    // Cargar imágenes base64 cuando se monta el componente
+    const cargarImagenesBase64 = async () => {
+      const nuevasImagenes = {};
+
+      for (const detalle of detalles) {
+        if (detalle.UrlImagenPersonalizada &&
+          detalle.UrlImagenPersonalizada !== 'pendiente' &&
+          !detalle.UrlImagenPersonalizada.startsWith('http') &&
+          !detalle.UrlImagenPersonalizada.startsWith('blob:')) {
+
+          // Intentar cargar como base64
+          try {
+            // Aquí puedes hacer una petición al backend para obtener la imagen
+            // Por ahora, si la URL parece base64, la usamos directamente
+            if (detalle.UrlImagenPersonalizada.startsWith('data:')) {
+              nuevasImagenes[detalle.DetalleVentaId] = detalle.UrlImagenPersonalizada;
+            }
+          } catch (error) {
+            console.error("Error cargando imagen:", error);
+          }
+        }
+      }
+
+      setImagenesCache(nuevasImagenes);
+    };
+
+    cargarImagenesBase64();
+  }, [detalles]);
 
   if (!detalles || detalles.length === 0) {
     return <p className="text-gray-500 text-center py-4">No hay productos en esta venta</p>;
@@ -112,6 +145,185 @@ const DetallesProductosAcordeon = ({ detalles }) => {
   const totalProductos = detalles.length;
   const totalCantidad = detalles.reduce((sum, d) => sum + (d.Cantidad || 0), 0);
   const totalSubtotal = detalles.reduce((sum, d) => sum + ((d.Subtotal ? parseFloat(d.Subtotal) : 0) || 0), 0);
+
+  // Función para determinar el tipo de archivo por la URL
+  const determinarTipoArchivo = (url) => {
+    if (!url || url === 'pendiente') return null;
+
+    // Si es base64
+    if (url.startsWith('data:')) {
+      if (url.startsWith('data:image/')) return 'imagen';
+      if (url.startsWith('data:application/pdf')) return 'pdf';
+      return 'desconocido';
+    }
+
+    const extension = url.split('.').pop()?.toLowerCase();
+
+    if (url.startsWith('blob:')) return 'imagen';
+    if (url.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i)) return 'imagen';
+    if (url.match(/\.pdf$/i)) return 'pdf';
+    if (url.match(/\.(doc|docx)$/i)) return 'word';
+    if (url.match(/\.(xls|xlsx)$/i)) return 'excel';
+    if (url.match(/\.(ppt|pptx)$/i)) return 'powerpoint';
+    if (url.match(/\.(txt|rtf)$/i)) return 'texto';
+
+    return 'desconocido';
+  };
+
+  // Función para obtener el ícono según el tipo de archivo
+  const getIconoArchivo = (tipo) => {
+    switch (tipo) {
+      case 'imagen':
+        return <Eye size={12} className="text-blue-500" />;
+      case 'pdf':
+        return <FileText size={12} className="text-red-500" />;
+      case 'word':
+        return <FileText size={12} className="text-blue-700" />;
+      case 'excel':
+        return <FileText size={12} className="text-green-600" />;
+      case 'powerpoint':
+        return <FileText size={12} className="text-orange-500" />;
+      default:
+        return <FileText size={12} className="text-gray-500" />;
+    }
+  };
+
+  // Función para manejar el clic en el archivo
+  const handleArchivoClick = (url, detalleId) => {
+    if (url === 'pendiente') {
+      toast.info("La imagen aún no ha sido procesada");
+      return;
+    }
+
+    const tipo = determinarTipoArchivo(url);
+    setTipoArchivo(tipo);
+
+    // Si tenemos la imagen en caché y es base64, usarla
+    if (detalleId && imagenesCache[detalleId]) {
+      setArchivoAmpliado(imagenesCache[detalleId]);
+    } else {
+      setArchivoAmpliado(url);
+    }
+  };
+
+  // Función para obtener la URL correcta de la imagen
+  const getImagenUrl = (url, detalleId) => {
+    if (!url || url === 'pendiente') return null;
+
+    // Si la URL ya es completa (http o https), usarla directamente
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+
+    // Si es una URL relativa que comienza con /uploads
+    if (url.startsWith('/uploads')) {
+      return `http://localhost:3000${url}`;
+    }
+
+    // Si es base64
+    if (url.startsWith('data:')) {
+      return url;
+    }
+
+    return url;
+  };
+
+  // Componente para mostrar el contenido ampliado según el tipo
+  const VisualizadorArchivo = ({ url, tipo, onClose }) => {
+    if (!url) return null;
+
+    // Si es imagen
+    if (tipo === 'imagen' || url.startsWith('blob:') || url.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i) || url.startsWith('data:image')) {
+      return (
+        <div className="p-4 max-w-4xl max-h-[90vh] overflow-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-gray-800">Vista previa de la imagen</h3>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="flex justify-center bg-gray-100 rounded-lg p-4">
+            <img
+              src={url}
+              alt="Imagen ampliada"
+              className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
+              onError={(e) => {
+                console.error("Error cargando imagen:", url);
+                e.target.onerror = null;
+                e.target.src = "https://via.placeholder.com/400?text=Error+al+cargar+imagen";
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // Si es PDF
+    if (tipo === 'pdf' || url.match(/\.pdf$/i) || url.startsWith('data:application/pdf')) {
+      return (
+        <div className="p-4 max-w-5xl max-h-[90vh] overflow-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-gray-800">Vista previa del PDF</h3>
+            <div className="flex gap-2">
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                <Download size={16} />
+                Descargar
+              </a>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+          <iframe
+            src={url.startsWith('data:') ? url : `${url}#toolbar=1&navpanes=1`}
+            title="Visor PDF"
+            className="w-full h-[70vh] border border-gray-300 rounded-lg"
+          />
+        </div>
+      );
+    }
+
+    // Si es otro tipo de documento (Word, Excel, etc)
+    return (
+      <div className="p-4 max-w-md">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold text-gray-800">Archivo adjunto</h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+          <FileText size={48} className="mx-auto mb-3 text-yellow-600" />
+          <p className="text-gray-700 mb-4">
+            Este archivo no puede visualizarse directamente en el navegador.
+          </p>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <Download size={18} />
+            Descargar archivo
+          </a>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-3">
@@ -152,80 +364,88 @@ const DetallesProductosAcordeon = ({ detalles }) => {
             <div className="col-span-1 text-center">Cant.</div>
             <div className="col-span-2 text-right">P.Unit</div>
             <div className="col-span-2 text-right">Subtotal</div>
-            <div className="col-span-1 text-center"></div>
+            <div className="col-span-1 text-center">Archivo</div>
           </div>
 
           {/* Filas más compactas */}
           <div className="max-h-80 overflow-y-auto divide-y">
-            {detalles.map((item, index) => (
-              <div key={item.DetalleVentaId || index} className="p-2 hover:bg-gray-50 grid grid-cols-12 text-xs items-center">
-                {/* Producto/Servicio con variantes inline */}
-                <div className="col-span-5">
-                  <div className="font-medium flex items-center gap-1">
-                    {item.NombreSnapshot}
-                    {/* Color como badge pequeño */}
-                    {item.ColorId && (
-                      <span className="inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.ColorHex || '#ccc' }}></span>
-                        <span>{item.ColorNombre || 'Color'}</span>
-                      </span>
+            {detalles.map((item, index) => {
+              const tieneArchivo = item.UrlImagenPersonalizada && item.UrlImagenPersonalizada !== 'pendiente';
+              const tipoArchivoItem = tieneArchivo ? determinarTipoArchivo(item.UrlImagenPersonalizada) : null;
+              const imagenUrl = getImagenUrl(item.UrlImagenPersonalizada, item.DetalleVentaId);
+
+              return (
+                <div key={item.DetalleVentaId || index} className="p-2 hover:bg-gray-50 grid grid-cols-12 text-xs items-center">
+                  {/* Producto/Servicio con variantes inline */}
+                  <div className="col-span-5">
+                    <div className="font-medium flex items-center gap-1">
+                      {item.NombreSnapshot}
+                      {/* Color como badge pequeño */}
+                      {item.ColorId && (
+                        <span className="inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.ColorHex || '#ccc' }}></span>
+                          <span>{item.ColorNombre || 'Color'}</span>
+                        </span>
+                      )}
+                      {/* Tamaño como badge */}
+                      {item.ServicioTamanoId && (
+                        <span className="ml-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium">
+                          {item.NombreTamano || 'Tamaño'}
+                        </span>
+                      )}
+                    </div>
+                    {/* Descripción en línea si es corta */}
+                    {item.DescripcionPersonalizada && item.DescripcionPersonalizada.length < 30 && (
+                      <div className="text-[10px] text-gray-500 italic truncate max-w-[200px]">
+                        📝 {item.DescripcionPersonalizada}
+                      </div>
                     )}
-                    {/* Tamaño como badge */}
-                    {item.ServicioTamanoId && (
-                      <span className="ml-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium">
-                        {item.NombreTamano || 'Tamaño'}
-                      </span>
+                    {/* Descripción en tooltip si es larga */}
+                    {item.DescripcionPersonalizada && item.DescripcionPersonalizada.length >= 30 && (
+                      <div className="text-[10px] text-gray-500 italic truncate max-w-[200px]" title={item.DescripcionPersonalizada}>
+                        📝 {item.DescripcionPersonalizada.substring(0, 25)}...
+                      </div>
                     )}
                   </div>
-                  {/* Descripción en línea si es corta */}
-                  {item.DescripcionPersonalizada && item.DescripcionPersonalizada.length < 30 && (
-                    <div className="text-[10px] text-gray-500 italic truncate max-w-[200px]">
-                      📝 {item.DescripcionPersonalizada}
-                    </div>
-                  )}
-                  {/* Descripción en tooltip si es larga */}
-                  {item.DescripcionPersonalizada && item.DescripcionPersonalizada.length >= 30 && (
-                    <div className="text-[10px] text-gray-500 italic truncate max-w-[200px]" title={item.DescripcionPersonalizada}>
-                      📝 {item.DescripcionPersonalizada.substring(0, 25)}...
-                    </div>
-                  )}
+
+                  {/* Tipo */}
+                  <div className="col-span-1 text-center">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${item.TipoItem === 'producto' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'
+                      }`}>
+                      {item.TipoItem === 'producto' ? 'P' : 'S'}
+                    </span>
+                  </div>
+
+                  {/* Cantidad */}
+                  <div className="col-span-1 text-center font-medium">{item.Cantidad || 0}</div>
+
+                  {/* Precio Unitario */}
+                  <div className="col-span-2 text-right font-medium">{formatPrice(item.PrecioUnitario)}</div>
+
+                  {/* Subtotal */}
+                  <div className="col-span-2 text-right font-semibold text-blue-600">{formatPrice(item.Subtotal)}</div>
+
+                  {/* Icono de archivo si existe */}
+                  <div className="col-span-1 text-center">
+                    {tieneArchivo && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleArchivoClick(item.UrlImagenPersonalizada, item.DetalleVentaId);
+                        }}
+                        className={`p-1.5 rounded-lg transition-all hover:scale-110 ${tipoArchivoItem === 'imagen'
+                            ? 'hover:bg-blue-50 text-blue-600'
+                            : 'hover:bg-amber-50 text-amber-600'
+                          }`}
+                        title={`Ver ${tipoArchivoItem || 'archivo'}`}
+                      >
+                        {getIconoArchivo(tipoArchivoItem)}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                
-                {/* Tipo */}
-                <div className="col-span-1 text-center">
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                    item.TipoItem === 'producto' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'
-                  }`}>
-                    {item.TipoItem === 'producto' ? 'P' : 'S'}
-                  </span>
-                </div>
-                
-                {/* Cantidad */}
-                <div className="col-span-1 text-center font-medium">{item.Cantidad || 0}</div>
-                
-                {/* Precio Unitario */}
-                <div className="col-span-2 text-right font-medium">{formatPrice(item.PrecioUnitario)}</div>
-                
-                {/* Subtotal */}
-                <div className="col-span-2 text-right font-semibold text-blue-600">{formatPrice(item.Subtotal)}</div>
-                
-                {/* Icono de imagen si existe */}
-                <div className="col-span-1 text-center">
-                  {item.UrlImagenPersonalizada && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setImagenAmpliada(item.UrlImagenPersonalizada);
-                      }}
-                      className="p-1 hover:bg-gray-200 rounded"
-                      title="Ver imagen"
-                    >
-                      <Eye size={12} className="text-gray-500" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Footer compacto */}
@@ -242,24 +462,14 @@ const DetallesProductosAcordeon = ({ detalles }) => {
         </div>
       )}
 
-      {/* Modal para ver imagen ampliada (igual que antes) */}
-      {imagenAmpliada && (
-        <Modal open={true} onClose={() => setImagenAmpliada(null)}>
-          <div className="p-4 max-w-3xl max-h-[90vh] overflow-auto">
-            <div className="flex justify-end mb-2">
-              <button
-                onClick={() => setImagenAmpliada(null)}
-                className="p-1 hover:bg-gray-100 rounded-full"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <img
-              src={imagenAmpliada}
-              alt="Imagen ampliada"
-              className="w-full h-auto object-contain rounded-lg"
-            />
-          </div>
+      {/* Modal para ver archivo ampliado */}
+      {archivoAmpliado && (
+        <Modal open={true} onClose={() => setArchivoAmpliado(null)}>
+          <VisualizadorArchivo
+            url={archivoAmpliado}
+            tipo={tipoArchivo}
+            onClose={() => setArchivoAmpliado(null)}
+          />
         </Modal>
       )}
     </div>
@@ -312,6 +522,10 @@ const ModalAnular = ({ open, onClose, onConfirm, venta }) => {
 // Modal de ver detalles - MEJORADO
 const ModalVerVenta = ({ open, onClose, venta }) => {
   if (!venta) return null;
+
+  const handleDescargarPDF = () => {
+    generarFacturaPDF(venta);
+  };
 
   // Extraer información del vendedor
   const vendedorNombre = venta.UsuarioVendedor?.NombreCompleto ||
@@ -469,7 +683,14 @@ const ModalVerVenta = ({ open, onClose, venta }) => {
           )}
         </div>
 
-        <div className="mt-6 pt-4 border-t flex justify-end">
+        <div className="mt-6 pt-4 border-t flex justify-between items-center">
+          <button
+            onClick={handleDescargarPDF}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <Download size={18} />
+            Descargar Factura PDF
+          </button>
           <button
             className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
             onClick={onClose}

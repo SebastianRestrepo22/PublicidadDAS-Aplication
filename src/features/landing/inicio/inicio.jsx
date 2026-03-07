@@ -3,6 +3,10 @@ import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from 'framer-motion';
+import axios from "axios";
+
+// Configuración de axios
+const API_URL = 'http://localhost:3000/';
 
 export const Inicio = () => {
     const navigate = useNavigate();
@@ -10,6 +14,11 @@ export const Inicio = () => {
     const [activeIndex, setActiveIndex] = useState(0);
     const [loading, setLoading] = useState(true);
     const [imageErrors, setImageErrors] = useState({});
+    
+    // Estados para productos y servicios aleatorios
+    const [productosAleatorios, setProductosAleatorios] = useState([]);
+    const [serviciosAleatorios, setServiciosAleatorios] = useState([]);
+    const [cargandoItems, setCargandoItems] = useState(true);
 
     const benefits = [
         {
@@ -33,7 +42,7 @@ export const Inicio = () => {
         {
             icon: "group",
             title: "Pedidos seguros",
-            description: "Tus pedidos con nostros estan seguros.",
+            description: "Tus pedidos con nostos estan seguros.",
             image: "/multimedia/pape4.jpg",
         }
     ];
@@ -52,24 +61,91 @@ export const Inicio = () => {
         "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=2000&q=80"
     ];
 
-    const products = [
-        { name: "LAPICEROS", img: "/multimedia/lapiceros.jpg", alt: "Lapiceros" },
-        { name: "PAPEL IRIS", img: "/multimedia/iris.png", alt: "Papeliris" },
-        { name: "MARCADORES", img: "/multimedia/marcadores.jpg", alt: "Marcadores" },
-        { name: "AGENDA Y CUADERNOS", img: "/multimedia/cuadernos.jpg", alt: "Agenda y Cuaderno" },
-        { name: "REGLA", img: "/multimedia/regla1.jpg", alt: "Reglas" },
-        { name: "TIJERAS", img: "/multimedia/tijeras.jpg", alt: "Tijeras" },
-        { name: "COLORES", img: "/multimedia/colores.jpg", alt: "Colores" },
-        { name: "BORRADOR SACAPUNTA", img: "/multimedia/borradorsaca.png", alt: "Borradorsaca" },
-    ];
+    // Función para obtener productos aleatorios activos
+    const cargarProductosAleatorios = async () => {
+        try {
+            const response = await axios.get(`${API_URL}producto`, {
+                params: { estado: 'Activo' }
+            });
+            
+            let productos = [];
+            if (response.data?.data) {
+                productos = response.data.data;
+            } else if (Array.isArray(response.data)) {
+                productos = response.data;
+            } else if (response.data?.productos) {
+                productos = response.data.productos;
+            }
+            
+            // Filtrar solo activos y aleatorizar
+            const productosActivos = productos.filter(p => p.Estado === 'Activo');
+            const aleatorios = [...productosActivos]
+                .sort(() => 0.5 - Math.random())
+                .slice(0, 4);
+            
+            setProductosAleatorios(aleatorios);
+        } catch (error) {
+            console.error("Error cargando productos aleatorios:", error);
+            setProductosAleatorios([]);
+        }
+    };
+
+    // Función para obtener servicios aleatorios activos
+    const cargarServiciosAleatorios = async () => {
+        try {
+            const response = await axios.get(`${API_URL}servicio`, {
+                params: { estado: 'Activo' }
+            });
+            
+            let servicios = [];
+            if (response.data?.data) {
+                servicios = response.data.data;
+            } else if (Array.isArray(response.data)) {
+                servicios = response.data;
+            } else if (response.data?.servicios) {
+                servicios = response.data.servicios;
+            }
+            
+            // Filtrar solo activos y aleatorizar
+            const serviciosActivos = servicios.filter(s => s.Estado === 'Activo');
+            const aleatorios = [...serviciosActivos]
+                .sort(() => 0.5 - Math.random())
+                .slice(0, 4);
+            
+            setServiciosAleatorios(aleatorios);
+        } catch (error) {
+            console.error("Error cargando servicios aleatorios:", error);
+            setServiciosAleatorios([]);
+        }
+    };
+
+    useEffect(() => {
+        const cargarDatos = async () => {
+            setCargandoItems(true);
+            await Promise.all([
+                cargarProductosAleatorios(),
+                cargarServiciosAleatorios()
+            ]);
+            setCargandoItems(false);
+        };
+
+        cargarDatos();
+    }, []);
 
     useEffect(() => {
         const preloadImages = async () => {
             const allImages = [
                 ...carouselImages,
-                ...products.map(p => p.img),
                 ...benefits.map(b => b.image)
             ];
+            
+            // Agregar imágenes de productos y servicios si existen
+            productosAleatorios.forEach(p => {
+                if (p.Imagen) allImages.push(p.Imagen);
+            });
+            serviciosAleatorios.forEach(s => {
+                if (s.Imagen) allImages.push(s.Imagen);
+            });
             
             const imagePromises = allImages.map((src) => {
                 return new Promise((resolve) => {
@@ -87,8 +163,10 @@ export const Inicio = () => {
             setTimeout(() => setLoading(false), 500); 
         };
 
-        preloadImages();
-    }, []);
+        if (!cargandoItems) {
+            preloadImages();
+        }
+    }, [cargandoItems, productosAleatorios, serviciosAleatorios]);
 
     const handleNext = () => {
         setCurrentIndex((prev) => (prev + 1) % carouselImages.length);
@@ -110,7 +188,24 @@ export const Inicio = () => {
         return localSrc;
     };
 
-    if (loading) {
+    // 🔥 NUEVAS FUNCIONES DE NAVEGACIÓN - Ahora van a las vistas generales
+    const handleProductoClick = () => {
+        navigate("/productos");
+    };
+
+    const handleServicioClick = () => {
+        navigate("/servicios");
+    };
+
+    const handleVerMasProductos = () => {
+        navigate("/productos");
+    };
+
+    const handleVerMasServicios = () => {
+        navigate("/servicios");
+    };
+
+    if (loading || cargandoItems) {
         return (
             <>
                 <Navbar />
@@ -252,56 +347,132 @@ export const Inicio = () => {
                     </div>
                 </section>
 
-                {/* SECCIÓN PRODUCTOS - SIN CUADRO BLANCO, SOLO BORDER RADIUS */}
-                <section className="py-20 bg-gray-50 text-black">
+                {/* SECCIÓN PRODUCTOS DESTACADOS */}
+                <section className="py-20 bg-gray-50">
                     <div className="max-w-6xl mx-auto px-4">
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ duration: 0.8 }}
-                            className="text-center mb-16"
+                            className="text-center mb-12"
                         >
                             <h2 className="text-3xl md:text-4xl font-bold text-[#25395C] mb-4 tracking-tight">
-                                NUESTROS PRODUCTOS
+                                PRODUCTOS DESTACADOS
                             </h2>
                             <div className="w-20 h-1 bg-[#25395C] mx-auto mb-4"></div>
                             <p className="text-gray-600 text-lg">
-                                Materiales de oficina y escolares de alta calidad
+                                Los productos más populares de nuestra tienda
                             </p>
                         </motion.div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
-                            {products.map((item, index) => (
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-8">
+                            {productosAleatorios.map((producto, index) => (
                                 <motion.div
-                                    key={index}
+                                    key={producto.ProductoId || index}
                                     initial={{ opacity: 0, scale: 0.9 }}
                                     whileInView={{ opacity: 1, scale: 1 }}
                                     viewport={{ once: true }}
                                     transition={{ duration: 0.5, delay: index * 0.1 }}
                                     whileHover={{ y: -8 }}
+                                    onClick={handleProductoClick} // 🔥 AHORA VA A /productos
                                     className="group relative flex flex-col items-center p-4 cursor-pointer"
                                 >
                                     <div className="relative w-32 h-32 md:w-40 md:h-40 rounded-full bg-gray-100 mb-4 overflow-hidden border-4 border-gray-50 group-hover:border-[#25395C]/10 transition-colors">
                                         <img
-                                            src={item.img}
-                                            alt={item.alt}
+                                            src={producto.Imagen || "https://via.placeholder.com/160?text=Producto"}
+                                            alt={producto.Nombre}
                                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                                             onError={(e) => {
                                                 e.target.src = "https://via.placeholder.com/160?text=Producto";
                                             }}
                                         />
                                     </div>
-                                    <p className="text-sm font-bold text-gray-800 text-center tracking-wide uppercase">
-                                        {item.name}
+                                    <p className="text-sm font-bold text-gray-800 text-center tracking-wide uppercase line-clamp-2">
+                                        {producto.Nombre}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Desde ${producto.Precio?.toLocaleString('es-CO')}
                                     </p>
                                 </motion.div>
                             ))}
+                        </div>
+
+                        <div className="text-center">
+                            <button
+                                onClick={handleVerMasProductos}
+                                className="px-8 py-3 bg-[#25395C] text-white rounded-lg font-medium hover:bg-[#2d4a74] transition-all transform hover:scale-105 shadow-lg"
+                            >
+                                Ver todos los productos
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                {/* SECCIÓN SERVICIOS DESTACADOS */}
+                <section className="py-20 bg-white">
+                    <div className="max-w-6xl mx-auto px-4">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 0.8 }}
+                            className="text-center mb-12"
+                        >
+                            <h2 className="text-3xl md:text-4xl font-bold text-[#25395C] mb-4 tracking-tight">
+                                SERVICIOS DESTACADOS
+                            </h2>
+                            <div className="w-20 h-1 bg-[#25395C] mx-auto mb-4"></div>
+                            <p className="text-gray-600 text-lg">
+                                Los servicios más solicitados por nuestros clientes
+                            </p>
+                        </motion.div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-8">
+                            {serviciosAleatorios.map((servicio, index) => (
+                                <motion.div
+                                    key={servicio.ServicioId || index}
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    whileInView={{ opacity: 1, scale: 1 }}
+                                    viewport={{ once: true }}
+                                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                                    whileHover={{ y: -8 }}
+                                    onClick={handleServicioClick} // 🔥 AHORA VA A /servicios
+                                    className="group relative flex flex-col items-center p-4 cursor-pointer"
+                                >
+                                    <div className="relative w-32 h-32 md:w-40 md:h-40 rounded-full bg-gray-100 mb-4 overflow-hidden border-4 border-gray-50 group-hover:border-[#25395C]/10 transition-colors">
+                                        <img
+                                            src={servicio.Imagen || "https://via.placeholder.com/160?text=Servicio"}
+                                            alt={servicio.Nombre}
+                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                            onError={(e) => {
+                                                e.target.src = "https://via.placeholder.com/160?text=Servicio";
+                                            }}
+                                        />
+                                    </div>
+                                    <p className="text-sm font-bold text-gray-800 text-center tracking-wide uppercase line-clamp-2">
+                                        {servicio.Nombre}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Desde ${servicio.Precio?.toLocaleString('es-CO')}
+                                    </p>
+                                </motion.div>
+                            ))}
+                        </div>
+
+                        <div className="text-center">
+                            <button
+                                onClick={handleVerMasServicios}
+                                className="px-8 py-3 bg-[#25395C] text-white rounded-lg font-medium hover:bg-[#2d4a74] transition-all transform hover:scale-105 shadow-lg"
+                            >
+                                Ver todos los servicios
+                            </button>
                         </div>
                     </div>
                 </section>
 
                 {/* SECCIÓN CONFIANZA / BENEFICIOS DETALLADOS - MÁS SEPARADA */}
-                <section className="bg-white py-32 px-6 overflow-hidden ">
+                <section className="bg-gray-50 py-32 px-6 overflow-hidden">
                     <div className="max-w-7xl mx-auto">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                             <div className="space-y-8 order-2 lg:order-1">
@@ -316,7 +487,7 @@ export const Inicio = () => {
                                         viewport={{ once: true }}
                                         transition={{ duration: 0.5, delay: index * 0.1 }}
                                         onMouseEnter={() => setActiveIndex(index)}
-                                        className={`cursor-pointer p-4 rounded-xl transition-all duration-300 ${activeIndex === index ? 'bg-gray-50 shadow-sm' : 'hover:bg-gray-50'}`}
+                                        className={`cursor-pointer p-4 rounded-xl transition-all duration-300 ${activeIndex === index ? 'bg-white shadow-sm' : 'hover:bg-white'}`}
                                     >
                                         <div className="flex items-start space-x-4">
                                             <div className={`
@@ -372,80 +543,6 @@ export const Inicio = () => {
                         </div>
                     </div>
                 </section>
-
-                {/* TESTIMONIOS */}
-                <div className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-white to-gray-50">
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.8 }}
-                        className="text-center mb-16"
-                    >
-                        <h1 className="text-3xl md:text-4xl font-semibold text-gray-900 mb-4 tracking-tight">
-                            Lo que dicen quienes confían en nosotros
-                        </h1>
-                        <div className="w-20 h-1 bg-gradient-to-r from-transparent via-[#25395C] to-transparent mx-auto mb-6"></div>
-                        <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-                            Nada nos hace más felices que ver a nuestros clientes satisfechos con el resultado final.
-                        </p>
-                    </motion.div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-                        {[
-                            {
-                                name: "Vanessa Sánchez",
-                                role: "Cliente Satisfecha",
-                                quote: "La calidad del trabajo es espectacular. Superaron mis expectativas en cada detalle.",
-                                img: "https://www.dzoom.org.es/wp-content/uploads/2020/02/portada-foto-perfil-redes-sociales-consejos.jpg",
-                            },
-                            {
-                                name: "Sebastián Restrepo",
-                                role: "Cliente Satisfecho",
-                                quote: "Servicio ágil, profesional y con excelente atención. Muy recomendados.",
-                                img: "https://plus.unsplash.com/premium_photo-1689568126014-06fea9d5d341",
-                            },
-                            {
-                                name: "Ana María Pérez",
-                                role: "Cliente Satisfecha",
-                                quote: "Trabajo con ellos desde hace tiempo. Siempre entregan calidad y excelentes resultados.",
-                                img: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200",
-                            },
-                        ].map((testimonial, index) => (
-                            <motion.div
-                                key={index}
-                                initial={{ opacity: 0, y: 30 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.6, delay: index * 0.1, ease: "easeOut" }}
-                                viewport={{ once: true, margin: "-100px" }}
-                                whileHover={{ y: -8 }}
-                                className="bg-white rounded-2xl border border-gray-100 shadow-lg shadow-black/5 hover:shadow-xl hover:shadow-black/10 transition-all duration-500 p-8 flex flex-col h-full"
-                            >
-                                <div className="flex items-center space-x-4 mb-6">
-                                    <img
-                                        className="w-16 h-16 rounded-full object-cover border-2 border-gray-100 shadow-md"
-                                        src={testimonial.img}
-                                        alt={`${testimonial.name}, ${testimonial.role}`}
-                                        loading="lazy"
-                                        onError={(e) => {
-                                            e.target.src = "https://via.placeholder.com/64?text=User";
-                                        }}
-                                    />
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-gray-900">{testimonial.name}</h3>
-                                        <p className="text-sm text-gray-500 font-medium">{testimonial.role}</p>
-                                    </div>
-                                </div>
-                                <p className="text-gray-700 text-base leading-relaxed flex-grow italic">
-                                    "{testimonial.quote}"
-                                </p>
-                                <div className="mt-6 flex text-yellow-400 text-xl" aria-label="5 estrellas">
-                                    ★★★★★
-                                </div>
-                            </motion.div>
-                        ))}
-                    </div>
-                </div>
-
             </main>
             <Footer />
         </>
