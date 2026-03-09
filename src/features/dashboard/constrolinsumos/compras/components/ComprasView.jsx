@@ -8,7 +8,7 @@ import {
 import { toast } from "react-toastify";
 import { CancelacionModal } from "../../../components/modals/CancelacionModal";
 import { ESTADOS_COMPRA } from "../hook/useCompras";
-import { generarFacturaPDF } from "../components/InvoicePDF";
+import { generarFacturaCompraPDF } from './InvoicePDF.jsx';
 
 const getShortId = (id) => {
   const str = String(id || "");
@@ -138,10 +138,10 @@ export const ComprasView = ({
     try {
       const productosAActualizar = nuevoEstado === ESTADOS_COMPRA.RECIBIDO
         ? selectedCompra.detalle.map(d => ({
-            ProductoId: d.ProductoId,
-            Cantidad: d.Cantidad,
-            colores: d.colores || []
-          }))
+          ProductoId: d.ProductoId,
+          Cantidad: d.Cantidad,
+          colores: d.colores || []
+        }))
         : null;
 
       await onActualizarEstado(selectedCompra.CompraId, nuevoEstado, productosAActualizar, motivo);
@@ -195,26 +195,69 @@ export const ComprasView = ({
   const conteoItems = selectedCompra.detalle?.length || 0;
 
   const handleDescargarFactura = () => {
-  try {
-    console.log("🟡 Datos para factura:", {
-      compra: selectedCompra,
-      detalles: selectedCompra.detalle,
-      proveedor: proveedores.find(p => p.ProveedorId === selectedCompra.ProveedorId)
-    });
-    
-    const proveedor = proveedores.find(p => p.ProveedorId === selectedCompra.ProveedorId);
-    generarFacturaPDF(
-      selectedCompra,
-      selectedCompra.detalle || [],
-      proveedor
-    );
-    toast.success('Factura generada correctamente');
-  } catch (error) {
-    console.error('🔴 Error detallado al generar factura:', error);
-    console.error('🔴 Stack trace:', error.stack);
-    toast.error(`Error al generar la factura: ${error.message}`);
-  }
-};
+    try {
+      console.log("🔵 DATOS COMPLETOS PARA FACTURA:");
+      console.log("1. selectedCompra:", selectedCompra);
+      console.log("2. Detalles en selectedCompra:", selectedCompra?.detalle);
+      console.log("3. Productos disponibles:", productos);
+      console.log("4. Proveedores:", proveedores);
+
+      // Buscar el proveedor
+      const proveedor = proveedores.find(p => p.ProveedorId === selectedCompra.ProveedorId);
+      console.log("5. Proveedor encontrado:", proveedor);
+
+      // Verificar si hay detalles
+      if (!selectedCompra.detalle || selectedCompra.detalle.length === 0) {
+        console.error("❌ No hay detalles en la compra");
+        toast.error('No hay productos en esta compra para facturar');
+        return;
+      }
+
+      // Mapear detalles para asegurar que tengan los nombres de producto
+      const detallesConNombres = selectedCompra.detalle.map(d => {
+        // Buscar el producto completo en la lista de productos
+        const productoCompleto = productos.find(p => p.ProductoId === d.ProductoId);
+
+        console.log(`6. Producto para detalle ${d.ProductoId}:`, productoCompleto);
+
+        return {
+          ...d,
+          ProductoNombre: productoCompleto?.Nombre || d.ProductoNombre || 'Producto sin nombre',
+          Cantidad: Number(d.Cantidad) || 0,
+          PrecioUnitario: Number(d.PrecioUnitario) || 0,
+          Subtotal: Number(d.Subtotal) || (Number(d.Cantidad) * Number(d.PrecioUnitario)) || 0
+        };
+      });
+
+      console.log("7. Detalles con nombres mapeados:", detallesConNombres);
+      console.log("8. Total de productos a facturar:", detallesConNombres.length);
+
+      // Verificar que los detalles tengan datos válidos
+      const detallesValidos = detallesConNombres.filter(d => d.Cantidad > 0 && d.PrecioUnitario > 0);
+      console.log("9. Detalles válidos:", detallesValidos);
+
+      if (detallesValidos.length === 0) {
+        toast.error('Los productos no tienen cantidades o precios válidos');
+        return;
+      }
+
+      // Calcular total para verificar
+      const totalCalculado = detallesValidos.reduce((sum, d) => sum + d.Subtotal, 0);
+      console.log("10. Total calculado:", totalCalculado);
+      console.log("11. Total de la compra:", selectedCompra.Total);
+
+      generarFacturaCompraPDF(
+        selectedCompra,
+        detallesValidos,  
+        proveedor
+      );
+
+      toast.success('Factura generada correctamente');
+    } catch (error) {
+      console.error('Error detallado al generar factura:', error);
+      toast.error(`Error al generar la factura: ${error.message}`);
+    }
+  };
 
   return (
     <>
@@ -238,12 +281,12 @@ export const ComprasView = ({
             {/* Botón de descargar factura */}
             <button
               onClick={handleDescargarFactura}
-              className="px-3 py-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm"
+              className="px-3 py-1 bg-blue-900 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
             >
               <Download size={16} />
               <span className="hidden sm:inline">Descargar Factura</span>
             </button>
-            
+
             <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${configActual.color}`}>
               <IconoActual size={14} />
               <span className="truncate">{configActual.label}</span>

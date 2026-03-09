@@ -416,7 +416,7 @@ export const Compras = () => {
     
     setViewMode("view");
   } catch (err) {
-    console.error("🔴 Error al cargar datos para vista detallada:", err);
+    console.error(" Error al cargar datos para vista detallada:", err);
     toast.error("No se pudieron cargar los detalles de la compra.");
     goToBackToList();
   }
