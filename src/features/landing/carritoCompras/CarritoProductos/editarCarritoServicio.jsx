@@ -10,10 +10,10 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { getTamanosByServicio } from "../../../dashboard/servicios/services/services.servicios";
 import { Navbar } from "../../components/Navbar";
 import { Footer } from "../../components/footer";
 import { useCart } from "../../../../context/CartContext";
-import { getTamanosByServicio } from "../../../dashboard/servicios/services/services.servicios";
 
 export const EditarCarritoServicio = () => {
   const location = useLocation();
@@ -30,6 +30,7 @@ export const EditarCarritoServicio = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [servicioOriginal, setServicioOriginal] = useState(null);
   const [tipoServicio, setTipoServicio] = useState("UNICO");
+  const [imagenAmpliada, setImagenAmpliada] = useState(null);
 
   useEffect(() => {
     if (!item) {
@@ -38,7 +39,6 @@ export const EditarCarritoServicio = () => {
       return;
     }
 
-    // Buscar el item actual en el carrito para obtener la información más reciente
     const currentItem = cart.find(cartItem => cartItem.id === item.id);
     if (!currentItem) {
       toast.error("El servicio ya no está en el carrito");
@@ -49,14 +49,12 @@ export const EditarCarritoServicio = () => {
     setServicioOriginal(currentItem);
     setTipoServicio(currentItem.TipoPrecio || "UNICO");
     
-    // Cargar datos existentes
     const customization = currentItem.customization || {};
     
     setDescripcion(customization.Descripcion || customization.descripcion || "");
     setTamano(customization.Tamaño || customization.tamaño || "");
     setImagenPreview(customization.UrlImagen || currentItem.Imagen || currentItem.UrlImagen || "");
     
-    // Cargar archivos adjuntos si existen
     if (customization.archivosAdjuntos) {
       const archivos = Array.isArray(customization.archivosAdjuntos) 
         ? customization.archivosAdjuntos 
@@ -64,7 +62,6 @@ export const EditarCarritoServicio = () => {
       setArchivosAdjuntos(archivos);
     }
 
-    // Si es POR_TAMANO, cargar los tamaños disponibles
     if (currentItem.TipoPrecio === 'POR_TAMANO' && currentItem.ServicioId) {
       cargarTamanos(currentItem.ServicioId);
     }
@@ -88,7 +85,9 @@ export const EditarCarritoServicio = () => {
       nombre: file.name,
       tipo: file.type,
       tamaño: file.size,
+      archivo: file,
       url: URL.createObjectURL(file),
+      esImagen: file.type.startsWith("image/")
     }));
 
     setArchivosAdjuntos((prev) => [...prev, ...nuevosArchivos]);
@@ -98,6 +97,20 @@ export const EditarCarritoServicio = () => {
     setArchivosAdjuntos((prev) =>
       prev.filter((a) => a.id !== archivoId)
     );
+  };
+
+  const verImagenCompleta = (archivo, e) => {
+    e.stopPropagation();
+    if (archivo.base64) {
+      setImagenAmpliada(archivo.base64);
+    } else if (archivo.url) {
+      setImagenAmpliada(archivo.url);
+    }
+  };
+
+  const cerrarImagenAmpliada = (e) => {
+    e.stopPropagation();
+    setImagenAmpliada(null);
   };
 
   const handleSubmit = async (e) => {
@@ -110,7 +123,6 @@ export const EditarCarritoServicio = () => {
       return;
     }
 
-    // Validar tamaño si es POR_TAMANO
     if (tipoServicio === 'POR_TAMANO' && !tamano) {
       toast.error("Por favor selecciona un tamaño");
       return;
@@ -119,26 +131,26 @@ export const EditarCarritoServicio = () => {
     setIsSubmitting(true);
 
     try {
-      // Preparar los cambios para actualizar en el carrito
+      const archivosParaGuardar = archivosAdjuntos.map(f => ({
+        id: f.id,
+        nombre: f.nombre,
+        tipo: f.tipo,
+        tamaño: f.tamaño,
+        pendiente: !!f.archivo,
+        esImagen: f.esImagen
+      }));
+
       const cambios = {
-        Descripcion: descripcion,
-        Imagen: imagenPreview || servicioOriginal.Imagen,
-        UrlImagen: imagenPreview || servicioOriginal.UrlImagen,
         customization: {
           Descripcion: descripcion,
           Tamaño: tamano,
-          UrlImagen: imagenPreview,
-          archivosAdjuntos: archivosAdjuntos.map(f => ({
-            nombre: f.nombre,
-            tipo: f.tipo,
-            tamaño: f.tamaño
-          }))
+          archivosAdjuntos: archivosParaGuardar,
+          tieneArchivosPendientes: archivosAdjuntos.some(f => f.archivo)
         }
       };
 
       console.log("Actualizando servicio con cambios:", cambios);
       
-      // Actualizar el item en el carrito
       updateItem(servicioOriginal.id, cambios);
       
       toast.success("Servicio actualizado correctamente");
@@ -193,7 +205,6 @@ export const EditarCarritoServicio = () => {
         </button>
 
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          {/* Encabezado sin degradado */}
           <div className="border-b border-gray-200 p-6">
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
               Editar Servicio: {servicioOriginal.Nombre}
@@ -204,11 +215,9 @@ export const EditarCarritoServicio = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6 md:p-8">
-            {/* Columna Izquierda - Formulario de edición */}
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-slate-800">Editar Personalización</h2>
 
-              {/* Vista previa actual - Solo informativo */}
               <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                 <h3 className="font-semibold text-slate-700 mb-2">Configuración actual:</h3>
                 {servicioOriginal.customization?.Descripcion && (
@@ -238,7 +247,6 @@ export const EditarCarritoServicio = () => {
                 />
               </div>
 
-              {/* Selector de Tamaño - SOLO si el servicio es POR_TAMANO */}
               {tipoServicio === 'POR_TAMANO' && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -261,7 +269,6 @@ export const EditarCarritoServicio = () => {
                 </div>
               )}
 
-              {/* Adjuntar archivos - IGUAL que en crear */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Archivos de Referencia
@@ -275,36 +282,70 @@ export const EditarCarritoServicio = () => {
                 
                 {archivosAdjuntos.length > 0 && (
                   <div className="space-y-3 mb-4">
-                    {archivosAdjuntos.map((archivo) => (
-                      <div
-                        key={archivo.id}
-                        className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
-                      >
-                        <div className="flex items-center space-x-3">
-                          {archivo.tipo && archivo.tipo.startsWith("image/") ? (
-                            <ImageIcon className="w-5 h-5 text-blue-500" />
-                          ) : (
-                            <FileText className="w-5 h-5 text-red-500" />
-                          )}
-                          <div>
-                            <p className="text-sm font-medium text-slate-800">{archivo.nombre}</p>
-                            {archivo.tamaño && (
-                              <p className="text-xs text-slate-500">
-                                {(archivo.tamaño / 1024).toFixed(2)} KB
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => eliminarArchivo(archivo.id)}
-                          className="text-red-500 hover:text-red-700 p-1"
-                          disabled={isSubmitting}
+                    <h3 className="font-semibold text-slate-700">Archivos adjuntos:</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {archivosAdjuntos.map((archivo) => (
+                        <div
+                          key={archivo.id}
+                          className="border border-slate-200 rounded-lg p-2 hover:border-blue-300 transition-all group relative"
                         >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-                    ))}
+                          {archivo.esImagen ? (
+                            <div className="relative">
+                              <img
+                                src={archivo.base64 || archivo.url}
+                                alt={archivo.nombre}
+                                className="w-full h-32 object-cover rounded-lg cursor-pointer"
+                                onClick={(e) => verImagenCompleta(archivo, e)}
+                              />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <button
+                                  onClick={(e) => verImagenCompleta(archivo, e)}
+                                  className="bg-white/90 p-2 rounded-full shadow-lg hover:bg-white"
+                                >
+                                  👁️
+                                </button>
+                              </div>
+                              {archivo.pendiente && (
+                                <span className="absolute top-1 left-1 bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                  Nuevo
+                                </span>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  eliminarArchivo(archivo.id);
+                                }}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 transition-colors"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                              <FileText className="h-8 w-8 text-red-500 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium truncate">{archivo.nombre}</p>
+                                <p className="text-xs text-slate-500">
+                                  {(archivo.tamaño / 1024).toFixed(2)} KB
+                                </p>
+                                {archivo.pendiente && (
+                                  <span className="text-amber-600 text-xs block">(nuevo)</span>
+                                )}
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  eliminarArchivo(archivo.id);
+                                }}
+                                className="text-red-500 hover:text-red-700 p-1 flex-shrink-0"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
                 
@@ -325,7 +366,6 @@ export const EditarCarritoServicio = () => {
               </div>
             </div>
 
-            {/* Columna Derecha - Resumen y Precio */}
             <div className="space-y-6">
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
                 <h3 className="font-bold text-blue-900 text-xl mb-4">Resumen del Servicio</h3>
@@ -387,7 +427,12 @@ export const EditarCarritoServicio = () => {
                         <p><span className="font-medium">Tamaño:</span> {tamano}</p>
                       )}
                       {archivosAdjuntos.length > 0 && (
-                        <p><span className="font-medium">Archivos adjuntos:</span> {archivosAdjuntos.length}</p>
+                        <p>
+                          <span className="font-medium">Archivos adjuntos:</span> {archivosAdjuntos.length}
+                          {archivosAdjuntos.some(f => f.archivo) && (
+                            <span className="ml-2 text-xs text-amber-600">(nuevos)</span>
+                          )}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -430,6 +475,28 @@ export const EditarCarritoServicio = () => {
           </form>
         </div>
       </div>
+
+      {imagenAmpliada && (
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={cerrarImagenAmpliada}
+        >
+          <div className="relative max-w-4xl max-h-[90vh]">
+            <img
+              src={imagenAmpliada}
+              alt="Imagen ampliada"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={cerrarImagenAmpliada}
+              className="absolute -top-4 -right-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

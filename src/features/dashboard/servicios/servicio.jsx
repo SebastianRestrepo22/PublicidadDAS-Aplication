@@ -118,7 +118,10 @@ export const ServiciosDashboard = () => {
 
                         <ModalEliminar
                             open={openEliminar}
-                            onClose={() => setOpenEliminar(false)}
+                            onClose={() => {
+                                setOpenEliminar(false);
+                                setEditData(null); // Limpiar editData al cerrar
+                            }}
                             editData={editData}
                             onConfirm={handleDelete}
                         />

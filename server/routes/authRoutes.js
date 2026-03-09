@@ -93,13 +93,12 @@ router.post('/login', async (req, res) => {
 
         const [users] = await connection.execute(
             `SELECT u.*, r.Nombre AS RoleNombre, td.Nombre AS TipoDocumentoNombre
-   FROM usuarios u
-   JOIN roles r ON u.RoleId = r.RoleId
-   JOIN tipodocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
-   WHERE u.CorreoElectronico = ?`,
+             FROM usuarios u
+             JOIN roles r ON u.RoleId = r.RoleId
+             JOIN tipodocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
+             WHERE u.CorreoElectronico = ?`,
             [CorreoElectronico]
         );
-
 
         if (users.length === 0) {
             return res.status(404).json({ message: 'Usuario no existe' });
@@ -107,16 +106,24 @@ router.post('/login', async (req, res) => {
 
         const user = users[0];
 
+        // 🔥 NUEVO: Verificar si el usuario tiene contraseña (si es NULL, significa que no ha sido establecida)
+        if (!user.Contrasena) {
+            return res.status(403).json({ 
+                message: 'Debes establecer tu contraseña primero. Revisa tu correo electrónico para el enlace de activación.',
+                codigo: 'PASSWORD_NOT_SET'
+            });
+        }
+
         const isMatch = await bcrypt.compare(Contrasena, user.Contrasena);
         if (!isMatch) {
             return res.status(401).json({ message: 'Credenciales inválidas' });
         }
 
-        // En la función de login, después de verificar credenciales:
+        // Obtener permisos del usuario
         const [permisos] = await connection.execute(
             `SELECT p.Nombre FROM permisos p
-   JOIN rol_permisos rp ON p.PermisoId = rp.PermisoId
-   WHERE rp.RoleId = ?`,
+             JOIN rol_permisos rp ON p.PermisoId = rp.PermisoId
+             WHERE rp.RoleId = ?`,
             [user.RoleId]
         );
 
@@ -127,12 +134,11 @@ router.post('/login', async (req, res) => {
                 CedulaId: user.CedulaId,
                 RoleId: user.RoleId,
                 Role: user.RoleNombre,
-                Permisos: permisosArray // Agregar permisos al token
+                Permisos: permisosArray
             },
             process.env.JWT_KEY,
             { expiresIn: '1h' }
         );
-
 
         res.status(200).json({ token });
     } catch (error) {
