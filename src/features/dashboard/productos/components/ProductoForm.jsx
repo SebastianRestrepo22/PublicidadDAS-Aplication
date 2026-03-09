@@ -86,13 +86,13 @@ export const ProductoForm = ({
     // Función para validar que el nombre solo contenga caracteres válidos
     const validateNombreFormato = (nombre) => {
         if (!nombre) return "";
-        
+
         // Expresión regular CORREGIDA: permite letras (con tildes), números, espacios y caracteres comunes
         // El problema anterior era que faltaba la bandera 'u' para caracteres Unicode y algunos caracteres no estabn bien escapados
         const nombreProductoRegex = /^[A-Za-zÁáÉéÍíÓóÚúÑñ0-9\s\-\.\,\(\)]+$/;
-        
+
         console.log("Validando nombre:", nombre, "Resultado:", nombreProductoRegex.test(nombre));
-        
+
         if (!nombreProductoRegex.test(nombre)) {
             return "El nombre solo puede contener letras, números, espacios y los caracteres: - . , ( )";
         }
@@ -102,43 +102,33 @@ export const ProductoForm = ({
     // Función para validar URL de imagen
     const validateImageUrl = (url) => {
         if (!url) return "";
-        
-        // Si es una imagen base64 (cargada desde archivo)
-        if (url.startsWith('data:image')) {
+        if (url.startsWith('data:image')) return "";
+
+        // Validación más permisiva y segura
+        try {
+            new URL(url); // Usa el nativo del navegador
             return "";
+        } catch (e) {
+            return "Ingrese una URL válida (http:// o https://)";
         }
-        
-        // Patrón para URL básica
-        const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/i;
-        
-        // Verificar si es una URL HTTP/HTTPS
-        if (url.startsWith('http://') || url.startsWith('https://')) {
-            if (!urlPattern.test(url)) {
-                return "La URL no tiene un formato válido";
-            }
-        } else if (url) {
-            return "Ingrese una URL válida (http:// o https://) o suba un archivo";
-        }
-        
-        return "";
     };
 
     // Función para validar el tamaño y tipo de archivo
     const validateImageFile = (file) => {
         if (!file) return "No se ha seleccionado ningún archivo";
-        
+
         // Validar tipo de archivo
         const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/bmp'];
         if (!allowedTypes.includes(file.type)) {
             return "Tipo de archivo no permitido. Use: JPG, PNG, GIF, WEBP, SVG o BMP";
         }
-        
+
         // Validar tamaño (máximo 5MB)
         const maxSize = 5 * 1024 * 1024; // 5MB en bytes
         if (file.size > maxSize) {
             return "El archivo es demasiado grande. Tamaño máximo: 5MB";
         }
-        
+
         return "";
     };
 
@@ -150,7 +140,7 @@ export const ProductoForm = ({
             // Validar formato
             const formatoError = validateNombreFormato(value);
             setNombreFormatoError(formatoError);
-            
+
             // Crear un evento personalizado si hay error
             if (formatoError && handleNombreBlur) {
                 const customEvent = {
@@ -179,11 +169,11 @@ export const ProductoForm = ({
     // Manejar blur del nombre con validación adicional
     const handleProductNombreBlur = (e) => {
         const { value } = e.target;
-        
+
         // Validar formato
         const formatoError = validateNombreFormato(value);
         setNombreFormatoError(formatoError);
-        
+
         // Si hay error de formato, lo manejamos
         if (formatoError && handleNombreBlur) {
             // Crear un evento personalizado para pasar el error
@@ -378,9 +368,9 @@ export const ProductoForm = ({
                                 onChange={handleProductChanges}
                                 onBlur={handleProductNombreBlur}
                                 className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-                                    ${submitted && !values.Nombre.trim() ? "border-red-500" : 
-                                      nombreFormatoError ? "border-red-500" : 
-                                      nombreError ? "border-red-500" : "border-gray-300"}`}
+                                    ${submitted && !values.Nombre.trim() ? "border-red-500" :
+                                        nombreFormatoError ? "border-red-500" :
+                                            nombreError ? "border-red-500" : "border-gray-300"}`}
                                 disabled={isSubmitting}
                             />
                             <div className="min-h-[40px] mt-0.5">
@@ -401,7 +391,7 @@ export const ProductoForm = ({
                                 )}
                                 {values.Nombre && !nombreFormatoError && !nombreError && (
                                     <p className="text-gray-500 text-[11px] leading-4">
-                                        {values.Nombre.length} caracteres • 
+                                        {values.Nombre.length} caracteres •
                                         Puede incluir letras, números y los caracteres: - . , ( )
                                     </p>
                                 )}
@@ -539,17 +529,16 @@ export const ProductoForm = ({
 
                 <div className="space-y-4">
                     <h4 className="font-medium text-gray-700">Imagen del producto</h4>
-                    
+
                     {/* Pestañas para elegir método de carga */}
                     <div className="flex border-b border-gray-200">
                         <button
                             type="button"
                             onClick={() => setImagenTab("url")}
-                            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-                                imagenTab === "url"
-                                    ? "text-blue-600 border-b-2 border-blue-600"
-                                    : "text-gray-500 hover:text-gray-700"
-                            }`}
+                            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${imagenTab === "url"
+                                ? "text-blue-600 border-b-2 border-blue-600"
+                                : "text-gray-500 hover:text-gray-700"
+                                }`}
                         >
                             <Link size={16} />
                             URL de imagen
@@ -557,11 +546,10 @@ export const ProductoForm = ({
                         <button
                             type="button"
                             onClick={() => setImagenTab("file")}
-                            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-                                imagenTab === "file"
-                                    ? "text-blue-600 border-b-2 border-blue-600"
-                                    : "text-gray-500 hover:text-gray-700"
-                            }`}
+                            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${imagenTab === "file"
+                                ? "text-blue-600 border-b-2 border-blue-600"
+                                : "text-gray-500 hover:text-gray-700"
+                                }`}
                         >
                             <Upload size={16} />
                             Subir archivo
@@ -581,8 +569,8 @@ export const ProductoForm = ({
                                         onChange={handleProductChanges}
                                         onBlur={handleImagenBlur}
                                         className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-                                            ${submitted && !values.Imagen.trim() ? "border-red-500" : 
-                                              imagenError && imagenError.includes("URL") ? "border-red-500" : "border-gray-300"}`}
+                                            ${submitted && !values.Imagen.trim() ? "border-red-500" :
+                                                imagenError && imagenError.includes("URL") ? "border-red-500" : "border-gray-300"}`}
                                         disabled={isSubmitting}
                                     />
                                     <p className="text-xs text-gray-500 mt-1">
