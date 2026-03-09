@@ -271,7 +271,7 @@ export const GraficosEstadisticos = () => {
           <div className="bg-white rounded-xl shadow p-4">
             <h2 className="text-lg font-bold">Ventas mensuales</h2>
             <p className="text-sm text-gray-500 mb-4">
-              Ventas por mes en el último semestre • <span className="text-blue-600">Hover para ver productos</span>
+              Ventas por mes en el último semestre • 
             </p>
             <div className="overflow-x-auto">
               <ResponsiveContainer width="100%" height={300}>
@@ -305,7 +305,7 @@ export const GraficosEstadisticos = () => {
           <div className="bg-white rounded-xl shadow p-4">
             <h2 className="text-lg font-bold">Ventas semanales</h2>
             <p className="text-sm text-gray-500 mb-4">
-              Tendencia de ventas por semana • <span className="text-blue-600">Hover para ver productos</span>
+              Tendencia de ventas por semana • 
             </p>
             <div className="overflow-x-auto">
               <ResponsiveContainer width="100%" height={300}>

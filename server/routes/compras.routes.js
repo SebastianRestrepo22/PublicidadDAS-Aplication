@@ -4,7 +4,8 @@ import {
   getCompraById,
   createCompra,
   deleteCompra,
-  updateCompra
+  updateCompra,
+  updateCompraEstado
 } from '../controllers/compras.controller.js';
 
 const router = express.Router();
@@ -15,6 +16,7 @@ router.post('/', createCompra);
 router.delete('/:id', deleteCompra);
 router.put('/:id', updateCompra);
 
+router.patch('/:id/estado', updateCompraEstado);
 
 
 export default router;

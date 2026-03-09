@@ -1,9 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
 import { dbPool } from '../lib/db.js';
 
-const sanitize = (v) => (v ===  undefined ? null : v) 
+const sanitize = (v) => (v === undefined ? null : v);
 
-// Obtener todos los proveedores
+// Obtener todas las compras
 export const getAllCompras = async () => {
   const [rows] = await dbPool.execute('SELECT * FROM Compras'); 
   return rows;
@@ -17,6 +17,7 @@ export const getCompraById = async (id) => {
   return rows[0];
 };
 
+// Crear compra
 export const createCompra = async ({ ProveedorId, Total, FechaRegistro, Estado }) => {
   const CompraId = uuidv4();
 
@@ -24,12 +25,12 @@ export const createCompra = async ({ ProveedorId, Total, FechaRegistro, Estado }
     `INSERT INTO Compras 
     (CompraId, ProveedorId, Total, FechaRegistro, Estado) 
     VALUES (?, ?, ?, ?, ?)`,
-    [CompraId, sanitize(ProveedorId), sanitize(Total), sanitize(FechaRegistro), sanitize(Estado ? 1 : 0)]
+    [CompraId, sanitize(ProveedorId), sanitize(Total), sanitize(FechaRegistro), Estado || 'pendiente']
   );
   return { CompraId, ProveedorId, Total, FechaRegistro, Estado };
 };
 
-//
+// Eliminar compra
 export const deleteCompra = async (id) => {
   const [result] = await dbPool.execute(
     'DELETE FROM Compras WHERE CompraId = ?', 
@@ -37,24 +38,68 @@ export const deleteCompra = async (id) => {
   return result;
 };
 
-// Actualizar 
+// Actualizar compra completa
 export const updateCompra = async (id, data) => {
-
-  const { ProveedorId, Total, FechaRegistro, Estado} = data;
+  const { ProveedorId, Total, FechaRegistro, Estado, MotivoCancelacion } = data;
 
   const [result] = await dbPool.execute(
     `UPDATE Compras
-    SET ProveedorId = ?, Total = ?, FechaRegistro = ?, Estado = ?
+    SET ProveedorId = ?, Total = ?, FechaRegistro = ?, Estado = ?, MotivoCancelacion = ?
     WHERE CompraId = ?`,
     [
         sanitize(ProveedorId), 
         sanitize(Total), 
         sanitize(FechaRegistro), 
-        sanitize(Estado ? 1 : 0), 
+        Estado,
+        sanitize(MotivoCancelacion),
         id
     ]
   );
 
   return result;
+};
 
+// Actualizar solo el estado de la compra
+export const updateCompraEstado = async (id, estado, motivoCancelacion = null) => {
+  const [result] = await dbPool.execute(
+    `UPDATE Compras
+    SET Estado = ?, MotivoCancelacion = ?
+    WHERE CompraId = ?`,
+    [estado, sanitize(motivoCancelacion), id]
+  );
+
+  return result;
+};
+
+// Obtener detalles de una compra
+export const getDetallesByCompraId = async (compraId) => {
+  const [rows] = await dbPool.execute(
+    'SELECT * FROM DetalleCompras WHERE CompraId = ?',
+    [compraId]
+  );
+  return rows;
+};
+
+// Actualizar stock de un producto
+export const actualizarStockProducto = async (productoId, cantidad) => {
+  // Verificar si el producto existe
+  const [producto] = await dbPool.execute(
+    'SELECT Stock FROM Productos WHERE ProductoId = ?',
+    [productoId]
+  );
+
+  if (producto.length === 0) {
+    throw new Error(`Producto ${productoId} no encontrado`);
+  }
+
+  // Actualizar stock (sumar porque es una compra)
+  const stockActual = producto[0].Stock || 0;
+  const nuevoStock = stockActual + cantidad;
+
+  await dbPool.execute(
+    'UPDATE Productos SET Stock = ? WHERE ProductoId = ?',
+    [nuevoStock, productoId]
+  );
+
+  return { productoId, stockAnterior: stockActual, stockNuevo: nuevoStock };
 };

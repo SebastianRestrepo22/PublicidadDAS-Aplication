@@ -3,16 +3,23 @@ import {
   getAllCompras,
   getAllProductos,
   getAllProveedores,
-  updateCompra
+  updateCompraEstado  // Asegúrate de importar esta función
 } from "../services/services.compras";
 import { toast } from "react-toastify";
+
+// Constantes para los estados
+export const ESTADOS_COMPRA = {
+  PENDIENTE: 'pendiente',
+  ORDEN_ENVIADA: 'orden_enviada',
+  RECIBIDO: 'recibido',
+  ANULADA: 'anulada'
+};
 
 export const useCompras = () => {
   const [compras, setCompras] = useState([]);
   const [productos, setProductos] = useState([]);
   const [proveedores, setProveedores] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [estadoActivo, setEstadoActivo] = useState({});
 
   const fetchCatalogos = async () => {
     setLoading(true);
@@ -43,11 +50,6 @@ export const useCompras = () => {
     try {
       const data = await getAllCompras();
       setCompras(data || []);
-      const estados = {};
-      (data || []).forEach((c) => {
-        estados[c.CompraId] = Number(c.Estado) === 1 ? 1 : 0;
-      });
-      setEstadoActivo(estados);
     } catch (err) {
       console.error("Error al cargar compras:", err);
       toast.error("No se pudieron cargar las compras");
@@ -59,28 +61,48 @@ export const useCompras = () => {
     fetchCompras();
   }, []);
 
-  const toggleEstado = async (idCompra, nuevoEstadoBoolean) => {
-    const nuevoEstadoNum = nuevoEstadoBoolean ? 1 : 0;
-    const compraActual = compras.find((c) => c.CompraId === idCompra);
-    if (!compraActual) return;
+  const actualizarEstado = async (idCompra, nuevoEstado, productosAActualizar = null, motivo = "") => {
     try {
-      await updateCompra(idCompra, {
-        ProveedorId: compraActual.ProveedorId,
-        Total: compraActual.Total,
-        FechaRegistro: compraActual.FechaRegistro,
-        Estado: nuevoEstadoNum,
+      console.log("Actualizando estado:", { idCompra, nuevoEstado, motivo }); // LOG PARA DEBUG
+      
+      const result = await updateCompraEstado(idCompra, nuevoEstado, {
+        productos: productosAActualizar,
+        motivoCancelacion: motivo
       });
-      setEstadoActivo((prev) => ({ ...prev, [idCompra]: nuevoEstadoNum }));
+      
+      console.log("Respuesta del servidor:", result); // LOG PARA DEBUG
+      
+      // Actualizar la compra en el estado local
       setCompras((prev) =>
         prev.map((c) =>
-          c.CompraId === idCompra ? { ...c, Estado: nuevoEstadoNum } : c
+          c.CompraId === idCompra ? { ...c, Estado: nuevoEstado, MotivoCancelacion: motivo } : c
         )
       );
-      toast.success('Estado actualizado correctamente');
+      
+      // Si se actualizó el inventario, recargar productos
+      if (nuevoEstado === ESTADOS_COMPRA.RECIBIDO) {
+        await fetchCatalogos();
+      }
+      
+      toast.success(result.message || 'Estado actualizado correctamente');
+      return result;
     } catch (err) {
-      console.error("Error al actualizar estado", err);
-      toast.error("Error al actualizar estado");
+      console.error("Error detallado al actualizar estado:", err);
+      console.error("Respuesta del error:", err.response?.data); // LOG PARA DEBUG
+      toast.error(err.response?.data?.error || "Error al actualizar estado");
+      throw err;
     }
+  };
+
+  const puedeCambiarEstado = (estadoActual, nuevoEstado) => {
+    const flujoEstados = {
+      [ESTADOS_COMPRA.PENDIENTE]: [ESTADOS_COMPRA.ORDEN_ENVIADA, ESTADOS_COMPRA.ANULADA],
+      [ESTADOS_COMPRA.ORDEN_ENVIADA]: [ESTADOS_COMPRA.RECIBIDO, ESTADOS_COMPRA.ANULADA],
+      [ESTADOS_COMPRA.RECIBIDO]: [],
+      [ESTADOS_COMPRA.ANULADA]: []
+    };
+    
+    return flujoEstados[estadoActual]?.includes(nuevoEstado) || false;
   };
 
   return {
@@ -88,11 +110,11 @@ export const useCompras = () => {
     productos,
     proveedores,
     loading,
-    estadoActivo,
+    ESTADOS_COMPRA,
     fetchCompras,
     fetchCatalogos,
-    toggleEstado,
-    setCompras,
-    setEstadoActivo
+    actualizarEstado,
+    puedeCambiarEstado,
+    setCompras
   };
 };

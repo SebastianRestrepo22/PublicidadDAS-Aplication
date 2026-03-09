@@ -1,6 +1,7 @@
 import React from "react";
 import { Eye, Plus, Search } from "lucide-react";
 import { Pagination } from "../../../components/paginacion/pagination";
+import { ESTADOS_COMPRA } from "../hook/useCompras";
 
 const getShortId = (id) => {
   const str = String(id || "");
@@ -26,14 +27,36 @@ const formatPrice = (value) => {
   return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
 };
 
+// Configuración de estados para mostrar en la tabla
+const estadoConfig = {
+  [ESTADOS_COMPRA.PENDIENTE]: {
+    color: 'bg-yellow-100 text-yellow-800',
+    label: 'Pendiente',
+    icon: '⏳'
+  },
+  [ESTADOS_COMPRA.ORDEN_ENVIADA]: {
+    color: 'bg-blue-100 text-blue-800',
+    label: 'Orden Enviada',
+    icon: '📦'
+  },
+  [ESTADOS_COMPRA.RECIBIDO]: {
+    color: 'bg-green-100 text-green-800',
+    label: 'Recibido',
+    icon: '✅'
+  },
+  [ESTADOS_COMPRA.ANULADA]: {
+    color: 'bg-red-100 text-red-800',
+    label: 'Anulada',
+    icon: '❌'
+  }
+};
+
 export const ComprasList = ({
   paginatedData,
-  estadoActivo,
   filtroText,
   setFiltroText,
   filtroCampo,
   setFiltroCampo,
-  onToggleEstado,
   onView,
   onCreate,
   currentPage,
@@ -75,6 +98,7 @@ export const ComprasList = ({
               <option value="CompraId">ID Compra</option>
               <option value="ProveedorId">ID Proveedor</option>
               <option value="FechaRegistro">Fecha</option>
+              <option value="Estado">Estado</option>
             </select>
           </div>
         </div>
@@ -93,39 +117,38 @@ export const ComprasList = ({
             </tr>
           </thead>
           <tbody className="divide-y">
-            {paginatedData.map((compra) => (
-              <tr key={compra.CompraId} className="hover:bg-slate-50">
-                <td className="py-4 px-6">{getShortId(compra.CompraId)}</td>
-                <td className="py-4 px-6">{getShortId(compra.ProveedorId)}</td>
-                <td className="py-4 px-6">{formatearFecha(compra.FechaRegistro)}</td>
-                <td className="py-4 px-6 text-center font-medium">
-                  {formatPrice(compra.Total)}
-                </td>
-                <td className="py-4 px-6 text-center">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={Number(estadoActivo[compra.CompraId]) === 1}
-                      onChange={(e) => onToggleEstado(compra.CompraId, e.target.checked)}
-                    />
-                    <div className="w-12 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-all"></div>
-                    <span className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-md transform peer-checked:translate-x-6 transition-all"></span>
-                  </label>
-                </td>
-                <td className="py-4 px-6">
-                  <div className="flex justify-center gap-3">
-                    <button
-                      onClick={() => onView(compra)}
-                      className="p-2 hover:bg-emerald-50 rounded-full transition-colors"
-                      title="Ver detalles"
-                    >
-                      <Eye size={18} className="text-emerald-600" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {paginatedData.map((compra) => {
+              const estado = compra.Estado || ESTADOS_COMPRA.PENDIENTE;
+              const config = estadoConfig[estado] || estadoConfig[ESTADOS_COMPRA.PENDIENTE];
+              
+              return (
+                <tr key={compra.CompraId} className="hover:bg-slate-50">
+                  <td className="py-4 px-6">{getShortId(compra.CompraId)}</td>
+                  <td className="py-4 px-6">{getShortId(compra.ProveedorId)}</td>
+                  <td className="py-4 px-6">{formatearFecha(compra.FechaRegistro)}</td>
+                  <td className="py-4 px-6 text-center font-medium">
+                    {formatPrice(compra.Total)}
+                  </td>
+                  <td className="py-4 px-6 text-center">
+                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${config.color}`}>
+                      <span>{config.icon}</span>
+                      <span>{config.label}</span>
+                    </span>
+                  </td>
+                  <td className="py-4 px-6">
+                    <div className="flex justify-center gap-3">
+                      <button
+                        onClick={() => onView(compra)}
+                        className="p-2 hover:bg-emerald-50 rounded-full transition-colors"
+                        title="Ver detalles"
+                      >
+                        <Eye size={18} className="text-emerald-600" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
             {paginatedData.length === 0 && (
               <tr>
                 <td colSpan={6} className="py-8 text-center text-gray-500">

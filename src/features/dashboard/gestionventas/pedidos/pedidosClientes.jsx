@@ -10,138 +10,125 @@ import {
   getAllProductos,
   getAllServicios,
   getAllColores,
+  getAllClientes,
 } from "./services/services.pedidosClientes";
 
-// Componentes hijos
-import { Pagination } from "../../components/paginacion/pagination";
+// Componentes
 import { OrderList } from "./OrderList";
 import { OrderForm } from "./OrderForm";
 import { OrderView } from "./OrderView";
-import { ClientSelector } from "./ClientSelector";
-import { ProductSelector } from "./ProductSelector";
-import { ColorSelector } from "./ColorSelector";
-import { useNavigate } from "react-router-dom";
 
 // Helpers
 import { generateTempId, calcularTotalDetalles } from "../../gestionventas/pedidos/utils/pedidosHelpers";
+
+const getTodayDate = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export const PedidosClientes = () => {
   const [pedidos, setPedidos] = useState([]);
   const [viewMode, setViewMode] = useState("list");
   const [selectedPedido, setSelectedPedido] = useState(null);
-  const [returnTo, setReturnTo] = useState(null);
-  const navigate = useNavigate();
+  const [updating, setUpdating] = useState(false);
 
-  // ===== FILTROS =====
-  const [campoFiltro, setCampoFiltro] = useState("");
-  const [busqueda, setBusqueda] = useState("");
-
-  // ===== CATÁLOGOS =====
+  // Catálogos
   const [productos, setProductos] = useState([]);
   const [servicios, setServicios] = useState([]);
   const [colores, setColores] = useState([]);
+  const [clientes, setClientes] = useState([]);
   const [errores, setErrores] = useState([]);
 
-  // ===== FORMULARIO =====
-  const [formPedido, setFormPedido] = useState({
-    ClienteId: "", 
+  // Formulario de creación
+  const [formCrear, setFormCrear] = useState({
+    ClienteId: "",
     NombreCliente: "",
-    FechaRegistro: new Date().toISOString().split('T')[0],
-    Total: 0, 
-    Estado: "pendiente", 
+    FechaRegistro: getTodayDate(),
+    Total: 0,
+    Estado: "pendiente",
     MetodoPago: "transferencia",
-    NombreRecibe: "", 
-    TelefonoEntrega: "", 
+    NombreRecibe: "",
+    TelefonoEntrega: "",
     DireccionEntrega: "",
-    Voucher: "", 
+    Voucher: "",
     VoucherPreview: ""
   });
 
-  const [detallesPedido, setDetallesPedido] = useState([{
-    _tempId: generateTempId(), 
-    ProductoId: "", 
+  const [detallesCrear, setDetallesCrear] = useState([{
+    _tempId: generateTempId(),
+    ProductoId: "",
     ServicioId: "",
-    Cantidad: 1, 
-    Tamaño: "Mediana", 
+    Cantidad: 1,
+    Tamaño: "Mediana",
     Descripcion: "",
-    UrlImagen: "", 
-    Precio: 0, 
+    UrlImagen: "",
+    Precio: 0,
     ColorId: ""
   }]);
 
-  // ===== TIPO DE CLIENTE =====
-  const [tipoCliente, setTipoCliente] = useState('registrado');
-  const [clienteWalkin, setClienteWalkin] = useState({
-    Nombre: "", 
-    Telefono: "", 
+  const [tipoClienteCrear, setTipoClienteCrear] = useState('registrado');
+  const [clienteWalkinCrear, setClienteWalkinCrear] = useState({
+    Nombre: "",
+    Telefono: "",
     Correo: ""
   });
 
-  // ===== UPLOAD =====
-  const [voucherFile, setVoucherFile] = useState(null);
+  const [voucherFileCrear, setVoucherFileCrear] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [showVoucher, setShowVoucher] = useState(false);
 
-  // ===== PAGINACIÓN PRINCIPAL =====
+  // Paginación
   const [allData, setAllData] = useState([]);
   const [paginatedData, setPaginatedData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [filtroCampo, setFiltroCampo] = useState("");
+  const [filtroText, setFiltroText] = useState("");
 
-  // ===== SELECCIÓN =====
-  const [currentDetailIndex, setCurrentDetailIndex] = useState(-1);
-  const [selectionType, setSelectionType] = useState("");
-  const [clienteSearchFrom, setClienteSearchFrom] = useState("");
-
-  // ===== CARGAR CATÁLOGOS INICIALES =====
+  // Cargar catálogos
   useEffect(() => {
-  const fetchData = async () => {
-    try {
-      const [p, s, c] = await Promise.all([
-        getAllProductos(), 
-        getAllServicios(), 
-        getAllColores()
-      ]);
-      
-      // 👇 DEBUG: Revisa los precios que llegan
-      console.log('📦 Productos recibidos (primeros 3):', p.slice(0, 3).map(x => ({
-        id: x.ProductoId,
-        nombre: x.Nombre,
-        precio: x.Precio,
-        tipoPrecio: typeof x.Precio,
-        precioString: String(x.Precio)
-      })));
-      
-      setProductos(Array.isArray(p) ? p : []);
-      setServicios(Array.isArray(s) ? s : []);
-      setColores(Array.isArray(c) ? c : []);
-    } catch (err) {
-      console.error("Error cargando catálogos:", err);
-      toast.error("Error cargando datos iniciales");
-    }
-  };
-  fetchData();
-}, []);
+    const fetchData = async () => {
+      try {
+        const [p, s, c, cl] = await Promise.all([
+          getAllProductos(),
+          getAllServicios(),
+          getAllColores(),
+          getAllClientes()
+        ]);
 
-  // ===== CALCULAR TOTAL EN CREACIÓN =====
+        setProductos(Array.isArray(p) ? p : []);
+        setServicios(Array.isArray(s) ? s : []);
+        setColores(Array.isArray(c) ? c : []);
+        setClientes(Array.isArray(cl) ? cl : []);
+      } catch (err) {
+        console.error("Error cargando catálogos:", err);
+        toast.error("Error cargando datos iniciales");
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Calcular total
   useEffect(() => {
     if (viewMode === "create") {
-      const total = calcularTotalDetalles(detallesPedido);
-      setFormPedido(prev => ({ ...prev, Total: total }));
+      const total = calcularTotalDetalles(detallesCrear);
+      setFormCrear(prev => ({ ...prev, Total: total }));
     }
-  }, [detallesPedido, viewMode]);
+  }, [detallesCrear, viewMode]);
 
-  // ===== CARGAR PEDIDOS =====
+  // Cargar pedidos
   const fetchPedidos = async () => {
     try {
       const base = await getAllPedidosClientes();
-      if (!Array.isArray(base)) { 
-        setPedidos([]); 
-        return; 
+      if (!Array.isArray(base)) {
+        setPedidos([]);
+        return;
       }
-      
+
       const conDetalles = await Promise.all(
         base.map(async (p) => {
           try {
@@ -149,14 +136,14 @@ export const PedidosClientes = () => {
             return {
               ...p,
               detalle: Array.isArray(det)
-                ? det.map(item => ({ 
-                    ...item, 
-                    _tempId: item.DetallePedidoClienteId || generateTempId() 
+                ? det.map(item => ({
+                    ...item,
+                    _tempId: item.DetallePedidoClienteId || generateTempId()
                   }))
                 : []
             };
-          } catch { 
-            return { ...p, detalle: [] }; 
+          } catch {
+            return { ...p, detalle: [] };
           }
         })
       );
@@ -167,24 +154,25 @@ export const PedidosClientes = () => {
     }
   };
 
-  useEffect(() => { 
-    fetchPedidos(); 
+  useEffect(() => {
+    fetchPedidos();
   }, []);
 
-  // ===== FILTRADO Y PAGINACIÓN =====
+  // Filtrado
   useEffect(() => {
     let filtered = Array.isArray(pedidos) ? pedidos : [];
-    if (campoFiltro && busqueda.trim()) {
+    if (filtroCampo && filtroText.trim()) {
       filtered = filtered.filter(p => {
-        const val = String(p[campoFiltro] || "").toLowerCase();
-        return val.includes(busqueda.toLowerCase());
+        const val = String(p[filtroCampo] || "").toLowerCase();
+        return val.includes(filtroText.toLowerCase());
       });
     }
     setAllData(filtered);
     setTotalItems(filtered.length);
     setCurrentPage(1);
-  }, [busqueda, campoFiltro, pedidos]);
+  }, [filtroText, filtroCampo, pedidos]);
 
+  // Paginación
   useEffect(() => {
     if (Array.isArray(allData) && allData.length > 0) {
       const tp = Math.ceil(allData.length / itemsPerPage);
@@ -198,16 +186,16 @@ export const PedidosClientes = () => {
     }
   }, [itemsPerPage, currentPage, allData]);
 
-  // ===== NAVEGACIÓN =====
-  const goToList = () => { 
-    setViewMode("list"); 
-    setSelectedPedido(null); 
-    setErrores([]); 
+  // Navegación
+  const goToList = () => {
+    setViewMode("list");
+    setSelectedPedido(null);
+    setErrores([]);
   };
 
-  const goToCreate = () => { 
-    resetForm(); 
-    setViewMode("create"); 
+  const goToCreate = () => {
+    resetForm();
+    setViewMode("create");
   };
 
   const goToView = async (pedido) => {
@@ -216,15 +204,15 @@ export const PedidosClientes = () => {
       setSelectedPedido({
         ...pedido,
         detalle: Array.isArray(det)
-          ? det.map(item => ({ 
-              ...item, 
-              _tempId: item.DetallePedidoClienteId || generateTempId() 
+          ? det.map(item => ({
+              ...item,
+              _tempId: item.DetallePedidoClienteId || generateTempId()
             }))
           : []
       });
       setViewMode("view");
-    } catch { 
-      toast.error("Error al cargar detalles"); 
+    } catch {
+      toast.error("Error al cargar detalles");
     }
   };
 
@@ -234,202 +222,73 @@ export const PedidosClientes = () => {
       setSelectedPedido({
         ...pedido,
         detalle: Array.isArray(det)
-          ? det.map(item => ({ 
-              ...item, 
-              _tempId: item.DetallePedidoClienteId || generateTempId() 
+          ? det.map(item => ({
+              ...item,
+              _tempId: item.DetallePedidoClienteId || generateTempId()
             }))
           : []
       });
       setErrores([]);
       setViewMode("edit");
-    } catch { 
-      toast.error("Error al cargar para editar"); 
+    } catch {
+      toast.error("Error al cargar para editar");
     }
   };
 
-  // ===== RESET FORM =====
   const resetForm = () => {
-    setFormPedido({
-      ClienteId: "", 
+    setFormCrear({
+      ClienteId: "",
       NombreCliente: "",
-      FechaRegistro: new Date().toISOString().split('T')[0],
-      Total: 0, 
-      Estado: "pendiente", 
+      FechaRegistro: getTodayDate(),
+      Total: 0,
+      Estado: "pendiente",
       MetodoPago: "transferencia",
-      NombreRecibe: "", 
-      TelefonoEntrega: "", 
+      NombreRecibe: "",
+      TelefonoEntrega: "",
       DireccionEntrega: "",
-      Voucher: "", 
+      Voucher: "",
       VoucherPreview: ""
     });
-    setDetallesPedido([{
-      _tempId: generateTempId(), 
-      ProductoId: "", 
+    setDetallesCrear([{
+      _tempId: generateTempId(),
+      ProductoId: "",
       ServicioId: "",
-      Cantidad: 1, 
-      Tamaño: "Mediana", 
+      Cantidad: 1,
+      Tamaño: "Mediana",
       Descripcion: "",
-      UrlImagen: "", 
-      Precio: 0, 
+      UrlImagen: "",
+      Precio: 0,
       ColorId: ""
     }]);
-    setClienteWalkin({ 
-      Nombre: "", 
-      Telefono: "", 
-      Correo: "" 
+    setTipoClienteCrear('registrado');
+    setClienteWalkinCrear({
+      Nombre: "",
+      Telefono: "",
+      Correo: ""
     });
-    setTipoCliente('registrado');
-    setVoucherFile(null);
+    setVoucherFileCrear(null);
     setErrores([]);
-    setShowVoucher(false);
   };
 
-  // ===== SELECCIÓN =====
-  const goToSelectCliente = (from) => {
-    setClienteSearchFrom(from);
-    setViewMode("select-cliente");
-  };
-
-  const goToSelectProducto = (from, index) => {
-    setReturnTo(from);
-    setCurrentDetailIndex(index);
-    setSelectionType("producto");
-    setViewMode("select-producto");
-  };
-
-  const goToSelectColor = (from, index) => {
-    setReturnTo(from);
-    setCurrentDetailIndex(index);
-    setSelectionType("color");
-    setViewMode("select-color");
-  };
-
-  const seleccionarDesdeVista = (item) => {
-    if (selectionType === "producto") {
-      const id = item.ProductoId || item.ServicioId || "";
-      if (returnTo === "create") {
-        setDetallesPedido(prev => {
-          const nuevos = [...prev];
-          nuevos[currentDetailIndex] = {
-            ...nuevos[currentDetailIndex],
-            ProductoId: item.tipo === 'producto' ? id : "",
-            ServicioId: item.tipo === 'servicio' ? id : "",
-            Precio: item.Precio || 0,
-            Descripcion: item.Descripcion || "",
-            UrlImagen: item.UrlImagen || ""
-          };
-          return nuevos;
-        });
-      } else if (returnTo === "edit" && selectedPedido) {
-        setSelectedPedido(prev => {
-          const nuevos = [...prev.detalle];
-          nuevos[currentDetailIndex] = {
-            ...nuevos[currentDetailIndex],
-            ProductoId: item.tipo === 'producto' ? id : "",
-            ServicioId: item.tipo === 'servicio' ? id : "",
-            Precio: item.Precio || 0,
-            Descripcion: item.Descripcion || "",
-            UrlImagen: item.UrlImagen || ""
-          };
-          return { ...prev, detalle: nuevos };
-        });
-      }
-    } else if (selectionType === "color") {
-      const colorId = item.ColorId || item.id || "";
-      if (returnTo === "create") {
-        setDetallesPedido(prev => {
-          const nuevos = [...prev];
-          nuevos[currentDetailIndex].ColorId = colorId;
-          return nuevos;
-        });
-      } else if (returnTo === "edit" && selectedPedido) {
-        setSelectedPedido(prev => {
-          const nuevos = [...prev.detalle];
-          nuevos[currentDetailIndex].ColorId = colorId;
-          return { ...prev, detalle: nuevos };
-        });
-      }
-    }
-    setViewMode(returnTo);
-  };
-
-  // ===== DETALLES =====
-  const añadirDetalle = (mode) => {
-    const nuevo = {
-      _tempId: generateTempId(), 
-      ProductoId: "", 
-      ServicioId: "",
-      Cantidad: 1, 
-      Tamaño: "Mediana", 
-      Descripcion: "",
-      UrlImagen: "", 
-      Precio: 0, 
-      ColorId: ""
-    };
-    if (mode === "create") {
-      setDetallesPedido(prev => [...prev, nuevo]);
-    } else if (mode === "edit" && selectedPedido) {
-      setSelectedPedido(prev => ({
-        ...prev, 
-        detalle: [...prev.detalle, nuevo]
-      }));
-    }
-  };
-
-  const eliminarDetalle = (index, mode) => {
-    if (mode === "create" && detallesPedido.length > 1) {
-      setDetallesPedido(prev => prev.filter((_, i) => i !== index));
-    } else if (mode === "edit" && selectedPedido?.detalle?.length > 1) {
-      setSelectedPedido(prev => ({
-        ...prev, 
-        detalle: prev.detalle.filter((_, i) => i !== index)
-      }));
-    }
-  };
-
-  const actualizarDetalle = (index, campo, valor, mode) => {
-    if (mode === "create") {
-      setDetallesPedido(prev => {
-        const nuevos = [...prev];
-        nuevos[index] = { ...nuevos[index], [campo]: valor };
-        return nuevos;
-      });
-    } else if (mode === "edit" && selectedPedido) {
-      setSelectedPedido(prev => {
-        const nuevos = [...prev.detalle];
-        nuevos[index] = { ...nuevos[index], [campo]: valor };
-        return { ...prev, detalle: nuevos };
-      });
-    }
-  };
-
-  // ===== VALIDACIONES =====
-  const validarFormulario = (form, detalles, mode = "create") => {
-    const errs = [];
-    if (!form.FechaRegistro) errs.push("La fecha es obligatoria.");
-    if (!detalles?.length) errs.push("Agregue al menos un producto/servicio.");
-    detalles?.forEach((d, i) => {
-      if (!d.ProductoId && !d.ServicioId) errs.push(`Artículo ${i + 1}: seleccione producto/servicio.`);
-      if (!d.Cantidad || Number(d.Cantidad) <= 0) errs.push(`Artículo ${i + 1}: cantidad inválida.`);
-      if (!d.Precio || Number(d.Precio) <= 0) errs.push(`Artículo ${i + 1}: precio inválido.`);
-    });
-    return errs;
-  };
-
-  // ===== CREAR =====
   const handleCreate = async () => {
-    const errs = validarFormulario(formPedido, detallesPedido, "create");
-    if (errs.length) { 
-      setErrores(errs); 
-      toast.error("Corrija los errores"); 
-      return; 
+    // Validaciones básicas
+    const errs = [];
+    if (!formCrear.FechaRegistro) errs.push("La fecha es obligatoria.");
+    if (tipoClienteCrear === 'walkin' && !clienteWalkinCrear.Nombre) {
+      errs.push("El nombre del cliente es obligatorio");
+    }
+    if (!detallesCrear?.length) errs.push("Agregue al menos un producto/servicio.");
+    
+    if (errs.length) {
+      setErrores(errs);
+      toast.error("Corrija los errores");
+      return;
     }
 
     try {
       setUploading(true);
 
-      // Preparar datos del pedido
-      const detallesLimpios = detallesPedido.map(d => ({
+      const detallesLimpios = detallesCrear.map(d => ({
         ProductoId: d.ProductoId?.trim() || null,
         ServicioId: d.ServicioId?.trim() || null,
         Cantidad: Number(d.Cantidad) || 1,
@@ -440,45 +299,35 @@ export const PedidosClientes = () => {
         ColorId: d.ColorId || null
       }));
 
-      // Crear FormData
       const formData = new FormData();
-
-      // Agregar los datos del pedido como JSON string
       const pedidoString = JSON.stringify({
-        ClienteId: tipoCliente === 'registrado' ? formPedido.ClienteId?.trim() || null : null,
-        FechaRegistro: formPedido.FechaRegistro,
-        Total: Number(formPedido.Total) || 0,
-        Estado: formPedido.Estado,
-        MetodoPago: formPedido.MetodoPago,
-        NombreRecibe: formPedido.MetodoPago === "contra_entrega" ? formPedido.NombreRecibe || null : null,
-        TelefonoEntrega: formPedido.MetodoPago === "contra_entrega" ? formPedido.TelefonoEntrega || null : null,
-        DireccionEntrega: formPedido.MetodoPago === "contra_entrega" ? formPedido.DireccionEntrega || null : null,
-        TipoCliente: tipoCliente,
-        ClienteNombre: tipoCliente === 'walkin' ? clienteWalkin.Nombre || null : null,
-        ClienteTelefono: tipoCliente === 'walkin' ? clienteWalkin.Telefono || null : null,
-        ClienteCorreo: tipoCliente === 'walkin' ? clienteWalkin.Correo || null : null,
+        ClienteId: tipoClienteCrear === 'registrado' ? formCrear.ClienteId?.trim() || null : null,
+        FechaRegistro: formCrear.FechaRegistro,
+        Total: Number(formCrear.Total) || 0,
+        Estado: formCrear.Estado,
+        MetodoPago: formCrear.MetodoPago,
+        NombreRecibe: formCrear.MetodoPago === "contra_entrega" ? formCrear.NombreRecibe || null : null,
+        TelefonoEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.TelefonoEntrega || null : null,
+        DireccionEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.DireccionEntrega || null : null,
+        TipoCliente: tipoClienteCrear,
+        ClienteNombre: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Nombre || null : null,
+        ClienteTelefono: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Telefono || null : null,
+        ClienteCorreo: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Correo || null : null,
         detalle: detallesLimpios
       });
 
       formData.append('pedido', pedidoString);
-
-      // Agregar el voucher si existe
-      if (formPedido.MetodoPago === "transferencia" && voucherFile) {
-        formData.append('voucher', voucherFile);
+      if (formCrear.MetodoPago === "transferencia" && voucherFileCrear) {
+        formData.append('voucher', voucherFileCrear);
       }
 
-      // Enviar petición
-      const response = await axios.post('http://localhost:3000/api/pedidos-clientes', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+      await axios.post('http://localhost:3000/api/pedidos-clientes', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      console.log('✅ Respuesta del servidor:', response.data);
       toast.success("Pedido creado correctamente");
       goToList();
       fetchPedidos();
-
     } catch (err) {
       console.error('❌ Error:', err);
       toast.error(`Error: ${err.response?.data?.error || err.message}`);
@@ -487,160 +336,54 @@ export const PedidosClientes = () => {
     }
   };
 
-  // ===== EDITAR =====
-  const handleEdit = async () => {
-    if (!selectedPedido) return;
-    
-    const errs = validarFormulario(selectedPedido, selectedPedido.detalle, "edit");
-    if (errs.length) { 
-      setErrores(errs); 
-      toast.error("Corrija los errores"); 
-      return; 
-    }
-
-    try {
-      setUploading(true);
-
-      const detallesLimpios = selectedPedido.detalle.map(d => ({
-        ProductoId: d.ProductoId?.trim() || null,
-        ServicioId: d.ServicioId?.trim() || null,
-        Cantidad: Number(d.Cantidad) || 1,
-        Tamaño: d.Tamaño || "Mediana",
-        Descripcion: d.Descripcion || "",
-        UrlImagen: d.UrlImagen || "",
-        Precio: Number(d.Precio) || 0,
-        ColorId: d.ColorId || null
-      }));
-
-      const pedidoData = {
-        ClienteId: selectedPedido.ClienteId?.trim() || null,
-        FechaRegistro: selectedPedido.FechaRegistro,
-        Total: Number(selectedPedido.Total) || 0,
-        Estado: selectedPedido.Estado,
-        MetodoPago: selectedPedido.MetodoPago,
-        NombreRecibe: selectedPedido.MetodoPago === "contra_entrega" ? selectedPedido.NombreRecibe : null,
-        TelefonoEntrega: selectedPedido.MetodoPago === "contra_entrega" ? selectedPedido.TelefonoEntrega : null,
-        DireccionEntrega: selectedPedido.MetodoPago === "contra_entrega" ? selectedPedido.DireccionEntrega : null,
-        Voucher: selectedPedido.Voucher || null,
-        TipoCliente: selectedPedido.TipoCliente || 'registrado',
-        ClienteNombre: selectedPedido.ClienteNombre || null,
-        ClienteTelefono: selectedPedido.ClienteTelefono || null,
-        ClienteCorreo: selectedPedido.ClienteCorreo || null,
-        detalle: detallesLimpios
-      };
-
-      const formData = new FormData();
-      formData.append('pedido', JSON.stringify(pedidoData));
-
-      if (selectedPedido.MetodoPago === "transferencia" && voucherFile) {
-        formData.append('voucher', voucherFile);
-      }
-
-      const response = await axios.put(
-        `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
-
-      console.log('✅ Pedido actualizado:', response.data);
-      toast.success("Pedido actualizado");
-      goToList();
-      fetchPedidos();
-
-    } catch (err) {
-      console.error('❌ Error:', err);
-      toast.error(`Error: ${err.response?.data?.error || err.message}`);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // ===== ACTUALIZAR ESTADO (CORREGIDO) =====
-  const handleUpdateEstado = async (estado) => {
+  const handleUpdateEstado = async (estado, motivo = "") => {
     if (!selectedPedido) return;
 
     try {
-      console.log(' Enviando actualización de estado:', {
-        id: selectedPedido.PedidoClienteId,
-        estado
-      });
+      setUpdating(true);
+      const payload = { Estado: estado };
+      if (estado === 'cancelado' && motivo) payload.motivo = motivo;
 
-      const response = await axios.put(
+      await axios.put(
         `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
-        { Estado: estado },
+        payload,
         { headers: { 'Content-Type': 'application/json' } }
       );
 
-      console.log(' Respuesta completa del servidor:', response.data);
+      setSelectedPedido(prev => ({
+        ...prev,
+        Estado: estado,
+        MotivoCancelacion: estado === 'cancelado' ? motivo : prev.MotivoCancelacion
+      }));
 
-      if (estado === 'aprobado') {
-        // Verificar si se creó la venta
-        if (response.data.ventaCreada) {
-          const ventaInfo = response.data.ventaCreada;
-          const ventaId = ventaInfo.id || ventaInfo.VentaId || '';
-          
-          toast.success(
-            ` Pedido aprobado. Venta #${ventaId.toString().slice(-3)} generada`,
-            {
-              onClick: () => navigate(`/ventas/${ventaId}`),
-              closeOnClick: true
-            }
-          );
-        } 
-        else if (response.data.errorVenta) {
-          const errorMsg = typeof response.data.errorVenta === 'object' 
-            ? response.data.errorVenta.mensaje || 'Error desconocido'
-            : response.data.errorVenta;
-          
-          toast.warning(` Pedido aprobado, pero la venta falló: ${errorMsg}`);
-          console.error(' Error en creación de venta:', response.data.errorVenta);
-        } 
-        else {
-          toast.success(" Pedido aprobado correctamente");
-        }
-      } else {
-        toast.success(`Estado actualizado a ${estado}`);
-      }
-
-      goToList();
+      toast.success(`✅ Pedido ${estado === 'cancelado' ? 'cancelado' : 'actualizado'} correctamente`);
       await fetchPedidos();
-
     } catch (err) {
-      console.error(' Error en la petición:', err);
-      
-      let errorMessage = "No se pudo actualizar el estado";
-      if (err.response?.data) {
-        errorMessage = err.response.data.error || 
-                       err.response.data.message || 
-                       JSON.stringify(err.response.data);
-      }
-      
-      toast.error(` Error: ${errorMessage}`);
+      console.error('❌ Error:', err);
+      toast.error(`Error: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setUpdating(false);
     }
   };
 
-  // ===== HANDLERS DE PAGINACIÓN =====
   const handlePageChange = (page) => setCurrentPage(page);
-
   const handleItemsPerPageChange = (newItems) => {
     setItemsPerPage(newItems);
     setCurrentPage(1);
   };
 
-  // ===== RENDER =====
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Pedidos</h1>
 
-        {/* LISTA */}
         {viewMode === "list" && (
           <OrderList
             paginatedData={paginatedData}
-            busqueda={busqueda}
-            setBusqueda={setBusqueda}
-            campoFiltro={campoFiltro}
-            setCampoFiltro={setCampoFiltro}
+            filtroText={filtroText}
+            setFiltroText={setFiltroText}
+            filtroCampo={filtroCampo}
+            setFiltroCampo={setFiltroCampo}
             currentPage={currentPage}
             totalPages={totalPages}
             itemsPerPage={itemsPerPage}
@@ -652,93 +395,43 @@ export const PedidosClientes = () => {
           />
         )}
 
-        {/* FORMULARIO */}
-        {(viewMode === "create" || viewMode === "edit") && (
+        {viewMode === "create" && (
           <OrderForm
-            viewMode={viewMode}
-            formPedido={formPedido}
-            setFormPedido={setFormPedido}
-            detallesPedido={detallesPedido}
-            setDetallesPedido={setDetallesPedido}
-            selectedPedido={selectedPedido}
-            setSelectedPedido={setSelectedPedido}
-            tipoCliente={tipoCliente}
-            setTipoCliente={setTipoCliente}
-            clienteWalkin={clienteWalkin}
-            setClienteWalkin={setClienteWalkin}
-            voucherFile={voucherFile}
-            setVoucherFile={setVoucherFile}
+            formCrear={formCrear}
+            setFormCrear={setFormCrear}
+            detallesCrear={detallesCrear}
+            setDetallesCrear={setDetallesCrear}
+            tipoClienteCrear={tipoClienteCrear}
+            setTipoClienteCrear={setTipoClienteCrear}
+            clienteWalkinCrear={clienteWalkinCrear}
+            setClienteWalkinCrear={setClienteWalkinCrear}
+            voucherFileCrear={voucherFileCrear}
+            setVoucherFileCrear={setVoucherFileCrear}
             uploading={uploading}
-            showVoucher={showVoucher}
-            setShowVoucher={setShowVoucher}
             errores={errores}
             productos={productos}
             servicios={servicios}
             colores={colores}
-            goToSelectCliente={goToSelectCliente}
-            goToSelectProducto={goToSelectProducto}
-            goToSelectColor={goToSelectColor}
-            añadirDetalle={añadirDetalle}
-            eliminarDetalle={eliminarDetalle}
-            actualizarDetalle={actualizarDetalle}
-            handleCreate={handleCreate}
-            handleEdit={handleEdit}
-            goToList={goToList}
-            setViewMode={setViewMode}
+            clientes={clientes}
+            onBack={goToList}
+            onCreate={handleCreate}
           />
         )}
 
-        {/* VER */}
         {viewMode === "view" && selectedPedido && (
           <OrderView
             selectedPedido={selectedPedido}
             productos={productos}
             servicios={servicios}
             colores={colores}
-            goToList={goToList}
-            goToEdit={goToEdit}
-            handleUpdateEstado={handleUpdateEstado}
-          />
-        )}
-
-        {/* SELECT CLIENTE */}
-        {viewMode === "select-cliente" && (
-          <ClientSelector
-            goToBack={() => setViewMode(clienteSearchFrom)}
-            onSelect={(cliente) => {
-              if (clienteSearchFrom === "create") {
-                setFormPedido({
-                  ...formPedido,
-                  ClienteId: cliente.CedulaId || "",
-                  NombreCliente: cliente.NombreCompleto || "Cliente",
-                  NombreRecibe: cliente.NombreCompleto || "",
-                  TelefonoEntrega: cliente.Telefono || ""
-                });
-              }
-              setViewMode(clienteSearchFrom);
-            }}
-          />
-        )}
-
-        {/* SELECT PRODUCTO */}
-        {viewMode === "select-producto" && (
-          <ProductSelector
-            goToBack={() => setViewMode(returnTo)}
-            onSelect={seleccionarDesdeVista}
-            productos={productos}
-            servicios={servicios}
-          />
-        )}
-
-        {/* SELECT COLOR */}
-        {viewMode === "select-color" && (
-          <ColorSelector
-            goToBack={() => setViewMode(returnTo)}
-            onSelect={seleccionarDesdeVista}
-            colores={colores}
+            onBack={goToList}
+            onEdit={goToEdit}
+            onUpdateEstado={handleUpdateEstado}
+            userRole="admin"
           />
         )}
       </div>
+
       <ToastContainer position="top-right" autoClose={3000} theme="colored" />
     </div>
   );
