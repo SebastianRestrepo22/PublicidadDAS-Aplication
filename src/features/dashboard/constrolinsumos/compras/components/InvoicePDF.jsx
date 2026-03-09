@@ -2,69 +2,104 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-export const generarFacturaPDF = (compra, detalles, proveedor) => {
+export const generarFacturaCompraPDF = (compra, detalles, proveedor) => {
   try {
-    console.log("🟡 Generando factura para compra:", compra?.CompraId);
-    console.log("🟡 Detalles de la compra:", detalles);
+    console.log("🟡 Generando factura de COMPRA:", compra?.CompraId);
+    console.log("🟡 Detalles:", detalles);
     console.log("🟡 Proveedor:", proveedor);
     
-    // Validar datos
     if (!compra) {
       throw new Error("No hay datos de la compra");
     }
     
-    // Crear nuevo documento PDF
     const doc = new jsPDF();
     
-    // Configurar fuente
+    // Colores
+    const colorPrimario = [30, 58, 138]; // Azul oscuro #1e3a8a
+    const colorSecundario = [243, 244, 246]; // Gris claro #f3f4f6
+    const colorTexto = [75, 85, 99]; // Gris oscuro #4b5563
+    
+    // ==========================================
+    // HEADER AZUL
+    // ==========================================
+    doc.setFillColor(...colorPrimario);
+    doc.rect(0, 0, 210, 40, 'F');
+    
     doc.setFont('helvetica');
-    
-    // Encabezado de la empresa
-    doc.setFontSize(20);
-    doc.setTextColor(0, 0, 0);
-    doc.text('PublicidadDAS', 20, 20);
-    
-    doc.setFontSize(10);
-    doc.text('NIT: 901.234.567-8', 20, 28);
-    doc.text('Regimen Comun', 20, 34);
-    
-    // Línea separadora
-    doc.setDrawColor(200, 200, 200);
-    doc.line(20, 38, 190, 38);
-    
-    // Título FACTURA
-    doc.setFontSize(16);
-    doc.setTextColor(0, 102, 204);
-    doc.text('FACTURA DE COMPRA', 20, 48);
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text('Documento equivalente a factura', 20, 54);
-    
-    // Número de factura (usar los primeros 8 caracteres del ID de la compra)
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
-    const facturaNum = compra.CompraId ? compra.CompraId.substring(0, 8).toUpperCase() : 'N/A';
-    doc.text(`FACTURA No. ${facturaNum}`, 140, 48);
-    
-    // Información del cliente (usar datos del proveedor)
-    doc.setFontSize(11);
-    doc.setTextColor(0, 0, 0);
-    doc.text('CLIENTE', 20, 68);
-    
-    doc.setFontSize(10);
-    const nombreProveedor = proveedor?.NombreProveedor || 'Cliente General';
-    const email = proveedor?.Email || 'N/A';
-    const telefono = proveedor?.Telefono || 'N/A';
-    
-    doc.text(`Nombre: ${nombreProveedor}`, 20, 76);
-    doc.text(`Email: ${email}`, 20, 82);
-    doc.text(`Teléfono: ${telefono}`, 20, 88);
-    
-    // Detalles de la factura
-    doc.setFontSize(11);
-    doc.text('DETALLES', 20, 102);
+    doc.setFontSize(22);
+    doc.setTextColor(255, 255, 255);
+    doc.text('PublicidadDAS', 20, 25);
     
     doc.setFontSize(9);
+    doc.text('NIT: 901.234.567-8', 150, 20);
+    doc.text('Regimen Comun', 150, 26);
+    
+    // ==========================================
+    // TÍTULO Y NÚMERO DE FACTURA
+    // ==========================================
+    doc.setFontSize(16);
+    doc.setTextColor(...colorPrimario);
+    doc.text('FACTURA DE COMPRA', 20, 55);
+    
+    doc.setFontSize(8);
+    doc.setTextColor(...colorTexto);
+    doc.text('Documento equivalente a factura', 20, 61);
+    
+    // Caja número de factura
+    doc.setFillColor(...colorSecundario);
+    doc.roundedRect(140, 45, 50, 20, 2, 2, 'F');
+    
+    doc.setFontSize(8);
+    doc.setTextColor(...colorTexto);
+    doc.text('FACTURA No.', 150, 52);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(...colorPrimario);
+    doc.setFont('helvetica', 'bold');
+    const facturaNum = compra.CompraId ? compra.CompraId.substring(0, 8).toUpperCase() : 'N/A';
+    doc.text(facturaNum, 150, 60);
+    
+    // ==========================================
+    // SECCIÓN CLIENTE (PROVEEDOR)
+    // ==========================================
+    doc.setFillColor(...colorSecundario);
+    doc.roundedRect(20, 75, 85, 35, 2, 2, 'F');
+    
+    doc.setFontSize(10);
+    doc.setTextColor(...colorPrimario);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PROVEEDOR', 25, 83);
+    
+    doc.setFontSize(9);
+    doc.setTextColor(...colorTexto);
+    doc.setFont('helvetica', 'normal');
+    
+    const nombreProveedor = proveedor?.NombreProveedor || 'Proveedor General';
+    const nitProveedor = proveedor?.NIT || 'N/A';
+    const email = proveedor?.Email || 'N/A';
+    const telefono = proveedor?.Telefono || 'N/A';
+    const direccion = proveedor?.Direccion || 'N/A';
+    
+    doc.text(`Nombre: ${nombreProveedor}`, 25, 92);
+    doc.text(`NIT: ${nitProveedor}`, 25, 98);
+    doc.text(`Email: ${email}`, 25, 104);
+    doc.text(`Teléfono: ${telefono}`, 25, 110);
+    
+    // ==========================================
+    // SECCIÓN DETALLES
+    // ==========================================
+    doc.setFillColor(...colorSecundario);
+    doc.roundedRect(115, 75, 75, 35, 2, 2, 'F');
+    
+    doc.setFontSize(10);
+    doc.setTextColor(...colorPrimario);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DETALLES', 120, 83);
+    
+    doc.setFontSize(8);
+    doc.setTextColor(...colorTexto);
+    doc.setFont('helvetica', 'normal');
+    
     let fechaTexto = 'Fecha no disponible';
     if (compra.FechaRegistro) {
       try {
@@ -80,14 +115,28 @@ export const generarFacturaPDF = (compra, detalles, proveedor) => {
         console.error("Error formateando fecha:", e);
       }
     }
-    doc.text(`Fecha: ${fechaTexto}`, 20, 110);
     
-    doc.setTextColor(0, 150, 0);
-    doc.text('Estado: PAGADA', 20, 116);
-    doc.setTextColor(0, 0, 0);
-    doc.text('Origen: Venta Manual', 20, 122);
+    doc.text(`Fecha: ${fechaTexto}`, 120, 92);
     
-    // Tabla de productos - USAR LOS DETALLES REALES
+    // Estado
+    const estado = compra.Estado || 'PENDIENTE';
+    const colorEstado = estado === 'PAGADA' ? [34, 197, 94] : [239, 68, 68];
+    doc.setTextColor(...colorEstado);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Estado: ${estado}`, 120, 98);
+    
+    doc.setTextColor(...colorTexto);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Origen: ${compra.Origen || 'Compra Manual'}`, 120, 104);
+    
+    // Número de factura del proveedor si existe
+    if (compra.NumeroFacturaProveedor) {
+      doc.text(`Fact. Proveedor: ${compra.NumeroFacturaProveedor}`, 120, 110);
+    }
+    
+    // ==========================================
+    // TABLA DE PRODUCTOS
+    // ==========================================
     const tableColumn = ['Producto/Servicio', 'Cant.', 'P.Unit', 'Subtotal'];
     const tableRows = [];
     
@@ -100,10 +149,8 @@ export const generarFacturaPDF = (compra, detalles, proveedor) => {
         const subtotalItem = detalle.Subtotal || (cantidad * precioUnit);
         subtotal += subtotalItem;
         
-        // Obtener nombre del producto (puede venir de diferentes formas)
         let nombreProducto = 'Producto';
         
-        // Buscar el producto en la lista de productos si está disponible
         if (detalle.ProductoNombre) {
           nombreProducto = detalle.ProductoNombre;
         } else if (detalle.producto?.Nombre) {
@@ -123,50 +170,80 @@ export const generarFacturaPDF = (compra, detalles, proveedor) => {
       tableRows.push(['No hay productos', '0', '$0', '$0']);
     }
     
-    // Generar tabla
+    // Generar tabla con header azul
     autoTable(doc, {
-      startY: 130,
+      startY: 120,
       head: [tableColumn],
       body: tableRows,
       theme: 'grid',
       headStyles: {
-        fillColor: [240, 240, 240],
-        textColor: [0, 0, 0],
-        fontStyle: 'bold'
+        fillColor: colorPrimario,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 9
+      },
+      bodyStyles: {
+        fontSize: 8
       },
       columnStyles: {
-        0: { cellWidth: 80 },
-        1: { cellWidth: 30, halign: 'center' },
+        0: { cellWidth: 90 },
+        1: { cellWidth: 25, halign: 'center' },
         2: { cellWidth: 30, halign: 'right' },
-        3: { cellWidth: 30, halign: 'right' }
-      }
+        3: { cellWidth: 35, halign: 'right' }
+      },
+      margin: { left: 20, right: 20 }
     });
     
-    // Totales
-    const finalY = doc.lastAutoTable?.finalY + 10 || 200;
+    // ==========================================
+    // TOTALES
+    // ==========================================
+    const finalY = doc.lastAutoTable?.finalY + 10 || 180;
     const iva = subtotal * 0.19;
     const total = subtotal + iva;
     
-    doc.setFontSize(10);
-    doc.text('Subtotal:', 140, finalY);
-    doc.text(`$${subtotal.toFixed(0)}`, 170, finalY, { align: 'right' });
+    // Caja de totales
+    doc.setFillColor(...colorSecundario);
+    doc.roundedRect(120, finalY, 70, 35, 2, 2, 'F');
     
-    doc.text('IVA (19%):', 140, finalY + 6);
-    doc.text(`$${iva.toFixed(0)}`, 170, finalY + 6, { align: 'right' });
+    doc.setFontSize(9);
+    doc.setTextColor(...colorTexto);
+    doc.setFont('helvetica', 'normal');
     
-    doc.setFontSize(12);
+    doc.text('Subtotal:', 125, finalY + 8);
+    doc.text(`$ ${subtotal.toFixed(0)}`, 185, finalY + 8, { align: 'right' });
+    
+    doc.text('IVA (19%):', 125, finalY + 16);
+    doc.text(`$ ${iva.toFixed(0)}`, 185, finalY + 16, { align: 'right' });
+    
+    doc.setDrawColor(200, 200, 200);
+    doc.line(125, finalY + 19, 185, finalY + 19);
+    
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('TOTAL:', 140, finalY + 14);
-    doc.text(`$${total.toFixed(0)}`, 170, finalY + 14, { align: 'right' });
+    doc.setTextColor(...colorPrimario);
+    doc.text('TOTAL:', 125, finalY + 28);
+    doc.text(`$ ${total.toFixed(0)}`, 185, finalY + 28, { align: 'right' });
     
-    // Guardar el PDF
-    const fileName = `factura-${compra.CompraId ? compra.CompraId.substring(0, 8) : 'unknown'}.pdf`;
+    // ==========================================
+    // FOOTER
+    // ==========================================
+    doc.setFontSize(8);
+    doc.setTextColor(...colorTexto);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Documento generado electrónicamente', 105, 280, { align: 'center' });
+    
+    // ==========================================
+    // GUARDAR PDF
+    // ==========================================
+    const fileName = `factura-compra-${facturaNum}.pdf`;
     doc.save(fileName);
     
-    console.log("🟢 Factura generada exitosamente con", detalles.length, "productos");
+    console.log("🟢 Factura de compra generada exitosamente con", detalles.length, "productos");
     
   } catch (error) {
-    console.error("🔴 Error en generarFacturaPDF:", error);
+    console.error("🔴 Error en generarFacturaCompraPDF:", error);
     throw error;
   }
 };
+
+export default generarFacturaCompraPDF;
