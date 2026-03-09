@@ -279,17 +279,6 @@ export const ProductoDetalle = () => {
                   <h1 className="text-2xl md:text-3xl font-bold text-slate-800 mb-3">
                     {producto.Nombre}
                   </h1>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="flex items-center">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className="h-4 w-4 md:h-5 md:w-5 fill-yellow-400 text-yellow-400"
-                        />
-                      ))}
-                    </div>
-                    <span className="text-slate-600 text-sm">(4.8 - 124 reseñas)</span>
-                  </div>
 
                   <div className="flex items-baseline gap-3 mb-2">
                     {producto.Descuento > 0 && (

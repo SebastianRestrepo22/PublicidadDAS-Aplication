@@ -11,25 +11,22 @@ export const createVentaManual = async (ventaData) => {
     
     let config = { headers };
     
+    // Si es FormData, NO establecer Content-Type (axios lo hará automáticamente con el boundary)
     if (ventaData instanceof FormData) {
-      console.log("Enviando FormData...");
+      console.log("📤 Enviando FormData con archivos...");
+      // No establecer Content-Type
     } else {
       headers['Content-Type'] = 'application/json';
     }
     
     const response = await axios.post(`${API_URL}/ventas/manual`, ventaData, config);
-    
-    console.log("Respuesta del servidor:", response.data);
-    
     return response.data;
     
   } catch (error) {
-    console.error("Error en createVentaManual:", error.response?.data || error);
-    
+    console.error("❌ Error en createVentaManual:", error.response?.data || error);
     if (error.response?.data) {
       throw error.response.data;
     }
-    
     throw error;
   }
 };

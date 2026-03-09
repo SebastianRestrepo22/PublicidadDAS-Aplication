@@ -90,38 +90,72 @@ export const CarritoCompras = () => {
     }
   }, [cart, colorsLoaded]);
 
-  const verificarDatosCarrito = () => {
-    console.log("=== VERIFICACIÓN DE DATOS DEL CARRITO ===");
-    cart.forEach((item, index) => {
-      console.log(`Item ${index + 1}: ${item.Nombre}`);
-      console.log("  - ProductoId:", item.ProductoId);
-      console.log("  - Customization:", item.customization);
-      console.log("  - Color Object:", item.customization?.color);
-      console.log("  - ColorId:", item.customization?.color?.ColorId);
-      console.log("  - Tiene ColorId?:", !!item.customization?.color?.ColorId);
-    });
-  };
+  // Función de depuración - opcional
+  useEffect(() => {
+    if (cart.length > 0) {
+      cart.forEach(item => {
+        if (item.ProductoId && item.customization?.color?.ColorId) {
+          const colors = productColors[item.ProductoId] || [];
+          const colorSeleccionado = colors.find(c => c.ColorId === item.customization.color.ColorId);
+          console.log(`🔍 Producto: ${item.Nombre}`, {
+            colorId: item.customization.color.ColorId,
+            colorNombre: item.customization.color.Nombre,
+            stockColor: colorSeleccionado?.Stock,
+            stockGeneral: item.Stock,
+            quantity: item.quantity
+          });
+        }
+      });
+    }
+  }, [cart, productColors]);
 
-  const handleCheckout = () => {
-    verificarDatosCarrito();
-    const total = getTotal();
-    if (total === 0) {
-      toast.error("No puedes finalizar una compra con valor $0");
-      return;
+  // Función para obtener el stock disponible según el color
+  const getStockDisponible = (item) => {
+    // Si es un producto con color seleccionado
+    if (item.ProductoId && item.customization?.color?.ColorId) {
+      // Buscar el color en productColors para obtener su stock específico
+      const colors = productColors[item.ProductoId] || [];
+      const colorSeleccionado = colors.find(c => c.ColorId === item.customization.color.ColorId);
+
+      if (colorSeleccionado) {
+        // Si el color tiene stock, devolver ese stock
+        if (colorSeleccionado.Stock !== undefined) {
+          return colorSeleccionado.Stock;
+        }
+      }
     }
-    if (!user) {
-      setShowModal(true);
-      return;
-    }
-    navigate("/checkout");
+
+    // Si no tiene color o no encontramos stock del color, usar stock general
+    return item.Stock ?? item.stock ?? null;
   };
 
   const handleIncrease = (item) => {
-    const stock = item.Stock ?? item.stock ?? null;
-    if (stock !== null && item.quantity + 1 > stock) {
-      toast.error(`Solo hay ${stock} unidades disponibles`);
+    const stockDisponible = getStockDisponible(item);
+
+    // Si el stock es null/undefined, significa que no hay límite de stock
+    if (stockDisponible === null || stockDisponible === undefined) {
+      updateQuantity(item.id, item.quantity + 1);
       return;
     }
+
+    // Verificar si hay stock suficiente
+    if (item.quantity + 1 > stockDisponible) {
+      // Mensaje específico según si tiene color o no
+      if (item.customization?.color?.ColorId) {
+        const colorName = item.customization.color.Nombre || 'seleccionado';
+        toast.warning(`⚠️ Límite de stock alcanzado\nSolo hay ${stockDisponible} unidades disponibles para el color ${colorName}`, {
+          icon: "📦",
+          autoClose: 4000,
+        });
+      } else {
+        toast.warning(`⚠️ Límite de stock alcanzado\nSolo hay ${stockDisponible} unidades disponibles de este producto`, {
+          icon: "📦",
+          autoClose: 4000,
+        });
+      }
+      return;
+    }
+
     updateQuantity(item.id, item.quantity + 1);
   };
 
@@ -140,10 +174,15 @@ export const CarritoCompras = () => {
 
   const saveStockEdit = (itemId) => {
     const item = cart.find(item => item.id === itemId);
-    const stock = item?.Stock ?? item?.stock ?? null;
+    const stockDisponible = getStockDisponible(item);
 
-    if (stock !== null && newQuantity > stock) {
-      toast.error(`Solo hay ${stock} unidades disponibles`);
+    if (stockDisponible !== null && stockDisponible !== undefined && newQuantity > stockDisponible) {
+      if (item.customization?.color?.ColorId) {
+        const colorName = item.customization.color.Nombre || 'seleccionado';
+        toast.error(`Solo hay ${stockDisponible} unidades disponibles para el color ${colorName}`);
+      } else {
+        toast.error(`Solo hay ${stockDisponible} unidades disponibles`);
+      }
       return;
     }
 
@@ -212,6 +251,32 @@ export const CarritoCompras = () => {
     const price = Number(item.Precio) || 0;
     const quantity = item.quantity || 1;
     return price * quantity;
+  };
+
+  const verificarDatosCarrito = () => {
+    console.log("=== VERIFICACIÓN DE DATOS DEL CARRITO ===");
+    cart.forEach((item, index) => {
+      console.log(`Item ${index + 1}: ${item.Nombre}`);
+      console.log("  - ProductoId:", item.ProductoId);
+      console.log("  - Customization:", item.customization);
+      console.log("  - Color Object:", item.customization?.color);
+      console.log("  - ColorId:", item.customization?.color?.ColorId);
+      console.log("  - Tiene ColorId?:", !!item.customization?.color?.ColorId);
+    });
+  };
+
+  const handleCheckout = () => {
+    verificarDatosCarrito();
+    const total = getTotal();
+    if (total === 0) {
+      toast.error("No puedes finalizar una compra con valor $0");
+      return;
+    }
+    if (!user) {
+      setShowModal(true);
+      return;
+    }
+    navigate("/checkout");
   };
 
   const total = getTotal();
@@ -322,10 +387,22 @@ export const CarritoCompras = () => {
                               ) : null}
                             </div>
 
-                            {/* Stock disponible */}
+                            {/* Stock disponible - AHORA USA getStockDisponible */}
                             <div className="flex items-center gap-4 mt-3">
                               <div className="text-sm text-slate-600">
-                                Stock disponible: <span className="font-semibold">{item.Stock || item.stock || "∞"}</span>
+                                {item.customization?.color?.ColorId ? (
+                                  <>
+                                    Stock del color <span className="font-semibold">{item.customization.color.Nombre || 'seleccionado'}</span>: {' '}
+                                    <span className={`font-semibold ${getStockDisponible(item) === 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                      {getStockDisponible(item) ?? "∞"}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    Stock disponible: {' '}
+                                    <span className="font-semibold">{getStockDisponible(item) ?? "∞"}</span>
+                                  </>
+                                )}
                               </div>
 
                               {/* Contador de cantidad */}
@@ -339,11 +416,11 @@ export const CarritoCompras = () => {
                                 </button>
 
                                 {editingStock === item.id ? (
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-lg border border-blue-300 shadow-sm">
                                     <input
                                       type="number"
                                       min="1"
-                                      max={item.Stock || item.stock || 999}
+                                      max={getStockDisponible(item) || 999}
                                       value={editingQuantities[item.id] ?? item.quantity}
                                       onChange={(e) => {
                                         const value = e.target.value;
@@ -354,15 +431,43 @@ export const CarritoCompras = () => {
                                           }));
                                         }
                                       }}
-                                      className="w-16 border rounded px-2 py-1 text-center"
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          const qty = editingQuantities[item.id] ?? item.quantity;
+                                          const stockDisp = getStockDisponible(item);
+
+                                          if (!qty || qty < 1 || (stockDisp !== null && stockDisp < qty)) {
+                                            if (item.customization?.color?.ColorId) {
+                                              toast.error(`Cantidad inválida (máx ${stockDisp} para este color)`);
+                                            } else {
+                                              toast.error(`Cantidad inválida (máx ${stockDisp})`);
+                                            }
+                                            setEditingQuantities(prev => ({ ...prev, [item.id]: item.quantity }));
+                                            return;
+                                          }
+
+                                          updateQuantity(item.id, qty);
+                                          setEditingStock(null);
+                                          setEditingQuantities(prev => ({ ...prev, [item.id]: undefined }));
+                                          toast.success("Cantidad actualizada");
+                                        }
+                                      }}
+                                      className="w-16 border border-blue-200 rounded-lg px-2 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-medium"
+                                      autoFocus
                                     />
 
                                     <button
                                       onClick={() => {
                                         const qty = editingQuantities[item.id] ?? item.quantity;
+                                        const stockDisp = getStockDisponible(item);
 
-                                        if (!qty || qty < 1 || (item.Stock || item.stock) < qty) {
-                                          toast.error(`Cantidad inválida (máx ${item.Stock || item.stock})`);
+                                        if (!qty || qty < 1 || (stockDisp !== null && stockDisp < qty)) {
+                                          if (item.customization?.color?.ColorId) {
+                                            toast.error(`Cantidad inválida (máx ${stockDisp} para este color)`);
+                                          } else {
+                                            toast.error(`Cantidad inválida (máx ${stockDisp})`);
+                                          }
                                           setEditingQuantities(prev => ({ ...prev, [item.id]: item.quantity }));
                                           return;
                                         }
@@ -372,7 +477,8 @@ export const CarritoCompras = () => {
                                         setEditingQuantities(prev => ({ ...prev, [item.id]: undefined }));
                                         toast.success("Cantidad actualizada");
                                       }}
-                                      className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                                      className="px-2.5 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all font-bold shadow-sm hover:shadow flex items-center justify-center text-sm"
+                                      title="Guardar (Enter)"
                                     >
                                       ✓
                                     </button>
@@ -382,27 +488,38 @@ export const CarritoCompras = () => {
                                         setEditingStock(null);
                                         setEditingQuantities(prev => ({ ...prev, [item.id]: undefined }));
                                       }}
-                                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                                      className="px-2.5 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all font-bold shadow-sm hover:shadow flex items-center justify-center text-sm"
+                                      title="Cancelar (Esc)"
                                     >
                                       ✗
                                     </button>
                                   </div>
                                 ) : (
                                   <>
-                                    <span className="font-bold text-lg w-8 text-center">{item.quantity}</span>
+                                    <span className="font-bold text-lg w-8 text-center bg-gray-50 rounded-lg py-1 border border-gray-200">
+                                      {item.quantity}
+                                    </span>
                                     <button
-                                      onClick={() => setEditingStock(item.id)}
-                                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                                      onClick={() => handleEditStock(item)}
+                                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-all font-medium border border-blue-200"
                                     >
-                                      <Edit2 className="h-3 w-3" /> Editar
+                                      <Edit2 className="h-3.5 w-3.5" /> Editar
                                     </button>
                                   </>
                                 )}
 
                                 <button
                                   onClick={() => handleIncrease(item)}
-                                  className="w-8 h-8 flex items-center justify-center border border-slate-300 rounded-full hover:bg-slate-100"
-                                  disabled={item.Stock && item.quantity >= item.Stock}
+                                  className={`w-8 h-8 flex items-center justify-center border rounded-full transition-all ${getStockDisponible(item) !== null && item.quantity >= getStockDisponible(item)
+                                      ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                                      : 'border-blue-300 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-400'
+                                    }`}
+                                  disabled={getStockDisponible(item) !== null && item.quantity >= getStockDisponible(item)}
+                                  title={
+                                    getStockDisponible(item) !== null && item.quantity >= getStockDisponible(item)
+                                      ? `Stock máximo alcanzado (${getStockDisponible(item)} unidades)`
+                                      : "Aumentar cantidad"
+                                  }
                                 >
                                   <Plus className="h-4 w-4" />
                                 </button>
@@ -450,10 +567,10 @@ export const CarritoCompras = () => {
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                   {servicios.map((item) => {
                     // Determinar la imagen a mostrar
-                    const imagenSrc = 
-                      item.customization?.UrlImagen || 
-                      item.UrlImagen || 
-                      item.Imagen || 
+                    const imagenSrc =
+                      item.customization?.UrlImagen ||
+                      item.UrlImagen ||
+                      item.Imagen ||
                       "https://via.placeholder.com/200";
 
                     return (
@@ -617,7 +734,7 @@ export const CarritoCompras = () => {
                   disabled={total === 0}
                   className={`w-full py-3 rounded-xl font-bold text-lg transition-all ${total === 0
                     ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl"
+                    : "bg-gradient-to-r from-blue-700 to-blue-800 text-white hover:from-blue-600 hover:to-blue-600 shadow-lg hover:shadow-xl"
                     }`}
                 >
                   Proceder al Pago
@@ -630,17 +747,6 @@ export const CarritoCompras = () => {
                 >
                   Vaciar Carrito
                 </button>
-              </div>
-
-              {/* Información adicional */}
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                <h4 className="font-semibold text-slate-800 mb-2">🎁 Beneficios:</h4>
-                <ul className="text-sm text-slate-600 space-y-1">
-                  <li>• Envío gratis en pedidos mayores a $100.000</li>
-                  <li>• Pago seguro con múltiples métodos</li>
-                  <li>• Soporte 24/7 para tus consultas</li>
-                  <li>• Garantía de satisfacción</li>
-                </ul>
               </div>
             </div>
           </div>

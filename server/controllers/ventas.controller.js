@@ -150,9 +150,10 @@ export const createVentaManual = async (req, res) => {
       
       try {
         ventaData = JSON.parse(req.body.ventaData);
-        console.log("Datos desde FormData (parseados):", ventaData);
+        console.log("📦 Datos desde FormData (parseados):", ventaData);
+        console.log("📸 Archivos recibidos:", req.files?.length || 0);
       } catch (parseError) {
-        console.error("Error parseando ventaData:", parseError);
+        console.error("❌ Error parseando ventaData:", parseError);
         return res.status(400).json({ 
           success: false,
           error: "Error al parsear los datos de la venta" 
@@ -160,7 +161,7 @@ export const createVentaManual = async (req, res) => {
       }
     } else {
       ventaData = req.body;
-      console.log("Datos desde JSON:", ventaData);
+      console.log("📦 Datos desde JSON:", ventaData);
     }
 
     // Validar datos básicos
@@ -193,18 +194,46 @@ export const createVentaManual = async (req, res) => {
     // PASO 1: Crear la venta PRIMERO
     const VentaId = await createVentaManualModel(ventaData, connection);
 
-    // PASO 2: Crear los detalles (TODOS los inserts)
+    // PASO 2: Mapear archivos a sus posiciones
+    // IMPORTANTE: Los archivos llegan en el MISMO ORDEN que los detalles que los requieren
+    let fileIndex = 0;
+    const archivosPorDetalle = [];
+
+    // Primero, identificar qué detalles TIENEN archivo (ImagenFile existe en el detalle original)
     for (let i = 0; i < detalles.length; i++) {
       const detalle = detalles[i];
       
-      // Determinar la URL de la imagen para servicios
-      let urlImagen = detalle.UrlImagenPersonalizada;
-      if (urlImagen === 'pendiente' && req.files && req.files.length > 0) {
-        const fileIndex = i < req.files.length ? i : req.files.length - 1;
-        const archivo = req.files[fileIndex];
-        urlImagen = `http://localhost:3000/uploads/${archivo.filename}`;
-        console.log(`Asignando URL ${urlImagen} al detalle ${i}`);
+      // Si este detalle debería tener un archivo (marcado como 'pendiente')
+      if (detalle.UrlImagenPersonalizada === 'pendiente') {
+        // Asignar el siguiente archivo disponible
+        if (req.files && fileIndex < req.files.length) {
+          const archivo = req.files[fileIndex];
+          // Construir URL pública del archivo
+          const urlArchivo = `${req.protocol}://${req.get('host')}/uploads/${archivo.filename}`;
+          archivosPorDetalle[i] = urlArchivo;
+          fileIndex++;
+          console.log(`✅ Detalle ${i} recibirá archivo: ${urlArchivo}`);
+        } else {
+          console.warn(`⚠️ Detalle ${i} requiere imagen pero no hay suficientes archivos`);
+          archivosPorDetalle[i] = null;
+        }
+      } else {
+        archivosPorDetalle[i] = null;
       }
+    }
+
+    // PASO 3: Crear los detalles con las URLs de los archivos
+    for (let i = 0; i < detalles.length; i++) {
+      const detalle = detalles[i];
+      
+      // Determinar la URL final de la imagen
+      let urlImagen = detalle.UrlImagenPersonalizada;
+      
+      // Si tiene archivo asignado, usar esa URL
+      if (archivosPorDetalle[i]) {
+        urlImagen = archivosPorDetalle[i];
+      }
+      // Si no, mantener la URL original (podría ser una URL externa)
       
       await createDetalleVentaManualModel(connection, {
         VentaId,
@@ -223,18 +252,16 @@ export const createVentaManual = async (req, res) => {
       });
     }
 
-    // PASO 3: AHORA SÍ, validar y descontar stock (JUSTO ANTES DEL COMMIT)
+    // PASO 4: Validar y descontar stock
     await validarYDescontarStockModel(connection, detalles);
 
-    // PASO 4: Confirmar TODO
+    // PASO 5: Confirmar TODO
     await connection.commit();
 
     // ENVIAR CORREO DE FACTURA
     if (ClienteCorreo) {
       try {
-        // Obtener los detalles completos con nombres
         const detallesCompletos = await getDetalleVentaByVentaIdModel(VentaId);
-        
         await sendVentaFacturaEmail(
           ClienteCorreo,
           ClienteNombre || 'Cliente',
@@ -243,21 +270,20 @@ export const createVentaManual = async (req, res) => {
           detallesCompletos
         );
       } catch (emailError) {
-        console.error("Error enviando correo de factura:", emailError);
-        // No interrumpir el flujo si falla el correo
+        console.error("❌ Error enviando correo de factura:", emailError);
       }
     }
 
     res.status(201).json({
       success: true,
       message: "Venta creada exitosamente",
-      VentaId
+      VentaId,
+      archivosProcesados: fileIndex
     });
 
   } catch (error) {
-    // SI ALGO FALLA, REVERTIR TODO
     await connection.rollback();
-    console.error("Error en createVentaManual:", error);
+    console.error("❌ Error en createVentaManual:", error);
     
     // Mensaje de error más amigable
     let mensajeError = error.message;
@@ -265,8 +291,6 @@ export const createVentaManual = async (req, res) => {
       mensajeError = error.message;
     } else if (error.code === 'ER_LOCK_WAIT_TIMEOUT') {
       mensajeError = 'La operación tomó demasiado tiempo. Por favor intenta de nuevo.';
-    } else if (error.code === 'ER_SIGNAL_EXCEPTION') {
-      mensajeError = 'Error de integridad en la base de datos';
     } else {
       mensajeError = "Error al crear la venta";
     }
@@ -439,6 +463,28 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
     await connection.commit();
 
     const ventaCreada = await getVentaByIdModel(VentaId);
+    const detallesCompletos = await getDetalleVentaByVentaIdModel(VentaId);
+    ventaCreada.detalle = detallesCompletos;
+
+    // ENVIAR CORREO DE FACTURA AQUÍ (esto es lo que faltaba)
+    const correoCliente = pedido.ClienteCorreo || ventaCreada.ClienteCorreo;
+    const nombreCliente = pedido.ClienteNombre || ventaCreada.ClienteNombre || 'Cliente';
+
+    if (correoCliente) {
+      try {
+        console.log("📧 [crearVentaDesdePedidoId] Enviando factura a:", correoCliente);
+        await sendVentaFacturaEmail(
+          correoCliente,
+          nombreCliente,
+          VentaId,
+          ventaCreada.Total,
+          detallesCompletos
+        );
+        console.log("Correo enviado exitosamente");
+      } catch (emailError) {
+        console.error("Error enviando correo de factura:", emailError);
+      }
+    }
 
     return {
       success: true,
