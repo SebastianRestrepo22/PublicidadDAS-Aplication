@@ -12,7 +12,7 @@ import detalleComprasRoutes from './routes/detalleCompras.routes.js';
 import pedidoClienteRoutes from "./routes/pedidoCliente.routes.js";
 import detallePedidoClienteRoutes from "./routes/detallePedidoCliente.routes.js";
 import ventasRoutes from "./routes/venta.routes.js";
-import detalleVentasRoutes from "./routes/detalleVentas.routes.js"
+import detalleVentasRoutes from "./routes/detalleVentas.routes.js";
 import productoRouter from './routes/producto.routes.js';
 import servicioRouter from './routes/services.routes.js';
 import voucherRoutes from './routes/voucher.routes.js';
@@ -20,51 +20,49 @@ import colorRoutes from "./routes/color.routes.js";
 import clientRouter from './routes/cliente.routes.js';
 import servicioTamanosRoutes from './routes/servicioTamanos.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
-import uploadTempRoutes from './routes/uploadTemporal.js'; 
+import uploadTempRoutes from './routes/uploadTemporal.js';
 
-// Rutas de autenticación y usuarios
+// Auth
 import authRouter from './routes/authRoutes.js';
 import roleRouter from './routes/role.routes.js';
 import userRouter from './routes/user.routes.js';
 import tipoDocumentoRoutes from './routes/tipoDocumento.js';
 
-// Scripts y DB
+// Scripts
 import { initRolesAndAdmin } from './scripts/initRolesAndAdmin.js';
-import connectDB from './lib/db.js';
-import { iniciarAutoCancelacionCompras } from './scripts/autoCancelCompras.js'; 
+import { dbPool } from './lib/db.js';
+import { iniciarAutoCancelacionCompras } from './scripts/autoCancelCompras.js';
+
 dotenv.config();
 
 const app = express();
 
 iniciarAutoCancelacionCompras();
 
-// Middlewares generales
 app.use(cors());
-
-// Aumentar el límite del body parser
-app.use(express.json({ limit: '50mb' })); // Aumentar de 1mb a 50mb
+app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-//  Configuración de __dirname para ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-//  Servir archivos estáticos (comprobantes de pago)
 app.use('/comprobantes', express.static(path.join(__dirname, '../public/comprobantes')));
 
-// Rutas de autenticación
+// Auth
 app.use('/auth', authRouter);
 app.use('/roles', roleRouter);
 app.use('/user', userRouter);
+
+// Generales
 app.use('/client', clientRouter);
 app.use('/producto', productoRouter);
 app.use('/servicio', servicioRouter);
 app.use('/api/servicio', servicioTamanosRoutes);
 app.use("/colores", colorRoutes);
 app.use('/tipos-documento', tipoDocumentoRoutes);
-app.use('/api', uploadTempRoutes); 
+app.use('/api', uploadTempRoutes);
 
-// Rutas de negocio
+// Negocio
 app.use('/api/categorias', categoriaRoutes);
 app.use('/api/proveedores', proveedorRoutes);
 app.use('/api/compras', comprasRoutes);
@@ -75,19 +73,24 @@ app.use("/api/ventas", ventasRoutes);
 app.use("/api/detalle-ventas", detalleVentasRoutes);
 app.use('/api/voucher', voucherRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
-// Iniciar servidor
+
 const startServer = async () => {
   try {
-    await connectDB();
-    await initRolesAndAdmin();
+
+    // inicializar roles y admin usando pool
+    await initRolesAndAdmin(dbPool);
+
     const port = process.env.PORT || 3000;
+
     app.listen(port, () => {
-      console.log(` Server is running on port ${port}`);
+      console.log(`Server is running on port ${port}`);
     });
+
   } catch (err) {
-    console.error(' Error al iniciar el servidor:', err);
+    console.error('Error al iniciar el servidor:', err);
     process.exit(1);
   }
 };
