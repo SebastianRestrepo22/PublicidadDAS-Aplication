@@ -12,7 +12,7 @@ import detalleComprasRoutes from './routes/detalleCompras.routes.js';
 import pedidoClienteRoutes from "./routes/pedidoCliente.routes.js";
 import detallePedidoClienteRoutes from "./routes/detallePedidoCliente.routes.js";
 import ventasRoutes from "./routes/venta.routes.js";
-import detalleVentasRoutes from "./routes/detalleVentas.routes.js"
+import detalleVentasRoutes from "./routes/detalleVentas.routes.js";
 import productoRouter from './routes/producto.routes.js';
 import servicioRouter from './routes/services.routes.js';
 import voucherRoutes from './routes/voucher.routes.js';
@@ -32,6 +32,7 @@ import tipoDocumentoRoutes from './routes/tipoDocumento.js';
 import { initRolesAndAdmin } from './scripts/initRolesAndAdmin.js';
 import connectDB from './lib/db.js';
 import { iniciarAutoCancelacionCompras } from './scripts/autoCancelCompras.js'; 
+import { dbPool } from './lib/db.js';
 dotenv.config();
 
 const app = express();
@@ -40,17 +41,17 @@ iniciarAutoCancelacionCompras();
 
 // Middlewares generales
 app.use(cors());
-
-// Aumentar el límite del body parser
-app.use(express.json({ limit: '50mb' })); // Aumentar de 1mb a 50mb
+app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-//  Configuración de __dirname para ES Modules
+// Configuración __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-//  Servir archivos estáticos (comprobantes de pago)
+// Archivos estáticos
 app.use('/comprobantes', express.static(path.join(__dirname, '../public/comprobantes')));
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Rutas de autenticación
 app.use('/auth', authRouter);
@@ -75,19 +76,23 @@ app.use("/api/ventas", ventasRoutes);
 app.use("/api/detalle-ventas", detalleVentasRoutes);
 app.use('/api/voucher', voucherRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
-app.use(express.static(path.join(__dirname, 'public')));
+
 // Iniciar servidor
 const startServer = async () => {
+  let connection;
   try {
-    await connectDB();
-    await initRolesAndAdmin();
+    // Obtener conexión explícita del pool para inicialización
+    connection = await dbPool.getConnection();
+    await initRolesAndAdmin(connection);
+    connection.release(); // liberar conexión
+
     const port = process.env.PORT || 3000;
     app.listen(port, () => {
-      console.log(` Server is running on port ${port}`);
+      console.log(`Server is running on port ${port}`);
     });
   } catch (err) {
-    console.error(' Error al iniciar el servidor:', err);
+    if (connection) connection.release();
+    console.error('Error al iniciar el servidor:', err);
     process.exit(1);
   }
 };

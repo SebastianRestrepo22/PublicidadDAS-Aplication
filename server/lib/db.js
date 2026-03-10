@@ -12,13 +12,3 @@ export const dbPool = mysql.createPool({
   connectionLimit: 10, // Ajusta según tus necesidades
   queueLimit: 0
 });
-
-// Tu función connectDB sigue existiendo
-const connectDB = async () => {
-  return dbPool; // El pool ya es promisificado
-};
-
-export default connectDB;
-
-
-

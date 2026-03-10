@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import connectDB from '../lib/db.js';
+import { dbPool } from '../lib/db.js';
 const router = express.Router();
 
 // Registro
@@ -17,13 +17,13 @@ router.post('/register', async (req, res) => {
     } = req.body;
 
     try {
-        const connection = await connectDB();
+
 
         // Objeto para acumular errores
         const errors = {};
 
         // Verifica si el correo ya existe
-        const [existente] = await connection.execute(
+        const [existente] = await dbPool.execute(
             'SELECT * FROM usuarios WHERE CorreoElectronico = ?',
             [CorreoElectronico]
         );
@@ -32,7 +32,7 @@ router.post('/register', async (req, res) => {
         }
 
         // Verifica si la cédula ya existe
-        const [cedulaExistente] = await connection.execute(
+        const [cedulaExistente] = await dbPool.execute(
             'SELECT * FROM usuarios WHERE CedulaId = ?',
             [CedulaId]
         );
@@ -41,7 +41,7 @@ router.post('/register', async (req, res) => {
         }
 
         // Verifica si el teléfono ya existe
-        const [telefonoExistente] = await connection.execute(
+        const [telefonoExistente] = await dbPool.execute(
             'SELECT * FROM usuarios WHERE Telefono = ?',
             [Telefono]
         );
@@ -55,7 +55,7 @@ router.post('/register', async (req, res) => {
         }
 
         // Busca el rol cliente
-        const [roles] = await connection.execute(
+        const [roles] = await dbPool.execute(
             'SELECT * FROM roles WHERE Nombre = ?',
             ['cliente']
         );
@@ -70,7 +70,7 @@ router.post('/register', async (req, res) => {
         const hash = await bcrypt.hash(Contrasena, 10);
 
         // Crea el usuario
-        await connection.execute(
+        await dbPool.execute(
             `INSERT INTO usuarios 
         (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -89,9 +89,9 @@ router.post('/login', async (req, res) => {
     const { CorreoElectronico, Contrasena } = req.body;
 
     try {
-        const connection = await connectDB();
 
-        const [users] = await connection.execute(
+
+        const [users] = await dbPool.execute(
             `SELECT u.*, r.Nombre AS RoleNombre, td.Nombre AS TipoDocumentoNombre
              FROM usuarios u
              JOIN roles r ON u.RoleId = r.RoleId
@@ -120,7 +120,7 @@ router.post('/login', async (req, res) => {
         }
 
         // Obtener permisos del usuario
-        const [permisos] = await connection.execute(
+        const [permisos] = await dbPool.execute(
             `SELECT p.Nombre FROM permisos p
              JOIN rol_permisos rp ON p.PermisoId = rp.PermisoId
              WHERE rp.RoleId = ?`,
@@ -167,9 +167,9 @@ const verifyToken = (req, res, next) => {
 // Dashboard
 router.get('/dashboard', verifyToken, async (req, res) => {
     try {
-        const connection = await connectDB();
 
-        const [users] = await connection.execute(
+
+        const [users] = await dbPool.execute(
             `SELECT u.*, r.Nombre AS RoleNombre, td.Nombre AS TipoDocumentoNombre
    FROM usuarios u
    JOIN roles r ON u.RoleId = r.RoleId
@@ -195,8 +195,8 @@ router.get('/validar-correo', async (req, res) => {
     const { correo } = req.query;
 
     try {
-        const connection = await connectDB();
-        const [usuarios] = await connection.execute(
+
+        const [usuarios] = await dbPool.execute(
             'SELECT * FROM usuarios WHERE CorreoElectronico = ?',
             [correo]
         );
@@ -213,8 +213,8 @@ router.get('/validar-cedula', async (req, res) => {
     const { cedula } = req.query;
 
     try {
-        const connection = await connectDB();
-        const [usuarios] = await connection.execute(
+
+        const [usuarios] = await dbPool.execute(
             'SELECT * FROM usuarios WHERE CedulaId = ?',
             [cedula]
         );
@@ -231,8 +231,8 @@ router.get('/validar-telefono', async (req, res) => {
     const { telefono } = req.query;
 
     try {
-        const connection = await connectDB();
-        const [usuarios] = await connection.execute(
+
+        const [usuarios] = await dbPool.execute(
             'SELECT * FROM usuarios WHERE Telefono = ?',
             [telefono]
         );
@@ -252,8 +252,8 @@ router.post('/forgot-password', async (req, res) => {
     const { correo } = req.body;
 
     try {
-        const connection = await connectDB();
-        const [usuarios] = await connection.execute(
+
+        const [usuarios] = await dbPool.execute(
             'SELECT * FROM usuarios WHERE CorreoElectronico = ?',
             [correo]
         );
@@ -269,7 +269,7 @@ router.post('/forgot-password', async (req, res) => {
         const expire = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
 
         // Guardar token en BD
-        await connection.execute(
+        await dbPool.execute(
             'UPDATE usuarios SET resetToken = ?, resetTokenExpire = ? WHERE CedulaId = ?',
             [resetToken, expire, user.CedulaId]
         );
@@ -489,8 +489,8 @@ router.post('/reset-password/:token', async (req, res) => {
     const { nuevaContrasena } = req.body;
 
     try {
-        const connection = await connectDB();
-        const [usuarios] = await connection.execute(
+
+        const [usuarios] = await dbPool.execute(
             'SELECT * FROM usuarios WHERE resetToken = ? AND resetTokenExpire > NOW()',
             [token]
         );
@@ -504,7 +504,7 @@ router.post('/reset-password/:token', async (req, res) => {
         const hash = await bcrypt.hash(nuevaContrasena, 10);
 
         // Actualizar contraseña y eliminar token
-        await connection.execute(
+        await dbPool.execute(
             'UPDATE usuarios SET Contrasena = ?, resetToken = NULL, resetTokenExpire = NULL WHERE CedulaId = ?',
             [hash, user.CedulaId]
         );
