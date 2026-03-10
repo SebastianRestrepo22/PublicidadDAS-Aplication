@@ -43,27 +43,14 @@ const estadoConfig = {
     icon: Clock,
     description: 'Compra registrada, esperando confirmación'
   },
-  [ESTADOS_COMPRA.ORDEN_ENVIADA]: {
-    color: 'bg-blue-100 text-blue-800',
-    borderColor: 'border-blue-200',
-    label: 'Orden Enviada',
-    icon: Truck,
-    description: 'Orden enviada al proveedor'
-  },
   [ESTADOS_COMPRA.RECIBIDO]: {
     color: 'bg-green-100 text-green-800',
     borderColor: 'border-green-200',
     label: 'Recibido',
     icon: CheckCircle,
     description: 'Productos recibidos y stock actualizado'
-  },
-  [ESTADOS_COMPRA.ANULADA]: {
-    color: 'bg-red-100 text-red-800',
-    borderColor: 'border-red-200',
-    label: 'Anulada',
-    icon: XCircle,
-    description: 'Compra cancelada'
   }
+  // NOTA: ORDEN_ENVIADA y ANULADA ya no existen
 };
 
 export const ComprasView = ({
@@ -77,9 +64,7 @@ export const ComprasView = ({
   puedeCambiarEstado,
   userRole = 'admin'
 }) => {
-  console.log("🔵 [ComprasView] selectedCompra recibido:", selectedCompra);
-  console.log("🔵 [ComprasView] detalle en selectedCompra:", selectedCompra?.detalle);
-  console.log("🔵 [ComprasView] productos disponibles:", productos?.length);
+  console.log("[ComprasView] selectedCompra recibido:", selectedCompra);
 
   const [updating, setUpdating] = useState(false);
   const [estadoSeleccionado, setEstadoSeleccionado] = useState(selectedCompra?.Estado || ESTADOS_COMPRA.PENDIENTE);
@@ -94,42 +79,40 @@ export const ComprasView = ({
   const configActual = estadoConfig[estadoActual] || estadoConfig[ESTADOS_COMPRA.PENDIENTE];
   const IconoActual = configActual.icon;
 
+  // Solo se puede cancelar si está pendiente
   const puedeCancelar = () =>
     userRole === 'admin' &&
-    estadoActual !== ESTADOS_COMPRA.RECIBIDO &&
-    estadoActual !== ESTADOS_COMPRA.ANULADA;
+    estadoActual === ESTADOS_COMPRA.PENDIENTE;
 
-  const puedeCambiarA = (estado) => {
-    return puedeCambiarEstado(estadoActual, estado);
+  // Solo se puede cambiar a Recibido si está pendiente
+  const puedeCambiarARecibido = () => {
+    return estadoActual === ESTADOS_COMPRA.PENDIENTE;
   };
 
+  // Función para obtener las opciones del select - SOLO DOS OPCIONES
   const getOpcionesEstado = () => {
-    const opciones = [
-      {
-        value: ESTADOS_COMPRA.PENDIENTE,
-        label: "Pendiente",
-        disabled: estadoActual === ESTADOS_COMPRA.PENDIENTE || estadoActual === ESTADOS_COMPRA.RECIBIDO || estadoActual === ESTADOS_COMPRA.ANULADA,
-        className: "text-yellow-700"
-      },
-      {
-        value: ESTADOS_COMPRA.ORDEN_ENVIADA,
-        label: "Orden Enviada",
-        disabled: !puedeCambiarA(ESTADOS_COMPRA.ORDEN_ENVIADA),
-        className: "text-blue-700"
-      },
-      {
+    const opciones = [];
+
+    // Opción de Recibido (solo si está pendiente)
+    if (puedeCambiarARecibido()) {
+      opciones.push({
         value: ESTADOS_COMPRA.RECIBIDO,
-        label: "Recibido (Actualizará Stock)",
-        disabled: !puedeCambiarA(ESTADOS_COMPRA.RECIBIDO),
-        className: "text-green-700"
-      },
-      {
-        value: ESTADOS_COMPRA.ANULADA,
-        label: "Cancelar Compra",
-        disabled: !puedeCancelar(),
+        label: " Marcar como Recibido (Actualizará Stock)",
+        disabled: false,
+        className: "text-green-700 font-medium"
+      });
+    }
+
+    // Opción de Cancelar (solo si está pendiente)
+    if (puedeCancelar()) {
+      opciones.push({
+        value: "CANCELAR",
+        label: " Cancelar Compra",
+        disabled: false,
         className: "text-red-700 font-medium"
-      }
-    ];
+      });
+    }
+
     return opciones;
   };
 
@@ -146,37 +129,39 @@ export const ComprasView = ({
 
       await onActualizarEstado(selectedCompra.CompraId, nuevoEstado, productosAActualizar, motivo);
       setEstadoSeleccionado(nuevoEstado);
-      toast.success(`Estado actualizado a ${estadoConfig[nuevoEstado].label}`);
+      toast.success(`Estado actualizado correctamente`);
     } catch (error) {
       console.error("Error al cambiar estado:", error);
       setEstadoSeleccionado(estadoActual);
     } finally {
       setUpdating(false);
       setShowConfirmModal(false);
+      setShowCancelModal(false);
       setProximoEstado(null);
     }
   };
 
   const handleEstadoChange = async (e) => {
-    const nuevoEstado = e.target.value;
-    if (nuevoEstado === estadoActual) return;
+    const valor = e.target.value;
 
-    if (nuevoEstado === ESTADOS_COMPRA.ANULADA) {
+    // Si selecciona Cancelar
+    if (valor === "CANCELAR") {
       setShowCancelModal(true);
       return;
     }
 
-    if (nuevoEstado === ESTADOS_COMPRA.RECIBIDO) {
-      setProximoEstado(nuevoEstado);
+    // Si selecciona Recibido
+    if (valor === ESTADOS_COMPRA.RECIBIDO) {
+      setProximoEstado(valor);
       setShowConfirmModal(true);
       return;
     }
-
-    await ejecutarCambioEstado(nuevoEstado);
   };
 
   const handleConfirmCancel = async (motivo) => {
-    await ejecutarCambioEstado(ESTADOS_COMPRA.ANULADA, motivo);
+    // Al cancelar, mantenemos el estado como PENDIENTE pero con motivo
+    // O podrías tener un estado especial "CANCELADO" si lo prefieres
+    await ejecutarCambioEstado(ESTADOS_COMPRA.PENDIENTE, motivo);
     setShowCancelModal(false);
   };
 
@@ -192,77 +177,92 @@ export const ComprasView = ({
   };
 
   const opcionesEstado = getOpcionesEstado();
-  const conteoItems = selectedCompra.detalle?.length || 0;
+  const tieneOpciones = opcionesEstado.length > 0;
 
   const handleDescargarFactura = () => {
-    try {
-      console.log("🔵 DATOS COMPLETOS PARA FACTURA:");
-      console.log("1. selectedCompra:", selectedCompra);
-      console.log("2. Detalles en selectedCompra:", selectedCompra?.detalle);
-      console.log("3. Productos disponibles:", productos);
-      console.log("4. Proveedores:", proveedores);
+  try {
+    console.log(" DATOS COMPLETOS DE LA COMPRA:", JSON.stringify(selectedCompra, null, 2));
+    
+    // Buscar el proveedor
+    const proveedor = proveedores.find(p => p.ProveedorId === selectedCompra.ProveedorId);
+    
+    if (!selectedCompra.detalle || selectedCompra.detalle.length === 0) {
+      toast.error('No hay productos en esta compra para facturar');
+      return;
+    }
 
-      // Buscar el proveedor
-      const proveedor = proveedores.find(p => p.ProveedorId === selectedCompra.ProveedorId);
-      console.log("5. Proveedor encontrado:", proveedor);
-
-      // Verificar si hay detalles
-      if (!selectedCompra.detalle || selectedCompra.detalle.length === 0) {
-        console.error("❌ No hay detalles en la compra");
-        toast.error('No hay productos en esta compra para facturar');
-        return;
-      }
-
-      // Mapear detalles para asegurar que tengan los nombres de producto
-      const detallesConNombres = selectedCompra.detalle.map(d => {
-        // Buscar el producto completo en la lista de productos
-        const productoCompleto = productos.find(p => p.ProductoId === d.ProductoId);
-
-        console.log(`6. Producto para detalle ${d.ProductoId}:`, productoCompleto);
-
-        return {
-          ...d,
-          ProductoNombre: productoCompleto?.Nombre || d.ProductoNombre || 'Producto sin nombre',
-          Cantidad: Number(d.Cantidad) || 0,
-          PrecioUnitario: Number(d.PrecioUnitario) || 0,
-          Subtotal: Number(d.Subtotal) || (Number(d.Cantidad) * Number(d.PrecioUnitario)) || 0
-        };
+    // ENRIQUECER LOS DETALLES CON NOMBRES DE PRODUCTOS Y COLORES
+    const detallesConNombres = selectedCompra.detalle.map(d => {
+      // Buscar el producto completo
+      const productoCompleto = productos.find(p => p.ProductoId === d.ProductoId);
+      
+      console.log(` PROCESANDO DETALLE:`, {
+        detalleOriginal: d,
+        productoCompleto: productoCompleto
       });
 
-      console.log("7. Detalles con nombres mapeados:", detallesConNombres);
-      console.log("8. Total de productos a facturar:", detallesConNombres.length);
-
-      // Verificar que los detalles tengan datos válidos
-      const detallesValidos = detallesConNombres.filter(d => d.Cantidad > 0 && d.PrecioUnitario > 0);
-      console.log("9. Detalles válidos:", detallesValidos);
-
-      if (detallesValidos.length === 0) {
-        toast.error('Los productos no tienen cantidades o precios válidos');
-        return;
+      // PROCESAR COLORES - ESTO ES CRÍTICO
+      let coloresProcesados = [];
+      
+      // Verificar si hay colores en el detalle
+      if (d.colores && Array.isArray(d.colores) && d.colores.length > 0) {
+        console.log(` COLORES ENCONTRADOS (${d.colores.length}):`, d.colores);
+        
+        coloresProcesados = d.colores.map(color => {
+          // Asegurarnos de que cada color tenga todos los campos necesarios
+          return {
+            Nombre: color.Nombre || color.nombre || 'Color sin nombre',
+            Stock: Number(color.Stock || color.stock || color.Cantidad || 0),
+            Hex: color.Hex || color.hex || '#CCCCCC',
+            // Preservar cualquier otro campo
+            ...color
+          };
+        });
+      } else {
+        console.log(` Este producto NO TIENE COLORES`);
       }
 
-      // Calcular total para verificar
-      const totalCalculado = detallesValidos.reduce((sum, d) => sum + d.Subtotal, 0);
-      console.log("10. Total calculado:", totalCalculado);
-      console.log("11. Total de la compra:", selectedCompra.Total);
+      // Construir el detalle enriquecido
+      const detalleEnriquecido = {
+        ...d,
+        ProductoNombre: productoCompleto?.Nombre || d.ProductoNombre || d.nombreProducto || 'Producto sin nombre',
+        Cantidad: Number(d.Cantidad) || 0,
+        PrecioUnitario: Number(d.PrecioUnitario) || 0,
+        Subtotal: Number(d.Subtotal) || (Number(d.Cantidad) * Number(d.PrecioUnitario)) || 0,
+        colores: coloresProcesados  // Aquí van los colores procesados
+      };
 
-      generarFacturaCompraPDF(
-        selectedCompra,
-        detallesValidos,  
-        proveedor
-      );
+      console.log(` DETALLE ENRIQUECIDO:`, detalleEnriquecido);
+      return detalleEnriquecido;
+    });
 
-      toast.success('Factura generada correctamente');
-    } catch (error) {
-      console.error('Error detallado al generar factura:', error);
-      toast.error(`Error al generar la factura: ${error.message}`);
+    console.log(" TODOS LOS DETALLES PROCESADOS:", JSON.stringify(detallesConNombres, null, 2));
+
+    // Verificar específicamente el producto con colores
+    const productoConColores = detallesConNombres.find(d => d.colores && d.colores.length > 0);
+    if (productoConColores) {
+      console.log(" PRODUCTO CON COLORES ENCONTRADO:", productoConColores);
+    } else {
+      console.log(" NO SE ENCONTRARON PRODUCTOS CON COLORES");
     }
-  };
 
+    // Generar la factura
+    generarFacturaCompraPDF(
+      selectedCompra,
+      detallesConNombres,  // Pasar los detalles enriquecidos
+      proveedor
+    );
+
+    toast.success('Factura generada correctamente');
+  } catch (error) {
+    console.error(' Error al generar factura:', error);
+    toast.error(`Error al generar la factura: ${error.message}`);
+  }
+};
   return (
     <>
       <div className="bg-white rounded-xl shadow-sm border p-6 max-w-full overflow-hidden">
-        {/* Header con botón de descargar factura */}
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div className="flex items-center gap-3">
             <button
@@ -287,10 +287,10 @@ export const ComprasView = ({
               <span className="hidden sm:inline">Descargar Factura</span>
             </button>
 
+            {/* Badge de estado actual */}
             <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${configActual.color}`}>
               <IconoActual size={14} />
               <span className="truncate">{configActual.label}</span>
-              {userRole === 'admin' && <span className="ml-1 text-[10px] opacity-75">(Admin)</span>}
             </div>
           </div>
         </div>
@@ -433,55 +433,63 @@ export const ComprasView = ({
           </div>
         </div>
 
-        {/* Selector de Estado */}
-        {userRole === 'admin' && (
+        {/* Selector de Estado - SOLO CON DOS OPCIONES: Recibido y Cancelar */}
+        {userRole === 'admin' && tieneOpciones && (
           <div className="bg-slate-50 p-4 rounded-lg border">
             <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
               <AlertTriangle size={14} />
-              Actualizar Estado
+              Acciones Disponibles
             </h4>
-            {opcionesEstado.length > 0 && (
-              <div className="flex flex-col sm:flex-row gap-3">
-                <select
-                  value={estadoSeleccionado}
-                  onChange={handleEstadoChange}
-                  disabled={updating || estadoActual === ESTADOS_COMPRA.RECIBIDO || estadoActual === ESTADOS_COMPRA.ANULADA}
-                  className="flex-1 h-9 px-3 border rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value={estadoActual} disabled>
-                    Actual: {configActual.label}
-                  </option>
-                  {opcionesEstado.map(op => (
-                    <option
-                      key={op.value}
-                      value={op.value}
-                      disabled={op.disabled}
-                      className={op.className}
-                    >
-                      {op.label}
-                    </option>
-                  ))}
-                </select>
 
-                {updating && (
-                  <div className="flex items-center gap-2 text-blue-600 text-sm">
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
-                    <span>Actualizando...</span>
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <select
+                value=""
+                onChange={handleEstadoChange}
+                disabled={updating || estadoActual === ESTADOS_COMPRA.RECIBIDO}
+                className="flex-1 h-9 px-3 border rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="" disabled>Seleccionar acción...</option>
+                {opcionesEstado.map(op => (
+                  <option
+                    key={op.value}
+                    value={op.value}
+                    disabled={op.disabled}
+                    className={op.className}
+                  >
+                    {op.label}
+                  </option>
+                ))}
+              </select>
+
+              {updating && (
+                <div className="flex items-center gap-2 text-blue-600 text-sm">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                  <span>Procesando...</span>
+                </div>
+              )}
+            </div>
 
             {estadoActual === ESTADOS_COMPRA.RECIBIDO && (
-              <p className="mt-2 text-[10px] text-green-600">
-                ✓ Stock actualizado
+              <p className="mt-2 text-xs text-green-600 bg-green-50 p-2 rounded-lg">
+                ✓ Compra completada. Stock actualizado.
               </p>
             )}
-            {estadoActual === ESTADOS_COMPRA.ANULADA && (
-              <p className="mt-2 text-[10px] text-red-600">
-                ✗ Compra anulada
+
+            {estadoActual === ESTADOS_COMPRA.PENDIENTE && selectedCompra.MotivoCancelacion && (
+              <p className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded-lg">
+                ✗ Compra cancelada: {selectedCompra.MotivoCancelacion}
               </p>
             )}
+          </div>
+        )}
+
+        {/* Mensaje cuando no hay acciones disponibles */}
+        {userRole === 'admin' && !tieneOpciones && estadoActual === ESTADOS_COMPRA.RECIBIDO && (
+          <div className="bg-slate-50 p-4 rounded-lg border">
+            <p className="text-sm text-green-600 flex items-center gap-2">
+              <CheckCircle size={16} />
+              Esta compra ya ha sido recibida. No hay acciones adicionales disponibles.
+            </p>
           </div>
         )}
       </div>
@@ -495,7 +503,7 @@ export const ComprasView = ({
               <h3 className="text-base font-bold">Confirmar Recepción</h3>
             </div>
             <p className="text-sm text-gray-600 mb-3">
-              Se actualizará el inventario:
+              Se actualizará el inventario con los siguientes productos:
             </p>
             <div className="mb-3 max-h-48 overflow-y-auto border rounded-lg">
               <table className="min-w-full text-xs">
@@ -533,13 +541,16 @@ export const ComprasView = ({
                 </tbody>
               </table>
             </div>
+            <p className="text-xs text-gray-500 mb-4">
+              Esta acción no se puede deshacer. El stock se incrementará permanentemente.
+            </p>
             <div className="flex gap-2">
               <button
                 onClick={handleConfirmRecibido}
                 disabled={updating}
                 className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50"
               >
-                {updating ? 'Procesando...' : 'Confirmar'}
+                {updating ? 'Procesando...' : 'Confirmar Recepción'}
               </button>
               <button
                 onClick={() => {
@@ -561,7 +572,6 @@ export const ComprasView = ({
         isOpen={showCancelModal}
         onClose={() => {
           setShowCancelModal(false);
-          setEstadoSeleccionado(estadoActual);
         }}
         onConfirm={handleConfirmCancel}
         pedidoId={selectedCompra.CompraId}
