@@ -2,14 +2,20 @@ import axios from "axios"
 const url = 'http://localhost:3000/'
 
 // Listar todos los datos
-export const GetDataRoles = async () => {
+export const GetDataRoles = async (page = 1, limit = 10, filtroCampo = null, filtroValor = null) => {
   try {
-    const response = await axios.get(url + 'roles')
-    return response
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(filtroCampo && filtroValor && { filtroCampo, filtroValor })
+    });
+    
+    const response = await axios.get(`${url}roles?${params}`);
+    return response.data; // Ahora devuelve { data: [...], pagination: {...} }
   } catch (error) {
-    return { status: false, message: "Error al obtener roles", error }
+    return { data: [], pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit }, error };
   }
-}
+};
 
 // Crear rol
 export const postDataRoles = async (data) => {
@@ -42,15 +48,22 @@ export const deleteDataRol = async (id) => {
 }
 
 // Buscar roles
-export const buscarRoles = async (campo, valor) => {
+export const buscarRoles = async (campo, valor, page = 1, limit = 10) => {
   try {
-    const response = await axios.get(`${url}roles/buscar?campo=${campo}&valor=${valor}`);
-    return response.data;
+    const params = new URLSearchParams({
+      campo,
+      valor,
+      page: page.toString(),
+      limit: limit.toString()
+    });
+    
+    const response = await axios.get(`${url}roles/buscar?${params}`);
+    return response.data; // Devuelve { data: [...], pagination: {...} }
   } catch (error) {
     console.error("Error al buscar roles:", error);
-    return [];
+    return { data: [], pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } };
   }
-}
+};
 
 // ========== NUEVAS FUNCIONES PARA PERMISOS ==========
 

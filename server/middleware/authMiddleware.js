@@ -1,7 +1,8 @@
 import jwt from "jsonwebtoken";
-import connectDB from "../lib/db.js";
+import { dbPool } from "../lib/db.js";
 
 const JWT_KEY = process.env.JWT_KEY || "-secret-token";
+
 export const authMiddleware = async (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader?.split(" ")[1]; // "Bearer <token>"
@@ -13,10 +14,10 @@ export const authMiddleware = async (req, res, next) => {
   try {
     // Verificar y decodificar el token
     const decoded = jwt.verify(token, JWT_KEY);
-    req.user = decoded; // Ahora req.user contiene el payload (incluyendo CedulaId)
+    req.user = decoded; // req.user contiene el payload (incluyendo CedulaId)
 
-    const connection = await connectDB();
-    const [rows] = await connection.execute(
+    // Usando dbPool directamente
+    const [rows] = await dbPool.execute(
       "SELECT CedulaId FROM usuarios WHERE CedulaId = ?",
       [decoded.CedulaId]
     );
