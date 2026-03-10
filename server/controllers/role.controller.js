@@ -1,6 +1,5 @@
-import connectDB from '../lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
-import { createDataRole, getDataAllRoles, getDataRolesById, updateDataRoles, rolesAsociados, deleteDataRole, changeDataStatus, validarDataRol, buscarRolesModel, getdataPermisos, getDataRolePermissions, existenPermisos, deletePermissos, actualizarPermisos, getDataRolUser, getDataPermissonRol, systemRole } from '../models/role.model.js';
+import { createDataRole, getDataRolesPaginated, buscarRolesPaginated , getDataRolesById, updateDataRoles, rolesAsociados, deleteDataRole, changeDataStatus, validarDataRol, buscarRolesModel, getdataPermisos, getDataRolePermissions, existenPermisos, deletePermissos, actualizarPermisos, getDataRolUser, getDataPermissonRol, systemRole } from '../models/role.model.js';
 
 // Crear rol
 export const createRole = async (req, res) => {
@@ -40,16 +39,38 @@ export const createRole = async (req, res) => {
 // Listar todos los roles
 export const getAllRoles = async (req, res) => {
   try {
-    const roles = await getDataAllRoles();
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const filtroCampo = req.query.filtroCampo || null;
+    const filtroValor = req.query.filtroValor || null;
 
-    if (roles.length === 0) {
-      return res.status(409).json({
-        message: 'No hay roles'
+    const result = await getDataRolesPaginated({ page, limit, filtroCampo, filtroValor });
+
+    if (result.data.length === 0 && page > 1) {
+      // Si no hay datos y la página > 1, devolver página 1 con los mismos metadatos
+      const fallback = await getDataRolesPaginated({ page: 1, limit, filtroCampo, filtroValor });
+      return res.status(200).json({
+        data: fallback.data,
+        pagination: {
+          totalItems: fallback.totalItems,
+          totalPages: Math.ceil(fallback.totalItems / limit),
+          currentPage: 1,
+          itemsPerPage: limit
+        }
       });
-    };
+    }
 
-    res.status(200).json(roles);
+    res.status(200).json({
+      data: result.data,
+      pagination: {
+        totalItems: result.totalItems,
+        totalPages: Math.ceil(result.totalItems / limit),
+        currentPage: result.currentPage,
+        itemsPerPage: result.itemsPerPage
+      }
+    });
   } catch (error) {
+    console.error('Error al obtener roles con paginación:', error);
     res.status(500).json({ message: 'Error al obtener los roles', error: error.message });
   }
 };
@@ -142,8 +163,6 @@ export const changeState = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const connection = await connectDB();
-
     // Verifica si hay usuarios asociados a este rol
     const users = await rolesAsociados(id);
 
@@ -183,7 +202,7 @@ export const validarRol = async (req, res) => {
 
 // Buscar roles
 export const buscarRoles = async (req, res) => {
-  const { campo, valor } = req.query;
+  const { campo, valor, page = 1, limit = 10 } = req.query;
 
   const columnasPermitidas = {
     id: 'RoleId',
@@ -198,13 +217,27 @@ export const buscarRoles = async (req, res) => {
   }
 
   try {
-    const roles = await buscarRolesModel(columna, valor);
-    res.status(200).json(roles);
+    const result = await buscarRolesPaginated({ 
+      page: parseInt(page), 
+      limit: parseInt(limit), 
+      columna, 
+      valor 
+    });
+
+    res.status(200).json({
+      data: result.data,
+      pagination: {
+        totalItems: result.totalItems,
+        totalPages: Math.ceil(result.totalItems / parseInt(limit)),
+        currentPage: result.currentPage,
+        itemsPerPage: result.itemsPerPage
+      }
+    });
   } catch (error) {
-    console.error('Error al buscar roles:', error);
+    console.error('Error al buscar roles con paginación:', error);
     res.status(500).json({ message: 'Error interno del servidor' });
   }
-}; 
+};
 
 // ========== NUEVAS FUNCIONES PARA PERMISOS ==========
 
