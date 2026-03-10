@@ -72,23 +72,50 @@ export const ServicioDetalle = () => {
     if (id) fetchServicio();
   }, [id, navigate]);
 
-  const handleFileUpload = (e) => {
+  const subirArchivo = async (file) => {
+    const formData = new FormData();
+    formData.append("archivo", file);
+
+    const res = await fetch("http://localhost:3000/api/upload-temp", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+
+    if (!data.ok) {
+      throw new Error("Error subiendo archivo");
+    }
+
+    return data.url;
+  };
+
+  const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
-    const nuevosArchivos = files.map((file) => ({
-      id: Math.random().toString(36).substr(2, 9),
-      nombre: file.name,
-      tipo: file.type,
-      tamaño: file.size,
-      archivo: file,
-      url: URL.createObjectURL(file),
-      esImagen: file.type.startsWith("image/")
-    }));
 
-    setArchivosAdjuntos((prev) => [...prev, ...nuevosArchivos]);
+    for (const file of files) {
+      try {
+        const urlServidor = await subirArchivo(file);
 
-    const imagen = files.find((f) => f.type.startsWith("image/"));
-    if (imagen && !imagenPreview) {
-      setImagenPreview(URL.createObjectURL(imagen));
+        const nuevoArchivo = {
+          id: Math.random().toString(36).substr(2, 9),
+          nombre: file.name,
+          tipo: file.type,
+          tamaño: file.size,
+          url: urlServidor,
+          esImagen: file.type.startsWith("image/")
+        };
+
+        setArchivosAdjuntos(prev => [...prev, nuevoArchivo]);
+
+        if (file.type.startsWith("image/") && !imagenPreview) {
+          setImagenPreview(urlServidor);
+        }
+
+      } catch (error) {
+        console.error(error);
+        toast.error("Error subiendo archivo");
+      }
     }
   };
 
@@ -137,12 +164,9 @@ export const ServicioDetalle = () => {
         Descripcion: descripcion,
         Tamaño: tamano,
         archivosAdjuntos: archivosAdjuntos.map(f => ({
-          id: f.id,
           nombre: f.nombre,
-          tipo: f.tipo,
-          tamaño: f.tamaño,
-          archivo: f.archivo,
-          esImagen: f.esImagen
+          url: f.url,
+          tipo: f.tipo
         }))
       };
 
@@ -421,8 +445,8 @@ export const ServicioDetalle = () => {
                     (servicio.TipoPrecio === 'POR_TAMANO' && !tamano)
                   }
                   className={`w-full mt-6 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl ${isSubmitting || !descripcion.trim() || (servicio.TipoPrecio === 'POR_TAMANO' && !tamano)
-                      ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed"
-                      : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                    ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed"
+                    : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                     }`}
                 >
                   {isSubmitting ? (
@@ -444,7 +468,7 @@ export const ServicioDetalle = () => {
       </div>
 
       {imagenAmpliada && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
           onClick={cerrarImagenAmpliada}
         >

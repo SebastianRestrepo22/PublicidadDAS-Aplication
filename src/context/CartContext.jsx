@@ -24,7 +24,7 @@ export const CartProvider = ({ children }) => {
 
   const obtenerStockProducto = (producto) => {
     if (producto.UsaColores === 1 || producto.UsaColores === "1") {
-      return producto.Colores && Array.isArray(producto.Colores) 
+      return producto.Colores && Array.isArray(producto.Colores)
         ? producto.Colores.reduce((sum, color) => sum + (color.Stock || 0), 0)
         : 0;
     } else {
@@ -46,16 +46,16 @@ export const CartProvider = ({ children }) => {
     const nuevaCantidadTotal = cantidadEnCarrito + cantidadSolicitada;
 
     if (stockDisponible === 0) {
-      return { 
-        valido: false, 
-        mensaje: `El color ${colorSeleccionado.Nombre} no tiene stock disponible` 
+      return {
+        valido: false,
+        mensaje: `El color ${colorSeleccionado.Nombre} no tiene stock disponible`
       };
     }
 
     if (nuevaCantidadTotal > stockDisponible) {
-      return { 
-        valido: false, 
-        mensaje: `Solo hay ${stockDisponible} unidades disponibles del color ${colorSeleccionado.Nombre}` 
+      return {
+        valido: false,
+        mensaje: `Solo hay ${stockDisponible} unidades disponibles del color ${colorSeleccionado.Nombre}`
       };
     }
 
@@ -71,9 +71,9 @@ export const CartProvider = ({ children }) => {
     }
 
     if (nuevaCantidadTotal > stockDisponible) {
-      return { 
-        valido: false, 
-        mensaje: `Solo hay ${stockDisponible} unidades disponibles` 
+      return {
+        valido: false,
+        mensaje: `Solo hay ${stockDisponible} unidades disponibles`
       };
     }
 
@@ -94,7 +94,7 @@ export const CartProvider = ({ children }) => {
     const isServicio = !!product.ServicioId;
     const productId = product.ProductoId || product.ServicioId || product.id;
     const usaColores = !isServicio && (product.UsaColores === 1 || product.UsaColores === "1");
-    
+
     console.log("Agregando item:", {
       productId,
       isServicio,
@@ -109,7 +109,7 @@ export const CartProvider = ({ children }) => {
     if (!isServicio && customization.color) {
       if (typeof customization.color === 'string') {
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        
+
         if (uuidRegex.test(customization.color)) {
           colorIdSeleccionado = customization.color;
           if (product.Colores && Array.isArray(product.Colores)) {
@@ -151,7 +151,7 @@ export const CartProvider = ({ children }) => {
         if (item.ServicioId !== product.ServicioId) return false;
         return JSON.stringify(item.customization) === JSON.stringify(customization);
       }
-      
+
       if (item.ProductoId !== product.ProductoId) return false;
 
       if (usaColores) {
@@ -199,7 +199,7 @@ export const CartProvider = ({ children }) => {
 
     const discount = product.Descuento || product.descuento || 0;
     const originalPrice = product.Precio || product.precio || 0;
-    
+
     let finalPrice = originalPrice;
     if (isServicio) {
       if (customization.precioSeleccionado) {
@@ -214,27 +214,21 @@ export const CartProvider = ({ children }) => {
 
     const itemType = isServicio ? "servicio" : "producto";
 
-    // Convertir archivos a Base64 para guardarlos en localStorage
-    const archivosBase64 = [];
+    // Guardar solo metadata de archivos (NO Base64)
+    const archivosMetadata = [];
+
     if (customization.archivosAdjuntos) {
       for (const f of customization.archivosAdjuntos) {
-        if (f.archivo) {
-          try {
-            const base64 = await fileToBase64(f.archivo);
-            archivosBase64.push({
-              id: f.id,
-              nombre: f.nombre,
-              tipo: f.tipo,
-              tamaño: f.tamaño,
-              base64: base64,
-              esImagen: f.tipo.startsWith('image/')
-            });
-          } catch (error) {
-            console.error("Error convirtiendo archivo a Base64:", error);
-          }
-        } else if (f.base64) {
-          archivosBase64.push(f);
-        }
+
+        archivosMetadata.push({
+          id: f.id || Date.now(),
+          nombre: f.nombre || f.name,
+          tipo: f.tipo || f.type,
+          tamaño: f.tamaño || f.size,
+          url: f.url,                          
+          esImagen: (f.tipo || f.type)?.startsWith("image/")
+        });
+
       }
     }
 
@@ -256,8 +250,9 @@ export const CartProvider = ({ children }) => {
       EsPersonalizado: product.EsPersonalizado || false,
       customization: {
         ...customization,
-        archivosAdjuntos: archivosBase64,
-        tieneArchivosPendientes: archivosBase64.length > 0
+        archivosAdjuntos: archivosMetadata,
+        archivosAdjuntosOriginales: customization.archivosAdjuntos || [],
+        tieneArchivosPendientes: archivosMetadata.length > 0
       },
       CategoriaId: product.CategoriaId,
       createdAt: new Date().toISOString()
@@ -265,9 +260,9 @@ export const CartProvider = ({ children }) => {
 
     setCart((prev) => [...prev, cartLine]);
     console.log("Item agregado exitosamente:", cartLine);
-    
-    if (archivosBase64.length > 0) {
-      toast.success(`${product.Nombre} agregado al carrito.`);
+
+    if (archivosMetadata.length > 0) {
+      toast.success(`${product.Nombre} agregado al carrito con archivos`);
     } else {
       toast.success(`${product.Nombre} agregado al carrito`);
     }
@@ -295,10 +290,10 @@ export const CartProvider = ({ children }) => {
                 Stock: l.customization.color.Stock || 0
               }]
             };
-            
+
             const validacion = validarStockColor(
-              productoSimulado, 
-              l.customization.color.ColorId, 
+              productoSimulado,
+              l.customization.color.ColorId,
               validatedQuantity,
               0
             );
@@ -371,14 +366,14 @@ export const CartProvider = ({ children }) => {
     setCart(prev => prev.map(item => {
       if (item.id === lineId) {
         const updatedItem = { ...item, ...updatedData };
-        
+
         if (updatedData.customization) {
           updatedItem.customization = {
             ...item.customization,
             ...updatedData.customization
           };
         }
-        
+
         return updatedItem;
       }
       return item;

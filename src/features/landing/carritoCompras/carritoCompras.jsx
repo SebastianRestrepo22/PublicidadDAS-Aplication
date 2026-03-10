@@ -563,7 +563,6 @@ export const CarritoCompras = () => {
             )}
 
             {/* Servicios */}
-           // En CarritoCompras.jsx, busca la sección de servicios y reemplázala con esta:
 
             {servicios.length > 0 && (
               <div className="bg-white rounded-xl shadow-lg p-6">
@@ -573,14 +572,12 @@ export const CarritoCompras = () => {
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                   {servicios.map((item) => {
                     const imagenAdjunta = item.customization?.archivosAdjuntos?.find(
-                      f => f.esImagen && f.base64
+                      f => f.esImagen && f.url
                     );
 
-                    const imagenSrc = imagenAdjunta?.base64 ||
-                      item.customization?.UrlImagen ||
-                      item.UrlImagen ||
-                      item.Imagen ||
-                      "https://via.placeholder.com/200";
+                    const imagenSrc = imagenAdjunta?.url
+                      ? `http://localhost:3000${imagenAdjunta.url}`
+                      : item.UrlImagen || item.Imagen || "https://via.placeholder.com/200";
 
                     return (
                       <div key={item.id} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors">
@@ -624,15 +621,22 @@ export const CarritoCompras = () => {
                                             className="border border-slate-200 rounded-lg p-1 hover:border-blue-300 transition-all group relative cursor-pointer"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              if (archivo.esImagen && archivo.base64) {
-                                                setImagenAmpliada(archivo.base64);
+
+                                              if (!archivo.url) return;
+
+                                              const url = `http://localhost:3000${archivo.url}`;
+
+                                              if (archivo.esImagen) {
+                                                setImagenAmpliada(url);
+                                              } else {
+                                                window.open(url, "_blank");
                                               }
                                             }}
                                           >
                                             {archivo.esImagen ? (
                                               <div className="relative">
                                                 <img
-                                                  src={archivo.base64}
+                                                  src={`http://localhost:3000${archivo.url}`}
                                                   alt={archivo.nombre}
                                                   className="w-full h-16 object-cover rounded"
                                                 />
@@ -641,8 +645,11 @@ export const CarritoCompras = () => {
                                                 </div>
                                               </div>
                                             ) : (
-                                              <div className="flex items-center justify-center p-2 bg-slate-50 rounded h-16">
+                                              <div className="flex flex-col items-center justify-center p-2 bg-slate-50 rounded h-16">
                                                 <FileText className="h-6 w-6 text-red-500" />
+                                                <span className="text-[10px] mt-1">
+                                                  {archivo.nombre?.split(".").pop()?.toUpperCase() || "FILE"}
+                                                </span>
                                               </div>
                                             )}
                                             <p className="text-[10px] truncate mt-1 text-center">{archivo.nombre}</p>
