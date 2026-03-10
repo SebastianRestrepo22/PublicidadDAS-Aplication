@@ -336,35 +336,57 @@ export const PedidosClientes = () => {
     }
   };
 
-  const handleUpdateEstado = async (estado, motivo = "") => {
-    if (!selectedPedido) return;
+  // En PedidosClientes.jsx
+const handleUpdateEstado = async (estado, motivo = "") => {
+  if (!selectedPedido) return;
 
-    try {
-      setUpdating(true);
-      const payload = { Estado: estado };
-      if (estado === 'cancelado' && motivo) payload.motivo = motivo;
+  try {
+    setUpdating(true);
+    
+    // Para actualizaciones de estado, solo enviamos JSON
+    const payload = { Estado: estado };
+    if (estado === 'cancelado' && motivo) payload.motivo = motivo;
 
-      await axios.put(
-        `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
-        payload,
-        { headers: { 'Content-Type': 'application/json' } }
-      );
+    console.log('🟡 Enviando actualización:', payload);
 
-      setSelectedPedido(prev => ({
-        ...prev,
-        Estado: estado,
-        MotivoCancelacion: estado === 'cancelado' ? motivo : prev.MotivoCancelacion
-      }));
+    const response = await axios.put(
+      `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
+      payload,
+      { 
+        headers: { 
+          'Content-Type': 'application/json' // 👈 IMPORTANTE: JSON, no multipart
+        } 
+      }
+    );
 
-      toast.success(`✅ Pedido ${estado === 'cancelado' ? 'cancelado' : 'actualizado'} correctamente`);
-      await fetchPedidos();
-    } catch (err) {
-      console.error('❌ Error:', err);
-      toast.error(`Error: ${err.response?.data?.error || err.message}`);
-    } finally {
-      setUpdating(false);
+    console.log('🟢 Respuesta del servidor:', response.data);
+
+    setSelectedPedido(prev => ({
+      ...prev,
+      Estado: estado,
+      MotivoCancelacion: estado === 'cancelado' ? motivo : prev.MotivoCancelacion
+    }));
+
+    toast.success(`✅ Pedido ${estado === 'cancelado' ? 'cancelado' : estado} correctamente`);
+    
+    // Recargar la lista
+    await fetchPedidos();
+    
+    // Si es aprobado, mostrar mensaje de venta creada
+    if (estado === 'aprobado' && response.data.venta) {
+      toast.success(`💰 Venta #${response.data.venta.VentaId.substring(0, 8)} creada`);
     }
-  };
+    
+  } catch (err) {
+    console.error('❌ Error detallado:', err.response?.data || err);
+    
+    const errorMsg = err.response?.data?.error || err.response?.data?.details || err.message;
+    toast.error(`Error: ${errorMsg}`);
+  } finally {
+    setUpdating(false);
+  }
+};
+
 
   const handlePageChange = (page) => setCurrentPage(page);
   const handleItemsPerPageChange = (newItems) => {

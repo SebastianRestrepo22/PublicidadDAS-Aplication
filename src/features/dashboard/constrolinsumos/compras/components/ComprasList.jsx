@@ -27,27 +27,17 @@ const formatPrice = (value) => {
   return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
 };
 
-// Configuración de estados para mostrar en la tabla
+// Configuración de estados para mostrar en la tabla - AHORA SOLO DOS
 const estadoConfig = {
   [ESTADOS_COMPRA.PENDIENTE]: {
     color: 'bg-yellow-100 text-yellow-800',
     label: 'Pendiente',
     icon: '⏳'
   },
-  [ESTADOS_COMPRA.ORDEN_ENVIADA]: {
-    color: 'bg-blue-100 text-blue-800',
-    label: 'Orden Enviada',
-    icon: '📦'
-  },
   [ESTADOS_COMPRA.RECIBIDO]: {
     color: 'bg-green-100 text-green-800',
     label: 'Recibido',
     icon: '✅'
-  },
-  [ESTADOS_COMPRA.ANULADA]: {
-    color: 'bg-red-100 text-red-800',
-    label: 'Anulada',
-    icon: '❌'
   }
 };
 

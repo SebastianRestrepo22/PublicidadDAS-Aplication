@@ -158,7 +158,6 @@ export const Compras = () => {
       if (Array.isArray(data)) {
         console.log("Es un array directo, longitud:", data.length);
 
-        // Los datos ya tienen la estructura correcta: ColorId, Nombre, Hex
         // Solo nos aseguramos de que tengan todos los campos necesarios
         const coloresFormateados = data.map(color => ({
           ColorId: color.ColorId,
@@ -314,18 +313,18 @@ export const Compras = () => {
 
   const goToView = async (compra) => {
   try {
-    console.log("🟡 [goToView] Compra recibida:", compra);
-    console.log("🟡 [goToView] Productos disponibles:", productos.length);
+    console.log(" [goToView] Compra recibida:", compra);
+    console.log(" [goToView] Productos disponibles:", productos.length);
     
     const detalles = await getDetallesByCompraId(compra.CompraId);
-    console.log("🟢 [goToView] Detalles recuperados de la BD:", detalles);
-    console.log("🟢 [goToView] Tipo de detalles:", typeof detalles);
-    console.log("🟢 [goToView] ¿Es array?", Array.isArray(detalles));
-    console.log("🟢 [goToView] Longitud de detalles:", detalles?.length);
+    console.log(" [goToView] Detalles recuperados de la BD:", detalles);
+    console.log(" [goToView] Tipo de detalles:", typeof detalles);
+    console.log(" [goToView] ¿Es array?", Array.isArray(detalles));
+    console.log(" [goToView] Longitud de detalles:", detalles?.length);
 
     // Si no hay detalles, mostrar un mensaje
     if (!detalles || detalles.length === 0) {
-      console.warn("⚠️ [goToView] No hay detalles para esta compra");
+      console.warn(" [goToView] No hay detalles para esta compra");
       
       const proveedor = proveedores.find(p => p.ProveedorId === compra.ProveedorId);
       const nombreProveedor = proveedor?.NombreProveedor || "";
@@ -340,8 +339,8 @@ export const Compras = () => {
     }
 
     // Mostrar el primer detalle para ver su estructura
-    console.log("🔵 [goToView] Primer detalle (raw):", detalles[0]);
-    console.log("🔵 [goToView] Propiedades del primer detalle:", Object.keys(detalles[0]));
+    console.log(" [goToView] Primer detalle (raw):", detalles[0]);
+    console.log(" [goToView] Propiedades del primer detalle:", Object.keys(detalles[0]));
 
     const proveedor = proveedores.find(p => p.ProveedorId === compra.ProveedorId);
     const nombreProveedor = proveedor?.NombreProveedor || "";
@@ -353,12 +352,12 @@ export const Compras = () => {
       const cantidad = Number(d.Cantidad) || 0;
       
       // IMPORTANTE: Verificar la estructura completa del detalle
-      console.log("🔵 [goToView] Procesando detalle:", d.DetalleCompraId);
+      console.log(" [goToView] Procesando detalle:", d.DetalleCompraId);
       
       // Procesar colores si existen
       let coloresDetalle = [];
       if (d.colores) {
-        console.log("🔵 [goToView] colores en detalle:", d.colores);
+        console.log(" [goToView] colores en detalle:", d.colores);
         if (Array.isArray(d.colores)) {
           coloresDetalle = d.colores;
         } else if (typeof d.colores === 'string') {
@@ -372,7 +371,7 @@ export const Compras = () => {
       
       // Buscar información del producto
       const producto = productos.find(p => p.ProductoId === d.ProductoId);
-      console.log("🔵 [goToView] Producto encontrado:", producto?.Nombre);
+      console.log(" [goToView] Producto encontrado:", producto?.Nombre);
       
       return {
         ...d,
@@ -387,12 +386,12 @@ export const Compras = () => {
       };
     });
 
-    console.log("🟢 [goToView] Detalles con producto mapeados:", detallesConProducto);
-    console.log("🟢 [goToView] Primer detalle mapeado:", detallesConProducto[0]);
+    console.log(" [goToView] Detalles con producto mapeados:", detallesConProducto);
+    console.log(" [goToView] Primer detalle mapeado:", detallesConProducto[0]);
 
     // Verificar que el detalle tenga la estructura correcta para la vista
     if (detallesConProducto[0]) {
-      console.log("🟢 [goToView] Estructura final:", {
+      console.log(" [goToView] Estructura final:", {
         DetalleCompraId: detallesConProducto[0].DetalleCompraId,
         ProductoId: detallesConProducto[0].ProductoId,
         ProductoNombre: detallesConProducto[0].ProductoNombre,
@@ -408,7 +407,7 @@ export const Compras = () => {
       nombreProveedor
     });
     
-    console.log("🟢 [goToView] selectedCompra actualizado:", {
+    console.log(" [goToView] selectedCompra actualizado:", {
       compraId: compra.CompraId,
       total: compra.Total,
       detallesCount: detallesConProducto.length

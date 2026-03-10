@@ -299,6 +299,10 @@ export const createPedidoCliente = async (req, res) => {
 export const updatePedidoCliente = async (req, res) => {
   const { id } = req.params;
   let updates = { ...req.body };
+  
+  // Declarar variables al inicio del ámbito de la función
+  let destinatario = null;
+  let nombreCliente = 'Cliente';
 
   try {
     console.log('🔍 [PEDIDOS] ===== INICIANDO ACTUALIZACIÓN =====');
@@ -363,8 +367,8 @@ export const updatePedidoCliente = async (req, res) => {
 
       try {
         // Determinar el destinatario del correo
-        let destinatario = null;
-        let nombreCliente = 'Cliente';
+        destinatario = null;
+        nombreCliente = 'Cliente';
 
         // Caso 1: Cliente registrado
         if (updated.ClienteId) {
@@ -467,8 +471,8 @@ export const updatePedidoCliente = async (req, res) => {
                 updated.detalle.map(d => ({
                   ...d,
                   NombreSnapshot: d.ProductoId ? 
-                    (productos.find(p => p.ProductoId === d.ProductoId)?.Nombre || 'Producto') :
-                    (servicios.find(s => s.ServicioId === d.ServicioId)?.Nombre || 'Servicio')
+                    (productos?.find(p => p.ProductoId === d.ProductoId)?.Nombre || 'Producto') :
+                    (servicios?.find(s => s.ServicioId === d.ServicioId)?.Nombre || 'Servicio')
                 }))
               ).catch(err => console.error('Error enviando factura:', err));
             } catch (facturaError) {

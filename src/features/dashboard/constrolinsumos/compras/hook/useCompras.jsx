@@ -3,16 +3,14 @@ import {
   getAllCompras,
   getAllProductos,
   getAllProveedores,
-  updateCompraEstado  // Asegúrate de importar esta función
+  updateCompraEstado
 } from "../services/services.compras";
 import { toast } from "react-toastify";
 
-// Constantes para los estados
+// Constantes para los estados - AHORA SOLO DOS
 export const ESTADOS_COMPRA = {
   PENDIENTE: 'pendiente',
-  ORDEN_ENVIADA: 'orden_enviada',
-  RECIBIDO: 'recibido',
-  ANULADA: 'anulada'
+  RECIBIDO: 'recibido'
 };
 
 export const useCompras = () => {
@@ -63,14 +61,14 @@ export const useCompras = () => {
 
   const actualizarEstado = async (idCompra, nuevoEstado, productosAActualizar = null, motivo = "") => {
     try {
-      console.log("Actualizando estado:", { idCompra, nuevoEstado, motivo }); // LOG PARA DEBUG
+      console.log("Actualizando estado:", { idCompra, nuevoEstado, motivo });
       
       const result = await updateCompraEstado(idCompra, nuevoEstado, {
         productos: productosAActualizar,
         motivoCancelacion: motivo
       });
       
-      console.log("Respuesta del servidor:", result); // LOG PARA DEBUG
+      console.log("Respuesta del servidor:", result);
       
       // Actualizar la compra en el estado local
       setCompras((prev) =>
@@ -88,21 +86,19 @@ export const useCompras = () => {
       return result;
     } catch (err) {
       console.error("Error detallado al actualizar estado:", err);
-      console.error("Respuesta del error:", err.response?.data); // LOG PARA DEBUG
+      console.error("Respuesta del error:", err.response?.data);
       toast.error(err.response?.data?.error || "Error al actualizar estado");
       throw err;
     }
   };
 
   const puedeCambiarEstado = (estadoActual, nuevoEstado) => {
-    const flujoEstados = {
-      [ESTADOS_COMPRA.PENDIENTE]: [ESTADOS_COMPRA.ORDEN_ENVIADA, ESTADOS_COMPRA.ANULADA],
-      [ESTADOS_COMPRA.ORDEN_ENVIADA]: [ESTADOS_COMPRA.RECIBIDO, ESTADOS_COMPRA.ANULADA],
-      [ESTADOS_COMPRA.RECIBIDO]: [],
-      [ESTADOS_COMPRA.ANULADA]: []
-    };
-    
-    return flujoEstados[estadoActual]?.includes(nuevoEstado) || false;
+    // Solo permitir cambiar de PENDIENTE a RECIBIDO
+    // Una vez RECIBIDO, no se puede cambiar
+    if (estadoActual === ESTADOS_COMPRA.PENDIENTE && nuevoEstado === ESTADOS_COMPRA.RECIBIDO) {
+      return true;
+    }
+    return false;
   };
 
   return {
