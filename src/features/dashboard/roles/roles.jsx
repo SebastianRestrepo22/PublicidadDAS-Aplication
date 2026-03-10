@@ -1,312 +1,70 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Search, Plus, Edit, Eye, Trash2, Shield, Check, X, ChevronDown, ChevronUp } from "lucide-react";
-import Modal from "../components/modals/modal.jsx";
-import { buscarRoles, deleteDataRol, GetDataRoles, postDataRoles, updateDataRol, getPermissions, getRolePermissions, updateRolePermissions } from './services/services.role';
-import axios from "axios";
-
-//importamos toastify
-import { toast, ToastContainer } from "react-toastify";
+import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { Pagination } from "../components/paginacion/pagination.jsx";
 
-function Toggle({ checked = false, onChange }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${checked ? "bg-green-500" : "bg-gray-300"}`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${checked ? "translate-x-6" : "translate-x-1"}`}
-      />
-    </button>
-  );
-}
+import Modal from "../components/modals/modal.jsx";
+import { Pagination } from "../components/paginacion/pagination.jsx";
+import { RolFilters } from "./components/RolFilters.jsx";
+import { RolTable } from "./components/RolTable.jsx";
+import { RolForm } from "./components/RolForm.jsx";
+import { RolView } from "./components/RolView.jsx";
+import { RolDelete } from "./components/RolDelete.jsx";
+import { PermissionsModal } from "./components/PermissionsModal.jsx";
+import { useRoles } from "./hooks/useRoles";
 
 export const Roles = () => {
-  //Paginación
-  const [allData, setAllData] = useState([]);
-  const [paginatedData, setPaginatedData] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const {
+    paginatedData,
+    currentPage,
+    itemsPerPage,
+    totalItems,
+    totalPages,
+    formData,
+    editData,
+    allPermissions,
+    selectedPermissions,
+    permissionsByModule,
+    filtroCampo,
+    filtroValor,
+    
+    // Estados de error
+    submitted,
+    rolError,
+    originalNombre,
+    
+    setCurrentPage,
+    setItemsPerPage,
+    setFormData,
+    setEditData,
+    setSelectedPermissions,
+    setFiltroCampo,
+    setFiltroValor,
+    setSubmitted,
+    setRolError,
+    setOriginalNombre,
+    
+    cargarRoles,
+    handleToggleEstado,
+    handleSubmit,
+    handleDelete,
+    handleSavePermissions,
+    loadRolePermissions,
+    resetFormErrors
+  } = useRoles();
 
-  const [roles, setRoles] = useState([]);
-  const [formData, setFormData] = useState({ Nombre: "", Estado: true, description: "" });
-  const [editData, setEditData] = useState(null);
-
-  // Nuevos estados para permisos
-  const [allPermissions, setAllPermissions] = useState([]);
-  const [selectedPermissions, setSelectedPermissions] = useState([]);
-  const [permissionsByModule, setPermissionsByModule] = useState({});
-  const [expandedModules, setExpandedModules] = useState([]); // Para expandir/contraer módulos
-
+  // Estados para modales
   const [openCreate, setOpenCreate] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
   const [openVer, setOpenVer] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
-  const [openPermissions, setOpenPermissions] = useState(false); // Nuevo modal para permisos
+  const [openPermissions, setOpenPermissions] = useState(false);
 
-  const [filtroCampo, setFiltroCampo] = useState('');
-  const [filtroValor, setFiltroValor] = useState('');
-
-  // Manejar los errores debajo del imput
-  const [submitted, setSubmitted] = useState(false);
-  const [rolError, setRolError] = useState('');
-  const [originalNombre, setOriginalNombre] = useState("");
-
-  // Cargar todos los permisos disponibles
+  // Cargar permisos del rol cuando se abre el modal
   useEffect(() => {
-    const loadPermissions = async () => {
-      try {
-        const permisos = await getPermissions();
-        setAllPermissions(permisos);
-
-        // Agrupar permisos por módulo
-        const grouped = permisos.reduce((acc, permiso) => {
-          const modulo = permiso.Modulo || 'General';
-          if (!acc[modulo]) acc[modulo] = [];
-          acc[modulo].push(permiso);
-          return acc;
-        }, {});
-        setPermissionsByModule(grouped);
-
-        // Expandir todos los módulos por defecto
-        setExpandedModules(Object.keys(grouped));
-      } catch (error) {
-        console.error('Error cargando permisos:', error);
-      }
-    };
-    loadPermissions();
-  }, []);
-
-  // Cargar permisos de un rol cuando se abre el modal de permisos
-  useEffect(() => {
-    const loadRolePermissions = async () => {
-      if (openPermissions && editData?.RoleId) {
-        try {
-          const permisos = await getRolePermissions(editData.RoleId);
-          const permisoIds = permisos.map(p => p.PermisoId);
-          setSelectedPermissions(permisoIds);
-        } catch (error) {
-          console.error('Error cargando permisos del rol:', error);
-          setSelectedPermissions([]);
-        }
-      }
-    };
-    loadRolePermissions();
+    if (openPermissions && editData?.RoleId) {
+      loadRolePermissions(editData.RoleId);
+    }
   }, [openPermissions, editData]);
-
-  // Función para paginar
-  const paginateData = (data) => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
-
-  // Función para cargar roles
-  const cargarRoles = async () => {
-    try {
-      let resultados;
-      if (filtroCampo && filtroValor) {
-        resultados = await buscarRoles(filtroCampo, filtroValor);
-      } else {
-        const todos = await GetDataRoles();
-        resultados = todos?.data || [];
-      }
-
-      setAllData(Array.isArray(resultados) ? resultados : []);
-      setTotalItems(Array.isArray(resultados) ? resultados.length : 0);
-
-      const totalPages = Math.ceil(resultados.length / itemsPerPage);
-      setTotalPages(totalPages > 0 ? totalPages : 1);
-
-      if (currentPage > totalPages && totalPages > 0) {
-        setCurrentPage(totalPages);
-      }
-
-      const paginatedData = paginateData(Array.isArray(resultados) ? resultados : []);
-      setPaginatedData(paginatedData);
-    } catch (error) {
-      console.error(error);
-      setRoles([]);
-    }
-  };
-
-  useEffect(() => {
-    cargarRoles();
-  }, [filtroCampo, filtroValor]);
-
-  useEffect(() => {
-    if (allData.length > 0) {
-      const totalPages = Math.ceil(allData.length / itemsPerPage);
-      setTotalPages(totalPages > 0 ? totalPages : 1);
-
-      if (currentPage > totalPages && totalPages > 0) {
-        setCurrentPage(totalPages);
-      }
-
-      const paginatedData = paginateData(allData);
-      setPaginatedData(paginatedData);
-    }
-  }, [itemsPerPage, currentPage, allData]);
-
-  const handleRolBlur = async () => {
-    if (formData.Nombre === originalNombre) return;
-
-    try {
-      const response = await axios.get(`http://localhost:3000/roles/validar-rol?rol=${formData.Nombre}`);
-      if (response.data.exists) {
-        setRolError('Este rol ya está registrado');
-      } else {
-        setRolError('');
-      }
-    } catch (error) {
-      console.error('Error validando el rol:', error);
-      setRolError('No se pudo validar el rol');
-    }
-  };
-
-  const changeData = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
-
-  const handleToggleEstado = async (roleId, nuevoEstado) => {
-    try {
-      const response = await axios.put(`http://localhost:3000/roles/${roleId}/estado`, {
-        estado: nuevoEstado
-      });
-      toast.success(response.data.message);
-
-      // Actualizar la lista después de cambiar estado
-      await cargarRoles();
-    } catch (error) {
-      if (error.response?.data?.message) {
-        toast.warning(error.response.data.message);
-      } else {
-        toast.error("No se pudo actualizar el estado del rol.");
-      }
-    }
-  };
-
-  const handlePermissionToggle = (permisoId) => {
-    setSelectedPermissions(prev => {
-      if (prev.includes(permisoId)) {
-        return prev.filter(id => id !== permisoId);
-      } else {
-        return [...prev, permisoId];
-      }
-    });
-  };
-
-  const toggleModule = (module) => {
-    setExpandedModules(prev =>
-      prev.includes(module)
-        ? prev.filter(m => m !== module)
-        : [...prev, module]
-    );
-  };
-
-  const handleSelectAllModule = (module) => {
-    const modulePermisos = permissionsByModule[module];
-    const allModuleIds = modulePermisos.map(p => p.PermisoId);
-
-    // Verificar si ya están todos seleccionados
-    const allSelected = allModuleIds.every(id => selectedPermissions.includes(id));
-
-    if (allSelected) {
-      // Deseleccionar todos
-      setSelectedPermissions(prev => prev.filter(id => !allModuleIds.includes(id)));
-    } else {
-      // Seleccionar todos los que no están
-      const newSelected = [...selectedPermissions];
-      allModuleIds.forEach(id => {
-        if (!newSelected.includes(id)) {
-          newSelected.push(id);
-        }
-      });
-      setSelectedPermissions(newSelected);
-    }
-  };
-
-  const handleSelectAllPermissions = () => {
-    const allPermisoIds = allPermissions.map(p => p.PermisoId);
-
-    // Verificar si ya están todos seleccionados
-    const allSelected = allPermisoIds.every(id => selectedPermissions.includes(id));
-
-    if (allSelected) {
-      // Deseleccionar todos
-      setSelectedPermissions([]);
-    } else {
-      // Seleccionar todos
-      setSelectedPermissions(allPermisoIds);
-    }
-  };
-
-  const handleSavePermissions = async () => {
-    try {
-      await updateRolePermissions(editData.RoleId, selectedPermissions);
-      toast.success('Permisos actualizados correctamente');
-      setOpenPermissions(false);
-    } catch (error) {
-      toast.error('Error al actualizar permisos');
-      console.error(error);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitted(true);
-
-    if (!formData.Nombre || !formData.Nombre.trim()) {
-      setRolError('El nombre no puede ir vacío');
-      return;
-    }
-
-    try {
-      const validarRes = await axios.get(
-        `http://localhost:3000/roles/validar-rol?rol=${encodeURIComponent(formData.Nombre.trim())}`
-      );
-      const exists = validarRes.data?.exists;
-
-      if (exists && (!editData || formData.Nombre.trim() !== (originalNombre || "").trim())) {
-        setRolError('Este rol ya está registrado');
-        toast.warning('Ya existe un rol con ese nombre');
-        return;
-      }
-
-      const estadoValido = formData.Estado === true ? "Activo" : "Inactivo";
-
-      let response;
-      if (editData && editData.RoleId) {
-        response = await updateDataRol(editData.RoleId, { ...formData, Estado: estadoValido });
-      } else {
-        response = await postDataRoles({ ...formData, Estado: estadoValido });
-      }
-
-      if (response && (response.status === 200 || response.status === 201)) {
-        // Actualizar la lista después de crear/editar
-        await cargarRoles();
-        toast.success(editData ? "Rol actualizado correctamente" : "Rol creado correctamente");
-        handleCloseModal();
-      } else {
-        toast.error("Error al guardar el rol");
-      }
-    } catch (error) {
-      console.error("Error en handleSubmit:", error);
-      const serverMessage = error?.response?.data?.message;
-      if (serverMessage) {
-        setRolError(serverMessage);
-        toast.warning(serverMessage);
-      } else {
-        toast.error("Error al procesar la solicitud");
-      }
-    }
-  };
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -320,8 +78,6 @@ export const Roles = () => {
   const handleEditClick = (rol) => {
     setEditData(rol);
     setFormData({ ...rol, Estado: rol.Estado === "Activo" });
-    setOriginalNombre(rol.Nombre || "");
-    setRolError('');
     setOpenEditar(true);
   };
 
@@ -341,22 +97,11 @@ export const Roles = () => {
     setOpenEliminar(true);
   };
 
-  const handleDelete = async (id) => {
-    try {
-      const response = await axios.delete(`http://localhost:3000/roles/${id}`);
-      toast.success(response.data.message);
-
-      // ACTUALIZAR LA LISTA INMEDIATAMENTE después de eliminar
-      await cargarRoles();
-
-      setOpenEliminar(false);
-    } catch (error) {
-      if (error.response?.data?.message) {
-        toast.warning(error.response.data.message);
-      } else {
-        toast.error('Error al eliminar el rol');
-      }
-    }
+  const handleNewRol = () => {
+    setEditData(null);
+    setFormData({ Nombre: "", description: "", Estado: true });
+    resetFormErrors(); // Limpiar errores al abrir nuevo rol
+    setOpenCreate(true);
   };
 
   const handleCloseModal = () => {
@@ -364,270 +109,76 @@ export const Roles = () => {
     setOpenEditar(false);
     setOpenVer(false);
     setOpenPermissions(false);
+    setOpenEliminar(false);
     setFormData({ Nombre: "", description: "", Estado: true });
     setEditData(null);
     setSelectedPermissions([]);
-    setRolError('');
-    setSubmitted(false);
+    resetFormErrors(); // Limpiar errores al cerrar cualquier modal
   };
 
-  useEffect(() => {
-    if (openCreate || openEditar) {
-      setSubmitted(false);
+  const handleFormSubmit = async (e) => {
+    const success = await handleSubmit(e);
+    if (success) {
+      handleCloseModal();
     }
-  }, [openCreate, openEditar]);
-
-  const renderForm = (type = "create") => {
-    const buttonLabel = type === "create" ? "Crear" : type === "editar" ? "Guardar" : "Cerrar";
-
-    return (
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 text-left">
-        <div className="flex flex-col">
-          <label className="mb-1 text-sm font-medium text-gray-700">Nombre del Rol</label>
-          <input
-            type="text"
-            name="Nombre"
-            placeholder="Ej: Administrador"
-            value={formData.Nombre}
-            onChange={changeData}
-            onBlur={handleRolBlur}
-            className={`w-full h-11 px-4 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 
-            ${(submitted && !formData.Nombre.trim()) || rolError ? "border-red-500" : "border-gray-300"}`}
-          />
-          {(!formData.Nombre.trim() && submitted) ? (
-            <p className="text-red-500 text-sm mt-1">El nombre no puede ir vacío</p>
-          ) : rolError ? (
-            <p className="text-red-500 text-sm mt-1">{rolError}</p>
-          ) : null}
-        </div>
-
-        <div className="col-span-1 flex gap-4 mt-4">
-          <button className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors">
-            {buttonLabel}
-          </button>
-          <button
-            type="button"
-            className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-            onClick={handleCloseModal}
-          >
-            Cancelar
-          </button>
-        </div>
-      </form>
-    );
   };
 
-  const renderPermissionsModal = () => {
-    if (!editData) return null;
+  const handleDeleteConfirm = async (id) => {
+    const success = await handleDelete(id);
+    if (success) {
+      setOpenEliminar(false);
+    }
+  };
 
-    const totalSelected = selectedPermissions.length;
-    const totalPermissions = allPermissions.length;
-    const allSelected = totalSelected === totalPermissions;
-
-    // Orden de módulos según el sidebar
-    const sidebarModuleOrder = [
-      'Dashboard',      // Medición y Desempeño
-      'Roles',          // Configuración
-      'Usuarios',       // Usuarios
-      'Categorias',     // Compras
-      'Productos',      // Compras
-      'Insumos',        // Compras (Proveedores + Compras)
-      'Servicios',      // Ventas
-      'Clientes',       // Ventas
-      'Ventas'          // Ventas (Pedidos + Ventas)
-    ];
-
-    // Ordenar los módulos según el sidebar
-    const orderedModules = Object.keys(permissionsByModule).sort((a, b) => {
-      const indexA = sidebarModuleOrder.indexOf(a);
-      const indexB = sidebarModuleOrder.indexOf(b);
-      return indexA - indexB;
+  const handlePermissionToggle = (permisoId) => {
+    setSelectedPermissions(prev => {
+      if (prev.includes(permisoId)) {
+        return prev.filter(id => id !== permisoId);
+      } else {
+        return [...prev, permisoId];
+      }
     });
-
-    // Agrupar módulos bajo las secciones del sidebar para mejor organización visual
-    const sidebarSections = [
-      { name: 'Medición y Desempeño', modules: ['Dashboard'] },
-      { name: 'Configuración', modules: ['Roles'] },
-      { name: 'Usuarios', modules: ['Usuarios'] },
-      { name: 'Compras', modules: ['Categorias', 'Productos', 'Insumos'] },
-      { name: 'Ventas', modules: ['Servicios', 'Clientes', 'Ventas'] }
-    ];
-
-    return (
-      <div className="flex flex-col h-full">
-        {/* Encabezado minimalista */}
-        <div className="mb-5 pb-3 border-b border-gray-200">
-          <h3 className="text-lg font-bold text-gray-800">Permisos para: <span className="text-blue-600">{editData.Nombre}</span></h3>
-          <div className="mt-2 flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${totalSelected > 0 ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-            <span className="text-sm text-gray-600 font-medium">
-              {totalSelected} de {totalPermissions} permisos seleccionados
-            </span>
-          </div>
-        </div>
-
-        {/* Controles compactos */}
-        <div className="mb-4 flex gap-2">
-          <button
-            type="button"
-            onClick={handleSelectAllPermissions}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${allSelected
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-          >
-            {allSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedPermissions([])}
-            className="px-4 bg-white border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-          >
-            Limpiar
-          </button>
-        </div>
-
-        {/* Contenedor de permisos - ordenado según sidebar */}
-        <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-          {sidebarSections.map((section) => {
-            // Filtrar solo los módulos que existen en permissionsByModule
-            const sectionModules = section.modules.filter(module => permissionsByModule[module]);
-
-            if (sectionModules.length === 0) return null;
-
-            return (
-              <div key={section.name} className="mb-5 last:mb-0">
-                {/* Título de sección (solo si tiene más de un módulo) */}
-                {sectionModules.length > 1 && (
-                  <div className="mb-3 pb-2 border-b border-gray-200">
-                    <span className="text-sm font-semibold text-gray-700">{section.name}</span>
-                  </div>
-                )}
-
-                {sectionModules.map((modulo) => {
-                  const modulePermisos = permissionsByModule[modulo];
-                  const moduleSelectedCount = modulePermisos.filter(p => selectedPermissions.includes(p.PermisoId)).length;
-                  const isModuleExpanded = expandedModules.includes(modulo);
-                  const moduleAllSelected = moduleSelectedCount === modulePermisos.length;
-
-                  // Mapear nombres de módulos para mostrar mejor
-                  const moduleName = modulo === 'Insumos'
-                    ? 'Proveedores y Compras'
-                    : modulo === 'Ventas' && section.name === 'Ventas'
-                      ? 'Pedidos y Ventas'
-                      : modulo;
-
-                  return (
-                    <div key={modulo} className="mb-3 last:mb-0">
-                      {/* Header del módulo */}
-                      <div
-                        className="flex items-center justify-between py-2 cursor-pointer group"
-                        onClick={() => toggleModule(modulo)}
-                      >
-                        <div className="flex items-center gap-2">
-                          {isModuleExpanded ? (
-                            <ChevronUp size={16} className="text-gray-500 group-hover:text-gray-700 transition-colors" />
-                          ) : (
-                            <ChevronDown size={16} className="text-gray-500 group-hover:text-gray-700 transition-colors" />
-                          )}
-                          <span className="font-medium text-gray-800">{moduleName}</span>
-                          {moduleSelectedCount > 0 && (
-                            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${moduleAllSelected ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                              }`}>
-                              {moduleSelectedCount}
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectAllModule(modulo);
-                          }}
-                          className={`text-xs font-medium px-2 py-1 rounded ${moduleAllSelected
-                              ? 'text-green-700 bg-green-100 hover:bg-green-200'
-                              : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
-                            }`}
-                        >
-                          {moduleAllSelected ? 'Todos' : 'Seleccionar'}
-                        </button>
-                      </div>
-
-                      {/* Lista de permisos */}
-                      {isModuleExpanded && (
-                        <div className="mt-2 space-y-1.5 pl-6">
-                          {modulePermisos.map((permiso) => {
-                            const isSelected = selectedPermissions.includes(permiso.PermisoId);
-                            return (
-                              <div
-                                key={permiso.PermisoId}
-                                className={`flex items-center py-1.5 px-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
-                                  }`}
-                                onClick={() => handlePermissionToggle(permiso.PermisoId)}
-                              >
-                                <div className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center mr-2 ${isSelected
-                                    ? 'bg-blue-600 border-blue-600'
-                                    : 'border-gray-300 bg-white hover:border-blue-400'
-                                  }`}>
-                                  {isSelected && <Check size={10} className="text-white" />}
-                                </div>
-                                <div className="flex-1">
-                                  <div className={`text-sm ${isSelected ? 'font-medium text-gray-800' : 'text-gray-700'}`}>
-                                    {permiso.Nombre}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Botones de acción */}
-        <div className="mt-6 pt-4 border-t border-gray-200 flex gap-3">
-          <button
-            type="button"
-            className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-            onClick={handleSavePermissions}
-          >
-            Guardar permisos
-          </button>
-          <button
-            type="button"
-            className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors font-medium"
-            onClick={() => setOpenPermissions(false)}
-          >
-            Cancelar
-          </button>
-        </div>
-      </div>
-    );
   };
 
-  const renderView = () => {
-    if (!editData) return null;
+  const handleSelectAllModule = (module) => {
+    const modulePermisos = permissionsByModule[module];
+    const allModuleIds = modulePermisos.map(p => p.PermisoId);
 
-    return (
-      <div className="text-left space-y-2">
-        <p><strong>ID:</strong> {editData.RoleId}</p>
-        <p><strong>Nombre:</strong> {editData.Nombre}</p>
-        <p><strong>Estado:</strong> {editData.Estado}</p>
-        <div className="mt-4 text-center">
-          <button
-            className="bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 w-[400px]"
-            onClick={() => setOpenVer(false)}
-          >
-            Cerrar
-          </button>
-        </div>
-      </div>
-    );
+    const allSelected = allModuleIds.every(id => selectedPermissions.includes(id));
+
+    if (allSelected) {
+      setSelectedPermissions(prev => prev.filter(id => !allModuleIds.includes(id)));
+    } else {
+      const newSelected = [...selectedPermissions];
+      allModuleIds.forEach(id => {
+        if (!newSelected.includes(id)) {
+          newSelected.push(id);
+        }
+      });
+      setSelectedPermissions(newSelected);
+    }
+  };
+
+  const handleSelectAllPermissions = (clear = false) => {
+    if (clear) {
+      setSelectedPermissions([]);
+    } else {
+      const allPermisoIds = allPermissions.map(p => p.PermisoId);
+      const allSelected = allPermisoIds.every(id => selectedPermissions.includes(id));
+      
+      if (allSelected) {
+        setSelectedPermissions([]);
+      } else {
+        setSelectedPermissions(allPermisoIds);
+      }
+    }
+  };
+
+  const handleSavePermissionsClick = async () => {
+    const success = await handleSavePermissions();
+    if (success) {
+      setOpenPermissions(false);
+    }
   };
 
   return (
@@ -636,185 +187,100 @@ export const Roles = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de roles</h1>
 
-          {/* Filtros */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <Link
-                onClick={() => {
-                  setEditData(null);
-                  setFormData({ Nombre: "", description: "", Estado: true });
-                  setRolError('');
-                  setOriginalNombre("");
-                  setSubmitted(false);
-                  setOpenCreate(true);
-                }}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow"
-              >
-                <Plus size={18} /> Nuevo rol
-              </Link>
-
-              {filtroCampo === "estado" ? (
-                <select
-                  value={filtroValor}
-                  onChange={(e) => setFiltroValor(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[160px]"
-                >
-                  <option value="">Seleccionar estado</option>
-                  <option value="Activo">Activo</option>
-                  <option value="Inactivo">Inactivo</option>
-                </select>
-              ) : (
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input
-                    value={filtroValor}
-                    onChange={(e) => setFiltroValor(e.target.value)}
-                    type="text"
-                    placeholder="Buscar roles"
-                    className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-700"
-                  />
-                </div>
-              )}
-
-              <select
-                value={filtroCampo}
-                onChange={(e) => setFiltroCampo(e.target.value)}
-                className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[140px]">
-                <option value="">Filtrar por campo</option>
-                <option value="nombre">Nombre</option>
-                <option value="estado">Estado</option>
-              </select>
-            </div>
-          </div>
+          <RolFilters
+            filtroCampo={filtroCampo}
+            setFiltroCampo={setFiltroCampo}
+            filtroValor={filtroValor}
+            setFiltroValor={setFiltroValor}
+            onNewRol={handleNewRol}
+          />
 
           {/* Modales */}
-          <Modal open={openCreate} onClose={() => setOpenCreate(false)}>
+          <Modal open={openCreate} onClose={handleCloseModal}>
             <div className="w-[450px] p-6 mx-auto text-center bg-white rounded-xl shadow-lg">
               <h3 className="text-lg font-black text-gray-800 mb-6">Nuevo rol</h3>
-              {renderForm("create")}
+              <RolForm
+                formData={formData}
+                setFormData={setFormData}
+                editData={editData}
+                onSubmit={handleFormSubmit}
+                onCancel={handleCloseModal}
+                type="create"
+                submitted={submitted}
+                setSubmitted={setSubmitted}
+                rolError={rolError}
+                setRolError={setRolError}
+                originalNombre={originalNombre}
+                setOriginalNombre={setOriginalNombre}
+              />
             </div>
           </Modal>
 
-          <Modal open={openEditar} onClose={() => setOpenEditar(false)}>
+          <Modal open={openEditar} onClose={handleCloseModal}>
             <div className="w-[450px] p-6 mx-auto text-center bg-white rounded-xl shadow-lg">
               <h3 className="text-lg font-black text-gray-800 mb-6">Editar rol</h3>
-              {renderForm("editar")}
+              <RolForm
+                formData={formData}
+                setFormData={setFormData}
+                editData={editData}
+                onSubmit={handleFormSubmit}
+                onCancel={handleCloseModal}
+                type="editar"
+                submitted={submitted}
+                setSubmitted={setSubmitted}
+                rolError={rolError}
+                setRolError={setRolError}
+                originalNombre={originalNombre}
+                setOriginalNombre={setOriginalNombre}
+              />
             </div>
           </Modal>
 
-          <Modal open={openVer} onClose={() => setOpenVer(false)}>
+          <Modal open={openVer} onClose={handleCloseModal}>
             <div className="w-[450px] p-6 mx-auto text-center bg-white rounded-xl shadow-lg">
               <h3 className="text-lg font-black text-gray-800 mb-6">Ver rol</h3>
-              {renderView()}
+              <RolView editData={editData} onClose={() => setOpenVer(false)} />
             </div>
           </Modal>
 
-          {/* MODAL DE PERMISOS CORREGIDO */}
-          <Modal open={openPermissions} onClose={() => setOpenPermissions(false)}>
+          <Modal open={openPermissions} onClose={handleCloseModal}>
             <div className="w-[700px] h-[85vh] p-6 mx-auto bg-white rounded-xl shadow-lg flex flex-col">
               <h3 className="text-lg font-black text-gray-800 mb-4 text-center">
                 Gestión de Permisos
               </h3>
-              {renderPermissionsModal()}
+              <PermissionsModal
+                editData={editData}
+                allPermissions={allPermissions}
+                permissionsByModule={permissionsByModule}
+                selectedPermissions={selectedPermissions}
+                onPermissionToggle={handlePermissionToggle}
+                onSelectAllModule={handleSelectAllModule}
+                onSelectAllPermissions={handleSelectAllPermissions}
+                onSave={handleSavePermissionsClick}
+                onClose={() => setOpenPermissions(false)}
+              />
             </div>
           </Modal>
 
-          <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
-            <div className="w-[400px] p-6 mx-auto text-center bg-white rounded-xl shadow-lg">
-              <h3 className="text-lg font-black text-gray-800 mb-4">Eliminar rol</h3>
-              <p className="mb-6 text-gray-600">¿Estás seguro de eliminar este rol?</p>
-              <div className="flex gap-4">
-                <button
-                  className="flex-1 bg-red-500 text-white py-2.5 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2 font-medium"
-                  onClick={() => handleDelete(editData.RoleId)}
-                >
-                  <Trash2 size={16} />
-                  Eliminar
-                </button>
-                <button
-                  className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors flex items-center justify-center gap-2 font-medium"
-                  onClick={() => setOpenEliminar(false)}
-                >
-                  <X size={16} />
-                  Cancelar
-                </button>
-              </div>
-            </div>
+          <Modal open={openEliminar} onClose={handleCloseModal}>
+            <RolDelete
+              editData={editData}
+              onDelete={handleDeleteConfirm}
+              onCancel={() => setOpenEliminar(false)}
+            />
           </Modal>
 
           {/* Tabla */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
-                  <tr>
-                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">ID</th>
-                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Nombre</th>
-                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider">Estado</th>
-                    <th className="py-4 px-6 text-sm font-semibold text-white uppercase tracking-wider text-center">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {paginatedData.length > 0 ? (
-                    paginatedData.map((rol) => (
-                      <tr key={rol.RoleId} className="hover:bg-slate-50 transition-colors duration-150">
-                        <td className="py-4 px-6 text-sm text-slate-900 font-mono">{String(rol.RoleId).slice(0, 3)}</td>
-                        <td className="py-4 px-6 text-sm text-slate-900 font-medium">{rol.Nombre}</td>
-                        <td className="py-4 px-6">
-                          <div className="flex justify-center">
-                            <Toggle
-                              checked={rol.Estado === "Activo"}
-                              onChange={(value) => handleToggleEstado(rol.RoleId, value ? "Activo" : "Inactivo")}
-                            />
-                          </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="flex justify-center gap-1">
-                            <button
-                              onClick={() => handleEditClick(rol)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Editar"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              onClick={() => handlePermissionsClick(rol)}
-                              className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                              title="Permisos"
-                            >
-                              <Shield size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleViewClick(rol)}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                              title="Ver"
-                            >
-                              <Eye size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteClick(rol)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Eliminar"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="4" className="text-center py-8">
-                        <div className="text-gray-500">
-                          <p className="text-lg font-medium">No se encontraron roles</p>
-                          <p className="text-sm mt-1">Intenta con otros filtros o crea un nuevo rol</p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <RolTable
+              roles={paginatedData}
+              onEdit={handleEditClick}
+              onPermissions={handlePermissionsClick}
+              onView={handleViewClick}
+              onDelete={handleDeleteClick}
+              onToggleEstado={handleToggleEstado}
+            />
+
             {paginatedData.length > 0 && (
               <Pagination
                 currentPage={currentPage}

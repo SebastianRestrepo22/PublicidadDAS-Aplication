@@ -165,3 +165,44 @@ export const getDataPermissonRol = async (RoleId) => {
   );
   return permisos;
 };
+
+export const getDataRolesPaginated = async ({ page = 1, limit = 10, filtroCampo = null, filtroValor = null }) => {
+  const offset = (page - 1) * limit;
+  let whereClause = '';
+  let params = [];
+
+  if (filtroCampo && filtroValor) {
+    if (filtroCampo === 'Estado') {
+      const valorNormalizado = filtroValor.toLowerCase() === 'activo' ? 'Activo' : 
+                               filtroValor.toLowerCase() === 'inactivo' ? 'Inactivo' : filtroValor;
+      whereClause = 'WHERE Estado = ?';
+      params.push(valorNormalizado);
+    } else if (filtroCampo === 'Nombre' || filtroCampo === 'RoleId') {
+      whereClause = `WHERE ${filtroCampo} LIKE ?`;
+      params.push(`%${filtroValor}%`);
+    }
+  }
+
+  // Consulta principal con LIMIT/OFFSET
+  const [rows] = await dbPool.query(
+    `SELECT * FROM roles ${whereClause} ORDER BY Nombre LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  );
+
+  // Consulta para obtener el total de registros (necesario para totalPages)
+  const [countResult] = await dbPool.query(
+    `SELECT COUNT(*) as total FROM roles ${whereClause}`,
+    params
+  );
+
+  return {
+    data: rows,
+    totalItems: countResult[0].total,
+    currentPage: Number(page),
+    itemsPerPage: Number(limit)
+  };
+};
+
+export const buscarRolesPaginated = async ({ page, limit, columna, valor }) => {
+  return await getDataRolesPaginated({ page, limit, filtroCampo: columna, filtroValor: valor });
+};
