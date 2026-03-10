@@ -74,6 +74,31 @@ export const Checkout = () => {
     return Object.keys(errores).length === 0;
   };
 
+  // ====== FUNCIÓN PARA CALCULAR TOTAL DE FORMA SEGURA ======
+  const calcularTotalSeguro = () => {
+    const total = getTotal();
+    console.log('💰 Total recibido de getTotal():', total, 'Tipo:', typeof total);
+    
+    // Convertir a número de forma segura
+    let totalNumerico = 0;
+    
+    if (total === null || total === undefined) {
+      console.warn('⚠️ getTotal() devolvió null/undefined');
+      totalNumerico = 0;
+    } else if (typeof total === 'number') {
+      totalNumerico = total;
+    } else if (typeof total === 'string') {
+      // Limpiar el string: eliminar símbolos de moneda, comas, espacios
+      const totalLimpio = total.replace(/[$,.]/g, '').trim();
+      totalNumerico = parseFloat(totalLimpio) || 0;
+    } else {
+      totalNumerico = Number(total) || 0;
+    }
+    
+    console.log('💰 Total numérico final:', totalNumerico);
+    return totalNumerico;
+  };
+
   // ====== ENVIAR PEDIDO ======
   const enviarPedido = async () => {
     if (!user) {
@@ -92,7 +117,16 @@ export const Checkout = () => {
     setError("");
 
     try {
-      // ✅ CONSTRUIR DETALLES CON VALIDACIÓN SEGURA
+      console.log('🔍 DEBUG - Cart items:', cart.map(item => ({
+        id: item.id,
+        nombre: item.Nombre,
+        tieneCustomization: !!item.customization,
+        archivosAdjuntos: item.customization?.archivosAdjuntos,
+        urlArchivo: item.customization?.archivosAdjuntos?.[0]?.url,
+        tipoArchivo: item.customization?.archivosAdjuntos?.[0]?.tipo
+      })));
+
+      // ✅ CONSTRUIR DETALLES CON VALIDACIÓN SEGURA Y URL DE ARCHIVO PERSONALIZADO
       const detallesValidados = cart.map(item => {
         const ProductoId = item.ProductoId || null;
         const ServicioId = item.ServicioId || null;
@@ -125,6 +159,30 @@ export const Checkout = () => {
           }
         }
 
+        // ✅ EXTRAER URL DE ARCHIVO PERSONALIZADO (cualquier tipo: imagen, PDF, Word, etc.)
+        let UrlArchivoPersonalizado = null;
+        let tipoArchivo = null;
+        let nombreArchivo = null;
+        
+        if (item.customization?.archivosAdjuntos?.length > 0) {
+          const archivo = item.customization.archivosAdjuntos[0];
+          if (archivo.url) {
+            // Construir URL completa si es necesario
+            UrlArchivoPersonalizado = archivo.url.startsWith('http') 
+              ? archivo.url 
+              : `http://localhost:3000${archivo.url}`;
+            
+            tipoArchivo = archivo.tipo || archivo.type || 'desconocido';
+            nombreArchivo = archivo.nombre || archivo.name || 'archivo';
+            
+            console.log(`📎 Archivo personalizado encontrado para ${item.Nombre}:`, {
+              url: UrlArchivoPersonalizado,
+              tipo: tipoArchivo,
+              nombre: nombreArchivo
+            });
+          }
+        }
+
         return {
           ProductoId,
           ServicioId,
@@ -133,7 +191,8 @@ export const Checkout = () => {
           Tamaño,
           Descripcion: descripcion,
           UrlImagen: item.options?.urlImagen || item.UrlImagen || null,
-          ColorId // ✅ UUID válido o null
+          UrlImagenPersonalizada: UrlArchivoPersonalizado, // Puede ser imagen, PDF, Word, etc.
+          ColorId
         };
       });
 
@@ -150,10 +209,25 @@ export const Checkout = () => {
         throw new Error("No hay items válidos para procesar el pedido");
       }
 
+      console.log('🔍 DEBUG - Detalles finales con archivos:', detallesFinales.map(d => ({
+        tieneArchivoPersonalizado: !!d.UrlImagenPersonalizada,
+        urlArchivoPersonalizado: d.UrlImagenPersonalizada,
+        urlImagen: d.UrlImagen
+      })));
+
+      // 🔥 CALCULAR TOTAL DE FORMA SEGURA
+      const totalSeguro = calcularTotalSeguro();
+      
+      // Validar que el total sea un número válido
+      if (isNaN(totalSeguro) || totalSeguro <= 0) {
+        console.error('❌ Total inválido después de calcular:', totalSeguro);
+        throw new Error("El total del pedido no es válido");
+      }
+
       const payload = {
         ClienteId: user.CedulaId,
         FechaRegistro: new Date().toISOString().split("T")[0],
-        Total: getTotal(),
+        Total: totalSeguro, // Usar el total seguro
         Estado: "pendiente",
         MetodoPago: metodoPago === "entrega" ? "contra_entrega" : metodoPago,
         detalle: detallesFinales
@@ -166,18 +240,21 @@ export const Checkout = () => {
         payload.DireccionEntrega = datosEntrega.direccion;
       }
 
-      console.log('📦 Enviando pedido:', payload);
+      console.log('📦 Payload a enviar:', JSON.stringify(payload, null, 2));
 
       // ✅ ENVIAR AL BACKEND
       const formData = new FormData();
 
       formData.append("pedido", JSON.stringify(payload));
 
-      // Adjuntar archivos de los items
-      cart.forEach(item => {
+      // Adjuntar archivos de los items (si existen y son archivos físicos)
+      cart.forEach((item, index) => {
         if (item.customization?.archivosAdjuntosOriginales) {
-          item.customization.archivosAdjuntosOriginales.forEach(file => {
-            formData.append("archivos", file);
+          item.customization.archivosAdjuntosOriginales.forEach((file, fileIndex) => {
+            if (file instanceof File) {
+              formData.append(`archivo_${index}_${fileIndex}`, file);
+              console.log(`📎 Adjuntando archivo físico: ${file.name} (${file.type})`);
+            }
           });
         }
       });
@@ -194,6 +271,15 @@ export const Checkout = () => {
       }
 
       const data = await res.json();
+      console.log('✅ Respuesta del servidor:', data);
+      
+      // Verificar si el archivo se guardó
+      if (data.detalle?.[0]?.UrlImagenPersonalizada) {
+        console.log('🎉 ¡Archivo guardado correctamente en la BD!');
+      } else {
+        console.warn('⚠️ El archivo NO se guardó en la BD');
+      }
+
       const pedidoId = String(data.PedidoClienteId).trim();
       clearCart();
 
@@ -201,7 +287,7 @@ export const Checkout = () => {
       if (metodoPago === "qr" || metodoPago === "transferencia") {
         setVoucher({
           id: pedidoId,
-          total: getTotal(),
+          total: totalSeguro, // Usar el total seguro
           fecha: new Date().toLocaleDateString("es-CO", {
             weekday: 'long',
             year: 'numeric',
@@ -225,7 +311,7 @@ export const Checkout = () => {
           state: {
             metodo: "entrega",
             id: pedidoId,
-            total: getTotal()
+            total: totalSeguro
           }
         });
         toast.success("¡Pedido creado! Se procesará al recibir tu entrega");
@@ -241,7 +327,7 @@ export const Checkout = () => {
     }
   };
 
-  // ====== COMPONENTE: Subir comprobante - CORREGIDO ======
+  // ====== COMPONENTE: Subir comprobante (acepta imágenes y PDF) ======
   const SubirComprobanteBanco = ({ pedidoId, metodo }) => {
     const [file, setFile] = useState(null);
     const [uploading, setUploading] = useState(false);
@@ -260,7 +346,7 @@ export const Checkout = () => {
         return;
       }
 
-      // Validar tipo
+      // Validar tipo (imágenes y PDF)
       if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
         toast.error("Solo se permiten imágenes o PDFs");
         return;
@@ -272,9 +358,8 @@ export const Checkout = () => {
       setUploading(true);
       try {
         console.log('📤 Subiendo comprobante para pedido:', pedidoId);
-        console.log('📄 Archivo:', file.name);
+        console.log('📄 Archivo:', file.name, 'Tipo:', file.type);
 
-        // ✅ ENDPOINT CORREGIDO - Actualiza el pedido con el voucher
         const res = await fetch(`http://localhost:3000/api/pedidos-clientes/${pedidoId}/voucher`, {
           method: "POST",
           body: formData
@@ -294,7 +379,7 @@ export const Checkout = () => {
                 id: pedidoId,
                 referencia: `PED${pedidoId.toString().padStart(6, '0')}`,
                 total: voucher?.total,
-                voucherUrl: data.voucher // La URL del voucher guardada
+                voucherUrl: data.voucher
               }
             });
           }, 2000);
@@ -359,7 +444,7 @@ export const Checkout = () => {
                 <p className="text-sm text-green-600 font-medium mt-1">
                   ✓ Archivo seleccionado: {file.name}
                   <span className="text-gray-500 ml-2">
-                    ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                    ({(file.size / 1024 / 1024).toFixed(2)} MB) - {file.type}
                   </span>
                 </p>
               )}
@@ -617,7 +702,7 @@ export const Checkout = () => {
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold text-gray-900">Total a pagar</span>
                 <span className="text-3xl font-bold text-black">
-                  {getTotal().toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+                  {calcularTotalSeguro().toLocaleString("es-CO", { style: "currency", currency: "COP" })}
                 </span>
               </div>
             </div>

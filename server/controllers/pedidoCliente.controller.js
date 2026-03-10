@@ -197,21 +197,33 @@ export const createPedidoCliente = async (req, res) => {
     for (let i = 0; i < detalle.length; i++) {
       const item = detalle[i];
 
-      console.log(`📝 Procesando detalle ${i + 1}:`, item);
+      console.log(`📝 [BACKEND] Procesando detalle ${i + 1}:`, {
+        ProductoId: item.ProductoId,
+        ServicioId: item.ServicioId,
+        UrlImagen: item.UrlImagen,
+        UrlImagenPersonalizada: item.UrlImagenPersonalizada,
+        tipoUrlImagen: typeof item.UrlImagenPersonalizada,
+        tieneImagenPersonalizada: !!item.UrlImagenPersonalizada
+      });
+
 
       const ProductoId = item.ProductoId || null;
       const ServicioId = item.ServicioId || null;
       const Cantidad = item.Cantidad ? parseInt(item.Cantidad) : 1;
-      
+
       // 🔥 CORRECCIÓN: Sanitizar precio del detalle
       const Precio = parseFloat(item.PrecioUnitario || item.Precio || 0);
-      
+
       const ColorId = item.ColorId || null;
       const Tamaño = ServicioId
         ? (item.Tamaño ?? item.DimensionesId ?? "Mediana")
         : null;
       const Descripcion = item.Descripcion || null;
+
+      // 🔴 IMPORTANTE: Separar imagen por defecto de imagen personalizada
       const UrlImagen = item.UrlImagen ? item.UrlImagen.trim() : null;
+      const UrlImagenPersonalizada = item.UrlImagenPersonalizada || null;
+
       const Subtotal = parseFloat((Cantidad * Precio).toFixed(2));
 
       // Validar campos requeridos
@@ -236,6 +248,7 @@ export const createPedidoCliente = async (req, res) => {
         Tamaño,
         Descripcion,
         UrlImagen,
+        UrlImagenPersonalizada, // 🔴 IMAGEN DEL CLIENTE
         Subtotal
       });
 
@@ -262,7 +275,7 @@ export const createPedidoCliente = async (req, res) => {
 
     console.log("🎉 Pedido completado exitosamente");
     res.status(201).json(pedidoCompleto);
-    
+
   } catch (error) {
     console.error("❌ Error al crear pedido:", error.message);
 
@@ -293,13 +306,12 @@ export const createPedidoCliente = async (req, res) => {
   }
 };
 
-
 // ✅ ACTUALIZAR PEDIDO - CON ENVÍO DE CORREO AUTOMÁTICO
 // ========================================
 export const updatePedidoCliente = async (req, res) => {
   const { id } = req.params;
   let updates = { ...req.body };
-  
+
   // Declarar variables al inicio del ámbito de la función
   let destinatario = null;
   let nombreCliente = 'Cliente';
@@ -377,7 +389,7 @@ export const updatePedidoCliente = async (req, res) => {
             destinatario = cliente.CorreoElectronico;
             nombreCliente = cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`;
           }
-        } 
+        }
         // Caso 2: Cliente walk-in con correo
         else if (updated.ClienteCorreo) {
           destinatario = updated.ClienteCorreo;
@@ -402,7 +414,7 @@ export const updatePedidoCliente = async (req, res) => {
             nuevoEstado,
             updates.motivo || '' // Para cancelación u otros estados que requieran motivo
           ).catch(err => console.error('Error en envío de correo:', err));
-          
+
           console.log(`📧 Correo encolado para ${destinatario}`);
         } else {
           console.log('⚠️ No se pudo determinar destinatario para el correo');
@@ -470,7 +482,7 @@ export const updatePedidoCliente = async (req, res) => {
                 updated.Total,
                 updated.detalle.map(d => ({
                   ...d,
-                  NombreSnapshot: d.ProductoId ? 
+                  NombreSnapshot: d.ProductoId ?
                     (productos?.find(p => p.ProductoId === d.ProductoId)?.Nombre || 'Producto') :
                     (servicios?.find(s => s.ServicioId === d.ServicioId)?.Nombre || 'Servicio')
                 }))
@@ -499,8 +511,8 @@ export const updatePedidoCliente = async (req, res) => {
     res.json({
       ...updated,
       correoEnviado: destinatario ? true : false,
-      mensajeCorreo: destinatario ? 
-        `Notificación enviada a ${destinatario}` : 
+      mensajeCorreo: destinatario ?
+        `Notificación enviada a ${destinatario}` :
         'No se pudo enviar notificación (cliente sin correo)'
     });
 

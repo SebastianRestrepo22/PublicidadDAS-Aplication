@@ -66,7 +66,7 @@ export const OrderView = ({
   const getItemDescripcion = (detalle) => {
     // Priorizar la descripción personalizada del detalle
     if (detalle.Descripcion) return detalle.Descripcion;
-    
+
     // Si no, buscar la descripción del producto/servicio
     if (detalle.ProductoId) {
       const producto = productos.find(p => p.ProductoId === detalle.ProductoId);
@@ -82,17 +82,9 @@ export const OrderView = ({
     return servicios.find(s => s.ServicioId === servicioId);
   };
 
-  // Verificar si la imagen es personalizada (si existe y es diferente de la imagen por defecto)
+  // Verificar si la imagen es personalizada
   const esImagenPersonalizada = (detalle) => {
-    if (!detalle.UrlImagen) return false;
-    
-    // Si es un servicio, comparar con la imagen por defecto
-    if (detalle.ServicioId) {
-      const servicio = servicios.find(s => s.ServicioId === detalle.ServicioId);
-      // Si no hay imagen por defecto o es diferente, es personalizada
-      return !servicio?.Imagen || servicio.Imagen !== detalle.UrlImagen;
-    }
-    return false;
+    return !!detalle.UrlImagenPersonalizada;
   };
 
   const abrirComprobante = (voucherUrl) => {
@@ -125,12 +117,30 @@ export const OrderView = ({
     return opciones;
   };
 
+  // 🔴 FUNCIÓN MODIFICADA - Ahora llama a onBack() después de actualizar
   const ejecutarCambioEstado = async (nuevoEstado, motivo = "") => {
     setUpdating(true);
     try {
       await onUpdateEstado(nuevoEstado, motivo);
+      
+      // Mostrar mensaje de éxito específico según el estado
+      if (nuevoEstado === 'aprobado') {
+        toast.success("✅ Pedido aprobado y venta generada correctamente");
+      } else if (nuevoEstado === 'cancelado') {
+        toast.success("✅ Pedido cancelado correctamente");
+      } else {
+        toast.success(`✅ Pedido actualizado a ${nuevoEstado}`);
+      }
+      
+      // 🔴 IMPORTANTE: Redirigir a la tabla principal después de 1 segundo
+      setTimeout(() => {
+        onBack(); // Esto vuelve a la lista de pedidos
+      }, 1000);
+      
     } catch (error) {
+      console.error("Error al actualizar estado:", error);
       setEstadoSeleccionado(selectedPedido.Estado);
+      toast.error("Error al actualizar el estado");
     } finally {
       setUpdating(false);
       setCancelando(false);
@@ -177,9 +187,8 @@ export const OrderView = ({
             </div>
           </div>
           <div className="flex gap-2">
-            <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
-              selectedPedido.TipoCliente === 'walkin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-            }`}>
+            <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${selectedPedido.TipoCliente === 'walkin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+              }`}>
               {selectedPedido.TipoCliente === 'walkin' ? <><Store size={14} /> Walk-in</> : <><User size={14} /> Registrado</>}
             </div>
             {selectedPedido.TipoCliente === 'walkin' && userRole === 'admin' && (
@@ -204,11 +213,10 @@ export const OrderView = ({
               </div>
               <div className="bg-white p-4 rounded-lg border">
                 <div className="text-sm text-slate-600 mb-1">Estado</div>
-                <div className={`font-medium flex items-center gap-1 ${
-                  selectedPedido.Estado === 'pendiente' ? 'text-yellow-600' :
+                <div className={`font-medium flex items-center gap-1 ${selectedPedido.Estado === 'pendiente' ? 'text-yellow-600' :
                   selectedPedido.Estado === 'aprobado' ? 'text-green-600' :
-                  selectedPedido.Estado === 'cancelado' ? 'text-red-600' : 'text-slate-600'
-                }`}>
+                    selectedPedido.Estado === 'cancelado' ? 'text-red-600' : 'text-slate-600'
+                  }`}>
                   {selectedPedido.Estado} {userRole === 'admin' && <Shield size={14} className="ml-1 text-blue-500" />}
                 </div>
                 {selectedPedido.MotivoCancelacion && (
@@ -263,8 +271,8 @@ export const OrderView = ({
               </button>
               {showVoucher && (
                 <div className="mt-4 bg-white p-4 rounded-lg border">
-                  <button 
-                    onClick={() => abrirComprobante(selectedPedido.Voucher)} 
+                  <button
+                    onClick={() => abrirComprobante(selectedPedido.Voucher)}
                     className="text-blue-600 hover:text-blue-800 flex items-center gap-2"
                   >
                     <ExternalLink size={16} /> Ver comprobante
@@ -285,9 +293,8 @@ export const OrderView = ({
                   <button
                     key={tipo}
                     onClick={() => setFiltroTipo(tipo)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                      filtroTipo === tipo ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 hover:bg-slate-100'
-                    }`}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium ${filtroTipo === tipo ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 hover:bg-slate-100'
+                      }`}
                   >
                     {tipo.charAt(0).toUpperCase() + tipo.slice(1)} ({tipo === 'todos' ? conteo.total : tipo === 'productos' ? conteo.productos : conteo.servicios})
                   </button>
@@ -297,6 +304,14 @@ export const OrderView = ({
 
             <div className="space-y-4">
               {detallesFiltrados.map((d, index) => {
+
+                console.log('👁️ [VIEW] Renderizando detalle:', {
+                  id: d.DetallePedidoClienteId,
+                  UrlImagenPersonalizada: d.UrlImagenPersonalizada,
+                  UrlImagen: d.UrlImagen,
+                  tienePersonalizada: !!d.UrlImagenPersonalizada
+                });
+
                 const esServicio = !!d.ServicioId;
                 const itemNombre = getItemNombre(d);
                 const itemDescripcion = getItemDescripcion(d);
@@ -307,27 +322,67 @@ export const OrderView = ({
                 return (
                   <div key={d.DetallePedidoClienteId || index} className="bg-white border rounded-xl p-6">
                     <div className="flex flex-col md:flex-row gap-4">
-                      {/* Imagen del item - USAMOS d.UrlImagen DIRECTAMENTE */}
-                      {d.UrlImagen ? (
+                      {/* Imagen del item - Verificar si hay imagen personalizada en la BD */}
+                      {d.UrlImagenPersonalizada ? (
                         <div className="flex-shrink-0">
                           <div className="relative">
-                            <img 
-                              src={d.UrlImagen} 
-                              alt={itemNombre}
-                              className="w-24 h-24 object-cover rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
-                              onClick={() => setImagenAmpliada(d.UrlImagen)}
-                              onError={(e) => {
-                                console.error("Error cargando imagen:", d.UrlImagen);
-                                e.target.onerror = null;
-                                e.target.src = 'https://via.placeholder.com/96?text=Sin+imagen';
-                              }}
-                            />
-                            {imagenPersonalizada && (
-                              <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full shadow-lg">
-                                Cliente
-                              </span>
+                            {d.UrlImagenPersonalizada.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i) ? (
+                              // Es una imagen
+                              <img
+                                src={d.UrlImagenPersonalizada}
+                                alt={itemNombre}
+                                className="w-24 h-24 object-cover rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => setImagenAmpliada(d.UrlImagenPersonalizada)}
+                                onError={(e) => {
+                                  console.error("Error cargando imagen:", d.UrlImagenPersonalizada);
+                                  e.target.onerror = null;
+                                  e.target.src = d.UrlImagen || 'https://via.placeholder.com/96?text=Error';
+                                }}
+                              />
+                            ) : (
+                              // Es otro tipo de archivo (PDF, Word, etc.)
+                              <a
+                                href={d.UrlImagenPersonalizada}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block w-24 h-24 bg-blue-50 rounded-lg border-2 border-blue-200 hover:bg-blue-100 transition-colors"
+                              >
+                                <div className="flex flex-col items-center justify-center h-full p-2">
+                                  {d.UrlImagenPersonalizada.match(/\.pdf$/i) ? (
+                                    <>
+                                      <FileText size={32} className="text-red-500" />
+                                      <span className="text-xs text-center mt-1 font-medium text-blue-700">PDF</span>
+                                    </>
+                                  ) : d.UrlImagenPersonalizada.match(/\.(doc|docx)$/i) ? (
+                                    <>
+                                      <FileText size={32} className="text-blue-600" />
+                                      <span className="text-xs text-center mt-1 font-medium text-blue-700">Word</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <FileText size={32} className="text-gray-600" />
+                                      <span className="text-xs text-center mt-1 font-medium text-blue-700">Archivo</span>
+                                    </>
+                                  )}
+                                </div>
+                              </a>
                             )}
+                            <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full shadow-lg">
+                              Cliente
+                            </span>
                           </div>
+                        </div>
+                      ) : d.UrlImagen ? (
+                        <div className="flex-shrink-0">
+                          <img
+                            src={d.UrlImagen}
+                            alt={itemNombre}
+                            className="w-24 h-24 object-cover rounded-lg border"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = 'https://via.placeholder.com/96?text=Sin+imagen';
+                            }}
+                          />
                         </div>
                       ) : (
                         <div className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -340,21 +395,20 @@ export const OrderView = ({
                         <div className="flex justify-between items-start">
                           <div className="space-y-2">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
-                                esServicio ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-                              }`}>
+                              <span className={`px-2 py-1 rounded-lg text-xs font-medium ${esServicio ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                                }`}>
                                 {esServicio ? 'Servicio' : 'Producto'}
                               </span>
-                              
+
                               {d.Tamaño && (
                                 <span className="px-2 py-1 bg-slate-100 rounded-lg text-xs font-medium text-slate-600">
                                   Tamaño: {d.Tamaño}
                                 </span>
                               )}
-                              
+
                               {colorInfo && (
                                 <span className="px-2 py-1 bg-slate-100 rounded-lg text-xs font-medium text-slate-600 flex items-center gap-1">
-                                  <span 
+                                  <span
                                     className="w-3 h-3 rounded-full border"
                                     style={{ backgroundColor: colorInfo.Hex }}
                                   />
@@ -379,7 +433,7 @@ export const OrderView = ({
                             {imagenPersonalizada && (
                               <div className="flex items-center gap-2 mt-2 text-xs text-green-600 bg-green-50 p-2 rounded-lg">
                                 <ImageIcon size={14} />
-                                <span>El cliente adjuntó una imagen de referencia</span>
+                                <span>El cliente adjuntó un archivo de referencia</span>
                               </div>
                             )}
                           </div>
@@ -428,6 +482,14 @@ export const OrderView = ({
                       </option>
                     ))}
                   </select>
+                  
+                  {/* Indicador de carga */}
+                  {updating && (
+                    <div className="flex items-center justify-center gap-2 text-blue-600">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                      <span>Actualizando...</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -437,14 +499,14 @@ export const OrderView = ({
 
       {/* Modal para imagen ampliada */}
       {imagenAmpliada && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
           onClick={() => setImagenAmpliada(null)}
         >
           <div className="relative max-w-4xl max-h-[90vh]">
-            <img 
-              src={imagenAmpliada} 
-              alt="Imagen ampliada" 
+            <img
+              src={imagenAmpliada}
+              alt="Imagen ampliada"
               className="max-w-full max-h-[90vh] object-contain"
             />
             <button

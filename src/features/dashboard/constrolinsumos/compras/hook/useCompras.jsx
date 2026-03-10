@@ -7,10 +7,11 @@ import {
 } from "../services/services.compras";
 import { toast } from "react-toastify";
 
-// Constantes para los estados - AHORA SOLO DOS
+// Constantes para los estados
 export const ESTADOS_COMPRA = {
   PENDIENTE: 'pendiente',
-  RECIBIDO: 'recibido'
+  RECIBIDO: 'recibido',
+  ANULADA: 'anulada'  // Agregamos este estado
 };
 
 export const useCompras = () => {
@@ -94,7 +95,7 @@ export const useCompras = () => {
 
   const puedeCambiarEstado = (estadoActual, nuevoEstado) => {
     // Solo permitir cambiar de PENDIENTE a RECIBIDO
-    // Una vez RECIBIDO, no se puede cambiar
+    // Una vez RECIBIDO o ANULADO, no se puede cambiar
     if (estadoActual === ESTADOS_COMPRA.PENDIENTE && nuevoEstado === ESTADOS_COMPRA.RECIBIDO) {
       return true;
     }

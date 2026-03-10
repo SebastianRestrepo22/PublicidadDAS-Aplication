@@ -137,9 +137,9 @@ export const PedidosClientes = () => {
               ...p,
               detalle: Array.isArray(det)
                 ? det.map(item => ({
-                    ...item,
-                    _tempId: item.DetallePedidoClienteId || generateTempId()
-                  }))
+                  ...item,
+                  _tempId: item.DetallePedidoClienteId || generateTempId()
+                }))
                 : []
             };
           } catch {
@@ -205,9 +205,9 @@ export const PedidosClientes = () => {
         ...pedido,
         detalle: Array.isArray(det)
           ? det.map(item => ({
-              ...item,
-              _tempId: item.DetallePedidoClienteId || generateTempId()
-            }))
+            ...item,
+            _tempId: item.DetallePedidoClienteId || generateTempId()
+          }))
           : []
       });
       setViewMode("view");
@@ -223,9 +223,9 @@ export const PedidosClientes = () => {
         ...pedido,
         detalle: Array.isArray(det)
           ? det.map(item => ({
-              ...item,
-              _tempId: item.DetallePedidoClienteId || generateTempId()
-            }))
+            ...item,
+            _tempId: item.DetallePedidoClienteId || generateTempId()
+          }))
           : []
       });
       setErrores([]);
@@ -278,7 +278,7 @@ export const PedidosClientes = () => {
       errs.push("El nombre del cliente es obligatorio");
     }
     if (!detallesCrear?.length) errs.push("Agregue al menos un producto/servicio.");
-    
+
     if (errs.length) {
       setErrores(errs);
       toast.error("Corrija los errores");
@@ -288,19 +288,57 @@ export const PedidosClientes = () => {
     try {
       setUploading(true);
 
-      const detallesLimpios = detallesCrear.map(d => ({
-        ProductoId: d.ProductoId?.trim() || null,
-        ServicioId: d.ServicioId?.trim() || null,
-        Cantidad: Number(d.Cantidad) || 1,
-        Tamaño: d.Tamaño || "Mediana",
-        Descripcion: d.Descripcion || "",
-        UrlImagen: d.UrlImagen || "",
-        Precio: Number(d.Precio) || 0,
-        ColorId: d.ColorId || null
-      }));
+      console.log('🔍 DEBUG - detallesCrear original:',
+        detallesCrear.map(d => ({
+          id: d.id,
+          tieneCustomization: !!d.customization,
+          archivosAdjuntos: d.customization?.archivosAdjuntos,
+          urlArchivo: d.customization?.archivosAdjuntos?.[0]?.url
+        }))
+      );
 
-      const formData = new FormData();
-      const pedidoString = JSON.stringify({
+      // 🔴 PASO 1: Construir detalles incluyendo UrlImagenPersonalizada
+      const detallesLimpios = detallesCrear.map(d => {
+        // Objeto base del detalle
+        const detalle = {
+          ProductoId: d.ProductoId?.trim() || null,
+          ServicioId: d.ServicioId?.trim() || null,
+          Cantidad: Number(d.quantity || d.Cantidad) || 1,
+          Tamaño: d.Tamaño || d.customization?.Tamaño || "Mediana",
+          Descripcion: d.customization?.Descripcion || d.Descripcion || "",
+          UrlImagen: d.UrlImagen || d.Imagen || "",
+          Precio: Number(d.Precio) || 0,
+          ColorId: d.ColorId || null
+        };
+
+        // 🔴 PASO 2: SI HAY ARCHIVOS ADJUNTOS, ASIGNAR UrlImagenPersonalizada
+        if (d.customization?.archivosAdjuntos?.length > 0) {
+          const archivo = d.customization.archivosAdjuntos[0];
+          if (archivo.url) {
+            // Construir URL completa si es necesario
+            const urlCompleta = archivo.url.startsWith('http')
+              ? archivo.url
+              : `http://localhost:3000${archivo.url}`;
+
+            detalle.UrlImagenPersonalizada = urlCompleta;
+            console.log('📸 ASIGNANDO UrlImagenPersonalizada:', urlCompleta);
+          }
+        }
+
+        return detalle;
+      });
+
+      // 🔴 PASO 3: VERIFICAR QUE SE ASIGNÓ
+      console.log('🔍 DEBUG - detallesLimpios FINAL:',
+        detallesLimpios.map(d => ({
+          tieneImagenPersonalizada: !!d.UrlImagenPersonalizada,
+          urlImagenPersonalizada: d.UrlImagenPersonalizada,
+          urlImagen: d.UrlImagen
+        }))
+      );
+
+      // 🔴 PASO 4: CONSTRUIR EL PEDIDO COMPLETO
+      const pedidoCompleto = {
         ClienteId: tipoClienteCrear === 'registrado' ? formCrear.ClienteId?.trim() || null : null,
         FechaRegistro: formCrear.FechaRegistro,
         Total: Number(formCrear.Total) || 0,
@@ -314,16 +352,29 @@ export const PedidosClientes = () => {
         ClienteTelefono: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Telefono || null : null,
         ClienteCorreo: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Correo || null : null,
         detalle: detallesLimpios
-      });
+      };
 
-      formData.append('pedido', pedidoString);
+      console.log('🔍 DEBUG - PEDIDO COMPLETO A ENVIAR:', pedidoCompleto);
+
+      const formData = new FormData();
+      formData.append('pedido', JSON.stringify(pedidoCompleto));
+
       if (formCrear.MetodoPago === "transferencia" && voucherFileCrear) {
         formData.append('voucher', voucherFileCrear);
       }
 
-      await axios.post('http://localhost:3000/api/pedidos-clientes', formData, {
+      const response = await axios.post('http://localhost:3000/api/pedidos-clientes', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
+
+      console.log('✅ RESPUESTA DEL SERVIDOR:', response.data);
+
+      // 🔴 PASO 5: VERIFICAR QUE EL SERVIDOR DEVOLVIÓ LA IMAGEN
+      if (response.data.detalle?.[0]?.UrlImagenPersonalizada) {
+        console.log('🎉 ¡IMAGEN GUARDADA CORRECTAMENTE!');
+      } else {
+        console.warn('⚠️ LA IMAGEN NO SE GUARDÓ - REVISAR BACKEND');
+      }
 
       toast.success("Pedido creado correctamente");
       goToList();
@@ -337,55 +388,55 @@ export const PedidosClientes = () => {
   };
 
   // En PedidosClientes.jsx
-const handleUpdateEstado = async (estado, motivo = "") => {
-  if (!selectedPedido) return;
+  const handleUpdateEstado = async (estado, motivo = "") => {
+    if (!selectedPedido) return;
 
-  try {
-    setUpdating(true);
-    
-    // Para actualizaciones de estado, solo enviamos JSON
-    const payload = { Estado: estado };
-    if (estado === 'cancelado' && motivo) payload.motivo = motivo;
+    try {
+      setUpdating(true);
 
-    console.log('🟡 Enviando actualización:', payload);
+      // Para actualizaciones de estado, solo enviamos JSON
+      const payload = { Estado: estado };
+      if (estado === 'cancelado' && motivo) payload.motivo = motivo;
 
-    const response = await axios.put(
-      `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
-      payload,
-      { 
-        headers: { 
-          'Content-Type': 'application/json' // 👈 IMPORTANTE: JSON, no multipart
-        } 
+      console.log(' Enviando actualización:', payload);
+
+      const response = await axios.put(
+        `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json' 
+          }
+        }
+      );
+
+      console.log(' Respuesta del servidor:', response.data);
+
+      setSelectedPedido(prev => ({
+        ...prev,
+        Estado: estado,
+        MotivoCancelacion: estado === 'cancelado' ? motivo : prev.MotivoCancelacion
+      }));
+
+      toast.success(`Pedido ${estado === 'cancelado' ? 'cancelado' : estado} correctamente`);
+
+      // Recargar la lista
+      await fetchPedidos();
+
+      // Si es aprobado, mostrar mensaje de venta creada
+      if (estado === 'aprobado' && response.data.venta) {
+        toast.success(` Venta #${response.data.venta.VentaId.substring(0, 8)} creada`);
       }
-    );
 
-    console.log('🟢 Respuesta del servidor:', response.data);
+    } catch (err) {
+      console.error(' Error detallado:', err.response?.data || err);
 
-    setSelectedPedido(prev => ({
-      ...prev,
-      Estado: estado,
-      MotivoCancelacion: estado === 'cancelado' ? motivo : prev.MotivoCancelacion
-    }));
-
-    toast.success(`✅ Pedido ${estado === 'cancelado' ? 'cancelado' : estado} correctamente`);
-    
-    // Recargar la lista
-    await fetchPedidos();
-    
-    // Si es aprobado, mostrar mensaje de venta creada
-    if (estado === 'aprobado' && response.data.venta) {
-      toast.success(`💰 Venta #${response.data.venta.VentaId.substring(0, 8)} creada`);
+      const errorMsg = err.response?.data?.error || err.response?.data?.details || err.message;
+      toast.error(`Error: ${errorMsg}`);
+    } finally {
+      setUpdating(false);
     }
-    
-  } catch (err) {
-    console.error('❌ Error detallado:', err.response?.data || err);
-    
-    const errorMsg = err.response?.data?.error || err.response?.data?.details || err.message;
-    toast.error(`Error: ${errorMsg}`);
-  } finally {
-    setUpdating(false);
-  }
-};
+  };
 
 
   const handlePageChange = (page) => setCurrentPage(page);

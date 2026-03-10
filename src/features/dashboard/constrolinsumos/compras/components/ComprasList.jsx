@@ -1,7 +1,8 @@
-import React from "react";
-import { Eye, Plus, Search } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Eye, Plus, Search, Clock, XCircle } from "lucide-react";
 import { Pagination } from "../../../components/paginacion/pagination";
 import { ESTADOS_COMPRA } from "../hook/useCompras";
+import { CancelacionModal } from "../../../components/modals/CancelacionModal";
 
 const getShortId = (id) => {
   const str = String(id || "");
@@ -27,17 +28,54 @@ const formatPrice = (value) => {
   return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
 };
 
-// Configuración de estados para mostrar en la tabla - AHORA SOLO DOS
+// Función para calcular minutos restantes para anulación automática (1 hora)
+const calcularMinutosRestantes = (fechaRegistro) => {
+  if (!fechaRegistro) return null;
+  
+  const fechaCompra = new Date(fechaRegistro);
+  const ahora = new Date();
+  
+  // Calcular la fecha límite (1 hora después de la compra)
+  const fechaLimite = new Date(fechaCompra);
+  fechaLimite.setHours(fechaLimite.getHours() + 1);
+  
+  // Si ya pasó la fecha límite
+  if (ahora > fechaLimite) return 0;
+  
+  // Calcular minutos restantes
+  const diffMs = fechaLimite - ahora;
+  const diffMinutos = Math.floor(diffMs / 60000);
+  
+  return diffMinutos;
+};
+
+// Formatear minutos para mostrar
+const formatearMinutosRestantes = (minutos) => {
+  if (minutos === null) return '';
+  if (minutos <= 0) return '0 min';
+  if (minutos < 60) return `${minutos} min`;
+  
+  const horas = Math.floor(minutos / 60);
+  const mins = minutos % 60;
+  return mins > 0 ? `${horas}h ${mins}m` : `${horas}h`;
+};
+
+// Configuración de estados
 const estadoConfig = {
   [ESTADOS_COMPRA.PENDIENTE]: {
     color: 'bg-yellow-100 text-yellow-800',
     label: 'Pendiente',
-    icon: '⏳'
+    icon: Clock
   },
   [ESTADOS_COMPRA.RECIBIDO]: {
     color: 'bg-green-100 text-green-800',
     label: 'Recibido',
     icon: '✅'
+  },
+  [ESTADOS_COMPRA.ANULADA]: {
+    color: 'bg-red-100 text-red-800',
+    label: 'Anulada',
+    icon: '❌'
   }
 };
 
@@ -49,6 +87,8 @@ export const ComprasList = ({
   setFiltroCampo,
   onView,
   onCreate,
+  onActualizarEstado,
+  onRefresh,
   currentPage,
   totalPages,
   onPageChange,
@@ -56,6 +96,58 @@ export const ComprasList = ({
   totalItems,
   onItemsPerPageChange
 }) => {
+  // Estado para actualizar los minutos cada minuto
+  const [tiempoActual, setTiempoActual] = useState(new Date());
+  // Estado para el modal de cancelación
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [compraSeleccionada, setCompraSeleccionada] = useState(null);
+  // Estado para controlar la carga durante la cancelación
+  const [cancelando, setCancelando] = useState(false);
+
+  useEffect(() => {
+    // Actualizar cada minuto para que los contadores se refresquen
+    const intervalo = setInterval(() => {
+      setTiempoActual(new Date());
+    }, 60000); // 60000 ms = 1 minuto
+
+    return () => clearInterval(intervalo);
+  }, []);
+
+  // Función para abrir modal de cancelación
+  const handleCancelClick = (compra) => {
+    setCompraSeleccionada(compra);
+    setShowCancelModal(true);
+  };
+
+  // Función para confirmar cancelación
+  const handleConfirmCancel = async (motivo) => {
+    if (compraSeleccionada && onActualizarEstado) {
+      setCancelando(true);
+      try {
+        await onActualizarEstado(compraSeleccionada.CompraId, ESTADOS_COMPRA.ANULADA, null, motivo);
+        
+        // Refrescar los datos después de la cancelación
+        if (onRefresh) {
+          await onRefresh();
+        }
+        
+        // Cerrar el modal después de 1 segundo
+        setTimeout(() => {
+          setShowCancelModal(false);
+          setCompraSeleccionada(null);
+        }, 500);
+        
+      } catch (error) {
+        console.error("Error al cancelar compra:", error);
+      } finally {
+        setCancelando(false);
+      }
+    } else {
+      setShowCancelModal(false);
+      setCompraSeleccionada(null);
+    }
+  };
+
   return (
     <>
       <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
@@ -111,6 +203,14 @@ export const ComprasList = ({
               const estado = compra.Estado || ESTADOS_COMPRA.PENDIENTE;
               const config = estadoConfig[estado] || estadoConfig[ESTADOS_COMPRA.PENDIENTE];
               
+              // Calcular minutos restantes solo para compras pendientes
+              const minutosRestantes = estado === ESTADOS_COMPRA.PENDIENTE 
+                ? calcularMinutosRestantes(compra.FechaRegistro)
+                : null;
+              
+              // Determinar si está por expirar (menos de 10 minutos)
+              const porExpirar = minutosRestantes !== null && minutosRestantes <= 10 && minutosRestantes > 0;
+              
               return (
                 <tr key={compra.CompraId} className="hover:bg-slate-50">
                   <td className="py-4 px-6">{getShortId(compra.CompraId)}</td>
@@ -120,20 +220,46 @@ export const ComprasList = ({
                     {formatPrice(compra.Total)}
                   </td>
                   <td className="py-4 px-6 text-center">
-                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${config.color}`}>
-                      <span>{config.icon}</span>
-                      <span>{config.label}</span>
-                    </span>
+                    <div className="flex items-center justify-center gap-2">
+                      {/* Solo mostramos el estado actual */}
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${config.color}`}>
+                        <span>{typeof config.icon === 'string' ? config.icon : <config.icon size={14} />}</span>
+                        <span>{config.label}</span>
+                      </span>
+                      
+                      {/* Solo mostramos minutos restantes si está pendiente */}
+                      {estado === ESTADOS_COMPRA.PENDIENTE && minutosRestantes !== null && minutosRestantes > 0 && (
+                        <span className={`text-xs font-medium ${
+                          porExpirar ? 'text-red-600 animate-pulse' : 'text-gray-500'
+                        }`}>
+                          {formatearMinutosRestantes(minutosRestantes)}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-4 px-6">
-                    <div className="flex justify-center gap-3">
+                    <div className="flex justify-center items-center gap-2">
+                      {/* Botón de ver detalles - siempre visible */}
                       <button
                         onClick={() => onView(compra)}
                         className="p-2 hover:bg-emerald-50 rounded-full transition-colors"
                         title="Ver detalles"
+                        disabled={cancelando}
                       >
                         <Eye size={18} className="text-emerald-600" />
                       </button>
+                      
+                      {/* Botón de cancelar - solo para compras pendientes */}
+                      {estado === ESTADOS_COMPRA.PENDIENTE && (
+                        <button
+                          onClick={() => handleCancelClick(compra)}
+                          className="p-2 hover:bg-red-50 rounded-full transition-colors"
+                          title="Cancelar compra"
+                          disabled={cancelando}
+                        >
+                          <XCircle size={18} className={`text-red-500 ${cancelando ? 'opacity-50' : ''}`} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -161,6 +287,17 @@ export const ComprasList = ({
           </div>
         )}
       </div>
+
+      {/* Modal de cancelación */}
+      <CancelacionModal
+        isOpen={showCancelModal}
+        onClose={() => {
+          setShowCancelModal(false);
+          setCompraSeleccionada(null);
+        }}
+        onConfirm={handleConfirmCancel}
+        pedidoId={compraSeleccionada?.CompraId || ''}
+      />
     </>
   );
 };

@@ -1,5 +1,5 @@
 import React from "react";
-import { Package, Trash2, X, Upload } from "lucide-react";
+import { Package, Trash2, X, Upload, FileText } from "lucide-react";
 import { getColorById, formatPrice } from "../pedidos/utils/pedidosHelpers";
 
 export const DetalleItem = ({
@@ -18,10 +18,41 @@ export const DetalleItem = ({
   onAbrirColores,
   onActualizar,
   onEliminar,
-  onUploadImagen,
+  onUploadArchivo, // Cambiado de onUploadImagen
+  onEliminarArchivo, // Nueva prop
   puedeEliminar = true
 }) => {
   const subtotal = (detalle.Cantidad || 0) * (detalle.Precio || 0);
+
+  // Función para determinar el ícono según el tipo de archivo
+  const getFileIcon = (tipoArchivo, url) => {
+    if (!url) return <Upload size={24} className="text-blue-500" />;
+    
+    if (tipoArchivo?.startsWith('image/')) {
+      return null; // Se maneja con img
+    }
+    
+    if (url.match(/\.pdf$/i) || tipoArchivo === 'application/pdf') {
+      return <FileText size={32} className="text-red-500" />;
+    }
+    
+    if (url.match(/\.(doc|docx)$/i) || tipoArchivo?.includes('word')) {
+      return <FileText size={32} className="text-blue-600" />;
+    }
+    
+    if (url.match(/\.(xls|xlsx)$/i) || tipoArchivo?.includes('excel')) {
+      return <FileText size={32} className="text-green-600" />;
+    }
+    
+    return <FileText size={32} className="text-gray-600" />;
+  };
+
+  // Función para obtener el nombre del archivo de la URL
+  const getFileNameFromUrl = (url) => {
+    if (!url) return '';
+    const parts = url.split('/');
+    return parts[parts.length - 1] || 'Archivo';
+  };
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4">
@@ -173,52 +204,68 @@ export const DetalleItem = ({
         </div>
       </div>
       
-      {/* Sección para subir imagen (solo para servicios que lo requieran) */}
-      {esServicio && itemSeleccionado && detalle.RequiereImagen && (
+      {/* 🔴 SECCIÓN PARA SUBIR ARCHIVOS - SOLO PARA SERVICIOS */}
+      {esServicio && itemSeleccionado && (
         <div className="mt-3 pl-[8.33%]">
-          <div className="border border-dashed border-slate-300 rounded-lg p-3 bg-slate-50">
-            <label className="block text-xs font-medium text-slate-700 mb-2">
-              Imagen del cliente (foto, documento, etc.)
+          <div className="border border-dashed border-slate-300 rounded-lg p-4 bg-slate-50">
+            <label className="block text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
+              <Upload size={16} className="text-blue-600" />
+              Adjuntar archivo (opcional)
             </label>
             
             {detalle.UrlImagenPersonalizada ? (
-              <div className="flex items-center gap-3">
-                <img 
-                  src={detalle.UrlImagenPersonalizada} 
-                  alt="Vista previa" 
-                  className="w-16 h-16 object-cover rounded-lg border"
-                />
+              <div className="flex items-start gap-4">
+                {/* Vista previa según el tipo de archivo */}
+                <div className="w-16 h-16 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
+                  {detalle.tipoArchivo?.startsWith('image/') ? (
+                    <img 
+                      src={detalle.UrlImagenPersonalizada} 
+                      alt="Vista previa" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    getFileIcon(detalle.tipoArchivo, detalle.UrlImagenPersonalizada)
+                  )}
+                </div>
+                
                 <div className="flex-1">
-                  <p className="text-xs text-slate-600 mb-2">Imagen cargada</p>
+                  <p className="text-sm font-medium text-slate-700">
+                    {detalle.nombreArchivo || getFileNameFromUrl(detalle.UrlImagenPersonalizada)}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {detalle.tipoArchivo || 'Archivo'} • {(detalle.tamañoArchivo / 1024).toFixed(2)} KB
+                  </p>
                   <button
-                    onClick={() => {
-                      if (detalle.UrlImagenPersonalizada?.startsWith('blob:')) {
-                        URL.revokeObjectURL(detalle.UrlImagenPersonalizada);
-                      }
-                      onActualizar(index, "UrlImagenPersonalizada", null);
-                      onActualizar(index, "ImagenPersonalizadaFile", null);
-                    }}
-                    className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1"
+                    onClick={() => onEliminarArchivo?.(index)}
+                    className="mt-2 text-xs text-red-600 hover:text-red-800 flex items-center gap-1 bg-red-50 px-2 py-1 rounded-lg"
                   >
-                    <X size={12} /> Eliminar imagen
+                    <X size={12} /> Eliminar archivo
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      onUploadImagen(index, file);
+                      onUploadArchivo?.(index, file);
                     }
+                    // Limpiar el input para poder subir el mismo archivo nuevamente
+                    e.target.value = '';
                   }}
-                  className="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  disabled={!itemSeleccionado}
+                  className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                 />
-                <span className="text-xs text-slate-400">Máx 5MB</span>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                  <span className="bg-white px-2 py-1 rounded border">📷 Imágenes</span>
+                  <span className="bg-white px-2 py-1 rounded border">📄 PDF</span>
+                  <span className="bg-white px-2 py-1 rounded border">📝 Word</span>
+                  <span className="bg-white px-2 py-1 rounded border">📊 Excel</span>
+                  <span className="bg-white px-2 py-1 rounded border">📃 TXT</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-2">Máximo 10MB por archivo</p>
               </div>
             )}
           </div>

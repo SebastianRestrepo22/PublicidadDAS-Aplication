@@ -49,8 +49,14 @@ const estadoConfig = {
     label: 'Recibido',
     icon: CheckCircle,
     description: 'Productos recibidos y stock actualizado'
+  },
+  [ESTADOS_COMPRA.ANULADA]: {
+    color: 'bg-red-100 text-red-800',
+    borderColor: 'border-red-200',
+    label: 'Anulada',
+    icon: XCircle,
+    description: 'Compra anulada'
   }
-  // NOTA: ORDEN_ENVIADA y ANULADA ya no existen
 };
 
 export const ComprasView = ({

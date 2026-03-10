@@ -18,6 +18,7 @@ export const getDetallePedidoByPedidoIdModel = async (PedidoClienteId) => {
         d.Tamaño,
         d.Descripcion,
         d.UrlImagen,
+        d.UrlImagenPersonalizada,
         d.Precio,
         d.ColorId,
         c.Nombre AS ColorNombre
@@ -52,6 +53,7 @@ export const createDetallePedidoModel = async ({
   Tamaño,
   Descripcion,
   UrlImagen,
+  UrlImagenPersonalizada,
   Precio,
   ColorId
 }) => {
@@ -60,8 +62,20 @@ export const createDetallePedidoModel = async ({
     
     const query = `
       INSERT INTO detallePedidosClientes 
-      (DetallePedidoClienteId, PedidoClienteId, ProductoId, ServicioId, Cantidad, Tamaño, Descripcion, UrlImagen, Precio, ColorId)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (
+        DetallePedidoClienteId, 
+        PedidoClienteId, 
+        ProductoId, 
+        ServicioId, 
+        Cantidad, 
+        Tamaño, 
+        Descripcion, 
+        UrlImagen, 
+        UrlImagenPersonalizada,
+        Precio, 
+        ColorId
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
@@ -73,6 +87,7 @@ export const createDetallePedidoModel = async ({
       Tamaño,
       Descripcion,
       UrlImagen,
+      UrlImagenPersonalizada,
       Precio,
       ColorId || null
     ];
@@ -81,6 +96,7 @@ export const createDetallePedidoModel = async ({
       DetallePedidoClienteId,
       ProductoId,
       ColorId,
+      UrlImagenPersonalizada: UrlImagenPersonalizada ? "✓ tiene imagen" : "sin imagen",
       valores: values
     });
     

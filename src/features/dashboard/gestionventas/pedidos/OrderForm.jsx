@@ -149,22 +149,79 @@ export const OrderForm = ({
     setModalServiciosAbierto(false);
   };
 
-  // Handler para subir imagen personalizada
-  const handleUploadImagenPersonalizada = (index, file) => {
-    if (file && file.size > 5 * 1024 * 1024) {
-      toast.error('La imagen debe ser menor a 5MB');
+  // 🔴 NUEVO HANDLER PARA SUBIR ARCHIVOS (IMÁGENES, PDF, WORD, EXCEL, ETC.)
+  const handleUploadArchivo = (index, file) => {
+    console.log('📎 [UPLOAD] Iniciando subida de archivo:', {
+      index,
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type
+    });
+
+    // Validar tamaño (máx 10MB para cualquier archivo)
+    if (file && file.size > 10 * 1024 * 1024) {
+      toast.error('El archivo debe ser menor a 10MB');
       return;
     }
 
-    const imagenUrl = URL.createObjectURL(file);
+    // Validar tipos permitidos
+    const tiposPermitidos = [
+      'image/', // Todas las imágenes
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'text/plain' // .txt
+    ];
+
+    const tipoPermitido = tiposPermitidos.some(tipo => file.type.startsWith(tipo));
+    if (!tipoPermitido) {
+      toast.error('Tipo de archivo no permitido. Solo imágenes, PDF, Word, Excel o TXT');
+      return;
+    }
+
+    const archivoUrl = URL.createObjectURL(file);
+    console.log('📎 [UPLOAD] URL creada:', archivoUrl);
     
     const nuevos = [...detallesCrear];
     nuevos[index] = {
       ...nuevos[index],
-      UrlImagenPersonalizada: imagenUrl,
-      ImagenPersonalizadaFile: file
+      UrlImagenPersonalizada: archivoUrl,
+      ArchivoPersonalizadoFile: file,
+      nombreArchivo: file.name,
+      tipoArchivo: file.type,
+      tamañoArchivo: file.size
+    };
+    
+    console.log('📎 [UPLOAD] Estado actualizado:', {
+      index,
+      tieneArchivo: !!nuevos[index].UrlImagenPersonalizada,
+      nombre: file.name,
+      tipo: file.type
+    });
+    
+    setDetallesCrear(nuevos);
+  };
+
+  // 🔴 NUEVO HANDLER PARA ELIMINAR ARCHIVO
+  const handleEliminarArchivo = (index) => {
+    if (detallesCrear[index].UrlImagenPersonalizada?.startsWith('blob:')) {
+      URL.revokeObjectURL(detallesCrear[index].UrlImagenPersonalizada);
+    }
+    
+    const nuevos = [...detallesCrear];
+    nuevos[index] = {
+      ...nuevos[index],
+      UrlImagenPersonalizada: null,
+      ArchivoPersonalizadoFile: null,
+      nombreArchivo: null,
+      tipoArchivo: null,
+      tamañoArchivo: null
     };
     setDetallesCrear(nuevos);
+    
+    toast.success('Archivo eliminado');
   };
 
   // Handlers para colores
@@ -186,6 +243,11 @@ export const OrderForm = ({
 
   // Handlers para detalles
   const cambiarTipoDetalle = (index, nuevoTipo) => {
+    // Limpiar URL del objeto si existe
+    if (detallesCrear[index].UrlImagenPersonalizada?.startsWith('blob:')) {
+      URL.revokeObjectURL(detallesCrear[index].UrlImagenPersonalizada);
+    }
+    
     const nuevos = [...detallesCrear];
     
     if (nuevoTipo === 'producto') {
@@ -199,7 +261,10 @@ export const OrderForm = ({
         Precio: 0,
         UrlImagen: "",
         UrlImagenPersonalizada: null,
-        ImagenPersonalizadaFile: null,
+        ArchivoPersonalizadoFile: null,
+        nombreArchivo: null,
+        tipoArchivo: null,
+        tamañoArchivo: null,
         RequiereImagen: false
       };
       setTimeout(() => abrirModalProductos(index), 100);
@@ -214,7 +279,10 @@ export const OrderForm = ({
         Precio: 0,
         UrlImagen: "",
         UrlImagenPersonalizada: null,
-        ImagenPersonalizadaFile: null,
+        ArchivoPersonalizadoFile: null,
+        nombreArchivo: null,
+        tipoArchivo: null,
+        tamañoArchivo: null,
         RequiereImagen: false
       };
       setTimeout(() => abrirModalServicios(index), 100);
@@ -236,7 +304,10 @@ export const OrderForm = ({
         Descripcion: "",
         UrlImagen: "",
         UrlImagenPersonalizada: null,
-        ImagenPersonalizadaFile: null,
+        ArchivoPersonalizadoFile: null,
+        nombreArchivo: null,
+        tipoArchivo: null,
+        tamañoArchivo: null,
         RequiereImagen: false,
         Precio: 0,
         ColorId: null
@@ -245,6 +316,7 @@ export const OrderForm = ({
   };
 
   const eliminarDetalle = (index) => {
+    // Limpiar URL del objeto si existe
     if (detallesCrear[index].UrlImagenPersonalizada?.startsWith('blob:')) {
       URL.revokeObjectURL(detallesCrear[index].UrlImagenPersonalizada);
     }
@@ -259,7 +331,10 @@ export const OrderForm = ({
         ServicioId: null,
         UrlImagen: "",
         UrlImagenPersonalizada: null,
-        ImagenPersonalizadaFile: null,
+        ArchivoPersonalizadoFile: null,
+        nombreArchivo: null,
+        tipoArchivo: null,
+        tamañoArchivo: null,
         Precio: 0,
         ColorId: null
       };
@@ -603,7 +678,8 @@ export const OrderForm = ({
                     onAbrirColores={abrirModalColores}
                     onActualizar={actualizarDetalle}
                     onEliminar={eliminarDetalle}
-                    onUploadImagen={handleUploadImagenPersonalizada}
+                    onUploadArchivo={handleUploadArchivo}
+                    onEliminarArchivo={handleEliminarArchivo}
                     puedeEliminar={detallesCrear.length > 1}
                   />
                 );

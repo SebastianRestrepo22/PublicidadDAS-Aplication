@@ -120,16 +120,15 @@ export const updateCompra = async (req, res) => {
   }
 };
 
-// Actualizar solo el estado de la compra
 export const updateCompraEstado = async (req, res) => {
   const id = req.params.id;
-  const { estado, productos, motivoCancelacion } = req.body;
+  const { estado, productos, motivoCancelacion, esAnulacionAutomatica } = req.body;
 
   if (!id || id.length !== 36) {
     return res.status(400).json({ error: "ID inválido" });
   }
 
-  const estadosValidos = ['pendiente', 'orden_enviada', 'recibido', 'anulada'];
+  const estadosValidos = ['pendiente', 'recibido', 'anulada'];
   if (!estadosValidos.includes(estado)) {
     return res.status(400).json({ error: "Estado no válido" });
   }
@@ -140,7 +139,17 @@ export const updateCompraEstado = async (req, res) => {
       return res.status(404).json({ message: "Compra no encontrada" });
     }
 
-    // Si el estado es "recibido", actualizar stock de productos (con o sin color)
+    // Si es anulación automática, verificar tiempo
+    if (esAnulacionAutomatica && estado === 'anulada') {
+      const puedeAnular = await puedeAnularseAutomaticamente(id);
+      if (!puedeAnular) {
+        return res.status(400).json({ 
+          error: "La compra no puede anularse automáticamente (menos de 1 hora)" 
+        });
+      }
+    }
+
+    // Si el estado es "recibido", actualizar stock de productos
     if (estado === 'recibido') {
       let itemsAActualizar = productos;
       
@@ -148,8 +157,9 @@ export const updateCompraEstado = async (req, res) => {
         const detalles = await getDetalleByCompraIdModel(id);
         itemsAActualizar = detalles.map(d => ({
           ProductoId: d.ProductoId,
-          ColorId: d.ColorId, // Incluimos ColorId
-          Cantidad: d.Cantidad
+          ColorId: d.ColorId,
+          Cantidad: d.Cantidad,
+          colores: d.colores
         }));
       }
 
@@ -157,10 +167,7 @@ export const updateCompraEstado = async (req, res) => {
         return res.status(400).json({ error: "No hay productos para actualizar el stock" });
       }
 
-      // Actualizar stock de todos los productos (maneja colores automáticamente)
       const resultadoStock = await actualizarStockMultiple(itemsAActualizar);
-
-      // Actualizar el estado de la compra
       await updateCompraEstadoModel(id, estado, motivoCancelacion);
 
       res.json({ 
@@ -168,10 +175,25 @@ export const updateCompraEstado = async (req, res) => {
         stockActualizado: resultadoStock
       });
     } 
-    // Si es anulación, solo guardar el motivo
+    // Si es anulación, restaurar stock (restar)
     else if (estado === 'anulada') {
       if (!motivoCancelacion) {
         return res.status(400).json({ error: "Debe proporcionar un motivo de cancelación" });
+      }
+      
+      // Si la compra estaba recibida, restaurar stock
+      if (compra.Estado === 'recibido') {
+        const detalles = await getDetalleByCompraIdModel(id);
+        const productosARestaurar = detalles.map(d => ({
+          ProductoId: d.ProductoId,
+          Cantidad: -d.Cantidad, // Negativo para restar
+          colores: d.colores ? d.colores.map(c => ({
+            ...c,
+            Stock: -c.Stock
+          })) : []
+        }));
+        
+        await actualizarStockMultiple(productosARestaurar);
       }
       
       await updateCompraEstadoModel(id, estado, motivoCancelacion);
