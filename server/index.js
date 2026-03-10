@@ -30,10 +30,14 @@ import tipoDocumentoRoutes from './routes/tipoDocumento.js';
 
 // Scripts y DB
 import { initRolesAndAdmin } from './scripts/initRolesAndAdmin.js';
+import connectDB from './lib/db.js';
+import { iniciarAutoCancelacionCompras } from './scripts/autoCancelCompras.js'; 
 import { dbPool } from './lib/db.js';
 dotenv.config();
 
 const app = express();
+
+iniciarAutoCancelacionCompras();
 
 // Middlewares generales
 app.use(cors());

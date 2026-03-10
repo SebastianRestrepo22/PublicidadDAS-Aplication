@@ -103,3 +103,37 @@ export const actualizarStockProducto = async (productoId, cantidad) => {
 
   return { productoId, stockAnterior: stockActual, stockNuevo: nuevoStock };
 };
+
+// Obtener compras pendientes con más de 1 hora
+export const getComprasPendientesExpiradas = async () => {
+  const [rows] = await dbPool.execute(`
+    SELECT * FROM Compras 
+    WHERE Estado = 'pendiente' 
+    AND FechaRegistro <= DATE_SUB(NOW(), INTERVAL 1 HOUR)
+    AND (MotivoCancelacion IS NULL OR MotivoCancelacion = '')
+  `);
+  return rows;
+};
+
+// Anular compra automáticamente
+export const anularCompraAutomatica = async (id, motivo) => {
+  const [result] = await dbPool.execute(
+    `UPDATE Compras
+     SET Estado = 'anulada', 
+         MotivoCancelacion = ?
+     WHERE CompraId = ? AND Estado = 'pendiente'`,
+    [motivo, id]
+  );
+  return result;
+};
+
+// Verificar si una compra puede anularse automáticamente
+export const puedeAnularseAutomaticamente = async (id) => {
+  const [rows] = await dbPool.execute(`
+    SELECT * FROM Compras 
+    WHERE CompraId = ? 
+    AND Estado = 'pendiente' 
+    AND FechaRegistro <= DATE_SUB(NOW(), INTERVAL 1 HOUR)
+  `, [id]);
+  return rows.length > 0;
+};

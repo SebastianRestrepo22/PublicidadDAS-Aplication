@@ -130,6 +130,7 @@ export const Compras = () => {
   }, []);
 
 
+
   // Función para cargar colores de la BD
   const cargarColores = async () => {
     setLoadingColores(true);
@@ -228,6 +229,29 @@ export const Compras = () => {
     }
   }, [itemsPerPage, currentPage, allData]);
 
+  // Agrega este useEffect después de los otros useEffects
+  useEffect(() => {
+    // Este efecto se ejecutará cada vez que compras cambie
+    let filtered = compras || [];
+    if (filtroCampo && filtroText.trim()) {
+      filtered = filtered.filter((c) => {
+        const valor = String(c[filtroCampo] || "").toLowerCase();
+        return valor.includes(filtroText.toLowerCase());
+      });
+    }
+    setAllData(filtered);
+    setTotalItems(filtered.length);
+
+    // Recalcular páginas
+    const newTotalPages = Math.ceil(filtered.length / itemsPerPage);
+    setTotalPages(newTotalPages > 0 ? newTotalPages : 1);
+
+    // Actualizar datos paginados
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setPaginatedData(filtered.slice(startIndex, endIndex));
+  }, [compras, filtroCampo, filtroText, itemsPerPage, currentPage]);
+
   // Load Proveedores Paginados
   const loadProveedoresPaginados = async (page = 1, search = "") => {
     setLoadingProveedores(true);
@@ -312,123 +336,142 @@ export const Compras = () => {
   };
 
   const goToView = async (compra) => {
-  try {
-    console.log(" [goToView] Compra recibida:", compra);
-    console.log(" [goToView] Productos disponibles:", productos.length);
-    
-    const detalles = await getDetallesByCompraId(compra.CompraId);
-    console.log(" [goToView] Detalles recuperados de la BD:", detalles);
-    console.log(" [goToView] Tipo de detalles:", typeof detalles);
-    console.log(" [goToView] ¿Es array?", Array.isArray(detalles));
-    console.log(" [goToView] Longitud de detalles:", detalles?.length);
+    try {
+      console.log(" [goToView] Compra recibida:", compra);
+      console.log(" [goToView] Productos disponibles:", productos.length);
 
-    // Si no hay detalles, mostrar un mensaje
-    if (!detalles || detalles.length === 0) {
-      console.warn(" [goToView] No hay detalles para esta compra");
-      
+      const detalles = await getDetallesByCompraId(compra.CompraId);
+      console.log(" [goToView] Detalles recuperados de la BD:", detalles);
+      console.log(" [goToView] Tipo de detalles:", typeof detalles);
+      console.log(" [goToView] ¿Es array?", Array.isArray(detalles));
+      console.log(" [goToView] Longitud de detalles:", detalles?.length);
+
+      // Si no hay detalles, mostrar un mensaje
+      if (!detalles || detalles.length === 0) {
+        console.warn(" [goToView] No hay detalles para esta compra");
+
+        const proveedor = proveedores.find(p => p.ProveedorId === compra.ProveedorId);
+        const nombreProveedor = proveedor?.NombreProveedor || "";
+
+        setSelectedCompra({
+          ...compra,
+          detalle: [],
+          nombreProveedor
+        });
+        setViewMode("view");
+        return;
+      }
+
+      // Mostrar el primer detalle para ver su estructura
+      console.log(" [goToView] Primer detalle (raw):", detalles[0]);
+      console.log(" [goToView] Propiedades del primer detalle:", Object.keys(detalles[0]));
+
       const proveedor = proveedores.find(p => p.ProveedorId === compra.ProveedorId);
       const nombreProveedor = proveedor?.NombreProveedor || "";
-      
-      setSelectedCompra({
-        ...compra,
-        detalle: [],
-        nombreProveedor
-      });
-      setViewMode("view");
-      return;
-    }
 
-    // Mostrar el primer detalle para ver su estructura
-    console.log(" [goToView] Primer detalle (raw):", detalles[0]);
-    console.log(" [goToView] Propiedades del primer detalle:", Object.keys(detalles[0]));
+      // Mapear detalles y asegurar que los colores estén presentes
+      const detallesConProducto = (detalles || []).map(d => {
+        // Asegurar que los valores numéricos sean correctos
+        const precioUnitario = Number(d.PrecioUnitario) || 0;
+        const cantidad = Number(d.Cantidad) || 0;
 
-    const proveedor = proveedores.find(p => p.ProveedorId === compra.ProveedorId);
-    const nombreProveedor = proveedor?.NombreProveedor || "";
+        // IMPORTANTE: Verificar la estructura completa del detalle
+        console.log(" [goToView] Procesando detalle:", d.DetalleCompraId);
 
-    // Mapear detalles y asegurar que los colores estén presentes
-    const detallesConProducto = (detalles || []).map(d => {
-      // Asegurar que los valores numéricos sean correctos
-      const precioUnitario = Number(d.PrecioUnitario) || 0;
-      const cantidad = Number(d.Cantidad) || 0;
-      
-      // IMPORTANTE: Verificar la estructura completa del detalle
-      console.log(" [goToView] Procesando detalle:", d.DetalleCompraId);
-      
-      // Procesar colores si existen
-      let coloresDetalle = [];
-      if (d.colores) {
-        console.log(" [goToView] colores en detalle:", d.colores);
-        if (Array.isArray(d.colores)) {
-          coloresDetalle = d.colores;
-        } else if (typeof d.colores === 'string') {
-          try {
-            coloresDetalle = JSON.parse(d.colores);
-          } catch (e) {
-            console.error("Error parseando colores:", e);
+        // Procesar colores si existen
+        let coloresDetalle = [];
+        if (d.colores) {
+          console.log(" [goToView] colores en detalle:", d.colores);
+          if (Array.isArray(d.colores)) {
+            coloresDetalle = d.colores;
+          } else if (typeof d.colores === 'string') {
+            try {
+              coloresDetalle = JSON.parse(d.colores);
+            } catch (e) {
+              console.error("Error parseando colores:", e);
+            }
           }
         }
-      }
-      
-      // Buscar información del producto
-      const producto = productos.find(p => p.ProductoId === d.ProductoId);
-      console.log(" [goToView] Producto encontrado:", producto?.Nombre);
-      
-      return {
-        ...d,
-        DetalleCompraId: d.DetalleCompraId,
-        ProductoId: d.ProductoId,
-        ProductoNombre: producto?.Nombre || 'Producto no encontrado',
-        Cantidad: cantidad,
-        PrecioUnitario: precioUnitario,
-        Subtotal: precioUnitario * cantidad,
-        Descripcion: d.Descripcion || "",
-        colores: coloresDetalle
-      };
-    });
 
-    console.log(" [goToView] Detalles con producto mapeados:", detallesConProducto);
-    console.log(" [goToView] Primer detalle mapeado:", detallesConProducto[0]);
+        // Buscar información del producto
+        const producto = productos.find(p => p.ProductoId === d.ProductoId);
+        console.log(" [goToView] Producto encontrado:", producto?.Nombre);
 
-    // Verificar que el detalle tenga la estructura correcta para la vista
-    if (detallesConProducto[0]) {
-      console.log(" [goToView] Estructura final:", {
-        DetalleCompraId: detallesConProducto[0].DetalleCompraId,
-        ProductoId: detallesConProducto[0].ProductoId,
-        ProductoNombre: detallesConProducto[0].ProductoNombre,
-        Cantidad: detallesConProducto[0].Cantidad,
-        PrecioUnitario: detallesConProducto[0].PrecioUnitario,
-        Subtotal: detallesConProducto[0].Subtotal
+        return {
+          ...d,
+          DetalleCompraId: d.DetalleCompraId,
+          ProductoId: d.ProductoId,
+          ProductoNombre: producto?.Nombre || 'Producto no encontrado',
+          Cantidad: cantidad,
+          PrecioUnitario: precioUnitario,
+          Subtotal: precioUnitario * cantidad,
+          Descripcion: d.Descripcion || "",
+          colores: coloresDetalle
+        };
       });
+
+      console.log(" [goToView] Detalles con producto mapeados:", detallesConProducto);
+      console.log(" [goToView] Primer detalle mapeado:", detallesConProducto[0]);
+
+      // Verificar que el detalle tenga la estructura correcta para la vista
+      if (detallesConProducto[0]) {
+        console.log(" [goToView] Estructura final:", {
+          DetalleCompraId: detallesConProducto[0].DetalleCompraId,
+          ProductoId: detallesConProducto[0].ProductoId,
+          ProductoNombre: detallesConProducto[0].ProductoNombre,
+          Cantidad: detallesConProducto[0].Cantidad,
+          PrecioUnitario: detallesConProducto[0].PrecioUnitario,
+          Subtotal: detallesConProducto[0].Subtotal
+        });
+      }
+
+      setSelectedCompra({
+        ...compra,
+        detalle: detallesConProducto,
+        nombreProveedor
+      });
+
+      console.log(" [goToView] selectedCompra actualizado:", {
+        compraId: compra.CompraId,
+        total: compra.Total,
+        detallesCount: detallesConProducto.length
+      });
+
+      setViewMode("view");
+    } catch (err) {
+      console.error(" Error al cargar datos para vista detallada:", err);
+      toast.error("No se pudieron cargar los detalles de la compra.");
+      goToBackToList();
     }
+  };
 
-    setSelectedCompra({
-      ...compra,
-      detalle: detallesConProducto,
-      nombreProveedor
-    });
-    
-    console.log(" [goToView] selectedCompra actualizado:", {
-      compraId: compra.CompraId,
-      total: compra.Total,
-      detallesCount: detallesConProducto.length
-    });
-    
-    setViewMode("view");
-  } catch (err) {
-    console.error(" Error al cargar datos para vista detallada:", err);
-    toast.error("No se pudieron cargar los detalles de la compra.");
-    goToBackToList();
-  }
-};
-
-  const handleActualizarEstado = async (idCompra, nuevoEstado, productosAActualizar) => {
+  const handleActualizarEstado = async (idCompra, nuevoEstado, productosAActualizar, motivo = "") => {
     try {
-      await actualizarEstado(idCompra, nuevoEstado, productosAActualizar);
+      // Actualizar el estado en el backend y en el hook
+      await actualizarEstado(idCompra, nuevoEstado, productosAActualizar, motivo);
 
-      // Recargar la lista de compras
-      await fetchCompras();
+      // Actualizar el estado local
+      setCompras(prevCompras =>
+        prevCompras.map(compra =>
+          compra.CompraId === idCompra
+            ? { ...compra, Estado: nuevoEstado, MotivoCancelacion: motivo }
+            : compra
+        )
+      );
 
-      // VOLVER A LA TABLA AUTOMÁTICAMENTE
+      // Aplicar filtros actuales
+      let filtered = compras;
+      if (filtroCampo && filtroText.trim()) {
+        filtered = filtered.filter((c) => {
+          const valor = String(c[filtroCampo] || "").toLowerCase();
+          return valor.includes(filtroText.toLowerCase());
+        });
+      }
+
+      setAllData(filtered);
+      setTotalItems(filtered.length);
+
+      // VOLVER A LA TABLA
       setViewMode("list");
       setSelectedCompra(null);
 
@@ -629,6 +672,8 @@ export const Compras = () => {
             setFiltroCampo={setFiltroCampo}
             onView={goToView}
             onCreate={goToCreate}
+            onActualizarEstado={handleActualizarEstado}
+            onRefresh={fetchCompras}  // ← Asegúrate de pasar esta prop
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={handlePageChange}
