@@ -19,9 +19,9 @@ export const EditarCarritoServicio = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { cart, updateItem } = useCart();
-  
+
   const { item } = location.state || {};
-  
+
   const [descripcion, setDescripcion] = useState("");
   const [tamano, setTamano] = useState("");
   const [tamanosDisponibles, setTamanosDisponibles] = useState([]);
@@ -48,16 +48,16 @@ export const EditarCarritoServicio = () => {
 
     setServicioOriginal(currentItem);
     setTipoServicio(currentItem.TipoPrecio || "UNICO");
-    
+
     const customization = currentItem.customization || {};
-    
+
     setDescripcion(customization.Descripcion || customization.descripcion || "");
     setTamano(customization.Tamaño || customization.tamaño || "");
     setImagenPreview(customization.UrlImagen || currentItem.Imagen || currentItem.UrlImagen || "");
-    
+
     if (customization.archivosAdjuntos) {
-      const archivos = Array.isArray(customization.archivosAdjuntos) 
-        ? customization.archivosAdjuntos 
+      const archivos = Array.isArray(customization.archivosAdjuntos)
+        ? customization.archivosAdjuntos
         : [];
       setArchivosAdjuntos(archivos);
     }
@@ -78,19 +78,47 @@ export const EditarCarritoServicio = () => {
     }
   };
 
-  const handleFileUpload = (e) => {
-    const files = Array.from(e.target.files);
-    const nuevosArchivos = files.map((file) => ({
-      id: Math.random().toString(36).substr(2, 9),
-      nombre: file.name,
-      tipo: file.type,
-      tamaño: file.size,
-      archivo: file,
-      url: URL.createObjectURL(file),
-      esImagen: file.type.startsWith("image/")
-    }));
+  const subirArchivo = async (file) => {
+    const formData = new FormData();
+    formData.append("archivo", file);
 
-    setArchivosAdjuntos((prev) => [...prev, ...nuevosArchivos]);
+    const res = await fetch("http://localhost:3000/api/upload-temp", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+
+    if (!data.ok) {
+      throw new Error("Error subiendo archivo");
+    }
+
+    return data.url;
+  };
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files);
+
+    for (const file of files) {
+      try {
+        const urlServidor = await subirArchivo(file);
+
+        const nuevoArchivo = {
+          id: Math.random().toString(36).substr(2, 9),
+          nombre: file.name,
+          tipo: file.type,
+          tamaño: file.size,
+          url: urlServidor,
+          esImagen: file.type.startsWith("image/")
+        };
+
+        setArchivosAdjuntos(prev => [...prev, nuevoArchivo]);
+
+      } catch (error) {
+        console.error(error);
+        toast.error("Error subiendo archivo");
+      }
+    }
   };
 
   const eliminarArchivo = (archivoId) => {
@@ -115,9 +143,9 @@ export const EditarCarritoServicio = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (isSubmitting) return;
-    
+
     if (!descripcion.trim()) {
       toast.error("Por favor, describe lo que necesitas");
       return;
@@ -127,7 +155,7 @@ export const EditarCarritoServicio = () => {
       toast.error("Por favor selecciona un tamaño");
       return;
     }
-    
+
     setIsSubmitting(true);
 
     try {
@@ -150,9 +178,9 @@ export const EditarCarritoServicio = () => {
       };
 
       console.log("Actualizando servicio con cambios:", cambios);
-      
+
       updateItem(servicioOriginal.id, cambios);
-      
+
       toast.success("Servicio actualizado correctamente");
       navigate("/carritodecompras");
 
@@ -274,12 +302,12 @@ export const EditarCarritoServicio = () => {
                   Archivos de Referencia
                 </label>
                 <p className="text-sm text-slate-500 mb-3">
-                  {archivosAdjuntos.length > 0 
+                  {archivosAdjuntos.length > 0
                     ? `Tienes ${archivosAdjuntos.length} archivo(s) adjunto(s)`
                     : "Sube imágenes, logos o documentos de referencia para tu proyecto."
                   }
                 </p>
-                
+
                 {archivosAdjuntos.length > 0 && (
                   <div className="space-y-3 mb-4">
                     <h3 className="font-semibold text-slate-700">Archivos adjuntos:</h3>
@@ -348,7 +376,7 @@ export const EditarCarritoServicio = () => {
                     </div>
                   </div>
                 )}
-                
+
                 <label className="flex flex-col items-center justify-center w-full px-4 py-4 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors">
                   <Upload className="w-6 h-6 text-slate-400 mb-2" />
                   <span className="text-sm text-slate-600">
@@ -447,15 +475,14 @@ export const EditarCarritoServicio = () => {
                   >
                     Cancelar
                   </button>
-                  
+
                   <button
                     type="submit"
                     disabled={isSubmitting || !descripcion.trim() || (tipoServicio === 'POR_TAMANO' && !tamano)}
-                    className={`flex-1 text-white py-3 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl ${
-                      isSubmitting || !descripcion.trim() || (tipoServicio === 'POR_TAMANO' && !tamano)
-                        ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed" 
-                        : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                    }`}
+                    className={`flex-1 text-white py-3 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl ${isSubmitting || !descripcion.trim() || (tipoServicio === 'POR_TAMANO' && !tamano)
+                      ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed"
+                      : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                      }`}
                   >
                     {isSubmitting ? (
                       <>
@@ -477,7 +504,7 @@ export const EditarCarritoServicio = () => {
       </div>
 
       {imagenAmpliada && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
           onClick={cerrarImagenAmpliada}
         >

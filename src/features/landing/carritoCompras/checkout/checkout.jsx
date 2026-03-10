@@ -169,10 +169,22 @@ export const Checkout = () => {
       console.log('📦 Enviando pedido:', payload);
 
       // ✅ ENVIAR AL BACKEND
+      const formData = new FormData();
+
+      formData.append("pedido", JSON.stringify(payload));
+
+      // Adjuntar archivos de los items
+      cart.forEach(item => {
+        if (item.customization?.archivosAdjuntosOriginales) {
+          item.customization.archivosAdjuntosOriginales.forEach(file => {
+            formData.append("archivos", file);
+          });
+        }
+      });
+
       const res = await fetch("http://localhost:3000/api/pedidos-clientes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: formData
       });
 
       if (!res.ok) {
@@ -635,17 +647,15 @@ export const Checkout = () => {
 
             {/* Opción 1: QR */}
             <div
-              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                metodoPago === "qr" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-              }`}
+              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "qr" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+                }`}
               onClick={() => setMetodoPago("qr")}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                      metodoPago === "qr" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                    }`}
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "qr" ? "border-blue-500 bg-blue-500" : "border-gray-300"
+                      }`}
                   >
                     {metodoPago === "qr" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                   </div>
@@ -678,16 +688,14 @@ export const Checkout = () => {
 
             {/* Opción 2: Transferencia */}
             <div
-              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                metodoPago === "transferencia" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-              }`}
+              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+                }`}
               onClick={() => setMetodoPago("transferencia")}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                    metodoPago === "transferencia" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                  }`}
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-500" : "border-gray-300"
+                    }`}
                 >
                   {metodoPago === "transferencia" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                 </div>
@@ -718,16 +726,14 @@ export const Checkout = () => {
 
             {/* Opción 3: Contra entrega */}
             <div
-              className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                metodoPago === "entrega" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-              }`}
+              className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "entrega" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+                }`}
               onClick={() => setMetodoPago("entrega")}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                    metodoPago === "entrega" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                  }`}
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "entrega" ? "border-blue-500 bg-blue-500" : "border-gray-300"
+                    }`}
                 >
                   {metodoPago === "entrega" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                 </div>
@@ -746,9 +752,8 @@ export const Checkout = () => {
                         placeholder="Nombre completo *"
                         value={datosEntrega.nombreRecibe}
                         onChange={(e) => setDatosEntrega({ ...datosEntrega, nombreRecibe: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${
-                          erroresEntrega.nombreRecibe ? "border-red-500" : "border-gray-300"
-                        }`}
+                        className={`w-full p-3 rounded-lg border ${erroresEntrega.nombreRecibe ? "border-red-500" : "border-gray-300"
+                          }`}
                       />
                       {erroresEntrega.nombreRecibe && (
                         <p className="text-red-500 text-sm mt-1">{erroresEntrega.nombreRecibe}</p>
@@ -760,9 +765,8 @@ export const Checkout = () => {
                         placeholder="Teléfono *"
                         value={datosEntrega.telefono}
                         onChange={(e) => setDatosEntrega({ ...datosEntrega, telefono: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${
-                          erroresEntrega.telefono ? "border-red-500" : "border-gray-300"
-                        }`}
+                        className={`w-full p-3 rounded-lg border ${erroresEntrega.telefono ? "border-red-500" : "border-gray-300"
+                          }`}
                       />
                       {erroresEntrega.telefono && (
                         <p className="text-red-500 text-sm mt-1">{erroresEntrega.telefono}</p>
@@ -773,9 +777,8 @@ export const Checkout = () => {
                         placeholder="Dirección completa *"
                         value={datosEntrega.direccion}
                         onChange={(e) => setDatosEntrega({ ...datosEntrega, direccion: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${
-                          erroresEntrega.direccion ? "border-red-500" : "border-gray-300"
-                        }`}
+                        className={`w-full p-3 rounded-lg border ${erroresEntrega.direccion ? "border-red-500" : "border-gray-300"
+                          }`}
                         rows="2"
                       />
                       {erroresEntrega.direccion && (
@@ -792,11 +795,10 @@ export const Checkout = () => {
           <button
             onClick={enviarPedido}
             disabled={loading || cart.length === 0}
-            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${
-              loading || cart.length === 0
+            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${loading || cart.length === 0
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-black hover:bg-gray-800 hover:shadow-xl"
-            }`}
+              }`}
           >
             {loading ? (
               <div className="flex items-center justify-center gap-2">

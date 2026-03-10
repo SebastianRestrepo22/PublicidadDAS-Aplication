@@ -20,6 +20,7 @@ import colorRoutes from "./routes/color.routes.js";
 import clientRouter from './routes/cliente.routes.js';
 import servicioTamanosRoutes from './routes/servicioTamanos.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
+import uploadTempRoutes from './routes/uploadTemporal.js'; 
 
 // Rutas de autenticación y usuarios
 import authRouter from './routes/authRoutes.js';
@@ -58,6 +59,7 @@ app.use('/servicio', servicioRouter);
 app.use('/api/servicio', servicioTamanosRoutes);
 app.use("/colores", colorRoutes);
 app.use('/tipos-documento', tipoDocumentoRoutes);
+app.use('/api', uploadTempRoutes); 
 
 // Rutas de negocio
 app.use('/api/categorias', categoriaRoutes);
