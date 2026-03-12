@@ -1,6 +1,6 @@
 // controllers/servicios.controller.js
 import { v4 as uuidv4 } from 'uuid';
-import { buscarServicioDB, createService, deleteDataService, findDuplicateName, getDataAllServcios, getDataServiceById, nombreServiceExiste, updateDataServicio } from '../models/services.model.js';
+import { buscarServicioDB, createService, deleteDataService, findDuplicateName, getServiciosPaginated, getDataServiceById, nombreServiceExiste, updateDataServicio } from '../models/services.model.js';
 import { dbPool } from '../lib/db.js';
 
 // Crear producto
@@ -70,13 +70,73 @@ export const postService = async (req, res) => {
 
 // Obtener todos los productos
 export const getAllService = async (req, res) => {
-    try {
-        const rows = await getDataAllServcios();
-        res.status(200).json(rows);
-    } catch (error) {
-        console.error('Error al obtener los servicios:', error);
-        res.status(500).json({ message: 'Error interno del servidor' });
+  try {
+    const { estado, page = 1, limit = 10, filtroCampo, filtroValor } = req.query;
+
+    // Validar y convertir parámetros
+    const currentPage = Math.max(1, parseInt(page) || 1);
+    const itemsPerPage = Math.max(1, parseInt(limit) || 10);
+
+    const result = await getServiciosPaginated({
+      page: currentPage,
+      limit: itemsPerPage,
+      filtroCampo: filtroCampo || null,
+      filtroValor: filtroValor || null,
+      estado: estado || null
+    });
+
+    // Validación defensiva
+    const data = result && result.data && Array.isArray(result.data) ? result.data : [];
+    const totalItems = result?.totalItems || 0;
+    const totalPages = result?.totalPages || Math.ceil(totalItems / itemsPerPage) || 1;
+
+    // Si no hay datos y la página > 1, volver a página 1
+    if (data.length === 0 && currentPage > 1 && totalItems > 0) {
+      const fallback = await getServiciosPaginated({
+        page: 1,
+        limit: itemsPerPage,
+        filtroCampo: filtroCampo || null,
+        filtroValor: filtroValor || null,
+        estado: estado || null
+      });
+      
+      const fallbackData = fallback && fallback.data && Array.isArray(fallback.data) ? fallback.data : [];
+      const fallbackTotal = fallback?.totalItems || 0;
+      const fallbackPages = fallback?.totalPages || Math.ceil(fallbackTotal / itemsPerPage) || 1;
+      
+      return res.status(200).json({
+        data: fallbackData,
+        pagination: {
+          totalItems: fallbackTotal,
+          totalPages: fallbackPages,
+          currentPage: 1,
+          itemsPerPage: itemsPerPage
+        }
+      });
     }
+
+    res.status(200).json({
+      data: data,
+      pagination: {
+        totalItems: totalItems,
+        totalPages: totalPages,
+        currentPage: currentPage,
+        itemsPerPage: itemsPerPage
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en getAllService:', error);
+    res.status(200).json({
+      data: [],
+      pagination: {
+        totalItems: 0,
+        totalPages: 1,
+        currentPage: 1,
+        itemsPerPage: parseInt(req.query.limit) || 10
+      }
+    });
+  }
 };
 
 // Obtener producto por ID
@@ -192,55 +252,61 @@ export const validarNombre = async (req, res) => {
 };
 
 export const buscarService = async (req, res) => {
-    const { campo, valor } = req.query;
+  const { campo, valor, page = 1, limit = 10, estado } = req.query;
 
-    const columnasPermitidas = {
-        nombre: 'Nombre',
-        descripcion: 'Descripcion',
-        precio: 'Precio',
-        descuento: 'Descuento',
-        categoria: 'CategoriaId',
-        estado: 'Estado'
-    };
+  const columnasPermitidas = {
+    nombre: 'nombre',
+    descripcion: 'descripcion',
+    precio: 'precio',
+    descuento: 'descuento',
+    categoria: 'categoria',
+    tipo: 'tipo'
+  };
 
-    const columna = columnasPermitidas[campo?.toLowerCase()];
-    if (!columna) {
-        return res.status(400).json({ message: 'Campo de búsqueda inválido' });
-    }
+  const filtroCampo = columnasPermitidas[campo?.toLowerCase()];
+  
+  if (campo && !filtroCampo) {
+    return res.status(400).json({ message: 'Campo de búsqueda inválido' });
+  }
 
-    if (valor === undefined || valor === '') {
-        return res.status(400).json({ message: 'Valor de búsqueda requerido' });
-    }
+  try {
+    const currentPage = Math.max(1, parseInt(page) || 1);
+    const itemsPerPage = Math.max(1, parseInt(limit) || 10);
 
-    try {
-        const camposExactos = ['Precio', 'Descuento', 'CategoriaId', 'Estado'];
-        const operador = camposExactos.includes(columna) ? '=' : 'LIKE';
+    const result = await getServiciosPaginated({
+      page: currentPage,
+      limit: itemsPerPage,
+      filtroCampo: filtroCampo || null,
+      filtroValor: valor || null,
+      estado: estado || null
+    });
 
-        let valorFinal = valor;
+    const data = result && result.data && Array.isArray(result.data) ? result.data : [];
+    const totalItems = result?.totalItems || 0;
+    const totalPages = result?.totalPages || Math.ceil(totalItems / itemsPerPage) || 1;
 
-        if (['Precio', 'Descuento'].includes(columna)) {
-            valorFinal = Number(valor);
-            if (Number.isNaN(valorFinal)) {
-                return res.status(400).json({ message: `${columna} debe ser numérico` });
-            }
-        }
+    res.status(200).json({
+      data: data,
+      pagination: {
+        totalItems: totalItems,
+        totalPages: totalPages,
+        currentPage: currentPage,
+        itemsPerPage: itemsPerPage
+      }
+    });
 
-        if (columna === 'Estado') {
-            const estadosValidos = ['Activo', 'Inactivo'];
-            if (!estadosValidos.includes(valor)) {
-                return res.status(400).json({ message: 'Estado inválido' });
-            }
-        }
-
-        const parametro = operador === '=' ? valorFinal : `%${valor}%`;
-
-        const servicios = await buscarServicioDB({ columna, operador, parametro });
-
-        res.status(200).json({ results: servicios });
-    } catch (error) {
-        console.error('Error al buscar servicios:', error);
-        res.status(500).json({ message: 'Error interno del servidor' });
-    }
+  } catch (error) {
+    console.error('Error en buscarService:', error);
+    res.status(200).json({
+      data: [],
+      pagination: {
+        totalItems: 0,
+        totalPages: 1,
+        currentPage: 1,
+        itemsPerPage: parseInt(limit) || 10
+      }
+    });
+  }
 };
 
 // Cambiar estado del servicio (toggle)
