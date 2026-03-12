@@ -1,194 +1,127 @@
 import { Link } from "react-router-dom";
 import { Search, Plus, Edit, Eye, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import axios from "axios";
 import Modal from "../components/modals/modal";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { Pagination } from "../components/paginacion/pagination.jsx"; 
+import { useCategorias } from "./hook/useCategorias.js"; 
 
 export const Categorias = () => {
-  const [categorias, setCategorias] = useState([]);
-  const [selectedCategoria, setSelectedCategoria] = useState(null);
-  const [campoFiltro, setCampoFiltro] = useState("");
-  const [busqueda, setBusqueda] = useState("");
-  const [errorNombre, setErrorNombre] = useState("");
-  const [errorDescripcion, setErrorDescripcion] = useState("");
-  const [loading, setLoading] = useState(false);
+  const {
+    paginatedData,
+    currentPage,
+    itemsPerPage,
+    totalItems,
+    totalPages,
+    formData,
+    editData,
+    filtroCampo,
+    filtroValor,
+    
+    // Estados de error
+    submitted,
+    nombreError,
+    descripcionError,
+    nombreDuplicado,
+    verificandoNombre,
+    originalNombre,
+    
+    setCurrentPage,
+    setItemsPerPage,
+    setFormData,
+    setEditData,
+    setFiltroCampo,
+    setFiltroValor,
+    setSubmitted,
+    setNombreError,
+    setDescripcionError,
+    setOriginalNombre,
+    
+    cargarCategorias,
+    handleSubmit,
+    handleDelete,
+    verificarNombreDuplicado,
+    resetFormErrors,
+    resetForm
+  } = useCategorias();
 
   const [openCreate, setOpenCreate] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
   const [openVer, setOpenVer] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
 
-  const [formCrear, setFormCrear] = useState({
-    nombreCategoria: "",
-    descripcion: "",
-  });
-
-  const [formEditar, setFormEditar] = useState({
-    nombreCategoria: "",
-    descripcion: "",
-  });
-
-  useEffect(() => {
-    fetchCategorias();
-  }, []);
-
-  const fetchCategorias = async () => {
-    try {
-      const { data } = await axios.get("http://localhost:3000/api/categorias");
-      setCategorias(data);
-    } catch (err) {
-      console.error("Error al cargar categorias:", err);
-      toast.error("Error al cargar las categorías. Verifica que el servidor esté corriendo.");
-    }
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
   };
 
-  const resetCreateForm = () => {
-    setFormCrear({ nombreCategoria: "", descripcion: "" });
-    setErrorNombre("");
-    setErrorDescripcion("");
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
   };
 
-  const validarFormularioCategoria = (form) => {
-    const errores = {};
-
-    if (!form.nombreCategoria || !form.nombreCategoria.trim()) {
-      errores.nombreCategoria = "El nombre de la categoría es obligatorio";
-    } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(form.nombreCategoria.trim())) {
-      errores.nombreCategoria = "El nombre solo puede contener letras y espacios";
-    }
-
-    if (!form.descripcion || !form.descripcion.trim()) {
-      errores.descripcion = "La descripción es obligatoria";
-    } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s.,-]+$/.test(form.descripcion.trim())) {
-      errores.descripcion = "La descripción solo puede contener letras y signos básicos";
-    }
-
-    return errores;
+  const openCreateModal = () => {
+    resetForm();
+    setOpenCreate(true);
   };
 
-  const handleCreate = async () => {
-    setLoading(true);
-    const errores = validarFormularioCategoria(formCrear);
-    if (Object.keys(errores).length > 0) {
-      if (errores.nombreCategoria) setErrorNombre(errores.nombreCategoria);
-      if (errores.descripcion) setErrorDescripcion(errores.descripcion);
-      toast.error("Por favor corrige los errores del formulario");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      console.log("📤 Enviando datos:", formCrear);
-      const response = await axios.post("http://localhost:3000/api/categorias", formCrear);
-      console.log("✅ Respuesta del servidor:", response.data);
-      toast.success("Categoría creada con éxito");
-      fetchCategorias();
-      setOpenCreate(false);
-      resetCreateForm();
-    } catch (error) {
-      console.error("❌ Error al crear:", error);
-      console.error("❌ Detalles del error:", error.response?.data);
-      const errorMsg = error.response?.data?.message || error.response?.data?.error || "Error al crear la categoría. Verifica el servidor.";
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdate = async () => {
-    if (!selectedCategoria?.CategoriaId) {
-      toast.error("No hay categoría seleccionada");
-      return;
-    }
-
-    setLoading(true);
-    const errores = validarFormularioCategoria(formEditar);
-    if (Object.keys(errores).length > 0) {
-      if (errores.nombreCategoria) setErrorNombre(errores.nombreCategoria);
-      if (errores.descripcion) setErrorDescripcion(errores.descripcion);
-      toast.error("Por favor corrige los errores del formulario");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      console.log(" Actualizando categoría ID:", selectedCategoria.CategoriaId);
-      await axios.put(
-        `http://localhost:3000/api/categorias/${selectedCategoria.CategoriaId}`,
-        formEditar
-      );
-      toast.success("Categoría actualizada con éxito");
-      fetchCategorias();
-      setOpenEditar(false);
-    } catch (error) {
-      console.error(" Error al actualizar:", error);
-      const errorMsg = error.response?.data?.message || error.response?.data?.error || "Error al actualizar la categoría";
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!selectedCategoria?.CategoriaId) {
-      toast.error("No hay categoría seleccionada para eliminar");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      console.log(" Eliminando categoría ID:", selectedCategoria.CategoriaId);
-      await axios.delete(
-        `http://localhost:3000/api/categorias/${selectedCategoria.CategoriaId}`
-      );
-      toast.success("Categoría eliminada con éxito");
-      setOpenEliminar(false);
-      setSelectedCategoria(null);
-      fetchCategorias();
-    } catch (err) {
-      console.error(" Error al eliminar categoria:", err);
-      console.error(" Detalles:", err.response?.data);
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || "Error al eliminar la categoría. Puede estar en uso.";
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const openEditarModal = (c) => {
-    setSelectedCategoria(c);
-    setFormEditar({
-      nombreCategoria: c.Nombre,
-      descripcion: c.Descripcion,
+  const openEditarModal = (categoria) => {
+    setEditData(categoria);
+    setFormData({
+      nombreCategoria: categoria.Nombre,
+      descripcion: categoria.Descripcion
     });
-    setErrorNombre("");
-    setErrorDescripcion("");
+    setOriginalNombre(categoria.Nombre);
+    setNombreDuplicado(false);
     setOpenEditar(true);
   };
 
-  const openVerModal = (c) => {
-    setSelectedCategoria(c);
+  const openVerModal = (categoria) => {
+    setEditData(categoria);
     setOpenVer(true);
   };
 
-  const openEliminarModal = (c) => {
-    setSelectedCategoria(c);
+  const openEliminarModal = (categoria) => {
+    setEditData(categoria);
     setOpenEliminar(true);
   };
 
-  const categoriasFiltradas = categorias.filter((c) => {
+  const handleCloseModal = () => {
+    setOpenCreate(false);
+    setOpenEditar(false);
+    setOpenVer(false);
+    setOpenEliminar(false);
+    resetForm();
+  };
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const success = await handleSubmit(e);
+    if (success) {
+      handleCloseModal();
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!editData?.CategoriaId) return;
+    setLoading(true);
+    const success = await handleDelete(editData.CategoriaId);
+    if (success) {
+      setOpenEliminar(false);
+    }
+    setLoading(false);
+  };
+
+  // Filtrar localmente solo para la UI (el backend ya filtra, esto es solo para visualización)
+  const categoriasFiltradas = paginatedData.filter((c) => {
     if (!busqueda) return true;
-    if (campoFiltro === "id") {
-      return c.CategoriaId.toString().includes(busqueda);
-    }
-    if (campoFiltro === "nombre") {
-      return c.Nombre.toLowerCase().includes(busqueda.toLowerCase());
-    }
     return (
-      c.CategoriaId.toString().includes(busqueda) ||
-      c.Nombre.toLowerCase().includes(busqueda.toLowerCase())
+      c.Nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+      c.Descripcion.toLowerCase().includes(busqueda.toLowerCase())
     );
   });
 
@@ -204,10 +137,7 @@ export const Categorias = () => {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-4 sm:mb-6">
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center">
               <button
-                onClick={() => {
-                  resetCreateForm();
-                  setOpenCreate(true);
-                }}
+                onClick={openCreateModal}
                 className="inline-flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 sm:px-6 sm:py-3 rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap text-sm sm:text-base"
               >
                 <Plus size={18} /> Nueva categoria
@@ -226,14 +156,28 @@ export const Categorias = () => {
 
               <div className="flex gap-2 items-center">
                 <select
-                  value={campoFiltro}
-                  onChange={(e) => setCampoFiltro(e.target.value)}
+                  value={filtroCampo}
+                  onChange={(e) => {
+                    setFiltroCampo(e.target.value);
+                    if (!e.target.value) setFiltroValor("");
+                  }}
                   className="border border-slate-300 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px] text-sm sm:text-base"
                 >
                   <option value="">Filtrar por campo</option>
-                  <option value="id">Categoria ID</option>
+                  <option value="id">ID</option>
                   <option value="nombre">Nombre</option>
+                  <option value="descripcion">Descripción</option>
                 </select>
+                
+                {filtroCampo && (
+                  <input
+                    type="text"
+                    placeholder={`Buscar por ${filtroCampo}...`}
+                    value={filtroValor}
+                    onChange={(e) => setFiltroValor(e.target.value)}
+                    className="border border-slate-300 rounded-lg px-3 py-2.5 sm:py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px] text-sm sm:text-base"
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -266,7 +210,7 @@ export const Categorias = () => {
                         className="hover:bg-slate-50 transition-colors duration-150"
                       >
                         <td className="py-4 px-4 sm:px-6 text-sm font-medium text-slate-900 align-top">
-                          {c.CategoriaId?.toString().substring(0, 3)}
+                          {c.CategoriaId?.toString().substring(0, 3)}...
                         </td>
                         <td className="py-4 px-4 sm:px-6 text-sm font-medium text-slate-900 align-top">
                           {c.Nombre}
@@ -311,39 +255,62 @@ export const Categorias = () => {
                 </tbody>
               </table>
             </div>
+
+            {totalItems > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                itemsPerPage={itemsPerPage}
+                totalItems={totalItems}
+                onItemsPerPageChange={handleItemsPerPageChange}
+              />
+            )}
           </div>
 
           {/* Modal Crear */}
-          <Modal open={openCreate} onClose={() => setOpenCreate(false)}>
+          <Modal open={openCreate} onClose={handleCloseModal}>
             <div className="w-full max-w-5xl p-6 mx-auto">
               <h3 className="text-xl font-bold text-gray-800 mb-6 text-center">
                 Nueva categoría
               </h3>
-              <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+              <form className="space-y-4" onSubmit={handleFormSubmit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
                       Nombre categoría <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="Ingrese el nombre de la categoría"
-                      value={formCrear.nombreCategoria}
-                      className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      onChange={(e) => {
-                        const valor = e.target.value;
-                        setFormCrear({ ...formCrear, nombreCategoria: valor });
-                        if (!valor.trim()) {
-                          setErrorNombre("El nombre es obligatorio");
-                        } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]*$/.test(valor)) {
-                          setErrorNombre("El nombre solo puede contener letras y espacios");
-                        } else {
-                          setErrorNombre("");
-                        }
-                      }}
-                    />
-                    {errorNombre && (
-                      <p className="text-red-500 text-xs mt-1">{errorNombre}</p>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Ingrese el nombre de la categoría"
+                        value={formData.nombreCategoria}
+                        className={`w-full h-11 px-4 border ${
+                          nombreDuplicado || nombreError ? 'border-red-500' : 'border-gray-300'
+                        } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        onChange={async (e) => {
+                          const valor = e.target.value;
+                          setFormData({ ...formData, nombreCategoria: valor });
+                          
+                          // Verificar nombre duplicado en tiempo real
+                          if (valor.trim().length >= 2) {
+                            await verificarNombreDuplicado(valor);
+                          } else {
+                            setNombreDuplicado(false);
+                          }
+                        }}
+                      />
+                      {verificandoNombre && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        </div>
+                      )}
+                    </div>
+                    {nombreError && (
+                      <p className="text-red-500 text-xs mt-1">{nombreError}</p>
+                    )}
+                    {nombreDuplicado && !nombreError && (
+                      <p className="text-red-500 text-xs mt-1">⚠️ Ya existe una categoría con este nombre</p>
                     )}
                   </div>
                   <div className="space-y-2">
@@ -352,41 +319,34 @@ export const Categorias = () => {
                     </label>
                     <textarea
                       placeholder="Ingrese la descripción"
-                      value={formCrear.descripcion}
+                      value={formData.descripcion}
                       rows={3}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      className={`w-full px-4 py-2 border ${
+                        descripcionError ? 'border-red-500' : 'border-gray-300'
+                      } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
                       onChange={(e) => {
-                        const valor = e.target.value;
-                        setFormCrear({ ...formCrear, descripcion: valor });
-                        if (!valor.trim()) {
-                          setErrorDescripcion("La descripción es obligatoria");
-                        } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s.,-]*$/.test(valor)) {
-                          setErrorDescripcion("La descripción solo puede contener letras y signos básicos");
-                        } else {
-                          setErrorDescripcion("");
+                        setFormData({ ...formData, descripcion: e.target.value });
+                        if (e.target.value.trim()) {
+                          setDescripcionError("");
                         }
                       }}
                     />
-                    {errorDescripcion && (
-                      <p className="text-red-500 text-xs mt-1">{errorDescripcion}</p>
+                    {descripcionError && (
+                      <p className="text-red-500 text-xs mt-1">{descripcionError}</p>
                     )}
                   </div>
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button
-                    type="button"
-                    onClick={handleCreate}
-                    disabled={loading}
+                    type="submit"
+                    disabled={loading || nombreDuplicado || verificandoNombre}
                     className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? "Creando..." : "Crear"}
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setOpenCreate(false);
-                      resetCreateForm();
-                    }}
+                    onClick={handleCloseModal}
                     disabled={loading}
                     className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors font-medium disabled:opacity-50"
                   >
@@ -398,39 +358,48 @@ export const Categorias = () => {
           </Modal>
 
           {/* Modal Editar */}
-          <Modal open={openEditar} onClose={() => setOpenEditar(false)}>
+          <Modal open={openEditar} onClose={handleCloseModal}>
             <div className="w-full max-w-5xl p-6 mx-auto">
               <h3 className="text-xl font-bold text-gray-800 mb-6 text-center">
                 Editar categoría
               </h3>
-              <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+              <form className="space-y-4" onSubmit={handleFormSubmit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
                       Nombre categoría <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="Ingrese el nombre de la categoría"
-                      value={formEditar.nombreCategoria}
-                      className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      onChange={(e) => {
-                        const valor = e.target.value;
-                        setFormEditar({
-                          ...formEditar,
-                          nombreCategoria: valor,
-                        });
-                        if (!valor.trim()) {
-                          setErrorNombre("El nombre es obligatorio");
-                        } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]*$/.test(valor)) {
-                          setErrorNombre("El nombre solo puede contener letras y espacios");
-                        } else {
-                          setErrorNombre("");
-                        }
-                      }}
-                    />
-                    {errorNombre && (
-                      <p className="text-red-500 text-xs mt-1">{errorNombre}</p>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Ingrese el nombre de la categoría"
+                        value={formData.nombreCategoria}
+                        className={`w-full h-11 px-4 border ${
+                          nombreDuplicado || nombreError ? 'border-red-500' : 'border-gray-300'
+                        } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        onChange={async (e) => {
+                          const valor = e.target.value;
+                          setFormData({ ...formData, nombreCategoria: valor });
+                          
+                          // Verificar nombre duplicado en tiempo real (excluyendo la actual)
+                          if (valor.trim().length >= 2 && editData?.CategoriaId) {
+                            await verificarNombreDuplicado(valor, editData.CategoriaId);
+                          } else {
+                            setNombreDuplicado(false);
+                          }
+                        }}
+                      />
+                      {verificandoNombre && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        </div>
+                      )}
+                    </div>
+                    {nombreError && (
+                      <p className="text-red-500 text-xs mt-1">{nombreError}</p>
+                    )}
+                    {nombreDuplicado && !nombreError && (
+                      <p className="text-red-500 text-xs mt-1">⚠️ Ya existe otra categoría con este nombre</p>
                     )}
                   </div>
                   <div className="space-y-2">
@@ -439,37 +408,34 @@ export const Categorias = () => {
                     </label>
                     <textarea
                       placeholder="Ingrese la descripción"
-                      value={formEditar.descripcion}
+                      value={formData.descripcion}
                       rows={3}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                      onChange={(e) =>
-                        setFormEditar({
-                          ...formEditar,
-                          descripcion: e.target.value,
-                        })
-                      }
+                      className={`w-full px-4 py-2 border ${
+                        descripcionError ? 'border-red-500' : 'border-gray-300'
+                      } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
+                      onChange={(e) => {
+                        setFormData({ ...formData, descripcion: e.target.value });
+                        if (e.target.value.trim()) {
+                          setDescripcionError("");
+                        }
+                      }}
                     />
-                    {errorDescripcion && (
-                      <p className="text-red-500 text-xs mt-1">{errorDescripcion}</p>
+                    {descripcionError && (
+                      <p className="text-red-500 text-xs mt-1">{descripcionError}</p>
                     )}
                   </div>
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button
-                    type="button"
-                    onClick={handleUpdate}
-                    disabled={loading}
+                    type="submit"
+                    disabled={loading || nombreDuplicado || verificandoNombre}
                     className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? "Guardando..." : "Guardar cambios"}
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setOpenEditar(false);
-                      setErrorNombre("");
-                      setErrorDescripcion("");
-                    }}
+                    onClick={handleCloseModal}
                     disabled={loading}
                     className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors font-medium disabled:opacity-50"
                   >
@@ -481,31 +447,31 @@ export const Categorias = () => {
           </Modal>
 
           {/* Modal Ver */}
-          <Modal open={openVer} onClose={() => setOpenVer(false)}>
+          <Modal open={openVer} onClose={handleCloseModal}>
             <div className="w-full max-w-2xl p-6 mx-auto">
               <h3 className="text-xl font-bold text-gray-800 mb-6 text-center">
                 Ver categoría
               </h3>
-              {selectedCategoria && (
+              {editData && (
                 <div className="text-left bg-gray-50 p-6 rounded-lg">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <p className="text-sm font-medium text-gray-500">ID</p>
-                      <p className="text-gray-800 font-mono text-lg">{selectedCategoria.CategoriaId}</p>
+                      <p className="text-gray-800 font-mono text-lg">{editData.CategoriaId}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-500">Nombre</p>
-                      <p className="text-gray-800 text-lg font-semibold">{selectedCategoria.Nombre}</p>
+                      <p className="text-gray-800 text-lg font-semibold">{editData.Nombre}</p>
                     </div>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500 mb-2">Descripción</p>
-                    <p className="text-gray-800 bg-white p-4 rounded-lg border">{selectedCategoria.Descripcion || "Sin descripción"}</p>
+                    <p className="text-gray-800 bg-white p-4 rounded-lg border">{editData.Descripcion || "Sin descripción"}</p>
                   </div>
                 </div>
               )}
               <button
-                onClick={() => setOpenVer(false)}
+                onClick={handleCloseModal}
                 className="mt-6 w-full bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors font-medium"
               >
                 Cerrar
@@ -514,7 +480,7 @@ export const Categorias = () => {
           </Modal>
 
           {/* Modal Eliminar */}
-          <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>
+          <Modal open={openEliminar} onClose={handleCloseModal}>
             <div className="w-full max-w-2xl p-6 mx-auto text-center">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trash2 size={32} className="text-red-600" />
@@ -523,11 +489,11 @@ export const Categorias = () => {
                 ¿Eliminar categoría?
               </h3>
               <p className="text-gray-600 mb-6">
-                Esta acción no se puede deshacer. La categoría será eliminada permanentemente del sistema.
+                Esta acción no se puede deshacer. La categoría <span className="font-semibold">{editData?.Nombre}</span> será eliminada permanentemente del sistema.
               </p>
               <div className="flex gap-3">
                 <button
-                  onClick={handleDelete}
+                  onClick={handleDeleteConfirm}
                   disabled={loading}
                   className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -535,10 +501,7 @@ export const Categorias = () => {
                 </button>
                 <button
                   className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors font-medium disabled:opacity-50"
-                  onClick={() => {
-                    setOpenEliminar(false);
-                    setSelectedCategoria(null);
-                  }}
+                  onClick={handleCloseModal}
                   disabled={loading}
                 >
                   Cancelar

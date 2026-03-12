@@ -11,126 +11,71 @@ export const usePaginacion = (mode, externalData = null, setExternalData = null)
     const [filtroCampo, setFiltroCampo] = useState('');
     const [filtroValor, setFiltroValor] = useState('');
     const [filtroEstado, setFiltroEstado] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
     // Usar datos externos si se proporcionan
     const dataToUse = externalData !== null ? externalData : allData;
     const setDataToUse = setExternalData || setAllData;
 
-    const paginateData = (data) => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        return data.slice(startIndex, endIndex);
-    };
-
-    // Efecto para cargar datos iniciales
+    // Efecto para cargar datos con paginación backend
     useEffect(() => {
-        const cargarservicio = async () => {
+        const cargarServicios = async () => {
             if (mode !== "list") return;
 
+            setIsLoading(true);
             try {
-                let resultados;
+                let resultado;
+
+                // Determinar si usar búsqueda o listado normal
                 if (filtroCampo && filtroValor) {
-                    const res = await buscarservicios(filtroCampo, filtroValor);
-                    resultados = Array.isArray(res) ? res : [];
+                    resultado = await buscarservicios(
+                        filtroCampo, 
+                        filtroValor, 
+                        currentPage, 
+                        itemsPerPage, 
+                        filtroEstado || null
+                    );
                 } else {
-                    const todos = await GetDataservicios();
-                    resultados = Array.isArray(todos?.data) ? todos.data : [];
+                    resultado = await GetDataservicios(
+                        filtroEstado === 'Activo', 
+                        currentPage, 
+                        itemsPerPage
+                    );
                 }
 
-                // Aplicar filtro de estado
-                if (filtroEstado) {
-                    resultados = resultados.filter(s => s.Estado === filtroEstado);
+                // Extraer datos y paginación
+                const data = resultado?.data && Array.isArray(resultado.data) ? resultado.data : [];
+                const pagination = resultado?.pagination || {};
+
+                console.log('Datos cargados:', data);
+                console.log('Paginación:', pagination);
+
+                // Actualizar estados
+                setDataToUse(data);
+                setPaginatedData(data);
+                setTotalItems(pagination.totalItems || 0);
+                setTotalPages(pagination.totalPages || 1);
+
+                // Ajustar página si es necesario
+                if (currentPage > (pagination.totalPages || 1) && (pagination.totalPages || 0) > 0) {
+                    setCurrentPage(pagination.totalPages);
                 }
 
-                setDataToUse(resultados);
-
-                // Manejar caso sin resultados
-                if (resultados.length === 0) {
-                    setPaginatedData([]);
-                    setTotalItems(0);
-                    setTotalPages(1);
-                    setCurrentPage(1); // Resetear a página 1
-                } else {
-                    setTotalItems(resultados.length);
-                    const totalPages = Math.ceil(resultados.length / itemsPerPage);
-                    setTotalPages(totalPages);
-
-                    if (currentPage > totalPages) {
-                        setCurrentPage(totalPages);
-                    } else {
-                        setPaginatedData(paginateData(resultados));
-                    }
-                }
             } catch (error) {
-                console.error(error);
-                // En caso de error, limpiar todo
-                setPaginatedData([]);
+                console.error("Error cargando servicios:", error);
                 setDataToUse([]);
+                setPaginatedData([]);
                 setTotalItems(0);
                 setTotalPages(1);
-                setCurrentPage(1);
+            } finally {
+                setIsLoading(false);
             }
         };
 
-        cargarservicio();
-    }, [filtroCampo, filtroValor, filtroEstado, mode]); // Removemos dependencias innecesarias
+        cargarServicios();
+    }, [currentPage, itemsPerPage, filtroCampo, filtroValor, filtroEstado, mode]);
 
-
-    // Efecto para actualizar paginación cuando cambian los datos o la página
-    useEffect(() => {
-        if (mode === "list") {
-            // Aplicar filtro de estado si existe
-            let datosFiltrados = dataToUse;
-
-            if (filtroEstado) {
-                datosFiltrados = dataToUse.filter(s => s.Estado === filtroEstado);
-            }
-
-            // Calcular total de páginas incluso cuando no hay datos
-            const totalItemsCount = datosFiltrados.length;
-            setTotalItems(totalItemsCount);
-
-            const nuevasPaginas = totalItemsCount > 0
-                ? Math.ceil(totalItemsCount / itemsPerPage)
-                : 1;
-
-            setTotalPages(nuevasPaginas);
-
-            // Ajustar página actual si es necesario
-            if (totalItemsCount === 0) {
-                // Si no hay datos, resetear a página 1
-                setCurrentPage(1);
-                setPaginatedData([]);
-            } else {
-                // Ajustar si la página actual es mayor que el total de páginas
-                if (currentPage > nuevasPaginas) {
-                    setCurrentPage(nuevasPaginas);
-                } else {
-                    // Calcular datos paginados normalmente
-                    const paginated = paginateData(datosFiltrados);
-                    setPaginatedData(paginated);
-                }
-            }
-        }
-    }, [dataToUse, itemsPerPage, currentPage, mode, filtroEstado]);
-
-    // fecto para manejar cambios de página
-    useEffect(() => {
-        if (mode === "list" && dataToUse.length > 0) {
-            // Aplicar filtros
-            let datosFiltrados = dataToUse;
-            if (filtroEstado) {
-                datosFiltrados = dataToUse.filter(s => s.Estado === filtroEstado);
-            }
-
-            if (datosFiltrados.length > 0) {
-                const paginated = paginateData(datosFiltrados);
-                setPaginatedData(paginated);
-            }
-        }
-    }, [currentPage, dataToUse, filtroEstado, itemsPerPage, mode]);
-
-    // Efecto para resetear página cuando cambian los filtros
+    // Resetear página cuando cambian los filtros
     useEffect(() => {
         if (filtroCampo && filtroValor) {
             setCurrentPage(1);
@@ -164,6 +109,7 @@ export const usePaginacion = (mode, externalData = null, setExternalData = null)
         setFiltroValor,
         filtroEstado,
         setFiltroEstado,
+        isLoading,
         handlePageChange,
         handleItemsPerPageChange
     };

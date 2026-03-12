@@ -455,3 +455,78 @@ export const getClientById = async (id, roleId) => {
 
   return rows[0];
 };
+
+/**
+ * Obtener usuarios con paginación y filtros
+ */
+export const getUsuariosPaginated = async ({ 
+  page = 1, 
+  limit = 10, 
+  filtroCampo = null, 
+  filtroValor = null,
+  excluirRoleId = null
+}) => {
+  const offset = (page - 1) * limit;
+  let whereConditions = ['1=1'];
+  let params = [];
+
+  // Excluir rol cliente si se especifica
+  if (excluirRoleId) {
+    whereConditions.push('u.RoleId != ?');
+    params.push(excluirRoleId);
+  }
+
+  // Mapeo de campos del frontend a columnas reales
+  const columnasMap = {
+    cedula: 'u.CedulaId',
+    nombre: 'u.NombreCompleto',
+    correo: 'u.CorreoElectronico',
+    telefono: 'u.Telefono',
+    direccion: 'u.Direccion',
+    rol: 'r.Nombre',
+    tipoDocumento: 'td.Nombre'
+  };
+
+  if (filtroCampo && filtroValor && columnasMap[filtroCampo]) {
+    whereConditions.push(`${columnasMap[filtroCampo]} LIKE ?`);
+    params.push(`%${filtroValor}%`);
+  }
+
+  const whereClause = whereConditions.length > 1 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+  // Consulta principal con JOINs y paginación
+  const [rows] = await dbPool.query(`
+    SELECT 
+      u.CedulaId,
+      u.TipoDocumentoId,
+      td.Nombre AS TipoDocumentoNombre,
+      u.NombreCompleto,
+      u.Telefono,
+      u.CorreoElectronico,
+      u.Direccion,
+      u.RoleId,
+      u.IsSystem,
+      r.Nombre AS RolNombre
+    FROM usuarios u
+    JOIN roles r ON u.RoleId = r.RoleId
+    JOIN TipoDocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
+    ${whereClause}
+    ORDER BY u.NombreCompleto ASC
+    LIMIT ? OFFSET ?
+  `, [...params, limit, offset]);
+
+  // Consulta de conteo para totalPages
+  const [countResult] = await dbPool.query(`
+    SELECT COUNT(*) as total 
+    FROM usuarios u
+    JOIN roles r ON u.RoleId = r.RoleId
+    ${whereClause}
+  `, params);
+
+  return {
+    data: rows,
+    totalItems: countResult[0]?.total || 0,
+    currentPage: Number(page),
+    itemsPerPage: Number(limit)
+  };
+};

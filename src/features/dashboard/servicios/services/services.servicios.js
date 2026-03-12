@@ -3,16 +3,45 @@ import axios from "axios"
 const url = 'http://localhost:3000/'
 
 // Listar todos los datos
-export const GetDataservicios = async () => {
-    try {
-        const response = await axios.get(url + 'servicio')
-        console.log("GetDataservicios response:", response)
-        return response
-    } catch (error) {
-        console.error("Error en GetDataservicios:", error)
-        return { status: false, message: "No esta la api : ", error }
+export const GetDataservicios = async (soloActivos = false, page = 1, limit = 10, filtroCampo = null, filtroValor = null) => {
+  try {
+    const params = {
+      page: page.toString(),
+      limit: limit.toString()
+    };
+    
+    if (soloActivos) {
+      params.estado = 'Activo';
     }
-}
+    
+    if (filtroCampo && filtroValor) {
+      params.filtroCampo = filtroCampo;
+      params.filtroValor = filtroValor;
+    }
+    
+    const response = await axios.get(`${url}servicio`, { params });
+    
+    const responseData = response.data;
+    const data = responseData?.data && Array.isArray(responseData.data) ? responseData.data : [];
+    const pagination = responseData?.pagination || { 
+      totalItems: 0, 
+      totalPages: 1, 
+      currentPage: page, 
+      itemsPerPage: limit 
+    };
+    
+    return {
+      data: data,
+      pagination: pagination
+    };
+  } catch (error) {
+    console.error("Error en GetDataservicios:", error);
+    return { 
+      data: [], 
+      pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } 
+    };
+  }
+};
 
 // Crear servicio
 export const postDataservicios = async (data) => {
@@ -68,20 +97,40 @@ export const cambiarEstadoServicio = async (id, nuevoEstado) => {
 }
 
 // Buscar servicios
-export const buscarservicios = async (campo, valor) => {
-    try {
-        console.log("buscarservicios - campo:", campo, "valor:", valor)
-        const response = await axios.get(
-            `${url}servicio/buscar`,
-            { params: { campo, valor } }
-        );
-        console.log("buscarservicios - respuesta:", response)
-        return response.data.results;
-    } catch (error) {
-        console.error("Error en buscarservicios:", error)
-        return [];
-    }
-}
+export const buscarservicios = async (campo, valor, page = 1, limit = 10, estado = null) => {
+  try {
+    const params = {
+      campo,
+      valor,
+      page: page.toString(),
+      limit: limit.toString()
+    };
+    
+    if (estado) params.estado = estado;
+    
+    const response = await axios.get(`${url}servicio/buscar`, { params });
+    
+    const responseData = response.data;
+    const data = responseData?.data && Array.isArray(responseData.data) ? responseData.data : [];
+    const pagination = responseData?.pagination || { 
+      totalItems: 0, 
+      totalPages: 1, 
+      currentPage: page, 
+      itemsPerPage: limit 
+    };
+    
+    return {
+      data: data,
+      pagination: pagination
+    };
+  } catch (error) {
+    console.error("Error al buscar servicios:", error);
+    return { 
+      data: [], 
+      pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } 
+    };
+  }
+};
 
 // ==============================================
 // FUNCIONES PARA TAMAÑOS 

@@ -4,7 +4,8 @@ import Modal from "../../components/modals/modal";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
-  getAllProveedores,
+  getProveedoresPaginated,
+  buscarProveedores,
   createProveedor,
   updateProveedor,
   deleteProveedor,
@@ -34,7 +35,6 @@ export const Proveedores = () => {
   const [openEliminar, setOpenEliminar] = useState(false);
 
   // Estados para PAGINACIÓN
-  const [allData, setAllData] = useState([]);
   const [paginatedData, setPaginatedData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
@@ -57,59 +57,49 @@ export const Proveedores = () => {
     estado: 1,
   });
 
-  // Obtener proveedores
+  // Función para obtener proveedores con paginación
   const fetchProveedores = async () => {
     try {
-      const data = await getAllProveedores();
-      setProveedores(Array.isArray(data) ? data : []);
+      let resultado;
       
-      // Inicializar estados
+      // Si hay filtros activos, usa búsqueda paginada
+      if (campoFiltro && busqueda.trim()) {
+        resultado = await buscarProveedores(campoFiltro, busqueda, currentPage, itemsPerPage);
+      } else {
+        // Si no hay filtros, usa paginación normal
+        resultado = await getProveedoresPaginated(currentPage, itemsPerPage);
+      }
+      
+      const { data, pagination } = resultado;
+      setPaginatedData(data);
+      setProveedores(data); // Para mantener compatibilidad con otras funciones
+      setTotalItems(pagination.totalItems);
+      setTotalPages(pagination.totalPages);
+      
+      // Inicializar estados de los checkboxes
       const estados = {};
       data.forEach((p) => {
-        const val = Number(p.Estado) === 1 ? 1 : 0;
-        estados[p.ProveedorId] = val;
+        estados[p.ProveedorId] = Number(p.Estado);
       });
       setEstadoActivo(estados);
+      
     } catch (error) {
       console.error("Error al obtener proveedores:", error);
       toast.error("Error al obtener proveedores");
+      setPaginatedData([]);
+      setProveedores([]);
     }
   };
 
+  // Efecto para resetear a página 1 cuando cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [campoFiltro, busqueda]);
+
+  // Efecto principal para cargar datos
   useEffect(() => {
     fetchProveedores();
-  }, []);
-
-  // Efecto para filtrar y preparar datos para paginación
-  useEffect(() => {
-    let filtered = proveedores;
-    if (campoFiltro && busqueda.trim()) {
-      filtered = proveedores.filter((p) => {
-        const valor = String(p[campoFiltro] || "").toLowerCase();
-        return valor.includes(busqueda.toLowerCase());
-      });
-    }
-    setAllData(filtered);
-    setTotalItems(filtered.length);
-    setCurrentPage(1);
-  }, [busqueda, campoFiltro, proveedores]);
-
-  // Efecto para paginar
-  useEffect(() => {
-    if (allData.length > 0) {
-      const totalPagesCalc = Math.ceil(allData.length / itemsPerPage);
-      setTotalPages(totalPagesCalc > 0 ? totalPagesCalc : 1);
-      if (currentPage > totalPagesCalc && totalPagesCalc > 0) {
-        setCurrentPage(totalPagesCalc);
-      }
-      const startIndex = (currentPage - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      setPaginatedData(allData.slice(startIndex, endIndex));
-    } else {
-      setPaginatedData([]);
-      setTotalPages(1);
-    }
-  }, [itemsPerPage, currentPage, allData]);
+  }, [currentPage, itemsPerPage, campoFiltro, busqueda]);
 
   // Resetear formulario de creación
   const resetCreateForm = () => {
@@ -206,7 +196,7 @@ export const Proveedores = () => {
       toast.success(" Proveedor creado exitosamente");
       setOpenCreate(false);
       resetCreateForm();
-      fetchProveedores();
+      await fetchProveedores(); // Recargar con paginación
     } catch (err) {
       console.error("Error al crear proveedor:", err);
       if (err.response && err.response.status === 400) {
@@ -246,7 +236,7 @@ export const Proveedores = () => {
 
       await updateProveedor(selectedProveedor.ProveedorId, proveedorData);
       toast.success(" Proveedor actualizado correctamente");
-      fetchProveedores();
+      await fetchProveedores(); // Recargar con paginación
       setOpenEditar(false);
       setSelectedProveedor(null);
     } catch (error) {
@@ -265,9 +255,9 @@ export const Proveedores = () => {
     try {
       await deleteProveedor(selectedProveedor.ProveedorId);
       toast.success(" Proveedor eliminado correctamente");
+      await fetchProveedores(); // Recargar con paginación
       setOpenEliminar(false);
       setSelectedProveedor(null);
-      fetchProveedores();
     } catch (err) {
       console.error("Error al eliminar proveedor:", err);
       toast.error(err.response?.data?.error || err.message || "Error al eliminar el proveedor");
@@ -304,12 +294,21 @@ export const Proveedores = () => {
         estado: nuevoEstadoNum
       });
 
+      // Actualizar estado local
       setEstadoActivo((prev) => ({ ...prev, [idProveedor]: nuevoEstadoNum }));
       setProveedores((prev) =>
         prev.map((p) =>
           p.ProveedorId === idProveedor ? { ...p, Estado: nuevoEstadoNum } : p
         )
       );
+      
+      // También actualizar en paginatedData
+      setPaginatedData((prev) =>
+        prev.map((p) =>
+          p.ProveedorId === idProveedor ? { ...p, Estado: nuevoEstadoNum } : p
+        )
+      );
+      
       toast.success(" Estado actualizado correctamente");
     } catch (error) {
       toast.error("Error al actualizar estado: " + (error.message || error));
@@ -365,9 +364,11 @@ export const Proveedores = () => {
                 >
                   <option value="">Filtrar por campo</option>
                   <option value="ProveedorId">ID</option>
-                  <option value="NombreProveedor">Nombre</option>
-                  <option value="Correo">Correo</option>
-                  <option value="Direccion">Dirección</option>
+                  <option value="nombre">Nombre</option>
+                  <option value="telefono">Teléfono</option>
+                  <option value="correo">Correo</option>
+                  <option value="direccion">Dirección</option>
+                  <option value="estado">Estado</option>
                 </select>
               </div>
             </div>
@@ -467,7 +468,7 @@ export const Proveedores = () => {
                   ) : (
                     <tr>
                       <td colSpan={6} className="py-4 sm:py-6 text-center text-gray-500 text-sm sm:text-base">
-                        {proveedores.length === 0 ? "No hay proveedores registrados" : "No se encontraron resultados"}
+                        No se encontraron proveedores
                       </td>
                     </tr>
                   )}
@@ -476,7 +477,7 @@ export const Proveedores = () => {
             </div>
 
             {/* PAGINACIÓN */}
-            {paginatedData.length > 0 && (
+            {totalItems > 0 && (
               <div className="px-6 py-4 border-t border-slate-200">
                 <Pagination
                   currentPage={currentPage}
@@ -622,36 +623,86 @@ export const Proveedores = () => {
                   <input
                     placeholder="Nombre del proveedor"
                     value={formEditar.nombreProveedor}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) => setFormEditar({ ...formEditar, nombreProveedor: e.target.value })}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errorNombre ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      setFormEditar({ ...formEditar, nombreProveedor: valor });
+                      setErrorNombre(validarNombre(valor));
+                    }}
+                    onBlur={(e) => {
+                      setErrorNombre(validarNombre(e.target.value));
+                    }}
                   />
+                  {errorNombre && (
+                    <span className="text-red-500 text-xs mt-1">{errorNombre}</span>
+                  )}
                 </div>
                 <div className="flex flex-col">
                   <label className="mb-1 text-sm font-medium text-gray-700">Teléfono *</label>
                   <input
                     placeholder="Ej: 3001234567"
                     value={formEditar.telefono}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) => setFormEditar({ ...formEditar, telefono: e.target.value.replace(/\D/g, "") })}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errorTelefono ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                    onChange={(e) => {
+                      const valor = e.target.value.replace(/\D/g, "");
+                      setFormEditar({ ...formEditar, telefono: valor });
+                      setErrorTelefono(validarTelefono(valor));
+                    }}
+                    onBlur={(e) => {
+                      setErrorTelefono(validarTelefono(e.target.value));
+                    }}
                     maxLength={10}
                   />
+                  {errorTelefono && (
+                    <span className="text-red-500 text-xs mt-1">{errorTelefono}</span>
+                  )}
                 </div>
                 <div className="flex flex-col">
                   <label className="mb-1 text-sm font-medium text-gray-700">Correo electrónico *</label>
                   <input
                     type="email"
+                    placeholder="proveedor@ejemplo.com"
                     value={formEditar.correo}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) => setFormEditar({ ...formEditar, correo: e.target.value })}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errorCorreo ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      setFormEditar({ ...formEditar, correo: valor });
+                      setErrorCorreo(validarCorreo(valor));
+                    }}
+                    onBlur={(e) => {
+                      setErrorCorreo(validarCorreo(e.target.value));
+                    }}
                   />
+                  {errorCorreo && (
+                    <span className="text-red-500 text-xs mt-1">{errorCorreo}</span>
+                  )}
                 </div>
                 <div className="flex flex-col">
                   <label className="mb-1 text-sm font-medium text-gray-700">Dirección *</label>
                   <input
+                    placeholder="Ingrese dirección completa"
                     value={formEditar.direccion}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) => setFormEditar({ ...formEditar, direccion: e.target.value })}
+                    className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errorDireccion ? "border-red-500" : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      setFormEditar({ ...formEditar, direccion: valor });
+                      setErrorDireccion(validarDireccion(valor));
+                    }}
+                    onBlur={(e) => {
+                      setErrorDireccion(validarDireccion(e.target.value));
+                    }}
                   />
+                  {errorDireccion && (
+                    <span className="text-red-500 text-xs mt-1">{errorDireccion}</span>
+                  )}
                 </div>
                 <div className="flex gap-3 mt-4">
                   <button
@@ -701,8 +752,12 @@ export const Proveedores = () => {
                   </p>
                   <p>
                     <strong>Estado:</strong> 
-                    <span className={`ml-2 px-2 py-1 rounded text-xs ${selectedProveedor.Estado ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {selectedProveedor.Estado ? 'Activo' : 'Inactivo'}
+                    <span className={`ml-2 px-2 py-1 rounded text-xs ${
+                      Number(selectedProveedor.Estado) === 1 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {Number(selectedProveedor.Estado) === 1 ? 'Activo' : 'Inactivo'}
                     </span>
                   </p>
                 </div>
