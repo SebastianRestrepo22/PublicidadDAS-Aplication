@@ -1,10 +1,11 @@
+// hooks/useServicios.js - Modificado
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import axios from "axios";
 import {
     deleteDataservicio,
-    GetDataservicios,
     postDataservicios,
     updateDataservicios,
     cambiarEstadoServicio,
@@ -13,7 +14,7 @@ import {
     updateTamanosServicio
 } from "../services/services.servicios.js";
 
-export const useServicios = (mode, id) => {
+export const useServicios = (mode, id, onRefrescarLista) => { // Recibe callback
     const navigate = useNavigate();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [values, setValues] = useState({
@@ -34,14 +35,6 @@ export const useServicios = (mode, id) => {
     const [editData, setEditData] = useState(null);
     const [openEliminar, setOpenEliminar] = useState(false);
     const [allData, setAllData] = useState([]);
-    // 🔥 Necesitamos saber la página actual para recargar
-    const [currentPagination, setCurrentPagination] = useState({
-        page: 1,
-        itemsPerPage: 5,
-        filtroEstado: '',
-        filtroCampo: '',
-        filtroValor: ''
-    });
 
     // Cargar datos para ver/editar
     useEffect(() => {
@@ -92,61 +85,6 @@ export const useServicios = (mode, id) => {
             cargarServicioCompleto();
         }
     }, [mode, id]);
-
-    // Cargar datos iniciales para la lista
-    useEffect(() => {
-        if (mode === "list") {
-            const cargarDatos = async () => {
-                try {
-                    const todos = await GetDataservicios(
-                        currentPagination.filtroEstado === 'Activo',
-                        currentPagination.page,
-                        currentPagination.itemsPerPage,
-                        currentPagination.filtroCampo,
-                        currentPagination.filtroValor
-                    );
-                    if (todos?.data) {
-                        setAllData(todos.data);
-                    }
-                } catch (error) {
-                    console.error("Error cargando datos:", error);
-                }
-            };
-            cargarDatos();
-        }
-    }, [mode, currentPagination]);
-
-    // 🔥 Función para refrescar los datos manteniendo la paginación actual
-    const refrescarDatos = async () => {
-        if (mode !== "list") return;
-        
-        try {
-            const resultado = await GetDataservicios(
-                currentPagination.filtroEstado === 'Activo',
-                currentPagination.page,
-                currentPagination.itemsPerPage,
-                currentPagination.filtroCampo,
-                currentPagination.filtroValor
-            );
-            
-            if (resultado?.data) {
-                setAllData(resultado.data);
-            }
-        } catch (error) {
-            console.error("Error refrescando datos:", error);
-        }
-    };
-
-    // 🔥 Función para actualizar la paginación (la llamará el componente padre)
-    const actualizarPaginacion = (pagina, itemsPorPagina, filtroEstado, filtroCampo, filtroValor) => {
-        setCurrentPagination({
-            page: pagina,
-            itemsPerPage: itemsPorPagina,
-            filtroEstado: filtroEstado || '',
-            filtroCampo: filtroCampo || '',
-            filtroValor: filtroValor || ''
-        });
-    };
 
     const goToBackToList = () => {
         navigate("/dashboard/servicio");
@@ -237,7 +175,7 @@ export const useServicios = (mode, id) => {
         setIsSubmitting(false);
     };
 
-    // 🔥 HANDLE TOGGLE ESTADO - Ahora refresca datos
+    // 🔥 HANDLE TOGGLE ESTADO - Ahora refresca la lista
     const handleToggleEstado = async (servicioId, nuevoEstado) => {
         try {
             const response = await cambiarEstadoServicio(servicioId, nuevoEstado);
@@ -245,10 +183,12 @@ export const useServicios = (mode, id) => {
             if (response.status === 200) {
                 toast.success(`Servicio ${nuevoEstado === 'Activo' ? 'activado' : 'desactivado'} correctamente`);
                 
-                // Refrescar datos manteniendo la paginación actual
-                await refrescarDatos();
+                // 🔥 Refrescar la lista si estamos en modo lista
+                if (mode === "list" && onRefrescarLista) {
+                    await onRefrescarLista();
+                }
                 
-                // Si estamos en modo vista/edición, actualizar editData
+                // Actualizar editData si estamos en vista/edición
                 if (editData && editData.ServicioId === servicioId) {
                     setEditData(prev => ({ ...prev, Estado: nuevoEstado }));
                 }
@@ -367,7 +307,12 @@ export const useServicios = (mode, id) => {
                     }
 
                     toast.success("Servicio actualizado correctamente");
-                    await refrescarDatos(); // 🔥 Refrescar antes de volver
+                    
+                    // 🔥 Refrescar la lista ANTES de volver
+                    if (onRefrescarLista) {
+                        await onRefrescarLista();
+                    }
+                    
                     goToBackToList();
                 } else {
                     toast.error("Error al actualizar el servicio");
@@ -394,7 +339,11 @@ export const useServicios = (mode, id) => {
                         }
                     }
 
-                    await refrescarDatos(); // 🔥 Refrescar antes de volver
+                    // 🔥 Refrescar la lista ANTES de volver
+                    if (onRefrescarLista) {
+                        await onRefrescarLista();
+                    }
+                    
                     goToBackToList();
                 } else {
                     toast.error("Error al crear el servicio");
@@ -402,14 +351,7 @@ export const useServicios = (mode, id) => {
             }
         } catch (error) {
             console.error("Error al procesar la solicitud:", error);
-
-            if (error.response) {
-                toast.error(error.response.data?.message || `Error ${error.response.status}`);
-            } else if (error.request) {
-                toast.error("No se pudo conectar con el servidor");
-            } else {
-                toast.error("Error al procesar la solicitud");
-            }
+            toast.error(error.response?.data?.message || "Error al procesar la solicitud");
         } finally {
             setIsSubmitting(false);
         }
@@ -422,7 +364,10 @@ export const useServicios = (mode, id) => {
             if (response.status === 200 || response.status === 201) {
                 toast.success(response.data.message);
                 
-                await refrescarDatos(); // 🔥 Refrescar después de eliminar
+                // 🔥 Refrescar la lista después de eliminar
+                if (mode === "list" && onRefrescarLista) {
+                    await onRefrescarLista();
+                }
                 
                 if (mode !== "list") {
                     goToBackToList();
@@ -435,14 +380,7 @@ export const useServicios = (mode, id) => {
             }
         } catch (error) {
             console.error("Error al eliminar servicio:", error);
-
-            if (error.response?.status === 400) {
-                toast.error(error.response.data?.message || "No se puede eliminar el servicio porque tiene ventas asociadas");
-            } else if (error.response?.data?.message) {
-                toast.error(error.response.data.message);
-            } else {
-                toast.error("Error al eliminar el servicio");
-            }
+            toast.error(error.response?.data?.message || "Error al eliminar el servicio");
         }
     };
 
@@ -452,22 +390,15 @@ export const useServicios = (mode, id) => {
     };
 
     return {
-        values,
-        setValues,
-        tamanos,
-        setTamanos,
-        estadoEdit,
-        setEstadoEdit,
-        submitted,
-        setSubmitted,
+        values, setValues,
+        tamanos, setTamanos,
+        estadoEdit, setEstadoEdit,
+        submitted, setSubmitted,
         nombreError,
-        editData,
-        setEditData,
-        openEliminar,
-        setOpenEliminar,
+        editData, setEditData,
+        openEliminar, setOpenEliminar,
         isSubmitting,
-        allData,
-        setAllData,
+        allData, setAllData,
         handleChanges,
         handleNombreBlur,
         handleToggleEstado,
@@ -478,8 +409,6 @@ export const useServicios = (mode, id) => {
         goToCreate,
         goToView,
         goToEdit,
-        resetForm,
-        actualizarPaginacion, 
-        refrescarDatos
+        resetForm
     };
 };

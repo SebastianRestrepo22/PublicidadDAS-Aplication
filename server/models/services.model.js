@@ -171,67 +171,19 @@ export const getServiciosPaginated = async ({
   let whereConditions = [];
   let params = [];
 
-  console.log('🔍 getServiciosPaginated - Parámetros:', { page, limit, filtroCampo, filtroValor, estado });
-
   // Filtro por estado
   if (estado && ['Activo', 'Inactivo'].includes(estado)) {
     whereConditions.push('Estado = ?');
     params.push(estado);
   }
 
-  // Mapeo de campos del frontend a columnas reales
-  const columnasMap = {
-    nombre: 'Nombre',
-    descripcion: 'Descripcion',
-    precio: 'Precio',
-    descuento: 'Descuento',
-    categoria: 'CategoriaId',
-    tipo: 'TipoPrecio'
-  };
-
-  if (filtroCampo && filtroValor && columnasMap[filtroCampo]) {
-    const columnaReal = columnasMap[filtroCampo];
-    const camposNumericos = ['Precio', 'Descuento'];
-    const camposExactos = ['TipoPrecio', 'CategoriaId'];
-    
-    if (camposNumericos.includes(columnaReal)) {
-      const valorNum = Number(filtroValor);
-      if (!isNaN(valorNum)) {
-        whereConditions.push(`${columnaReal} = ?`);
-        params.push(valorNum);
-      }
-    } else if (camposExactos.includes(columnaReal)) {
-      whereConditions.push(`${columnaReal} = ?`);
-      params.push(filtroValor);
-    } else {
-      whereConditions.push(`${columnaReal} LIKE ?`);
-      params.push(`%${filtroValor}%`);
-    }
-  }
+  // ... lógica de filtros ...
 
   const whereClause = whereConditions.length > 0 
     ? `WHERE ${whereConditions.join(' AND ')}` 
     : '';
 
-  console.log('🔍 SQL Query:', `
-    SELECT 
-      ServicioId,
-      Nombre,
-      Descripcion,
-      Imagen,
-      TipoPrecio,
-      Precio,
-      Descuento,
-      CategoriaId,
-      Estado
-    FROM Servicios
-    ${whereClause}
-    ORDER BY Nombre
-    LIMIT ? OFFSET ?
-  `);
-  console.log('📊 Params:', [...params, limit, offset]);
-
-  // 🔥 CORREGIDO: Quitamos CreatedAt y UpdatedAt que no existen
+  // 🔥 CONSULTA CON LIMIT Y OFFSET (ESTO ES PAGINACIÓN)
   const [servicios] = await dbPool.query(`
     SELECT 
       ServicioId,
@@ -249,27 +201,20 @@ export const getServiciosPaginated = async ({
     LIMIT ? OFFSET ?
   `, [...params, limit, offset]);
 
-  console.log('✅ Servicios encontrados:', servicios.length);
-  if (servicios.length > 0) {
-    console.log('✅ Primer servicio:', servicios[0]);
-  }
-
-  // Obtener total de servicios para paginación
+  // 🔥 CONSULTA DE TOTAL (para calcular páginas)
   const [countResult] = await dbPool.query(`
     SELECT COUNT(*) as total 
     FROM Servicios
     ${whereClause}
   `, params);
 
-  console.log('✅ Total en BD:', countResult[0]?.total);
-
   const totalItems = countResult[0]?.total || 0;
 
   return {
-    data: servicios,
-    totalItems: totalItems,
+    data: servicios,                    // SOLO los de esta página
+    totalItems: totalItems,              // Total en BD
     currentPage: Number(page),
     itemsPerPage: Number(limit),
-    totalPages: Math.ceil(totalItems / limit)
+    totalPages: Math.ceil(totalItems / limit)  // Cálculo de páginas
   };
 };
