@@ -65,25 +65,50 @@ export const ProductosDashboard = () => {
   const [filtroCampo, setFiltroCampo] = useState('');
   const [filtroValor, setFiltroValor] = useState('');
 
-  function Toggle({ checked = false, onChange, disabled = false }) {
-    return (
-      <button
-        type="button"
-        onClick={() => !disabled && onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${disabled
-          ? 'bg-gray-200 cursor-not-allowed'
-          : checked
-            ? 'bg-green-500'
-            : 'bg-gray-300'
-          }`}
-        disabled={disabled}
-      >
-        <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${checked ? 'translate-x-6' : 'translate-x-1'}`}
-        />
-      </button>
-    );
+  const cargarProducto = async () => {
+  if (mode !== "list") return;
+
+  try {
+    let resultado;
+
+    console.log('Cargando productos - Filtros:', {
+      filtroCampo,
+      filtroValor,
+      filtroEstado,
+      currentPage,
+      itemsPerPage
+    });
+
+    if (filtroCampo && filtroValor) {
+      resultado = await buscarProductos(filtroCampo, filtroValor, currentPage, itemsPerPage, filtroEstado || null);
+    } else {
+      resultado = await GetDataproductos(filtroEstado === 'Activo', currentPage, itemsPerPage);
+    }
+
+    console.log('Resultado de la API:', resultado);
+
+    const data = resultado?.data && Array.isArray(resultado.data) ? resultado.data : [];
+    const pagination = resultado?.pagination || {};
+
+    console.log('Datos procesados:', data);
+    console.log('Paginación:', pagination);
+
+    setAllData(data);
+    setPaginatedData(data);
+    setTotalItems(pagination.totalItems || 0);
+    setTotalPages(pagination.totalPages || 1);
+
+    if (currentPage > (pagination.totalPages || 1) && (pagination.totalPages || 0) > 0) {
+      setCurrentPage(pagination.totalPages);
+    }
+  } catch (error) {
+    console.error("Error cargando productos:", error);
+    setAllData([]);
+    setPaginatedData([]);
+    setTotalItems(0);
+    setTotalPages(1);
   }
+};
 
   useEffect(() => {
     const fetchCategoria = async () => {
@@ -129,77 +154,15 @@ export const ProductosDashboard = () => {
     }
   }, [categoriaBusqueda, categorias]);
 
-  const paginateData = (data) => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
-
   useEffect(() => {
-    const cargarProducto = async () => {
-      if (mode !== "list") return;
-
-      try {
-        let resultados;
-        if (filtroCampo && filtroValor) {
-          const res = await buscarProductos(filtroCampo, filtroValor);
-          resultados = Array.isArray(res) ? res : [];
-        } else {
-          const todos = await GetDataproductos(false); // false para traer todos
-          resultados = Array.isArray(todos?.data) ? todos.data : [];
-        }
-
-        // Aplicar filtro de estado si existe
-        if (filtroEstado) {
-          resultados = resultados.filter(p => p.Estado === filtroEstado);
-        }
-
-        setAllData(Array.isArray(resultados) ? resultados : []);
-        setTotalItems(Array.isArray(resultados) ? resultados.length : 0);
-        const totalPages = Math.ceil(resultados.length / itemsPerPage);
-        setTotalPages(totalPages > 0 ? totalPages : 1);
-
-        if (currentPage > totalPages && totalPages > 0) {
-          setCurrentPage(totalPages);
-        }
-
-        const paginatedData = paginateData(Array.isArray(resultados) ? resultados : []);
-        setPaginatedData(paginatedData);
-      } catch (error) {
-        console.error(error);
-        setPaginatedData([]);
-        setAllData([]);
-        setTotalItems(0);
-        setTotalPages(1);
-      }
-    };
     cargarProducto();
-  }, [filtroCampo, filtroValor, filtroEstado, currentPage, itemsPerPage, mode]);
+  }, [currentPage, itemsPerPage, filtroCampo, filtroValor, filtroEstado, mode]);
 
   useEffect(() => {
     if (filtroCampo && filtroValor) {
       setCurrentPage(1);
     }
   }, [filtroCampo, filtroValor]);
-
-useEffect(() => {
-  if (allData.length > 0 && mode === "list") {
-    const totalPages = Math.ceil(allData.length / itemsPerPage);
-    setTotalPages(totalPages > 0 ? totalPages : 1);
-
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(totalPages);
-    }
-
-    const paginatedData = paginateData(allData);
-    setPaginatedData(paginatedData);
-  } else if (mode === "list") {
-    // Si no hay datos, limpiar la tabla
-    setPaginatedData([]);
-    setTotalPages(1);
-    setCurrentPage(1);
-  }
-}, [itemsPerPage, currentPage, allData, mode]);
 
   useEffect(() => {
     if (mode === "view" || mode === "edit") {
@@ -358,17 +321,10 @@ useEffect(() => {
       if (response.status === 200) {
         toast.success(`Producto ${nuevoEstado === 'Activo' ? 'activado' : 'desactivado'} correctamente`);
 
-        // Actualizar la lista localmente
-        setAllData(prevData =>
-          prevData.map(producto =>
-            producto.ProductoId === productoId
-              ? { ...producto, Estado: nuevoEstado }
-              : producto
-          )
-        );
+        //  recargar con paginación backend
+        await cargarProducto();
 
       } else if (response.status === 400 && response.data?.message) {
-        // Mostrar mensaje específico del backend
         toast.error(response.data.message);
       } else {
         toast.error("No se pudo cambiar el estado");
@@ -434,12 +390,12 @@ useEffect(() => {
     const currentUsaColores = parseInt(currentValues.UsaColores);
 
     console.log('========================================');
-  console.log('🚀 DEBUG - handleSubmit:');
-  console.log('values.UsaColores (string):', values.UsaColores);
-  console.log('currentUsaColores (number):', currentUsaColores);
-  console.log('values.Stock:', values.Stock);
-  console.log('coloresConStock:', coloresConStock);
-  console.log('========================================');
+    console.log('🚀 DEBUG - handleSubmit:');
+    console.log('values.UsaColores (string):', values.UsaColores);
+    console.log('currentUsaColores (number):', currentUsaColores);
+    console.log('values.Stock:', values.Stock);
+    console.log('coloresConStock:', coloresConStock);
+    console.log('========================================');
 
     // Si usa colores, debe tener al menos un color asignado
     if (currentUsaColores === 1 && coloresConStock.length === 0) {
@@ -510,40 +466,44 @@ useEffect(() => {
 
     try {
       if (mode === "edit" && editData) {
-    const response = await updateDataproductos(editData.ProductoId, datosParaEnviar);
-    if (response.status === 200) {
-      // Si UsaColores = 0, eliminar TODOS los colores del producto
-      if (currentUsaColores === 0) {
-        try {
-          // Eliminar colores de la BD - pasar array vacío o null
-          await updateColoresProducto(editData.ProductoId, []);
-        } catch (error) {
-          console.error('Error eliminando colores:', error);
-          // No detener el flujo, solo loggear
+        const response = await updateDataproductos(editData.ProductoId, datosParaEnviar);
+        if (response.status === 200) {
+          if (currentUsaColores === 0) {
+            try {
+              await updateColoresProducto(editData.ProductoId, []);
+            } catch (error) {
+              console.error('Error eliminando colores:', error);
+            }
+          } else if (currentUsaColores === 1 && coloresConStock.length > 0) {
+            await updateColoresProducto(editData.ProductoId, coloresConStock);
+          }
+
+          toast.success("Producto actualizado correctamente");
+
+          setCurrentPage(1);
+          await cargarProducto();
+
+          goToBackToList();
         }
-      } 
-      // Si UsaColores = 1, actualizar colores
-      else if (currentUsaColores === 1 && coloresConStock.length > 0) {
-        await updateColoresProducto(editData.ProductoId, coloresConStock);
-      }
-      
-      toast.success("Producto actualizado correctamente");
-      goToBackToList();
-    }
-  } else if (mode === "create") {
-    const response = await postDataproductos(datosParaEnviar);
-    if (response.status === 201) {
-      const nuevoProductoId = response.data.ProductoId;
+      } else if (mode === "create") {
+        const response = await postDataproductos(datosParaEnviar);
+        if (response.status === 201) {
+          const nuevoProductoId = response.data.ProductoId;
 
-      // Solo guardar colores si UsaColores = 1
-      if (currentUsaColores === 1 && coloresConStock.length > 0) {
-        await updateColoresProducto(nuevoProductoId, coloresConStock);
-      }
+          // Solo guardar colores si UsaColores = 1
+          if (currentUsaColores === 1 && coloresConStock.length > 0) {
+            await updateColoresProducto(nuevoProductoId, coloresConStock);
+          }
 
-      toast.success("Producto creado correctamente");
-      goToBackToList();
-    }
-  }
+          toast.success("Producto creado correctamente");
+
+          setCurrentPage(1);        // Volver a página 1 para mostrar el nuevo producto
+          await cargarProducto();   // Recargar lista con paginación backend
+
+          goToBackToList();         // Navegar al listado
+        }
+
+      }
     } catch (error) {
       console.error("Error al procesar la solicitud:", error);
 
@@ -565,72 +525,37 @@ useEffect(() => {
     }
   };
 
-// En ProductosDashboard.jsx, reemplaza la función handleDelete completa:
+  // En ProductosDashboard.jsx, reemplaza la función handleDelete completa:
 
-const handleDelete = async (id) => {
-  try {
-    const response = await deleteDataproducto(id);
+  const handleDelete = async (id) => {
+    try {
+      const response = await deleteDataproducto(id);
 
-    if (response.status === 200 || response.status === 201) {
-      toast.success(response.data.message);
-      
-      // 🔥 CORRECCIÓN: Actualizar la lista después de eliminar
-      const todos = await GetDataproductos(false); // false para traer todos
-      const nuevosDatos = Array.isArray(todos?.data) ? todos.data : [];
-      
-      // Aplicar filtros actuales
-      let datosFiltrados = [...nuevosDatos];
-      
-      // Aplicar filtro de estado si existe
-      if (filtroEstado) {
-        datosFiltrados = datosFiltrados.filter(p => p.Estado === filtroEstado);
+      if (response.status === 200 || response.status === 201) {
+        toast.success(response.data.message);
+
+        // 🔥 ÚNICA LÍNEA NECESARIA: recargar con paginación backend
+        await cargarProducto();
+
+        setOpenEliminar(false);
+      } else {
+        toast.error(response.data?.message || "No se pudo eliminar el producto");
       }
-      
-      // Aplicar filtro de búsqueda si existe
-      if (filtroCampo && filtroValor) {
-        // Aquí deberías aplicar el filtro específico según el campo
-        // Por simplicidad, filtramos por nombre
-        datosFiltrados = datosFiltrados.filter(p => 
-          p.Nombre?.toLowerCase().includes(filtroValor.toLowerCase())
-        );
+    } catch (error) {
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else if (error.response?.status === 404) {
+        toast.error("Producto no encontrado");
+      } else {
+        toast.error("Error al eliminar el producto");
       }
-      
-      setAllData(datosFiltrados);
-      setTotalItems(datosFiltrados.length);
-      
-      // Calcular nuevas páginas
-      const nuevasPaginas = Math.ceil(datosFiltrados.length / itemsPerPage);
-      setTotalPages(nuevasPaginas > 0 ? nuevasPaginas : 1);
-      
-      // Si la página actual es mayor que el total de páginas, ajustar
-      if (currentPage > nuevasPaginas && nuevasPaginas > 0) {
-        setCurrentPage(nuevasPaginas);
-      } else if (datosFiltrados.length === 0) {
-        // Si no hay datos, resetear a página 1
-        setCurrentPage(1);
+
+      // No cerrar modal si hubo error
+      if (error.response?.status === 200 || error.response?.status === 201) {
+        setOpenEliminar(false);
       }
-      
-      // Forzar actualización de la tabla
-      setPaginatedData(prev => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        return datosFiltrados.slice(startIndex, endIndex);
-      });
-      
-      setOpenEliminar(false);
-    } else {
-      toast.error(response.data?.message || "No se pudo eliminar el producto");
     }
-  } catch (error) {
-    if (error.response?.data?.message) {
-      toast.error(error.response.data.message);
-    } else if (error.response?.status === 404) {
-      toast.error("Producto no encontrado");
-    } else {
-      toast.error("Error al eliminar el producto");
-    }
-  }
-};
+  };
 
   const handleDeleteClick = (producto) => {
     setEditData(producto);
@@ -770,7 +695,7 @@ const handleDelete = async (id) => {
                 />
               </div>
 
-              {paginatedData.length > 0 && (
+              {paginatedData && paginatedData.length > 0 && (
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}

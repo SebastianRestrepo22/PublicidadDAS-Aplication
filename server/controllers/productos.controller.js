@@ -8,7 +8,8 @@ import {
   getDataAllProductos,
   getDataProductoById,
   nombreProductoExiste,
-  updateDataProducto
+  updateDataProducto,
+  getProductosPaginated
 } from '../models/producto.model.js';
 
 // Crear producto - Ahora incluye UsaColores y Stock
@@ -143,47 +144,74 @@ export const cambiarEstadoProducto = async (req, res) => {
   }
 };
 
-// Obtener todos los productos - Adaptada para nuevo esquema
+// Obtener todos los productos 
 export const getAllProducto = async (req, res) => {
   try {
-    const { estado } = req.query;
-    const soloActivos = estado === 'Activo';
-    
-    const rows = await getDataAllProductos(soloActivos);
+    const { estado, page = 1, limit = 10, filtroCampo, filtroValor } = req.query;
 
-    const productosMap = {};
+    // Validar y convertir parámetros
+    const currentPage = Math.max(1, parseInt(page) || 1);
+    const itemsPerPage = Math.max(1, parseInt(limit) || 10);
 
-    for (const row of rows) {
-      if (!productosMap[row.ProductoId]) {
-        productosMap[row.ProductoId] = {
-          ProductoId: row.ProductoId,
-          Nombre: row.Nombre,
-          Descripcion: row.Descripcion,
-          Imagen: row.Imagen,
-          Precio: row.Precio,
-          Descuento: row.Descuento,
-          CategoriaId: row.CategoriaId,
-          UsaColores: parseInt(row.UsaColores),  // ← FORZAR CONVERSIÓN A NÚMERO
-          Estado: row.Estado || 'Activo',
-          Stock: row.UsaColores === 0 ? row.StockGeneral : null,
-          Colores: []
-        };
-      }
+    const result = await getProductosPaginated({
+      page: currentPage,
+      limit: itemsPerPage,
+      filtroCampo: filtroCampo || null,
+      filtroValor: filtroValor || null,
+      estado: estado || null
+    });
 
-      if (row.ColorId) {
-        productosMap[row.ProductoId].Colores.push({
-          ColorId: row.ColorId,
-          Nombre: row.ColorNombre,
-          Hex: row.Hex,
-          Stock: row.StockColor || 0
-        });
-      }
+    // Validación defensiva
+    const data = result && result.data && Array.isArray(result.data) ? result.data : [];
+    const totalItems = result?.totalItems || 0;
+    const totalPages = result?.totalPages || Math.ceil(totalItems / itemsPerPage) || 1;
+
+    // Si no hay datos y la página > 1, volver a página 1
+    if (data.length === 0 && currentPage > 1 && totalItems > 0) {
+      const fallback = await getProductosPaginated({
+        page: 1,
+        limit: itemsPerPage,
+        filtroCampo: filtroCampo || null,
+        filtroValor: filtroValor || null,
+        estado: estado || null
+      });
+      
+      const fallbackData = fallback && fallback.data && Array.isArray(fallback.data) ? fallback.data : [];
+      const fallbackTotal = fallback?.totalItems || 0;
+      const fallbackPages = fallback?.totalPages || Math.ceil(fallbackTotal / itemsPerPage) || 1;
+      
+      return res.status(200).json({
+        data: fallbackData,
+        pagination: {
+          totalItems: fallbackTotal,
+          totalPages: fallbackPages,
+          currentPage: 1,
+          itemsPerPage: itemsPerPage
+        }
+      });
     }
 
-    res.status(200).json(Object.values(productosMap));
+    res.status(200).json({
+      data: data,
+      pagination: {
+        totalItems: totalItems,
+        totalPages: totalPages,
+        currentPage: currentPage,
+        itemsPerPage: itemsPerPage
+      }
+    });
+
   } catch (error) {
-    console.error("Error al obtener productos:", error);
-    res.status(500).json({ message: "Error interno del servidor" });
+    console.error('Error en getAllProducto:', error);
+    res.status(200).json({
+      data: [],
+      pagination: {
+        totalItems: 0,
+        totalPages: 1,
+        currentPage: 1,
+        itemsPerPage: parseInt(req.query.limit) || 10
+      }
+    });
   }
 };
 
@@ -417,57 +445,58 @@ export const validarNombre = async (req, res) => {
 
 // Buscar productos - Actualizada para incluir nuevos campos
 export const buscarProducto = async (req, res) => {
-  const { campo, valor } = req.query;
+  const { campo, valor, page = 1, limit = 10, estado } = req.query;
 
   const columnasPermitidas = {
-    nombre: 'Nombre',
-    descripcion: 'Descripcion',
-    precio: 'Precio',
-    descuento: 'Descuento',
-    categoria: 'CategoriaId',
-    usacolores: 'UsaColores',
-    stock: 'Stock'
+    nombre: 'nombre',
+    descripcion: 'descripcion',
+    precio: 'precio',
+    descuento: 'descuento',
+    categoria: 'categoria',
+    stock: 'stock',
+    usacolores: 'usacolores'
   };
 
-  const columna = columnasPermitidas[campo?.toLowerCase()];
-  if (!columna) {
+  const filtroCampo = columnasPermitidas[campo?.toLowerCase()];
+  
+  if (campo && !filtroCampo) {
     return res.status(400).json({ message: 'Campo de búsqueda inválido' });
   }
 
-  if (valor === undefined || valor === '') {
-    return res.status(400).json({ message: 'Valor de búsqueda requerido' });
-  }
-
   try {
-    const camposExactos = ['Precio', 'Descuento', 'CategoriaId', 'UsaColores', 'Stock'];
-    const operador = camposExactos.includes(columna) ? '=' : 'LIKE';
-
-    let valorFinal = valor;
-
-    if (['Precio', 'Descuento', 'UsaColores', 'Stock'].includes(columna)) {
-      valorFinal = Number(valor);
-      if (Number.isNaN(valorFinal)) {
-        return res.status(400).json({ message: `${columna} debe ser un número válido` });
-      }
-    }
-
-    if (columna === 'CategoriaId') {
-      if (!valor || typeof valor !== 'string') {
-        return res.status(400).json({ message: 'CategoriaId inválido' });
-      }
-    }
-
-    const parametro = operador === '=' ? valorFinal : `%${valor}%`;
-
-    const productos = await buscarProductoDB({
-      columna,
-      operador,
-      parametro
+    const result = await getProductosPaginated({
+      page: Math.max(1, parseInt(page) || 1),
+      limit: Math.max(1, parseInt(limit) || 10),
+      filtroCampo: filtroCampo || null,
+      filtroValor: valor || null,
+      estado: estado || null
     });
 
-    res.status(200).json({ results: productos });
+    const data = result && result.data && Array.isArray(result.data) ? result.data : [];
+    const totalItems = typeof result?.totalItems === 'number' ? result.totalItems : 0;
+    const currentPage = typeof result?.currentPage === 'number' ? result.currentPage : 1;
+    const itemsPerPage = Math.max(1, parseInt(limit) || 10);
+
+    res.status(200).json({
+      data: data,
+      pagination: {
+        totalItems: totalItems,
+        totalPages: Math.ceil(totalItems / itemsPerPage),
+        currentPage: currentPage,
+        itemsPerPage: itemsPerPage
+      }
+    });
+
   } catch (error) {
-    console.error('Error al buscar productos:', error);
-    res.status(500).json({ message: 'Error interno del servidor' });
+    console.error('Error en buscarProducto:', error);
+    res.status(200).json({
+      data: [],
+      pagination: {
+        totalItems: 0,
+        totalPages: 1,
+        currentPage: 1,
+        itemsPerPage: parseInt(limit) || 10
+      }
+    });
   }
 };

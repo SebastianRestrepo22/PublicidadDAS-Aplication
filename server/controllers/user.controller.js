@@ -7,7 +7,8 @@ import {
     getAllUsuariosSimpleModel,
     searchUsuariosForPedidosModel,
     getUserSystem,
-    contarAdmins
+    contarAdmins,
+    getUsuariosPaginated
 } from '../models/user.model.js';
 
 // Crear usuario
@@ -78,15 +79,74 @@ export const createUser = async (req, res) => {
 
 // Listar todos los usuarios
 export const getAllUsers = async (req, res) => {
-    try {
-        const users = await getAllDataUsers();
-        res.status(200).json(users);
-    } catch (error) {
-        console.error('Error al obtener usuarios:', error);
-        res.status(500).json({ message: 'Error al obtener usuarios' });
-    }
-};
+  try {
+    const rolesCliente = await rolCliente();
+    const clienteRoleId = rolesCliente[0]?.RoleId;
 
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const filtroCampo = req.query.filtroCampo || null;
+    const filtroValor = req.query.filtroValor || null;
+
+    const result = await getUsuariosPaginated({ 
+      page, 
+      limit, 
+      filtroCampo, 
+      filtroValor,
+      excluirRoleId: clienteRoleId
+    });
+
+    // Validación segura de datos
+    const data = result && result.data && Array.isArray(result.data) ? result.data : [];
+    const totalItems = result && typeof result.totalItems === 'number' ? result.totalItems : 0;
+    const currentPage = result && typeof result.currentPage === 'number' ? result.currentPage : page;
+
+    // Si no hay datos y la página > 1, volver a página 1
+    if (data.length === 0 && page > 1 && totalItems > 0) {
+      const fallback = await getUsuariosPaginated({ 
+        page: 1, 
+        limit, 
+        filtroCampo, 
+        filtroValor,
+        excluirRoleId: clienteRoleId
+      });
+      const fallbackData = fallback && fallback.data && Array.isArray(fallback.data) ? fallback.data : [];
+      const fallbackTotal = fallback && typeof fallback.totalItems === 'number' ? fallback.totalItems : 0;
+      
+      return res.status(200).json({
+        data: fallbackData,
+        pagination: {
+          totalItems: fallbackTotal,
+          totalPages: Math.ceil(fallbackTotal / limit),
+          currentPage: 1,
+          itemsPerPage: limit
+        }
+      });
+    }
+
+    res.status(200).json({
+      data: data,
+      pagination: {
+        totalItems: totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: currentPage,
+        itemsPerPage: limit
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en getAllUsers:', error);
+    res.status(200).json({
+      data: [],
+      pagination: {
+        totalItems: 0,
+        totalPages: 1,
+        currentPage: 1,
+        itemsPerPage: parseInt(req.query.limit) || 10
+      }
+    });
+  }
+};
 
 // Obtener usuario por ID 
 export const getUserById = async (req, res) => {
@@ -247,33 +307,64 @@ export const validarTelefono = async (req, res) => {
 
 // Buscar usuarios
 export const buscarUsuarios = async (req, res) => {
-    const { campo, valor } = req.query;
+  const { campo, valor, page = 1, limit = 10 } = req.query;
 
-    // Campos permitidos
-    const columnasPermitidas = {
-        id: "u.CedulaId",
-        cedula: "u.CedulaId",
-        nombre: "u.NombreCompleto",
-        direccion: "u.Direccion",
-        correo: "u.CorreoElectronico",
-        telefono: "u.Telefono",
-        rol: "r.Nombre",
-        tipoDocumento: "td.Nombre"
-    };
+  const columnasPermitidas = {
+    cedula: 'cedula',
+    nombre: 'nombre', 
+    correo: 'correo',
+    telefono: 'telefono',
+    direccion: 'direccion',
+    rol: 'rol',
+    tipoDocumento: 'tipoDocumento'
+  };
 
-    const columna = columnasPermitidas[campo];
-    if (!columna) {
-        return res.status(400).json({ message: "Campo de búsqueda inválido" });
-    }
+  const filtroCampo = columnasPermitidas[campo];
+  
+  if (campo && !filtroCampo) {
+    return res.status(400).json({ message: 'Campo de búsqueda inválido' });
+  }
 
-    try {
-        const usuarios = await buscarUsuarioData(columna, valor);
+  try {
+    const rolesCliente = await rolCliente();
+    const clienteRoleId = rolesCliente[0]?.RoleId;
 
-        res.status(200).json(usuarios);
-    } catch (error) {
-        console.error("Error al buscar usuarios:", error);
-        res.status(500).json({ message: "Error interno del servidor" });
-    }
+    const result = await getUsuariosPaginated({ 
+      page: Math.max(1, parseInt(page) || 1), 
+      limit: Math.max(1, parseInt(limit) || 10), 
+      filtroCampo: filtroCampo || null, 
+      filtroValor: valor || null,
+      excluirRoleId: clienteRoleId
+    });
+
+    // Validación segura de datos
+    const data = result && result.data && Array.isArray(result.data) ? result.data : [];
+    const totalItems = result && typeof result.totalItems === 'number' ? result.totalItems : 0;
+    const currentPage = result && typeof result.currentPage === 'number' ? result.currentPage : 1;
+    const itemsPerPage = Math.max(1, parseInt(limit) || 10);
+
+    res.status(200).json({
+      data: data,
+      pagination: {
+        totalItems: totalItems,
+        totalPages: Math.ceil(totalItems / itemsPerPage),
+        currentPage: currentPage,
+        itemsPerPage: itemsPerPage
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en buscarUsuarios:', error);
+    res.status(200).json({
+      data: [],
+      pagination: {
+        totalItems: 0,
+        totalPages: 1,
+        currentPage: 1,
+        itemsPerPage: parseInt(limit) || 10
+      }
+    });
+  }
 };
 
 export const resetPassword = async (req, res) => {

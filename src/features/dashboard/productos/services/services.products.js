@@ -12,16 +12,47 @@ export const cambiarEstadoProducto = async (id, Estado) => {
 };
 
 // Listar todos los datos con filtro de estado
-export const GetDataproductos = async (soloActivos = false) => {
+export const GetDataproductos = async (soloActivos = false, page = 1, limit = 10, filtroCampo = null, filtroValor = null) => {
   try {
-    // Enviar parámetro de estado a la API
-    const response = await axios.get(`${url}producto`, {
-      params: soloActivos ? { estado: 'Activo' } : {}
-    });
-    return response;
+    const params = {
+      page: page.toString(),
+      limit: limit.toString()
+    };
+    
+    // CORRECCIÓN: Usar 'estado' en lugar de 'soloActivos' para coincidir con el backend
+    if (soloActivos) {
+      params.estado = 'Activo';
+    }
+    
+    if (filtroCampo && filtroValor) {
+      params.filtroCampo = filtroCampo;
+      params.filtroValor = filtroValor;
+    }
+    
+    const response = await axios.get(`${url}producto`, { params });
+    
+    // Validar estructura de respuesta
+    const responseData = response.data;
+    
+    // Extraer datos y paginación con validación
+    const data = responseData?.data && Array.isArray(responseData.data) ? responseData.data : [];
+    const pagination = responseData?.pagination || { 
+      totalItems: 0, 
+      totalPages: 1, 
+      currentPage: page, 
+      itemsPerPage: limit 
+    };
+    
+    return {
+      data: data,
+      pagination: pagination
+    };
   } catch (error) {
-    console.error('Error en GetDataproductos:', error);
-    return { status: false, message: "No está la api : ", error };
+    console.error("Error en GetDataproductos:", error);
+    return { 
+      data: [], 
+      pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } 
+    };
   }
 };
 
@@ -78,12 +109,39 @@ export const deleteDataproducto = async (id) => {
 }
 
 // Buscar productos
-export const buscarProductos = async (campo, valor) => {
-    const response = await axios.get(
-        `${url}producto/buscar`,
-        { params: { campo, valor } }
-    );
-    return response.data.results;
+export const buscarProductos = async (campo, valor, page = 1, limit = 10, estado = null) => {
+  try {
+    const params = {
+      campo,
+      valor,
+      page: page.toString(),
+      limit: limit.toString()
+    };
+    
+    if (estado) params.estado = estado;
+    
+    const response = await axios.get(`${url}producto/buscar`, { params });
+    
+    const responseData = response.data;
+    const data = responseData && responseData.data && Array.isArray(responseData.data) ? responseData.data : [];
+    const pagination = responseData && responseData.pagination ? responseData.pagination : { 
+      totalItems: 0, 
+      totalPages: 1, 
+      currentPage: page, 
+      itemsPerPage: limit 
+    };
+    
+    return {
+      data: data,
+      pagination: pagination
+    };
+  } catch (error) {
+    console.error("Error al buscar productos:", error);
+    return { 
+      data: [], 
+      pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } 
+    };
+  }
 };
 
 export const updateColoresProducto = async (productoId, coloresConStock) => {

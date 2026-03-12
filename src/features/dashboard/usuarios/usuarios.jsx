@@ -12,7 +12,6 @@ import "react-toastify/dist/ReactToastify.css";
 import { Pagination } from "../components/paginacion/pagination.jsx";
 
 export const Usuarios = () => {
-  const [user, setUser] = useState([]);
   const [values, setValues] = useState({
     CedulaId: "",
     TipoDocumentoId: "",
@@ -41,11 +40,35 @@ export const Usuarios = () => {
   const [openVer, setOpenVer] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
 
-  // FUNCIÓN PARA PAGINAR 
-  const paginateData = (data) => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return data.slice(startIndex, endIndex);
+  const cargarUsuarios = async () => {
+    try {
+      let resultado;
+
+      if (filtroCampo && filtroValor) {
+        // Búsqueda con filtros + paginación
+        resultado = await buscarUsuarios(filtroCampo, filtroValor, currentPage, itemsPerPage);
+      } else {
+        // Listado normal con paginación
+        resultado = await GetDataUser(currentPage, itemsPerPage);
+      }
+
+      // Extracción segura de datos
+      const data = resultado && resultado.data && Array.isArray(resultado.data) ? resultado.data : [];
+      const pagination = resultado && resultado.pagination ? resultado.pagination : {};
+
+      setPaginatedData(data);
+      setTotalItems(pagination.totalItems || 0);
+      setTotalPages(pagination.totalPages || 1);
+
+      if (currentPage > (pagination.totalPages || 1) && (pagination.totalPages || 0) > 0) {
+        setCurrentPage(pagination.totalPages);
+      }
+    } catch (error) {
+      console.error("Error cargando usuarios:", error);
+      setPaginatedData([]);
+      setTotalItems(0);
+      setTotalPages(1);
+    }
   };
 
   //Traer los tipos de documentos
@@ -71,12 +94,12 @@ export const Usuarios = () => {
         const response = await GetDataRoles();
         //Que solo aparezca los roles activos
         const activos = response.data.filter(
-  (rol) =>
-    rol.Estado === "Activo" &&
-    rol.Nombre?.trim().toLowerCase() !== "cliente"
-);
+          (rol) =>
+            rol.Estado === "Activo" &&
+            rol.Nombre?.trim().toLowerCase() !== "cliente"
+        );
 
-setRoles(activos);
+        setRoles(activos);
 
       } catch (error) {
         console.error("Error al cargar roles:", error);
@@ -90,69 +113,8 @@ setRoles(activos);
   const [filtroValor, setFiltroValor] = useState('');
 
   useEffect(() => {
-    if (filtroCampo && filtroValor) {
-      buscarUsuarios(filtroCampo, filtroValor).then(setUser);
-    }
-  }, [filtroCampo, filtroValor]);
-
-  useEffect(() => {
-    const buscar = async () => {
-      if (filtroCampo && filtroValor) {
-        const resultados = await buscarUsuarios(filtroCampo, filtroValor);
-        setUser(resultados);
-      }
-    };
-    buscar();
-  }, [filtroCampo, filtroValor]);
-
-  useEffect(() => {
-    const cargarUsuarios = async () => {
-      try {
-        let resultados;
-        if (filtroCampo && filtroValor) {
-          resultados = await buscarUsuarios(filtroCampo, filtroValor);
-        } else {
-          const todos = await GetDataUser();
-          resultados = todos?.data || [];
-        }
-        // 1. Guardar todos los datos
-        setAllData(Array.isArray(resultados) ? resultados : []);
-        setTotalItems(Array.isArray(resultados) ? resultados.length : 0);
-
-        // 2. Calcular total de páginas
-        const totalPages = Math.ceil(resultados.length / itemsPerPage);
-        setTotalPages(totalPages > 0 ? totalPages : 1);
-
-        // 3. Ajustar página actual si es necesario
-        if (currentPage > totalPages && totalPages > 0) {
-          setCurrentPage(totalPages);
-        }
-
-        // 4. Paginar los datos
-        const paginatedData = paginateData(Array.isArray(resultados) ? resultados : []);
-        setPaginatedData(paginatedData);
-      } catch (error) {
-        console.error(error);
-        setUser([]);
-      }
-    };
     cargarUsuarios();
-  }, [filtroCampo, filtroValor]);
-
-  // EFECTO PARA RECALCULAR PAGINACIÓN 
-  useEffect(() => {
-    if (allData.length > 0) {
-      const totalPages = Math.ceil(allData.length / itemsPerPage);
-      setTotalPages(totalPages > 0 ? totalPages : 1);
-
-      if (currentPage > totalPages && totalPages > 0) {
-        setCurrentPage(totalPages);
-      }
-
-      const paginatedData = paginateData(allData);
-      setPaginatedData(paginatedData);
-    }
-  }, [itemsPerPage, currentPage, allData]);
+  }, [currentPage, itemsPerPage, filtroCampo, filtroValor]);
 
   const [correoError, setCorreoError] = useState("");
   const [cedulaError, setCedulaError] = useState("");
@@ -164,30 +126,21 @@ setRoles(activos);
   // Estado para validación del nombre
   const [nombreError, setNombreError] = useState("");
 
-  // Obtener usuarios al cargar
-  useEffect(() => {
-    const fetchUsers = async () => {
-      const data = await GetDataUser();
-      if (data?.data) setUser(data.data);
-    };
-    fetchUsers();
-  }, []);
-
   // Función para validar que el nombre solo contenga letras y espacios
   const validateNombre = (nombre) => {
     if (!nombre) {
       setNombreError("");
       return true;
     }
-    
+
     // Expresión regular: solo letras (incluyendo tildes y ñ) y espacios
     const nombreRegex = /^[A-Za-zÁáÉéÍíÓóÚúÑñ\s]+$/;
-    
+
     if (!nombreRegex.test(nombre)) {
       setNombreError("El nombre solo puede contener letras y espacios");
       return false;
     }
-    
+
     setNombreError("");
     return true;
   };
@@ -220,7 +173,7 @@ setRoles(activos);
       } else if (name === "Telefono") {
         validateTelefonoFormat(limitedValue);
       }
-    } 
+    }
     // Validación para el nombre (solo letras y espacios)
     else if (name === "NombreCompleto") {
       // Permitir letras, espacios y eliminar cualquier carácter no deseado
@@ -392,34 +345,32 @@ setRoles(activos);
     }
 
     try {
+      let response;
       if (editData) {
-        const response = await updateDatauser(editData.CedulaId, values);
+        response = await updateDatauser(editData.CedulaId, values);
         if (response.status === 200) {
-          const updatedList = await GetDataUser();
-
-          // ACTUALIZAR DATOS CON PAGINACIÓN 
-          setAllData(updatedList.data || []);
-          setTotalItems(updatedList.data?.length || 0);
-
-          setOpenEditar(false);
           toast.success("Usuario actualizado correctamente");
+          setOpenEditar(false);
         }
       } else {
-        const response = await postDataUsers(values);
-        if (response.status === 201) {
-          const updatedList = await GetDataUser();
-          setUser(updatedList.data);
-          // ACTUALIZAR DATOS CON PAGINACIÓN 
-          setAllData(updatedList.data || []);
-          setTotalItems(updatedList.data?.length || 0);
-          setOpenCreate(false);
+        response = await postDataUsers(values);
+
+        // Verificación segura del status
+        if (response?.status === 201) {
           toast.success("Usuario creado correctamente");
+          await cargarUsuarios();  // Recarga INMEDIATA después del toast
+          setOpenCreate(false);
+        } else {
+          // Manejo de error específico
+          const errorMsg = response?.data?.message || "Error al crear el usuario";
+          toast.error(errorMsg);
         }
       }
-      resetForm();
+      resetForm(); 
+
     } catch (error) {
       console.error(error);
-      toast.error("Error al procesar la solicitud");
+      toast.error(error.response?.data?.message || "Error al procesar la solicitud");
     }
   };
 
@@ -447,39 +398,34 @@ setRoles(activos);
   };
 
   // Eliminar usuario
-  const handleDelete = async (id) => {
-    try {
-      const response = await deleteDataUser(id); // Usamos la función del servicio
+const handleDelete = async (id) => {
+  try {
+    const response = await deleteDataUser(id);
 
-      // Si la respuesta es exitosa (200 o 201)
-      if (response.status === 200 || response.status === 201) {
-        toast.success(response.data.message); // Mensaje del backend
-
-        // Actualiza la lista de usuarios después de eliminar
-        const updatedList = await GetDataUser();
-        if (updatedList?.data) {
-          // ACTUALIZAR DATOS CON PAGINACIÓN 
-          setAllData(updatedList.data);
-          setTotalItems(updatedList.data.length);
-        }
-
-        setOpenEliminar(false); // Cerramos el modal
-      }
-    } catch (error) {
-      // Manejar específicamente el error 409 (Conflict)
-      if (error.response && error.response.status === 409) {
-        // Mostrar el mensaje específico del backend
-        toast.warning(error.response.data.message || "No se puede eliminar el usuario porque tiene pedidos asociados");
-      } else {
-        // Otros errores
-        toast.error(error.message || "Error al eliminar el usuario");
-      }
-      // No cerrar el modal si hay error 409
-      if (!error.response || error.response.status !== 409) {
-        setOpenEliminar(false);
-      }
+    if (response?.status === 200 || response?.status === 201) {
+      toast.success(response.data?.message || "Usuario eliminado correctamente");
+      await cargarUsuarios();
+      setOpenEliminar(false);
     }
-  };
+  } catch (error) {
+    // Manejo específico por código de estado
+    if (error.response?.status === 403) {
+      // Usuario del sistema o último administrador
+      toast.warning(error.response.data?.message || "Este usuario no puede ser eliminado");
+    } else if (error.response?.status === 409) {
+      // Tiene pedidos asociados
+      toast.warning(error.response.data?.message || "No se puede eliminar porque tiene pedidos asociados");
+    } else {
+      // Error genérico
+      toast.error(error.response?.data?.message || "Error al eliminar el usuario");
+    }
+    
+    // No cerrar modal si hubo error (para que el usuario vea el mensaje)
+    if (error.response?.status === 200 || error.response?.status === 201) {
+      setOpenEliminar(false);
+    }
+  }
+};
 
   // FUNCIONES DE PAGINACIÓN 
   const handlePageChange = (page) => {
@@ -870,7 +816,7 @@ setRoles(activos);
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginatedData.length > 0 ? (
+                {paginatedData && paginatedData.length > 0 ? (
                   paginatedData.map((u) => (
                     <tr key={u.CedulaId} className="hover:bg-slate-50 transition-colors duration-150">
                       <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[120px]">
@@ -907,7 +853,7 @@ setRoles(activos);
               </tbody>
             </table>
           </div>
-          {paginatedData.length > 0 && (
+          {paginatedData && paginatedData.length > 0 && (
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}

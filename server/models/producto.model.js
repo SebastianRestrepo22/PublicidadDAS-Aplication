@@ -268,3 +268,147 @@ export const buscarProductoDB = async ({ columna, operador, parametro }) => {
 
   return productos;
 };
+
+export const getProductosPaginated = async ({ 
+  page = 1, 
+  limit = 10, 
+  filtroCampo = null, 
+  filtroValor = null,
+  estado = null
+}) => {
+  const offset = (page - 1) * limit;
+  let whereConditions = [];
+  let params = [];
+
+  // Filtro por estado
+  if (estado && ['Activo', 'Inactivo'].includes(estado)) {
+    whereConditions.push('Estado = ?');
+    params.push(estado);
+  }
+
+  // Mapeo de campos del frontend a columnas reales
+  const columnasMap = {
+    nombre: 'Nombre',
+    descripcion: 'Descripcion',
+    precio: 'Precio',
+    descuento: 'Descuento',
+    categoria: 'CategoriaId',
+    stock: 'Stock',
+    usacolores: 'UsaColores'
+  };
+
+  if (filtroCampo && filtroValor && columnasMap[filtroCampo]) {
+    const columnaReal = columnasMap[filtroCampo];
+    const camposNumericos = ['Precio', 'Descuento', 'Stock', 'UsaColores'];
+    
+    if (camposNumericos.includes(columnaReal)) {
+      const valorNum = Number(filtroValor);
+      if (!isNaN(valorNum)) {
+        whereConditions.push(`${columnaReal} = ?`);
+        params.push(valorNum);
+      }
+    } else {
+      whereConditions.push(`${columnaReal} LIKE ?`);
+      params.push(`%${filtroValor}%`);
+    }
+  }
+
+  const whereClause = whereConditions.length > 0 
+    ? `WHERE ${whereConditions.join(' AND ')}` 
+    : '';
+
+  // 🔥 PRIMERO: Obtener productos con paginación (SIN JOIN de colores)
+  const [productos] = await dbPool.query(`
+    SELECT 
+      ProductoId,
+      Nombre,
+      Descripcion,
+      Imagen,
+      Precio,
+      Descuento,
+      CategoriaId,
+      UsaColores,
+      Estado,
+      Stock AS StockGeneral
+    FROM Productos
+    ${whereClause}
+    ORDER BY Nombre
+    LIMIT ? OFFSET ?
+  `, [...params, limit, offset]);
+
+  // 🔥 SEGUNDO: Obtener total de productos para paginación
+  const [countResult] = await dbPool.query(`
+    SELECT COUNT(*) as total 
+    FROM Productos
+    ${whereClause}
+  `, params);
+
+  // Si no hay productos, retornar vacío
+  if (productos.length === 0) {
+    return {
+      data: [],
+      totalItems: 0,
+      currentPage: Number(page),
+      itemsPerPage: Number(limit),
+      totalPages: 0
+    };
+  }
+
+  // 🔥 TERCERO: Obtener colores SOLO para los productos de esta página
+  const productoIds = productos.map(p => p.ProductoId);
+  
+  const [colores] = await dbPool.query(`
+    SELECT 
+      pc.ProductoId,
+      c.ColorId,
+      c.Nombre AS ColorNombre,
+      c.Hex,
+      COALESCE(pcs.Stock, 0) AS StockColor
+    FROM ProductoColores pc
+    INNER JOIN Colores c ON c.ColorId = pc.ColorId
+    LEFT JOIN ProductoColores_Stock pcs ON pcs.ProductoId = pc.ProductoId AND pcs.ColorId = pc.ColorId
+    WHERE pc.ProductoId IN (?)
+  `, [productoIds]);
+
+  // 🔥 CUARTO: Construir objeto de productos con sus colores
+  const productosMap = {};
+  
+  // Inicializar productos
+  productos.forEach(producto => {
+    productosMap[producto.ProductoId] = {
+      ProductoId: producto.ProductoId,
+      Nombre: producto.Nombre,
+      Descripcion: producto.Descripcion,
+      Imagen: producto.Imagen,
+      Precio: producto.Precio,
+      Descuento: producto.Descuento,
+      CategoriaId: producto.CategoriaId,
+      UsaColores: parseInt(producto.UsaColores),
+      Estado: producto.Estado || 'Activo',
+      Stock: producto.UsaColores === 0 ? producto.StockGeneral : null,
+      Colores: []
+    };
+  });
+
+  // Agregar colores a los productos correspondientes
+  colores.forEach(color => {
+    if (productosMap[color.ProductoId]) {
+      productosMap[color.ProductoId].Colores.push({
+        ColorId: color.ColorId,
+        Nombre: color.ColorNombre,
+        Hex: color.Hex,
+        Stock: color.StockColor || 0
+      });
+    }
+  });
+
+  const totalItems = countResult[0]?.total || 0;
+
+  return {
+    data: Object.values(productosMap),
+    totalItems: totalItems,
+    currentPage: Number(page),
+    itemsPerPage: Number(limit),
+    totalPages: Math.ceil(totalItems / limit)
+  };
+};

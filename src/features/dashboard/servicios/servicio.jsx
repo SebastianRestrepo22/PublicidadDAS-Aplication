@@ -28,6 +28,9 @@ export const ServiciosDashboard = () => {
     }, [location.pathname, id]);
 
     // Hook de servicios
+    // ServiciosDashboard.jsx - Agrega el callback
+
+    // Hook de servicios
     const {
         values,
         setValues,
@@ -55,10 +58,11 @@ export const ServiciosDashboard = () => {
         goToEdit,
         resetForm,
         allData: serviciosData,
-        setAllData: setServiciosData
+        setAllData: setServiciosData,
+        actualizarPaginacion // 🔥 Nueva función
     } = useServicios(mode, id);
 
-    // Hook de paginación - AHORA USA LOS DATOS DE serviciosData
+    // Hook de paginación - con callback
     const {
         paginatedData,
         currentPage,
@@ -73,8 +77,12 @@ export const ServiciosDashboard = () => {
         setFiltroEstado,
         handlePageChange,
         handleItemsPerPageChange
-    } = usePaginacion(mode, serviciosData, setServiciosData);
-
+    } = usePaginacion(
+        mode,
+        serviciosData,
+        setServiciosData,
+        actualizarPaginacion 
+    );
     const {
         categorias,
         openCategoriasModal,
