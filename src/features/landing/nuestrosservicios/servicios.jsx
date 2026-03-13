@@ -2,21 +2,21 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer";
 import {
-  ShoppingCart,
   Search,
   ChevronLeft,
   ChevronRight,
   X,
   Tag,
   Layers,
-  Ruler,
-  Package,
+  MessageCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { GetDataservicios, getTamanosByServicio } from "../../dashboard/servicios/services/services.servicios";
+import { GetDataservicios } from "../../dashboard/servicios/services/services.servicios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { getAllCategorias } from "../../dashboard/categoria/services/services.categoria";
+
+const WHATSAPP_NUMBER = "3218319494";
 
 export const Servicios = () => {
   const navigate = useNavigate();
@@ -31,54 +31,7 @@ export const Servicios = () => {
   const [serviciosOferta, setServiciosOferta] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [tamanosMap, setTamanosMap] = useState({});
 
-  // Función para obtener información de tamaños
-  const getTamanosInfo = async (servicioId) => {
-    try {
-      const tamanos = await getTamanosByServicio(servicioId);
-      if (tamanos && tamanos.length > 0) {
-        const precios = tamanos.map(t => t.Precio);
-        return {
-          minPrecio: Math.min(...precios),
-          maxPrecio: Math.max(...precios),
-          cantidad: tamanos.length,
-          tamanos: tamanos.sort((a, b) => a.Precio - b.Precio)
-        };
-      }
-      return null;
-    } catch (error) {
-      console.error("Error obteniendo tamaños:", error);
-      return null;
-    }
-  };
-
-  // Cargar tamaños para servicios POR_TAMANO
-  useEffect(() => {
-    const cargarTamanosParaServicios = async () => {
-      const serviciosPorTamano = servicios.filter(s => s.TipoPrecio === 'POR_TAMANO');
-      const nuevoMap = { ...tamanosMap };
-
-      for (const servicio of serviciosPorTamano) {
-        try {
-          const info = await getTamanosInfo(servicio.ServicioId);
-          if (info) {
-            nuevoMap[servicio.ServicioId] = info;
-          }
-        } catch (error) {
-          console.error(`Error cargando tamaños para servicio ${servicio.ServicioId}:`, error);
-        }
-      }
-
-      setTamanosMap(nuevoMap);
-    };
-
-    if (servicios.length > 0) {
-      cargarTamanosParaServicios();
-    }
-  }, [servicios]);
-
-  // Preparar servicios en oferta (solo activos)
   const prepararServiciosOferta = useCallback((serviciosData) => {
     const serviciosActivos = serviciosData.filter(s => s.Estado === "Activo");
     const serviciosConDescuento = serviciosActivos.filter(s => s.Descuento > 0);
@@ -101,7 +54,6 @@ export const Servicios = () => {
 
         if (!isMounted) return;
 
-        // Filtrar solo servicios ACTIVOS
         const serviciosActivos = Array.isArray(serviciosRes.data)
           ? serviciosRes.data.filter(s => s.Estado === "Activo")
           : [];
@@ -129,18 +81,14 @@ export const Servicios = () => {
     };
   }, [prepararServiciosOferta]);
 
-  // Servicios destacados (solo activos)
   const featuredServices = servicios
     .filter((s) => s.Descuento > 0)
     .sort(() => 0.5 - Math.random())
     .slice(0, 6);
 
-  // Filtrar servicios activos
   const filteredServices = servicios.filter((servicio) => {
-    // Solo mostrar servicios activos (ya filtrados arriba, pero por seguridad)
     if (servicio.Estado !== "Activo") return false;
 
-    // Si seleccionó "ofertas", mostrar solo servicios con descuento
     if (selectedCategory === "ofertas") {
       return servicio.Descuento > 0;
     }
@@ -154,10 +102,19 @@ export const Servicios = () => {
     return matchesCategory && matchesSearch;
   });
 
-  // Función para navegar al detalle del servicio
   const handleViewDetails = (servicioId, e) => {
     if (e) e.stopPropagation();
     navigate(`/servicios/${servicioId}`);
+  };
+
+  const handleCotizarWhatsApp = (servicio, e) => {
+    if (e) e.stopPropagation();
+
+    const mensaje = `Hola, me interesa cotizar el servicio: ${servicio.Nombre}`;
+    const mensajeEncoded = encodeURIComponent(mensaje);
+    const urlWhatsApp = `https://wa.me/${WHATSAPP_NUMBER}?text=${mensajeEncoded}`;
+
+    window.open(urlWhatsApp, '_blank');
   };
 
   const toggleFavorite = (id, e) => {
@@ -188,96 +145,6 @@ export const Servicios = () => {
 
   const calcularPrecioConDescuento = (precio, descuento) => {
     return precio - (precio * descuento) / 100;
-  };
-
-  // Componente para precios ÚNICOS - altura fija y diseño consistente
-  const PrecioUnico = ({ servicio, formatPrice, calcularPrecioConDescuento }) => {
-    const tieneDescuento = servicio.Descuento > 0;
-
-    return (
-      <div className="h-[64px] flex flex-col justify-center">
-        <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border ${tieneDescuento
-          ? 'bg-red-50 border-red-200'
-          : 'bg-blue-50 border-blue-200'
-          }`}>
-          {tieneDescuento ? (
-            <>
-              <span className="text-sm text-gray-400 line-through">
-                {formatPrice(servicio.Precio)}
-              </span>
-              <span className="text-lg font-bold text-red-600">
-                {formatPrice(calcularPrecioConDescuento(servicio.Precio, servicio.Descuento))}
-              </span>
-              <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full">
-                -{servicio.Descuento}%
-              </span>
-            </>
-          ) : (
-            <span className="text-lg font-bold text-blue-600">
-              {formatPrice(servicio.Precio)}
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Componente para mostrar precios de servicios POR TAMAÑO - AHORA SOLO 2 PRECIOS
-  const PrecioPorTamano = ({ servicio, tamanosInfo, formatPrice, calcularPrecioConDescuento }) => {
-    // Loading state con misma altura
-    if (!tamanosInfo) {
-      return (
-        <div className="h-[64px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200">
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-300 border-t-blue-600"></div>
-            <span>Cargando precios...</span>
-          </div>
-        </div>
-      );
-    }
-
-    const tieneDescuento = servicio.Descuento > 0;
-    const minPrecio = tieneDescuento
-      ? calcularPrecioConDescuento(tamanosInfo.minPrecio, servicio.Descuento)
-      : tamanosInfo.minPrecio;
-
-    return (
-      <div className="h-[64px] flex flex-col justify-center">
-        <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border ${tieneDescuento
-            ? 'bg-red-50 border-red-200'
-            : 'bg-blue-50 border-blue-200'
-          }`}>
-          <Ruler className={`w-4 h-4 ${tieneDescuento ? 'text-red-600' : 'text-blue-600'}`} />
-
-          <div className="flex items-baseline gap-2">
-            {tieneDescuento && (
-              <span className="text-xs text-gray-400 line-through">
-                {formatPrice(tamanosInfo.minPrecio)}
-              </span>
-            )}
-            <span className={`text-lg font-bold ${tieneDescuento ? 'text-red-600' : 'text-blue-600'}`}>
-              {formatPrice(minPrecio)}
-            </span>
-            <span className={`text-xs ${tieneDescuento ? 'text-red-600' : 'text-blue-600'} font-medium`}>
-              desde
-            </span>
-          </div>
-
-          {tieneDescuento && (
-            <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full">
-              -{servicio.Descuento}%
-            </span>
-          )}
-        </div>
-
-        {/* Badge de tamaños - fuera del contenedor principal para no afectar altura */}
-        <div className="mt-1 pl-1">
-          <span className="text-[10px] text-gray-500">
-            {tamanosInfo.cantidad} tamaño{tamanosInfo.cantidad > 1 ? 's' : ''}
-          </span>
-        </div>
-      </div>
-    );
   };
 
   const handleCategorySelect = useCallback((categoriaId) => {
@@ -322,7 +189,6 @@ export const Servicios = () => {
       <div className="max-w-7xl mx-auto px-4 py-[80px]">
         <div className="flex flex-col lg:flex-row gap-8 min-h-[calc(100vh-200px)]">
           <div className="flex-1 space-y-8 mt-8">
-            {/* Carrusel de servicios destacados */}
             {featuredServices.length > 0 && (
               <section>
                 <h2 className="text-2xl font-bold mb-4 text-slate-800">Servicios Destacados</h2>
@@ -334,7 +200,6 @@ export const Servicios = () => {
                     {featuredServices.map((servicio) => (
                       <div key={servicio.ServicioId} className="min-w-full">
                         <div className="relative h-48 overflow-hidden flex-shrink-0 group">
-                          {/* Imagen con z-index base */}
                           <img
                             src={servicio.Imagen || "/multimedia/placeholder.jpg"}
                             alt={servicio.Nombre}
@@ -343,36 +208,21 @@ export const Servicios = () => {
                             onError={(e) => (e.currentTarget.src = "/multimedia/placeholder.jpg")}
                           />
 
-                          {/* Overlay oscuro sutil al hover */}
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" style={{ zIndex: 2 }} />
 
-                          {/* Badges - posicionados con más margen y z-index alto */}
                           <div className="absolute top-3 left-3 right-3 flex justify-between items-start z-10">
-                            {(servicio.Descuento > 0 || servicio.TipoPrecio === 'POR_TAMANO') && (
-                              <div className="flex flex-col gap-1">
-                                {servicio.Descuento > 0 && (
-                                  <span className="bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-sm">
-                                    -{servicio.Descuento}%
-                                  </span>
-                                )}
-                                {servicio.TipoPrecio === 'POR_TAMANO' && !servicio.Descuento && (
-                                  <span className="bg-blue-500/95 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1">
-                                    <Package className="w-3 h-3" />
-                                    Por tamaño
-                                  </span>
-                                )}
-                              </div>
+                            {servicio.Descuento > 0 && (
+                              <span className="bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-sm">
+                                -{servicio.Descuento}%
+                              </span>
                             )}
 
-                            {/* Botón de carrito - solo visible al hover */}
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewDetails(servicio.ServicioId, e);
-                              }}
-                              className="bg-white/95 hover:bg-white text-black rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-y-2 group-hover:translate-y-0"
+                              onClick={(e) => handleCotizarWhatsApp(servicio, e)}
+                              className="bg-green-600 hover:bg-green-700 text-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-y-2 group-hover:translate-y-0"
+                              title="Cotizar por WhatsApp"
                             >
-                              <ShoppingCart className="h-4 w-4" />
+                              <MessageCircle className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
@@ -400,8 +250,7 @@ export const Servicios = () => {
                           <button
                             key={index}
                             onClick={() => setCurrentSlide(index)}
-                            className={`h-1.5 rounded-full transition-all ${currentSlide === index ? "w-6 bg-white" : "w-1.5 bg-white/50"
-                              }`}
+                            className={`h-1.5 rounded-full transition-all ${currentSlide === index ? "w-6 bg-white" : "w-1.5 bg-white/50"}`}
                           />
                         ))}
                       </div>
@@ -411,7 +260,6 @@ export const Servicios = () => {
               </section>
             )}
 
-            {/* Listado de servicios */}
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold text-slate-800">
@@ -437,16 +285,16 @@ export const Servicios = () => {
                   {filteredServices.map((servicio) => (
                     <div
                       key={servicio.ServicioId}
-                      onClick={(e) => handleViewDetails(servicio.ServicioId, e)}
-                      className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-200 cursor-pointer flex flex-col h-full"
+                      className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-200 flex flex-col h-full"
                     >
-                      {/* Imagen */}
-                      <div className="relative h-48 overflow-hidden flex-shrink-0">
+                      <div
+                        className="relative h-48 overflow-hidden flex-shrink-0 cursor-pointer"
+                        onClick={(e) => handleViewDetails(servicio.ServicioId, e)}
+                      >
                         <img
                           src={servicio.Imagen || "/multimedia/placeholder.jpg"}
                           alt={servicio.Nombre}
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          style={{ zIndex: 1 }}
+                          className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                           onError={(e) => {
                             console.warn(`Error cargando: ${servicio.Imagen}`);
                             e.currentTarget.src = "/multimedia/placeholder.jpg";
@@ -455,9 +303,11 @@ export const Servicios = () => {
                         />
                       </div>
 
-                      {/* Contenido - AGREGAR min-h-0 para que flex funcione */}
                       <div className="p-5 flex-1 flex flex-col min-h-0">
-                        <h3 className="font-bold text-lg mb-2 text-slate-800 line-clamp-1">
+                        <h3
+                          className="font-bold text-lg mb-2 text-slate-800 line-clamp-1 cursor-pointer hover:text-blue-600"
+                          onClick={(e) => handleViewDetails(servicio.ServicioId, e)}
+                        >
                           {servicio.Nombre}
                         </h3>
 
@@ -465,18 +315,22 @@ export const Servicios = () => {
                           {servicio.Descripcion}
                         </p>
 
-                        {/* Empujar precio al fondo con mt-auto en lugar de flex-1 vacío */}
                         <div className="mt-auto">
-                          {servicio.TipoPrecio === 'UNICO' ? (
-                            <PrecioUnico servicio={servicio} formatPrice={formatPrice} calcularPrecioConDescuento={calcularPrecioConDescuento} />
-                          ) : (
-                            <PrecioPorTamano
-                              servicio={servicio}
-                              tamanosInfo={tamanosMap[servicio.ServicioId]}
-                              formatPrice={formatPrice}
-                              calcularPrecioConDescuento={calcularPrecioConDescuento}
-                            />
-                          )}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-slate-500">Cotización personalizada</span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewDetails(servicio.ServicioId, e); // Siempre redirige al formulario
+                              }}
+                              className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                              Cotizar
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -486,7 +340,6 @@ export const Servicios = () => {
             </section>
           </div>
 
-          {/* Sidebar */}
           <aside className="lg:w-80 shrink-0">
             <div className="sticky top-[120px] space-y-4 py-[60px]">
               <button
@@ -536,10 +389,10 @@ export const Servicios = () => {
                 </div>
               </button>
 
-              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-xl shadow-md p-4">
-                <h3 className="font-bold text-base mb-1">¡Encuentra lo que buscas!</h3>
+              <div className="bg-gradient-to-br from-green-600 to-emerald-700 text-white rounded-xl shadow-md p-4">
+                <h3 className="font-bold text-base mb-1">¿Necesitas una cotización?</h3>
                 <p className="text-xs opacity-90">
-                  Usa los botones para explorar categorías y ofertas
+                  Todos nuestros servicios se cotizan personalmente por WhatsApp para ofrecerte la mejor opción
                 </p>
               </div>
             </div>
@@ -547,7 +400,6 @@ export const Servicios = () => {
         </div>
       </div>
 
-      {/* Modales */}
       {showCategoriasModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
@@ -714,12 +566,12 @@ export const Servicios = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleViewDetails(servicio.ServicioId, e);
-                            setShowOfertasModal(false);
+                            handleCotizarWhatsApp(servicio, e);
                           }}
-                          className="absolute bottom-2 right-2 bg-gradient-to-r from-red-800 to-red-900 text-white rounded-full p-1.5 hover:from-red-700 hover:to-red-800 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute bottom-2 right-2 bg-green-600 text-white rounded-full p-1.5 hover:bg-green-700 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Cotizar por WhatsApp"
                         >
-                          <ShoppingCart className="h-4 w-4" />
+                          <MessageCircle className="h-4 w-4" />
                         </button>
                       </div>
                       <div className="p-3">
@@ -730,30 +582,16 @@ export const Servicios = () => {
                           {servicio.Descripcion}
                         </p>
                         <div className="flex items-center justify-between">
-                          {servicio.TipoPrecio === 'UNICO' ? (
-                            <div>
-                              <span className="text-xs text-gray-400 line-through">
-                                {formatPrice(servicio.Precio)}
-                              </span>
-                              <span className="text-sm font-bold text-red-800 ml-1">
-                                {formatPrice(calcularPrecioConDescuento(servicio.Precio, servicio.Descuento))}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <Package className="w-3 h-3 text-gray-500" />
-                              <span className="text-xs text-gray-600">
-                                Por tamaño
-                              </span>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-slate-500">Cotización personalizada</span>
+                          </div>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setShowOfertasModal(false);
                               handleViewDetails(servicio.ServicioId, e);
                             }}
-                            className="text-red-800 hover:text-red-600 text-xs font-medium"
+                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
                           >
                             Ver detalles →
                           </button>

@@ -1,5 +1,3 @@
-// ServiciosDashboard.jsx - Versión final
-
 import React from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
@@ -29,10 +27,7 @@ export const ServiciosDashboard = () => {
         return "list";
     }, [location.pathname, id]);
 
-    // 🔥 Hook de paginación (ahora tiene función refrescar)
     const paginacion = usePaginacion(mode);
-
-    // 🔥 Hook de servicios (recibe la función refrescar)
     const servicios = useServicios(mode, id, paginacion.refrescar);
 
     const {
@@ -46,7 +41,6 @@ export const ServiciosDashboard = () => {
         obtenerNombreCategoria
     } = useCategorias(servicios.values, servicios.setValues);
 
-    // Navegación
     const handleViewClick = (servicio) => {
         servicios.goToView(servicio.ServicioId);
     };
@@ -120,7 +114,6 @@ export const ServiciosDashboard = () => {
                             <DetalleServicio
                                 editData={servicios.editData}
                                 categorias={categorias}
-                                tamanos={servicios.tamanos}
                                 onEdit={servicios.goToEdit}
                                 onDelete={servicios.handleDeleteClick}
                                 onBack={servicios.goToBackToList}
@@ -130,8 +123,6 @@ export const ServiciosDashboard = () => {
                                 mode={mode}
                                 values={servicios.values}
                                 setValues={servicios.setValues}
-                                tamanos={servicios.tamanos}
-                                setTamanos={servicios.setTamanos}
                                 estadoEdit={servicios.estadoEdit}
                                 setEstadoEdit={servicios.setEstadoEdit}
                                 submitted={servicios.submitted}

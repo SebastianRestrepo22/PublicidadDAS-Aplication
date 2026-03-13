@@ -48,8 +48,6 @@ export const BarraAcciones = ({
                 <option value="">Filtrar por...</option>
                 <option value="nombre">Nombre</option>
                 <option value="descripcion">Descripción</option>
-                <option value="precio">Precio</option>
-                <option value="descuento">Descuento</option>
                 <option value="categoria">Categoría</option>
                 <option value="estado">Estado</option>
             </select>

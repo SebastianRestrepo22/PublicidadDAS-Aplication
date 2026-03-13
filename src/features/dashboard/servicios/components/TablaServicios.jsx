@@ -17,20 +17,6 @@ export const TablaServicios = ({
     onPageChange,
     onItemsPerPageChange
 }) => {
-     // Formatear precio
-    const formatPrice = (value, currency = '$') => {
-        if (value === null || value === undefined || value === '') return `${currency}0.00`;
-
-        // Convertir a número si es string
-        const num = typeof value === 'string' ? parseFloat(value) : value;
-
-        // Verificar si es un número válido
-        if (isNaN(num)) return `${currency}0.00`;
-
-        // Formatear con separador de miles y 2 decimales
-        return `${currency}${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
-    };
-
     const getEstadoColor = (estado) => {
         switch (estado) {
             case 'Activo': return 'bg-green-100 text-green-800';
@@ -56,9 +42,6 @@ export const TablaServicios = ({
                             <th className="py-3 px-4 text-left text-xs font-semibold">ID</th>
                             <th className="py-3 px-4 text-left text-xs font-semibold">Nombre</th>
                             <th className="py-3 px-4 text-left text-xs font-semibold">Estado</th>
-                            <th className="py-3 px-4 text-left text-xs font-semibold">Tipo</th>
-                            <th className="py-3 px-4 text-left text-xs font-semibold">Precio</th>
-                            <th className="py-3 px-4 text-left text-xs font-semibold">Descuento</th>
                             <th className="py-3 px-4 text-left text-xs font-semibold">Categoría</th>
                             <th className="py-3 px-4 text-left text-xs font-semibold">Acciones</th>
                         </tr>
@@ -66,9 +49,6 @@ export const TablaServicios = ({
                     <tbody className="divide-y">
                         {paginatedData.map((p) => {
                             const estado = p.Estado || 'Activo';
-                            const precioMostrar = p.TipoPrecio === 'UNICO'
-                                ? `${formatPrice(p.Precio || 0)}`
-                                : 'Por tamaño';
 
                             return (
                                 <tr key={p.ServicioId} className={`hover:bg-gray-50 ${estado === 'Inactivo' ? 'bg-gray-50 opacity-75' : ''}`}>
@@ -86,21 +66,6 @@ export const TablaServicios = ({
                                                 {estado}
                                             </span>
                                         </div>
-                                    </td>
-                                    <td className="py-3 px-4">
-                                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${p.TipoPrecio === 'UNICO' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
-                                            {p.TipoPrecio}
-                                        </span>
-                                    </td>
-                                    <td className="py-3 px-4 text-sm font-medium text-blue-900">{precioMostrar}</td>
-                                    <td className="py-3 px-4">
-                                        {p.Descuento ? (
-                                            <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                                {p.Descuento}%
-                                            </span>
-                                        ) : (
-                                            <span className="text-gray-400">0%</span>
-                                        )}
                                     </td>
                                     <td className="py-3 px-4 text-sm text-gray-700">
                                         {categorias.find(c => c.CategoriaId === p.CategoriaId)?.Nombre || "—"}

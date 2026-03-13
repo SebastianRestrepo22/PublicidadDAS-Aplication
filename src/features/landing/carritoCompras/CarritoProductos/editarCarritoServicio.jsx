@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { getTamanosByServicio } from "../../../dashboard/servicios/services/services.servicios";
 import { Navbar } from "../../components/Navbar";
 import { Footer } from "../../components/footer";
 import { useCart } from "../../../../context/CartContext";

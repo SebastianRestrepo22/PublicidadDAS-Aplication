@@ -3,26 +3,10 @@ import React from "react";
 export const DetalleServicio = ({
     editData,
     categorias,
-    tamanos,
     onEdit,
     onDelete,
     onBack
 }) => {
-     // Formatear precio
-    const formatPrice = (value, currency = '$') => {
-        if (value === null || value === undefined || value === '') return `${currency}0.00`;
-
-        // Convertir a número si es string
-        const num = typeof value === 'string' ? parseFloat(value) : value;
-
-        // Verificar si es un número válido
-        if (isNaN(num)) return `${currency}0.00`;
-
-        // Formatear con separador de miles y 2 decimales
-        return `${currency}${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
-    };
-
-
     if (!editData) {
         return (
             <div className="text-center py-12">
@@ -42,7 +26,6 @@ export const DetalleServicio = ({
 
     return (
         <div className="space-y-6">
-            {/* Información general */}
             <div className="bg-white rounded-lg shadow-sm border p-6">
                 <div className="flex justify-between items-start mb-4">
                     <h4 className="text-lg font-semibold text-gray-800">Información general</h4>
@@ -65,29 +48,12 @@ export const DetalleServicio = ({
                         <dd>{editData.Descripcion || "—"}</dd>
                     </div>
                     <div>
-                        <dt className="text-sm text-gray-500">Tipo de precio</dt>
-                        <dd>
-                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                                editData.TipoPrecio === 'UNICO' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
-                            }`}>
-                                {editData.TipoPrecio === 'UNICO' ? 'Precio Único' : 'Por Tamaño'}
-                            </span>
-                        </dd>
-                    </div>
-                    <div>
                         <dt className="text-sm text-gray-500">Categoría</dt>
                         <dd>{categorias.find(c => c.CategoriaId === editData.CategoriaId)?.Nombre || editData.CategoriaId}</dd>
                     </div>
-                    {editData.Descuento > 0 && (
-                        <div>
-                            <dt className="text-sm text-gray-500">Descuento</dt>
-                            <dd className="text-red-600 font-medium">{editData.Descuento}%</dd>
-                        </div>
-                    )}
                 </dl>
             </div>
 
-            {/* Imagen */}
             {editData.Imagen && (
                 <div className="bg-white rounded-lg shadow-sm border p-6">
                     <h4 className="text-lg font-semibold text-gray-800 mb-4">Imagen</h4>
@@ -103,67 +69,6 @@ export const DetalleServicio = ({
                 </div>
             )}
 
-            {/* Precio o tamaños según tipo */}
-            {editData.TipoPrecio === 'UNICO' ? (
-                <div className="bg-white rounded-lg shadow-sm border p-6">
-                    <h4 className="text-lg font-semibold text-gray-800 mb-4">Precio</h4>
-
-                    <dl>
-                        <div>
-                            <dt className="text-sm text-gray-500">Precio base</dt>
-                            <dd className="text-xl font-bold text-blue-900">{formatPrice(editData.Precio || 0)}</dd>
-                        </div>
-                        {editData.Descuento > 0 && (
-                            <div className="mt-4 bg-green-50 p-4 rounded-lg">
-                                <dt className="text-sm text-gray-600">Precio final con descuento</dt>
-                                <dd className="text-2xl font-bold text-green-600">
-                                    {(formatPrice(editData.Precio) * (1 - editData.Descuento / 100))}
-                                </dd>
-                                <dd className="text-xs text-gray-500">Descuento del {editData.Descuento}% aplicado</dd>
-                            </div>
-                        )}
-                    </dl>
-                </div>
-            ) : (
-                <div className="bg-white rounded-lg shadow-sm border p-6">
-                    <h4 className="text-lg font-semibold text-gray-800 mb-4">Tamaños disponibles</h4>
-
-                    {tamanos.length > 0 ? (
-                        <div className="space-y-2">
-                            {tamanos.map((tamano, index) => (
-                                <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border">
-                                    <span className="font-medium text-gray-900">{tamano.NombreTamano}</span>
-                                    <div className="text-right">
-                                        {editData.Descuento > 0 ? (
-                                            <>
-                                                <span className="text-gray-400 line-through text-sm mr-2">
-                                                    {formatPrice(tamano.Precio)}
-                                                </span>
-                                                <span className="text-blue-600 font-bold">
-                                                    {(formatPrice(tamano.Precio) * (1 - editData.Descuento / 100))}
-                                                </span>
-                                            </>
-                                        ) : (
-                                            <span className="text-blue-600 font-bold">
-                                                {formatPrice(tamano.Precio)}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                            {editData.Descuento > 0 && (
-                                <p className="text-sm text-gray-500 mt-2">
-                                    * Descuento del {editData.Descuento}% aplicado a todos los tamaños
-                                </p>
-                            )}
-                        </div>
-                    ) : (
-                        <p className="text-gray-500 italic">No hay tamaños configurados</p>
-                    )}
-                </div>
-            )}
-
-            {/* Botones de acción */}
             <div className="flex gap-4 pt-4">
                 <button
                     className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
