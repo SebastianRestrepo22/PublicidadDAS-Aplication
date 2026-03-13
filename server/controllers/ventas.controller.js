@@ -6,6 +6,7 @@ import {
   createVentaFromPedidoModel,
   createVentaManualModel,
   existeVentaParaPedidoModel,
+  getVentasPaginated,
 } from "../models/venta.models.js";
 import {
   getDetalleVentaByVentaIdModel,
@@ -16,14 +17,77 @@ import { sendVentaFacturaEmail, sendVentaAnuladaEmail } from "../utils/email.js"
 
 export const getVentas = async (req, res) => {
   try {
-    const ventas = await getAllVentasModel();
-    for (const venta of ventas) {
-      venta.detalle = await getDetalleVentaByVentaIdModel(venta.VentaId);
+    const { 
+      page = 1, 
+      limit = 10, 
+      filtroCampo, 
+      filtroValor,
+      fechaInicio,
+      fechaFin 
+    } = req.query;
+
+    const result = await getVentasPaginated({
+      page: Math.max(1, parseInt(page) || 1),
+      limit: Math.max(1, parseInt(limit) || 10),
+      filtroCampo: filtroCampo || null,
+      filtroValor: filtroValor || null,
+      fechaInicio: fechaInicio || null,
+      fechaFin: fechaFin || null
+    });
+
+    // Validación defensiva
+    const data = result && result.data && Array.isArray(result.data) ? result.data : [];
+    const totalItems = typeof result?.totalItems === 'number' ? result.totalItems : 0;
+    const currentPage = typeof result?.currentPage === 'number' ? result.currentPage : 1;
+    const itemsPerPage = Math.max(1, parseInt(limit) || 10);
+
+    // Si no hay datos y la página > 1, volver a página 1
+    if (data.length === 0 && currentPage > 1 && totalItems > 0) {
+      const fallback = await getVentasPaginated({
+        page: 1,
+        limit: itemsPerPage,
+        filtroCampo: filtroCampo || null,
+        filtroValor: filtroValor || null,
+        fechaInicio: fechaInicio || null,
+        fechaFin: fechaFin || null
+      });
+      const fallbackData = fallback && fallback.data && Array.isArray(fallback.data) ? fallback.data : [];
+      const fallbackTotal = typeof fallback?.totalItems === 'number' ? fallback.totalItems : 0;
+      
+      return res.status(200).json({
+        data: fallbackData,
+        pagination: {
+          totalItems: fallbackTotal,
+          totalPages: Math.ceil(fallbackTotal / itemsPerPage),
+          currentPage: 1,
+          itemsPerPage: itemsPerPage
+        }
+      });
     }
-    res.status(200).json(ventas);
+
+    // ✅ Respuesta con estructura CORRECTA
+    res.status(200).json({
+      data: data,
+      pagination: {
+        totalItems: totalItems,
+        totalPages: Math.ceil(totalItems / itemsPerPage),
+        currentPage: currentPage,
+        itemsPerPage: itemsPerPage
+      }
+    });
+
   } catch (error) {
-    console.error("Error al obtener ventas:", error);
-    res.status(500).json({ error: "Error al obtener ventas" });
+    console.error('Error en getVentas:', error);
+    // ✅ Fallback con estructura CORRECTA
+    res.status(200).json({
+      data: [],
+      pagination: {
+        totalItems: 0,
+        totalPages: 1,
+        currentPage: 1,
+        itemsPerPage: parseInt(req.query.limit) || 10
+      }
+    });
   }
 };
 
