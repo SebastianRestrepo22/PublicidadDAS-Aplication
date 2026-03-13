@@ -130,34 +130,34 @@ export const rolCliente = async () => {
   return roles;
 };
 
-export const createByAdmin = async ({ 
-    CedulaId, 
-    TipoDocumentoId, 
-    NombreCompleto, 
-    Telefono, 
-    CorreoElectronico, 
-    Direccion, 
-    RoleId, 
-    resetToken, 
-    resetTokenExpire 
+export const createByAdmin = async ({
+  CedulaId,
+  TipoDocumentoId,
+  NombreCompleto,
+  Telefono,
+  CorreoElectronico,
+  Direccion,
+  RoleId,
+  resetToken,
+  resetTokenExpire
 }) => {
-    await dbPool.query(
-        `INSERT INTO usuarios 
+  await dbPool.query(
+    `INSERT INTO usuarios 
          (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId, resetToken, resetTokenExpire)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-            CedulaId,
-            TipoDocumentoId,
-            NombreCompleto,
-            Telefono,
-            CorreoElectronico,
-            Direccion,
-            null, //Contrasena NULL
-            RoleId,
-            resetToken,
-            resetTokenExpire
-        ]
-    );
+    [
+      CedulaId,
+      TipoDocumentoId,
+      NombreCompleto,
+      Telefono,
+      CorreoElectronico,
+      Direccion,
+      null, //Contrasena NULL
+      RoleId,
+      resetToken,
+      resetTokenExpire
+    ]
+  );
 };
 
 export const updateDataUser = async ({ id, updatedUser }) => {
@@ -459,10 +459,10 @@ export const getClientById = async (id, roleId) => {
 /**
  * Obtener usuarios con paginación y filtros
  */
-export const getUsuariosPaginated = async ({ 
-  page = 1, 
-  limit = 10, 
-  filtroCampo = null, 
+export const getUsuariosPaginated = async ({
+  page = 1,
+  limit = 10,
+  filtroCampo = null,
   filtroValor = null,
   excluirRoleId = null
 }) => {
@@ -523,6 +523,78 @@ export const getUsuariosPaginated = async ({
     ${whereClause}
   `, params);
 
+  return {
+    data: rows,
+    totalItems: countResult[0]?.total || 0,
+    currentPage: Number(page),
+    itemsPerPage: Number(limit)
+  };
+};
+
+/**
+ * Obtener clientes con paginación y filtros
+ */
+export const getClientesPaginated = async ({
+  page = 1,
+  limit = 10,
+  filtroCampo = null,
+  filtroValor = null
+}) => {
+  const offset = (page - 1) * limit;
+  let whereConditions = [];
+  let params = [];
+
+  // 🔥 FILTRO OBLIGATORIO: Solo clientes (RoleId con Nombre = 'cliente')
+  whereConditions.push("r.Nombre = 'cliente'");
+
+  // Mapeo de campos del frontend a columnas reales
+  const columnasMap = {
+    cedula: 'u.CedulaId',
+    nombre: 'u.NombreCompleto',
+    correo: 'u.CorreoElectronico',
+    telefono: 'u.Telefono',
+    direccion: 'u.Direccion',
+    tipoDocumento: 'td.Nombre'
+  };
+
+  // Agregar filtro de búsqueda si existe
+  if (filtroCampo && filtroValor && columnasMap[filtroCampo]) {
+    whereConditions.push(`${columnasMap[filtroCampo]} LIKE ?`);
+    params.push(`%${filtroValor}%`);
+  }
+
+  const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+  // 🔹 Consulta principal con JOINs y paginación
+  const [rows] = await dbPool.query(`
+    SELECT 
+      u.CedulaId,
+      u.TipoDocumentoId,
+      td.Nombre AS TipoDocumentoNombre,
+      u.NombreCompleto,
+      u.Telefono,
+      u.CorreoElectronico,
+      u.Direccion,
+      u.RoleId,
+      u.IsSystem,
+      r.Nombre AS RolNombre
+    FROM usuarios u
+    INNER JOIN roles r ON u.RoleId = r.RoleId
+    INNER JOIN TipoDocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
+    ${whereClause}
+    ORDER BY u.NombreCompleto ASC
+    LIMIT ? OFFSET ?
+  `, [...params, limit, offset]);
+
+  // 🔹 Consulta de conteo para totalPages (MISMO WHERE que la principal)
+  const [countResult] = await dbPool.query(`
+    SELECT COUNT(*) as total 
+    FROM usuarios u
+    INNER JOIN roles r ON u.RoleId = r.RoleId
+    ${whereClause}
+  `, params);
+
+  // ✅ RETORNO con clave "data" explícita
   return {
     data: rows,
     totalItems: countResult[0]?.total || 0,

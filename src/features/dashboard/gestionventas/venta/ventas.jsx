@@ -434,8 +434,8 @@ const DetallesProductosAcordeon = ({ detalles }) => {
                           handleArchivoClick(item.UrlImagenPersonalizada, item.DetalleVentaId);
                         }}
                         className={`p-1.5 rounded-lg transition-all hover:scale-110 ${tipoArchivoItem === 'imagen'
-                            ? 'hover:bg-blue-50 text-blue-600'
-                            : 'hover:bg-amber-50 text-amber-600'
+                          ? 'hover:bg-blue-50 text-blue-600'
+                          : 'hover:bg-amber-50 text-amber-600'
                           }`}
                         title={`Ver ${tipoArchivoItem || 'archivo'}`}
                       >
@@ -727,31 +727,34 @@ export const Ventas = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  const paginateData = (data) => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
-
+  // Cargar ventas con paginación y filtros
   const cargarVentas = async () => {
     setCargando(true);
     try {
-      const data = await getVentas();
+      const resultado = await getVentas(
+        currentPage,
+        itemsPerPage,
+        campoFiltro,
+        filtroValor,
+        null,
+        null
+      );
 
-      if (Array.isArray(data)) {
-        setVentas(data);
-        aplicarFiltrosYOrdenar(data);
-      } else {
-        setVentas([]);
-        setAllData([]);
-        setPaginatedData([]);
-        setTotalItems(0);
-        setTotalPages(1);
+      // Extracción segura de datos
+      const data = resultado && resultado.data && Array.isArray(resultado.data) ? resultado.data : [];
+      const pagination = resultado && resultado.pagination ? resultado.pagination : {};
+
+      setAllData(data);
+      setPaginatedData(data);
+      setTotalItems(pagination.totalItems || 0);
+      setTotalPages(pagination.totalPages || 1);
+
+      if (currentPage > (pagination.totalPages || 1) && (pagination.totalPages || 0) > 0) {
+        setCurrentPage(pagination.totalPages);
       }
     } catch (error) {
-      console.error("Error al cargar ventas:", error);
+      console.error("Error cargando ventas:", error);
       toast.error("Error al cargar las ventas");
-      setVentas([]);
       setAllData([]);
       setPaginatedData([]);
       setTotalItems(0);
@@ -761,62 +764,10 @@ export const Ventas = () => {
     }
   };
 
-  const aplicarFiltrosYOrdenar = (data) => {
-    const ordenadas = [...data].sort((a, b) => {
-      return new Date(b.FechaVenta) - new Date(a.FechaVenta);
-    });
-
-    let filtradas = ordenadas;
-    if (campoFiltro && filtroValor.trim()) {
-      const valorBusqueda = filtroValor.toLowerCase().trim();
-      filtradas = ordenadas.filter(venta => {
-        switch (campoFiltro) {
-          case 'VentaId':
-            return venta.VentaId?.toLowerCase().includes(valorBusqueda);
-          case 'PedidoClienteId':
-            return venta.PedidoClienteId?.toLowerCase().includes(valorBusqueda);
-          case 'ClienteNombre':
-            return venta.ClienteNombre?.toLowerCase().includes(valorBusqueda);
-          case 'Estado':
-            return venta.Estado?.toLowerCase().includes(valorBusqueda);
-          case 'Origen':
-            return venta.Origen?.toLowerCase().includes(valorBusqueda);
-          default:
-            return true;
-        }
-      });
-    }
-
-    setAllData(filtradas);
-    setTotalItems(filtradas.length);
-
-    const totalPagesCalc = Math.ceil(filtradas.length / itemsPerPage);
-    setTotalPages(totalPagesCalc > 0 ? totalPagesCalc : 1);
-
-    if (currentPage > totalPagesCalc && totalPagesCalc > 0) {
-      setCurrentPage(totalPagesCalc);
-    }
-
-    const paginated = paginateData(filtradas);
-    setPaginatedData(paginated);
-  };
-
+  // useEffect que dispara la carga
   useEffect(() => {
     cargarVentas();
-  }, []);
-
-  useEffect(() => {
-    if (ventas.length > 0) {
-      aplicarFiltrosYOrdenar(ventas);
-    }
-  }, [campoFiltro, filtroValor]);
-
-  useEffect(() => {
-    if (allData.length > 0) {
-      const paginated = paginateData(allData);
-      setPaginatedData(paginated);
-    }
-  }, [currentPage, itemsPerPage, allData]);
+  }, [currentPage, itemsPerPage, campoFiltro, filtroValor]);
 
   const handleVerClick = async (venta) => {
     setCargandoVenta(true);
@@ -895,7 +846,10 @@ export const Ventas = () => {
                 {campoFiltro === "Estado" ? (
                   <select
                     value={filtroValor}
-                    onChange={(e) => setFiltroValor(e.target.value)}
+                    onChange={(e) => {
+                      setFiltroValor(e.target.value);
+                      setCurrentPage(1);
+                    }}
                     className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700"
                   >
                     <option value="">Todos los estados</option>
@@ -905,7 +859,10 @@ export const Ventas = () => {
                 ) : campoFiltro === "Origen" ? (
                   <select
                     value={filtroValor}
-                    onChange={(e) => setFiltroValor(e.target.value)}
+                    onChange={(e) => {
+                      setFiltroValor(e.target.value);
+                      setCurrentPage(1);
+                    }}
                     className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700"
                   >
                     <option value="">Todos los orígenes</option>
@@ -990,7 +947,7 @@ export const Ventas = () => {
                       <p className="mt-2">Cargando ventas...</p>
                     </td>
                   </tr>
-                ) : paginatedData.length > 0 ? (
+                ) : paginatedData && paginatedData.length > 0 ? (
                   paginatedData.map((venta) => (
                     <tr key={venta.VentaId} className="hover:bg-slate-50">
                       <td className="px-6 py-4 text-sm text-slate-700 font-mono font-bold">
@@ -1007,14 +964,16 @@ export const Ventas = () => {
                         {formatPrice(venta.Total)}
                       </td>
                       <td className="px-6 py-4 text-sm">
-                        <div className="font-medium">{venta.detalle?.length || 0} items</div>
-                        {venta.detalle && (
+                        <div className="font-medium">
+                          {venta.ItemsCount || venta.detalle?.length || 0} items
+                        </div>
+                        {(venta.ItemsCount || venta.detalle?.length) > 0 && (
                           <div className="text-xs text-slate-500">
-                            {venta.detalle.filter(d => d.TipoItem === 'producto').length} prod /
-                            {venta.detalle.filter(d => d.TipoItem === 'servicio').length} serv
+                            {venta.ProductosCount || venta.detalle?.filter(d => d?.TipoItem === 'producto').length || 0} prod /
+                            {venta.ServiciosCount || venta.detalle?.filter(d => d?.TipoItem === 'servicio').length || 0} serv
                           </div>
                         )}
-                      </td>
+                      </td> 
                       <td className="px-6 py-4">
                         <OrigenBadge origen={venta.Origen} />
                       </td>
@@ -1058,7 +1017,7 @@ export const Ventas = () => {
               </tbody>
             </table>
 
-            {paginatedData.length > 0 && (
+            {paginatedData && paginatedData.length > 0 && (
               <div className="px-6 py-4 border-t">
                 <Pagination
                   currentPage={currentPage}

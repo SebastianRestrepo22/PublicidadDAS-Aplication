@@ -31,17 +31,48 @@ export const createVentaManual = async (ventaData) => {
   }
 };
 
-export const getVentas = async () => {
+export const getVentas = async (page = 1, limit = 10, filtroCampo = null, filtroValor = null, fechaInicio = null, fechaFin = null) => {
   try {
-    const response = await axios.get(`${API_URL}/ventas`, {
+    const params = {
+      page: page.toString(),
+      limit: limit.toString()
+    };
+    
+    if (filtroCampo && filtroValor) {
+      params.filtroCampo = filtroCampo;
+      params.filtroValor = filtroValor;
+    }
+    if (fechaInicio) params.fechaInicio = fechaInicio;
+    if (fechaFin) params.fechaFin = fechaFin;
+    
+    const response = await axios.get(`${API_URL}/ventas`, { 
+      params,
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
     });
-    return response.data;
+    
+    const responseData = response.data;
+    const data = responseData && responseData.data && Array.isArray(responseData.data) ? responseData.data : [];
+    const pagination = responseData && responseData.pagination ? responseData.pagination : { 
+      totalItems: 0, 
+      totalPages: 1, 
+      currentPage: page, 
+      itemsPerPage: limit 
+    };
+    
+    // ✅ RETORNO CORRECTO
+    return {
+      data: data,
+      pagination: pagination
+    };
   } catch (error) {
     console.error("Error en getVentas:", error);
-    throw error;
+    // ✅ Fallback CORRECTO
+    return { 
+      data: [], 
+      pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } 
+    };
   }
 };
 
