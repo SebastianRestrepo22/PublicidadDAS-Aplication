@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Modal from "../components/modals/modal";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { Pagination } from "../components/paginacion/pagination.jsx"; 
-import { useCategorias } from "./hook/useCategorias.js"; 
+import { Pagination } from "../components/paginacion/pagination.jsx"; // Importa el componente de paginación
+import { useCategorias } from "./hook/useCategorias.js"; // Importa el nuevo hook
 
 export const Categorias = () => {
   const {

@@ -3,10 +3,12 @@ import { useCompras, ESTADOS_COMPRA } from "./hook/useCompras";
 import { ComprasList } from "./components/ComprasList";
 import { ComprasCreate } from "./components/ComprasCreate";
 import { ComprasView } from "./components/ComprasView";
-import { ComprasSelectProveedor } from "./components/ComprasSelectProveedor";
 import { ComprasSelectProducto } from "./components/ComprasSelectProducto";
 import { getDetallesByCompraId, createCompra, createDetalleCompra } from "./services/services.compras";
 import { toast, ToastContainer } from "react-toastify";
+import axios from "axios";
+import { buscarProductosPorCampo } from "./services/services.compras";
+
 
 const getShortId = (id) => {
   const str = String(id || "");
@@ -67,12 +69,28 @@ const validarFormulario = (form, detalles, listaProveedores) => {
 };
 
 export const Compras = () => {
+  // 🔥 AQUÍ VA LA PRIMERA PARTE: Desestructurar el hook con las nuevas propiedades
   const {
+    // Datos paginados
+    paginatedData,
+    currentPage,
+    setCurrentPage,
+    itemsPerPage,
+    setItemsPerPage,
+    totalItems,
+    totalPages,
+    filtroCampo,
+    setFiltroCampo,
+    filtroValor,
+    setFiltroValor,
+
+    // Propiedades existentes
     compras,
     productos,
     proveedores,
     ESTADOS_COMPRA,
     fetchCompras,
+    fetchProductos,
     actualizarEstado,
     puedeCambiarEstado,
     setCompras
@@ -97,24 +115,6 @@ export const Compras = () => {
   const [errores, setErrores] = useState([]);
   const [returnTo, setReturnTo] = useState(null);
 
-  // PAGINACIÓN
-  const [allData, setAllData] = useState([]);
-  const [paginatedData, setPaginatedData] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [filtroCampo, setFiltroCampo] = useState("");
-  const [filtroText, setFiltroText] = useState("");
-
-  // Select Proveedor
-  const [searchTermProveedores, setSearchTermProveedores] = useState("");
-  const [currentPageProveedores, setCurrentPageProveedores] = useState(1);
-  const [totalPagesProveedores, setTotalPagesProveedores] = useState(1);
-  const [totalProveedores, setTotalProveedores] = useState(0);
-  const [proveedoresPaginados, setProveedoresPaginados] = useState([]);
-  const [loadingProveedores, setLoadingProveedores] = useState(false);
-
   // Select Producto
   const [searchTermProductos, setSearchTermProductos] = useState("");
   const [currentPageProductos, setCurrentPageProductos] = useState(1);
@@ -129,8 +129,6 @@ export const Compras = () => {
     cargarColores();
   }, []);
 
-
-
   // Función para cargar colores de la BD
   const cargarColores = async () => {
     setLoadingColores(true);
@@ -143,7 +141,6 @@ export const Compras = () => {
         throw new Error(`Error HTTP: ${response.status}`);
       }
 
-      // Verificar que la respuesta sea JSON
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes('application/json')) {
         console.error("Content-Type no es JSON:", contentType);
@@ -155,15 +152,13 @@ export const Compras = () => {
       const data = await response.json();
       console.log("Datos recibidos del servidor:", data);
 
-      // Como los datos ya son un array directamente, los usamos así
       if (Array.isArray(data)) {
         console.log("Es un array directo, longitud:", data.length);
 
-        // Solo nos aseguramos de que tengan todos los campos necesarios
         const coloresFormateados = data.map(color => ({
           ColorId: color.ColorId,
           Nombre: color.Nombre,
-          Hex: color.Hex || '#CCCCCC' // Por si acaso
+          Hex: color.Hex || '#CCCCCC'
         }));
 
         console.log("Colores formateados:", coloresFormateados);
@@ -198,120 +193,25 @@ export const Compras = () => {
     }
   };
 
-  // Filtros
-  useEffect(() => {
-    let filtered = compras || [];
-    if (filtroCampo && filtroText.trim()) {
-      filtered = filtered.filter((c) => {
-        const valor = String(c[filtroCampo] || "").toLowerCase();
-        return valor.includes(filtroText.toLowerCase());
-      });
-    }
-    setAllData(filtered);
-    setTotalItems(filtered.length);
-    setCurrentPage(1);
-  }, [filtroText, filtroCampo, compras]);
 
-  // Paginación
-  useEffect(() => {
-    if (allData.length > 0) {
-      const totalPagesCalc = Math.ceil(allData.length / itemsPerPage);
-      setTotalPages(totalPagesCalc > 0 ? totalPagesCalc : 1);
-      if (currentPage > totalPagesCalc && totalPagesCalc > 0) {
-        setCurrentPage(totalPagesCalc);
-      }
-      const startIndex = (currentPage - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      setPaginatedData(allData.slice(startIndex, endIndex));
-    } else {
-      setPaginatedData([]);
-      setTotalPages(1);
-    }
-  }, [itemsPerPage, currentPage, allData]);
 
-  // Agrega este useEffect después de los otros useEffects
-  useEffect(() => {
-    // Este efecto se ejecutará cada vez que compras cambie
-    let filtered = compras || [];
-    if (filtroCampo && filtroText.trim()) {
-      filtered = filtered.filter((c) => {
-        const valor = String(c[filtroCampo] || "").toLowerCase();
-        return valor.includes(filtroText.toLowerCase());
-      });
-    }
-    setAllData(filtered);
-    setTotalItems(filtered.length);
-
-    // Recalcular páginas
-    const newTotalPages = Math.ceil(filtered.length / itemsPerPage);
-    setTotalPages(newTotalPages > 0 ? newTotalPages : 1);
-
-    // Actualizar datos paginados
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    setPaginatedData(filtered.slice(startIndex, endIndex));
-  }, [compras, filtroCampo, filtroText, itemsPerPage, currentPage]);
-
-  // Load Proveedores Paginados
-  const loadProveedoresPaginados = async (page = 1, search = "") => {
-    setLoadingProveedores(true);
-    try {
-      const params = new URLSearchParams();
-      params.set("page", page);
-      params.set("limit", itemsPerPage);
-      if (search) params.set("search", search);
-      const res = await fetch(`http://localhost:3000/api/proveedores?${params.toString()}`);
-      const response = await res.json();
-      let data = [];
-      let total = 0;
-      if (Array.isArray(response)) {
-        data = response;
-        total = response.length;
-      } else if (response.data && Array.isArray(response.data)) {
-        data = response.data;
-        total = response.total || response.totalCount || data.length;
-      }
-      setProveedoresPaginados(data);
-      setTotalProveedores(total);
-      setTotalPagesProveedores(Math.ceil(total / itemsPerPage) || 1);
-      setCurrentPageProveedores(page);
-    } catch (err) {
-      console.error("Error al cargar proveedores paginados:", err);
-      setProveedoresPaginados([]);
-      setTotalPagesProveedores(1);
-      setTotalProveedores(0);
-      toast.error("Error al cargar proveedores");
-    } finally {
-      setLoadingProveedores(false);
-    }
-  };
-
-  // Load Productos Paginados
   const loadProductosPaginados = async (page = 1, search = "") => {
     setLoadingProductos(true);
     try {
-      const params = new URLSearchParams();
-      params.set("page", page);
-      params.set("limit", itemsPerPage);
-      if (search) params.set("search", search);
+      const resultado = await buscarProductosPorCampo(
+        search ? "nombre" : null,  // Si hay búsqueda, buscar por nombre
+        search,
+        page,
+        itemsPerPage
+      );
 
-      const resProductos = await fetch(`http://localhost:3000/producto?${params.toString()}`);
-      if (!resProductos.ok) {
-        throw new Error(`HTTP error! status: ${resProductos.status}`);
-      }
-
-      const dataProd = await resProductos.json();
-      const prodData = Array.isArray(dataProd) ? dataProd.map(p => ({
-        ...p,
-        Precio: Number(p.Precio) || 0
-      })) : [];
-
-      setProductosPaginados(prodData);
-      setTotalProductos(prodData.length);
-      setTotalPagesProductos(Math.ceil(prodData.length / itemsPerPage) || 1);
+      setProductosPaginados(resultado.data);
+      setTotalProductos(resultado.total);
+      setTotalPagesProductos(resultado.pages);
       setCurrentPageProductos(page);
-    } catch (err) {
-      console.error("Error al cargar productos paginados:", err);
+
+    } catch (error) {
+      console.error("Error:", error);
       setProductosPaginados([]);
       setTotalPagesProductos(1);
       setTotalProductos(0);
@@ -346,7 +246,6 @@ export const Compras = () => {
       console.log(" [goToView] ¿Es array?", Array.isArray(detalles));
       console.log(" [goToView] Longitud de detalles:", detalles?.length);
 
-      // Si no hay detalles, mostrar un mensaje
       if (!detalles || detalles.length === 0) {
         console.warn(" [goToView] No hay detalles para esta compra");
 
@@ -362,23 +261,18 @@ export const Compras = () => {
         return;
       }
 
-      // Mostrar el primer detalle para ver su estructura
       console.log(" [goToView] Primer detalle (raw):", detalles[0]);
       console.log(" [goToView] Propiedades del primer detalle:", Object.keys(detalles[0]));
 
       const proveedor = proveedores.find(p => p.ProveedorId === compra.ProveedorId);
       const nombreProveedor = proveedor?.NombreProveedor || "";
 
-      // Mapear detalles y asegurar que los colores estén presentes
       const detallesConProducto = (detalles || []).map(d => {
-        // Asegurar que los valores numéricos sean correctos
         const precioUnitario = Number(d.PrecioUnitario) || 0;
         const cantidad = Number(d.Cantidad) || 0;
 
-        // IMPORTANTE: Verificar la estructura completa del detalle
         console.log(" [goToView] Procesando detalle:", d.DetalleCompraId);
 
-        // Procesar colores si existen
         let coloresDetalle = [];
         if (d.colores) {
           console.log(" [goToView] colores en detalle:", d.colores);
@@ -393,7 +287,6 @@ export const Compras = () => {
           }
         }
 
-        // Buscar información del producto
         const producto = productos.find(p => p.ProductoId === d.ProductoId);
         console.log(" [goToView] Producto encontrado:", producto?.Nombre);
 
@@ -413,7 +306,6 @@ export const Compras = () => {
       console.log(" [goToView] Detalles con producto mapeados:", detallesConProducto);
       console.log(" [goToView] Primer detalle mapeado:", detallesConProducto[0]);
 
-      // Verificar que el detalle tenga la estructura correcta para la vista
       if (detallesConProducto[0]) {
         console.log(" [goToView] Estructura final:", {
           DetalleCompraId: detallesConProducto[0].DetalleCompraId,
@@ -447,10 +339,8 @@ export const Compras = () => {
 
   const handleActualizarEstado = async (idCompra, nuevoEstado, productosAActualizar, motivo = "") => {
     try {
-      // Actualizar el estado en el backend y en el hook
       await actualizarEstado(idCompra, nuevoEstado, productosAActualizar, motivo);
 
-      // Actualizar el estado local
       setCompras(prevCompras =>
         prevCompras.map(compra =>
           compra.CompraId === idCompra
@@ -459,19 +349,6 @@ export const Compras = () => {
         )
       );
 
-      // Aplicar filtros actuales
-      let filtered = compras;
-      if (filtroCampo && filtroText.trim()) {
-        filtered = filtered.filter((c) => {
-          const valor = String(c[filtroCampo] || "").toLowerCase();
-          return valor.includes(filtroText.toLowerCase());
-        });
-      }
-
-      setAllData(filtered);
-      setTotalItems(filtered.length);
-
-      // VOLVER A LA TABLA
       setViewMode("list");
       setSelectedCompra(null);
 
@@ -488,23 +365,8 @@ export const Compras = () => {
     setErrores([]);
   };
 
-  const goToSelectProveedor = (from) => {
-    setReturnTo(from);
-    setSearchTermProveedores("");
-    loadProveedoresPaginados(1, "");
-    setViewMode("select-proveedor");
-  };
 
-  const seleccionarProveedorDesdeVista = (proveedor) => {
-    if (returnTo === "create") {
-      setFormCrear(prev => ({
-        ...prev,
-        ProveedorId: proveedor.ProveedorId,
-        nombreProveedor: proveedor.NombreProveedor
-      }));
-    }
-    setViewMode(returnTo || "list");
-  };
+
 
   const goToSelectProducto = (from, index) => {
     setReturnTo(from);
@@ -514,7 +376,7 @@ export const Compras = () => {
     setViewMode("select-producto");
   };
 
-  const seleccionarProductoDesdeVista = (item) => {
+  const seleccionarProductoDesdeVista = async (item) => {
     if (returnTo === "create" && currentDetailIndex >= 0) {
       setDetallesCrear(prev => {
         const nuevos = [...prev];
@@ -524,18 +386,14 @@ export const Compras = () => {
         }
         return nuevos;
       });
+
+      // Recargar productos después de seleccionar
+      await fetchProductos();
     }
     setViewMode(returnTo || "list");
   };
 
-  const getProveedorDisplay = (id, nombre = "") => {
-    if (!id) return "Seleccionar proveedor";
-    if (nombre) {
-      return `${getShortId(id)} - ${nombre}`;
-    }
-    const prov = proveedores.find(p => p.ProveedorId === id);
-    return prov ? `${getShortId(prov.ProveedorId)} - ${prov.NombreProveedor}` : `ID: ${getShortId(id)}`;
-  };
+
 
   const getProductoDisplay = (id) => {
     if (!id) return "Seleccionar producto";
@@ -550,24 +408,20 @@ export const Compras = () => {
     ]);
   };
 
-
   const actualizarDetalleCrear = (index, campo, valor) => {
     setDetallesCrear(prev => {
       const nuevos = [...prev];
 
-      // Si es el campo colores, asegurar que se guarde correctamente
       if (campo === "colores") {
         console.log(`Actualizando colores en índice ${index}:`, valor);
         nuevos[index][campo] = valor;
 
-        // Calcular cantidad total basada en los colores
         const cantidadTotal = valor.reduce((sum, color) => sum + (Number(color.Stock) || 0), 0);
         nuevos[index].Cantidad = cantidadTotal;
         nuevos[index].tipoStock = "colores";
       } else {
         nuevos[index][campo] = valor;
 
-        // Recalcular subtotal si es cantidad o precio
         if (campo === "Cantidad" || campo === "PrecioUnitario") {
           const cantidad = Number(nuevos[index].Cantidad) || 0;
           const precio = Number(nuevos[index].PrecioUnitario) || 0;
@@ -575,7 +429,6 @@ export const Compras = () => {
         }
       }
 
-      // Si es ProductoId, abrir selector de producto
       if (campo === "ProductoId") {
         goToSelectProducto("create", index);
       }
@@ -594,7 +447,7 @@ export const Compras = () => {
     setErrores([]);
 
     try {
-      console.log("Detalles a guardar:", detallesCrear); // LOG IMPORTANTE
+      console.log("Detalles a guardar:", detallesCrear);
 
       const total = detallesCrear.reduce((sum, item) => sum + (Number(item.Subtotal) || 0), 0);
 
@@ -606,6 +459,7 @@ export const Compras = () => {
       };
 
       const compraCreada = await createCompra(compraData);
+      console.log("✅ Compra creada:", compraCreada);
 
       if (!compraCreada || !compraCreada.CompraId) {
         throw new Error("No se recibió el ID de la compra creada");
@@ -621,17 +475,21 @@ export const Compras = () => {
           Cantidad: Number(detalle.Cantidad) || 0,
           PrecioUnitario: Number(detalle.PrecioUnitario) || 0,
           Descripcion: detalle.Descripcion || `Compra de producto`,
-          colores: detalle.colores || [] // <-- Asegurar que se envíen los colores
+          colores: detalle.colores || []
         };
 
-        console.log(`Enviando detalle ${i}:`, detalleData); // LOG IMPORTANTE
-
+        console.log(`Enviando detalle ${i}:`, detalleData);
         await createDetalleCompra(detalleData);
       }
 
-      goToBackToList();
-      await fetchCompras();
+      // 🔥 IMPORTANTE: Forzar a página 1 y recargar datos
+      setCurrentPage(1);  // Volver a la primera página
+      await fetchCompras();  // Recargar compras
+
       toast.success(`Compra creada exitosamente. Total: ${formatPrice(total)}`);
+
+      // Volver a la lista
+      goToBackToList();
 
     } catch (err) {
       console.error("ERROR DETALLADO:", err);
@@ -664,16 +522,17 @@ export const Compras = () => {
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Compras</h1>
 
         {viewMode === "list" && (
+          // 🔥 AQUÍ VA LA SEGUNDA PARTE: Pasar los datos paginados al componente
           <ComprasList
-            paginatedData={paginatedData}
-            filtroText={filtroText}
-            setFiltroText={setFiltroText}
+            paginatedData={paginatedData}  // ← Usar paginatedData en lugar de filtrar localmente
+            filtroText={filtroValor}
+            setFiltroText={setFiltroValor}
             filtroCampo={filtroCampo}
             setFiltroCampo={setFiltroCampo}
             onView={goToView}
             onCreate={goToCreate}
             onActualizarEstado={handleActualizarEstado}
-            onRefresh={fetchCompras}  // ← Asegúrate de pasar esta prop
+            onRefresh={fetchCompras}
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={handlePageChange}
@@ -689,17 +548,15 @@ export const Compras = () => {
             setFormCrear={setFormCrear}
             detallesCrear={detallesCrear}
             productos={productos}
-            colores={colores} // ← AHORA PASAMOS LOS COLORES
+            colores={colores}
             proveedores={proveedores}
             errores={errores}
             onBack={goToBackToList}
-            onSelectProveedor={goToSelectProveedor}
             onSelectProducto={goToSelectProducto}
             onActualizarDetalle={actualizarDetalleCrear}
             onAñadirDetalle={añadirDetalleCrear}
             onEliminarDetalle={(index) => setDetallesCrear(prev => prev.filter((_, i) => i !== index))}
             onCreate={handleCreate}
-            getProveedorDisplay={getProveedorDisplay}
             getProductoDisplay={getProductoDisplay}
             calcularTotal={calcularTotal}
           />
@@ -714,21 +571,6 @@ export const Compras = () => {
             getProveedorDisplay={getProveedorDisplay}
             onActualizarEstado={handleActualizarEstado}
             puedeCambiarEstado={puedeCambiarEstado}
-          />
-        )}
-
-        {viewMode === "select-proveedor" && (
-          <ComprasSelectProveedor
-            searchTermProveedores={searchTermProveedores}
-            setSearchTermProveedores={setSearchTermProveedores}
-            proveedoresPaginados={proveedoresPaginados}
-            totalProveedores={totalProveedores}
-            currentPageProveedores={currentPageProveedores}
-            totalPagesProveedores={totalPagesProveedores}
-            loadingProveedores={loadingProveedores}
-            onLoadProveedores={loadProveedoresPaginados}
-            onSelectProveedor={seleccionarProveedorDesdeVista}
-            onCancel={() => setViewMode(returnTo || "list")}
           />
         )}
 

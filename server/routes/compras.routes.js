@@ -5,19 +5,31 @@ import {
   createCompra,
   deleteCompra,
   updateCompra,
-  updateCompraEstado
+  updateCompraEstado,
+  // 🔥 Nuevas funciones importadas
+  getComprasPaginated,
+  buscarCompras
 } from '../controllers/compras.controller.js';
 
 const router = express.Router();
 
-router.get('/', getAllCompras);
+// 🔥 Ruta principal con paginación (GET /api/compras)
+router.get('/', getComprasPaginated);
+
+// 🔥 Ruta de búsqueda con paginación (GET /api/compras/buscar)
+router.get('/buscar', buscarCompras);
+
+// 📌 Ruta para obtener TODAS las compras (sin paginación) - para compatibilidad
+router.get('/todas', getAllCompras);
+
+// Rutas CRUD (específicas después de las rutas con parámetros)
 router.get('/:id', getCompraById);
 router.post('/', createCompra);
-router.delete('/:id', deleteCompra);
 router.put('/:id', updateCompra);
-
+router.delete('/:id', deleteCompra);
 router.patch('/:id/estado', updateCompraEstado);
 
+// Ruta para anulación automática
 router.post('/auto-cancelar', async (req, res) => {
   try {
     const resultado = await anularComprasExpiradas();
@@ -30,6 +42,5 @@ router.post('/auto-cancelar', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 
 export default router;

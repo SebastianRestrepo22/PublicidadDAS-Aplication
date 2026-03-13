@@ -27,62 +27,9 @@ export const ServiciosDashboard = () => {
         return "list";
     }, [location.pathname, id]);
 
-    // Hook de servicios
-    // ServiciosDashboard.jsx - Agrega el callback
+    const paginacion = usePaginacion(mode);
+    const servicios = useServicios(mode, id, paginacion.refrescar);
 
-    // Hook de servicios
-    const {
-        values,
-        setValues,
-        tamanos,
-        setTamanos,
-        estadoEdit,
-        setEstadoEdit,
-        submitted,
-        setSubmitted,
-        nombreError,
-        editData,
-        setEditData,
-        openEliminar,
-        setOpenEliminar,
-        isSubmitting,
-        handleChanges,
-        handleNombreBlur,
-        handleToggleEstado,
-        handleDelete,
-        handleDeleteClick,
-        handleSubmit,
-        goToBackToList,
-        goToCreate,
-        goToView,
-        goToEdit,
-        resetForm,
-        allData: serviciosData,
-        setAllData: setServiciosData,
-        actualizarPaginacion // 🔥 Nueva función
-    } = useServicios(mode, id);
-
-    // Hook de paginación - con callback
-    const {
-        paginatedData,
-        currentPage,
-        totalPages,
-        totalItems,
-        itemsPerPage,
-        filtroCampo,
-        setFiltroCampo,
-        filtroValor,
-        setFiltroValor,
-        filtroEstado,
-        setFiltroEstado,
-        handlePageChange,
-        handleItemsPerPageChange
-    } = usePaginacion(
-        mode,
-        serviciosData,
-        setServiciosData,
-        actualizarPaginacion 
-    );
     const {
         categorias,
         openCategoriasModal,
@@ -92,16 +39,15 @@ export const ServiciosDashboard = () => {
         categoriasFiltradas,
         seleccionarCategoria,
         obtenerNombreCategoria
-    } = useCategorias(values, setValues);
+    } = useCategorias(servicios.values, servicios.setValues);
 
-    // Navegación
     const handleViewClick = (servicio) => {
-        goToView(servicio.ServicioId);
+        servicios.goToView(servicio.ServicioId);
     };
 
     const handleEditClick = (servicio) => {
         if (servicio.Estado === 'Activo') {
-            goToEdit(servicio.ServicioId);
+            servicios.goToEdit(servicio.ServicioId);
         }
     };
 
@@ -115,38 +61,38 @@ export const ServiciosDashboard = () => {
                 {mode === "list" && (
                     <>
                         <BarraAcciones
-                            onNewClick={goToCreate}
-                            filtroEstado={filtroEstado}
-                            setFiltroEstado={setFiltroEstado}
-                            filtroValor={filtroValor}
-                            setFiltroValor={setFiltroValor}
-                            filtroCampo={filtroCampo}
-                            setFiltroCampo={setFiltroCampo}
+                            onNewClick={servicios.goToCreate}
+                            filtroEstado={paginacion.filtroEstado}
+                            setFiltroEstado={paginacion.setFiltroEstado}
+                            filtroValor={paginacion.filtroValor}
+                            setFiltroValor={paginacion.setFiltroValor}
+                            filtroCampo={paginacion.filtroCampo}
+                            setFiltroCampo={paginacion.setFiltroCampo}
                         />
 
                         <ModalEliminar
-                            open={openEliminar}
+                            open={servicios.openEliminar}
                             onClose={() => {
-                                setOpenEliminar(false);
-                                setEditData(null); // Limpiar editData al cerrar
+                                servicios.setOpenEliminar(false);
+                                servicios.setEditData(null);
                             }}
-                            editData={editData}
-                            onConfirm={handleDelete}
+                            editData={servicios.editData}
+                            onConfirm={servicios.handleDelete}
                         />
 
                         <TablaServicios
-                            paginatedData={paginatedData}
+                            paginatedData={paginacion.paginatedData}
                             categorias={categorias}
                             onView={handleViewClick}
                             onEdit={handleEditClick}
-                            onDelete={handleDeleteClick}
-                            onToggleEstado={handleToggleEstado}
-                            currentPage={currentPage}
-                            totalPages={totalPages}
-                            totalItems={totalItems}
-                            itemsPerPage={itemsPerPage}
-                            onPageChange={handlePageChange}
-                            onItemsPerPageChange={handleItemsPerPageChange}
+                            onDelete={servicios.handleDeleteClick}
+                            onToggleEstado={servicios.handleToggleEstado}
+                            currentPage={paginacion.currentPage}
+                            totalPages={paginacion.totalPages}
+                            totalItems={paginacion.totalItems}
+                            itemsPerPage={paginacion.itemsPerPage}
+                            onPageChange={paginacion.handlePageChange}
+                            onItemsPerPageChange={paginacion.handleItemsPerPageChange}
                         />
                     </>
                 )}
@@ -154,7 +100,7 @@ export const ServiciosDashboard = () => {
                 {(mode === "create" || mode === "edit" || mode === "view") && (
                     <div className="bg-white rounded-xl shadow-sm border p-6">
                         <div className="flex items-center gap-3 mb-6">
-                            <button onClick={goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
+                            <button onClick={servicios.goToBackToList} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
                                 <ArrowLeft size={18} />
                             </button>
                             <h2 className="text-xl font-bold">
@@ -166,29 +112,26 @@ export const ServiciosDashboard = () => {
 
                         {mode === "view" ? (
                             <DetalleServicio
-                                editData={editData}
+                                editData={servicios.editData}
                                 categorias={categorias}
-                                tamanos={tamanos}
-                                onEdit={goToEdit}
-                                onDelete={handleDeleteClick}
-                                onBack={goToBackToList}
+                                onEdit={servicios.goToEdit}
+                                onDelete={servicios.handleDeleteClick}
+                                onBack={servicios.goToBackToList}
                             />
                         ) : (
                             <FormularioServicio
                                 mode={mode}
-                                values={values}
-                                setValues={setValues}
-                                tamanos={tamanos}
-                                setTamanos={setTamanos}
-                                estadoEdit={estadoEdit}
-                                setEstadoEdit={setEstadoEdit}
-                                submitted={submitted}
-                                nombreError={nombreError}
-                                isSubmitting={isSubmitting}
-                                handleChanges={handleChanges}
-                                handleNombreBlur={handleNombreBlur}
-                                handleSubmit={handleSubmit}
-                                onCancel={goToBackToList}
+                                values={servicios.values}
+                                setValues={servicios.setValues}
+                                estadoEdit={servicios.estadoEdit}
+                                setEstadoEdit={servicios.setEstadoEdit}
+                                submitted={servicios.submitted}
+                                nombreError={servicios.nombreError}
+                                isSubmitting={servicios.isSubmitting}
+                                handleChanges={servicios.handleChanges}
+                                handleNombreBlur={servicios.handleNombreBlur}
+                                handleSubmit={servicios.handleSubmit}
+                                onCancel={servicios.goToBackToList}
                                 abrirModalCategorias={() => setOpenCategoriasModal(true)}
                                 obtenerNombreCategoria={obtenerNombreCategoria}
                             />
@@ -203,7 +146,7 @@ export const ServiciosDashboard = () => {
                     categoriaBusqueda={categoriaBusqueda}
                     setCategoriaBusqueda={setCategoriaBusqueda}
                     onSelectCategoria={seleccionarCategoria}
-                    categoriaSeleccionada={values.CategoriaId}
+                    categoriaSeleccionada={servicios.values.CategoriaId}
                 />
 
                 <ToastContainer position="top-right" autoClose={3000} theme="colored" />

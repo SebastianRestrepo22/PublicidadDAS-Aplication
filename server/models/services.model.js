@@ -1,28 +1,22 @@
 import { dbPool } from '../lib/db.js';
 
-// Crear producto
+// Crear servicio
 export const createService = async ({
     ServicioId,
     Nombre,
     Descripcion,
     Imagen,
-    TipoPrecio,
-    Precio,
-    Descuento,
     CategoriaId
 }) => {
     await dbPool.query(
         `INSERT INTO Servicios 
-        (ServicioId, Nombre, Descripcion, Imagen, TipoPrecio, Precio, Descuento, CategoriaId)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (ServicioId, Nombre, Descripcion, Imagen, CategoriaId)
+        VALUES (?, ?, ?, ?, ?)`,
         [
             ServicioId,
             Nombre,
             Descripcion,
             Imagen,
-            TipoPrecio,
-            Precio,
-            Descuento,
             CategoriaId
         ]
     );
@@ -36,9 +30,6 @@ export const getDataServiceById = async (ServicioId) => {
             Nombre,
             Descripcion,
             Imagen,
-            TipoPrecio,
-            Precio,
-            Descuento,
             CategoriaId,
             Estado
         FROM Servicios 
@@ -48,7 +39,7 @@ export const getDataServiceById = async (ServicioId) => {
     return rows;
 };
 
-// Obtener todos los productos
+// Obtener todos los servicios
 export const getDataAllServcios = async () => {
     const [rows] = await dbPool.query(
         `SELECT 
@@ -56,9 +47,6 @@ export const getDataAllServcios = async () => {
             Nombre,
             Descripcion,
             Imagen,
-            TipoPrecio,
-            Precio,
-            Descuento,
             CategoriaId,
             Estado
         FROM Servicios`
@@ -66,31 +54,20 @@ export const getDataAllServcios = async () => {
     return rows;
 };
 
-// Actualizar producto
+// Actualizar servicio
 export const updateDataServicio = async ({
     ServicioId,
     Nombre,
     Descripcion,
     Imagen,
-    TipoPrecio,
-    Precio,
-    Descuento,
     CategoriaId,
     Estado
 }) => {
-
-    if (TipoPrecio === 'POR_TAMANO') {
-        Precio = null;
-    }
-
     const [rows] = await dbPool.query(
         `UPDATE Servicios
          SET Nombre = ?, 
              Descripcion = ?, 
              Imagen = ?, 
-             TipoPrecio = ?,
-             Precio = ?,
-             Descuento = ?, 
              CategoriaId = ?, 
              Estado = ?
          WHERE ServicioId = ?`,
@@ -98,20 +75,15 @@ export const updateDataServicio = async ({
             Nombre,
             Descripcion,
             Imagen,
-            TipoPrecio,
-            Precio,
-            Descuento,
             CategoriaId,
             Estado,
             ServicioId
         ]
     );
-
     return rows.affectedRows;
 };
 
-
-
+// Verificar si un nombre de servicio ya existe
 export const findDuplicateName = async ({ ServicioId, Nombre }) => {
     const [rows] = await dbPool.query(
         'SELECT ServicioId FROM Servicios WHERE Nombre = ? AND ServicioId != ?',
@@ -120,7 +92,7 @@ export const findDuplicateName = async ({ ServicioId, Nombre }) => {
     return rows;
 };
 
-// Eliminar producto
+// Eliminar servicio
 export const deleteDataService = async (ServicioId) => {
     await dbPool.query(
         `DELETE FROM Servicios WHERE ServicioId = ?`,
@@ -128,7 +100,7 @@ export const deleteDataService = async (ServicioId) => {
     );
 };
 
-// Verificar si nombre de producto ya existe
+// Verificar si un nombre de servicio ya existe (para validación)
 export const nombreServiceExiste = async (Nombre) => {
     const [rows] = await dbPool.query(
         `SELECT * FROM Servicios WHERE Nombre = ?`,
@@ -137,16 +109,14 @@ export const nombreServiceExiste = async (Nombre) => {
     return rows;
 };
 
+// Buscar servicio por columna y operador
 export const buscarServicioDB = async ({ columna, operador, parametro }) => {
     const columnasSeguras = [
         'Nombre',
         'Descripcion',
-        'Precio',
-        'Descuento',
         'CategoriaId',
         'Estado'
     ];
-
 
     if (!columnasSeguras.includes(columna)) {
         throw new Error('Columna no permitida');
@@ -160,116 +130,85 @@ export const buscarServicioDB = async ({ columna, operador, parametro }) => {
     return servicios;
 };
 
-export const getServiciosPaginated = async ({ 
-  page = 1, 
-  limit = 10, 
-  filtroCampo = null, 
-  filtroValor = null,
-  estado = null
-}) => {
-  const offset = (page - 1) * limit;
-  let whereConditions = [];
-  let params = [];
-
-  console.log('🔍 getServiciosPaginated - Parámetros:', { page, limit, filtroCampo, filtroValor, estado });
-
-  // Filtro por estado
-  if (estado && ['Activo', 'Inactivo'].includes(estado)) {
-    whereConditions.push('Estado = ?');
-    params.push(estado);
-  }
-
-  // Mapeo de campos del frontend a columnas reales
-  const columnasMap = {
-    nombre: 'Nombre',
-    descripcion: 'Descripcion',
-    precio: 'Precio',
-    descuento: 'Descuento',
-    categoria: 'CategoriaId',
-    tipo: 'TipoPrecio'
-  };
-
-  if (filtroCampo && filtroValor && columnasMap[filtroCampo]) {
-    const columnaReal = columnasMap[filtroCampo];
-    const camposNumericos = ['Precio', 'Descuento'];
-    const camposExactos = ['TipoPrecio', 'CategoriaId'];
+// Verificar si un servicio tiene registros asociados en otras tablas
+export const verificarAsociacionesServicio = async (ServicioId) => {
+    const [detallePedidos] = await dbPool.query(
+        'SELECT COUNT(*) as total FROM detallepedidosclientes WHERE ServicioId = ?',
+        [ServicioId]
+    );
     
-    if (camposNumericos.includes(columnaReal)) {
-      const valorNum = Number(filtroValor);
-      if (!isNaN(valorNum)) {
-        whereConditions.push(`${columnaReal} = ?`);
-        params.push(valorNum);
-      }
-    } else if (camposExactos.includes(columnaReal)) {
-      whereConditions.push(`${columnaReal} = ?`);
-      params.push(filtroValor);
-    } else {
-      whereConditions.push(`${columnaReal} LIKE ?`);
-      params.push(`%${filtroValor}%`);
+    const [detalleVentas] = await dbPool.query(
+        'SELECT COUNT(*) as total FROM detalleventas WHERE ServicioId = ?',
+        [ServicioId]
+    );
+    
+    return {
+        tieneAsociaciones: detallePedidos[0].total > 0 || detalleVentas[0].total > 0,
+        detallePedidos: detallePedidos[0].total,
+        detalleVentas: detalleVentas[0].total
+    };
+};
+
+// Obtener servicios con paginación y filtros
+export const getServiciosPaginated = async ({ 
+    page = 1, 
+    limit = 10, 
+    filtroCampo = null, 
+    filtroValor = null,
+    estado = null
+}) => {
+    const offset = (page - 1) * limit;
+    let whereConditions = [];
+    let params = [];
+
+    // Filtro por estado
+    if (estado && ['Activo', 'Inactivo'].includes(estado)) {
+        whereConditions.push('Estado = ?');
+        params.push(estado);
     }
-  }
 
-  const whereClause = whereConditions.length > 0 
-    ? `WHERE ${whereConditions.join(' AND ')}` 
-    : '';
+    // Filtro dinámico por campo
+    if (filtroCampo && filtroValor) {
+        const camposPermitidos = ['Nombre', 'Descripcion', 'CategoriaId'];
+        if (camposPermitidos.includes(filtroCampo)) {
+            whereConditions.push(`${filtroCampo} LIKE ?`);
+            params.push(`%${filtroValor}%`);
+        }
+    }
 
-  console.log('🔍 SQL Query:', `
-    SELECT 
-      ServicioId,
-      Nombre,
-      Descripcion,
-      Imagen,
-      TipoPrecio,
-      Precio,
-      Descuento,
-      CategoriaId,
-      Estado
-    FROM Servicios
-    ${whereClause}
-    ORDER BY Nombre
-    LIMIT ? OFFSET ?
-  `);
-  console.log('📊 Params:', [...params, limit, offset]);
+    const whereClause = whereConditions.length > 0 
+        ? `WHERE ${whereConditions.join(' AND ')}` 
+        : '';
 
-  // 🔥 CORREGIDO: Quitamos CreatedAt y UpdatedAt que no existen
-  const [servicios] = await dbPool.query(`
-    SELECT 
-      ServicioId,
-      Nombre,
-      Descripcion,
-      Imagen,
-      TipoPrecio,
-      Precio,
-      Descuento,
-      CategoriaId,
-      Estado
-    FROM Servicios
-    ${whereClause}
-    ORDER BY Nombre
-    LIMIT ? OFFSET ?
-  `, [...params, limit, offset]);
+    // Consulta principal con paginación
+    const [servicios] = await dbPool.query(`
+        SELECT 
+            ServicioId,
+            Nombre,
+            Descripcion,
+            Imagen,
+            CategoriaId,
+            Estado
+        FROM Servicios
+        ${whereClause}
+        ORDER BY Nombre
+        LIMIT ? OFFSET ?
+    `, [...params, limit, offset]);
 
-  console.log('✅ Servicios encontrados:', servicios.length);
-  if (servicios.length > 0) {
-    console.log('✅ Primer servicio:', servicios[0]);
-  }
+    // Contar total de registros para paginación
+    const [countResult] = await dbPool.query(`
+        SELECT COUNT(*) as total 
+        FROM Servicios
+        ${whereClause}
+    `, params);
 
-  // Obtener total de servicios para paginación
-  const [countResult] = await dbPool.query(`
-    SELECT COUNT(*) as total 
-    FROM Servicios
-    ${whereClause}
-  `, params);
+    const totalItems = countResult[0]?.total || 0;
 
-  console.log('✅ Total en BD:', countResult[0]?.total);
-
-  const totalItems = countResult[0]?.total || 0;
-
-  return {
-    data: servicios,
-    totalItems: totalItems,
-    currentPage: Number(page),
-    itemsPerPage: Number(limit),
-    totalPages: Math.ceil(totalItems / limit)
-  };
+    return {
+        data: servicios,
+        totalItems: totalItems,
+        currentPage: Number(page),
+        itemsPerPage: Number(limit),
+        totalPages: Math.ceil(totalItems / limit)
+    };
 };

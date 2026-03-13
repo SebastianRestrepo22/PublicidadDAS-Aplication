@@ -2,21 +2,16 @@ import axios from "axios";
 
 const url = 'http://localhost:3000/api/';
 
-// ========== FUNCIÓN PARA COMPATIBILIDAD CON MÓDULO DE PRODUCTOS ==========
-// ¡NO ELIMINAR! Esta función la usa el módulo de productos de mi compañero
+// Listar todas las categorías (sin paginación - para compatibilidad)
 export const getAllCategorias = async () => {
   try {
-    const response = await axios.get(`${'http://localhost:3000/api/'}categorias/todas`);
-    return response; // Devuelve la respuesta completa como espera el componente productos
+    const response = await axios.get('http://localhost:3000/api/' + "categorias/all");
+    return response;
   } catch (error) {
-    console.error("Error al obtener todas las categorías:", error);
-    return { data: [], status: false };
+    return { status: false, message: "No está la API de categorías", error };
   }
 };
 
-// ========== TUS FUNCIONES CON PAGINACIÓN ==========
-
-// Obtener categorías con paginación (para tu módulo de categorías)
 export const getCategoriasPaginated = async (page = 1, limit = 10, filtroCampo = null, filtroValor = null) => {
   try {
     const params = new URLSearchParams({
@@ -26,14 +21,14 @@ export const getCategoriasPaginated = async (page = 1, limit = 10, filtroCampo =
     });
     
     const response = await axios.get(`${'http://localhost:3000/api/'}categorias?${params}`);
-    return response.data;
+    return response.data; // Devuelve { data: [...], pagination: {...} }
   } catch (error) {
     console.error("Error al obtener categorías paginadas:", error);
     return { data: [], pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } };
   }
 };
 
-// Buscar categorías con paginación
+// 🔥 NUEVA FUNCIÓN: Buscar categorías con paginación
 export const buscarCategorias = async (campo, valor, page = 1, limit = 10) => {
   try {
     const params = new URLSearchParams({
@@ -44,14 +39,12 @@ export const buscarCategorias = async (campo, valor, page = 1, limit = 10) => {
     });
     
     const response = await axios.get(`${'http://localhost:3000/api/'}categorias/buscar?${params}`);
-    return response.data;
+    return response.data; // Devuelve { data: [...], pagination: {...} }
   } catch (error) {
     console.error("Error al buscar categorías:", error);
     return { data: [], pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } };
   }
 };
-
-// ========== FUNCIONES CRUD ==========
 
 // Obtener una categoría por ID
 export const getCategoriaById = async (id) => {

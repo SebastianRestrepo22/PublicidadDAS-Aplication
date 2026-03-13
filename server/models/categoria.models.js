@@ -1,7 +1,5 @@
 import { dbPool } from "../lib/db.js";
 
-// ========== FUNCIONES EXISTENTES ==========
-
 // Obtener todas las categorías (sin paginación)
 export const getAllCategorias = async () => {
   const [categorias] = await dbPool.query('SELECT * FROM categorias ORDER BY Nombre');
@@ -27,12 +25,13 @@ export const getCategoriaByNombre = async (nombre) => {
 };
 
 // Crear categoría
-export const createCategoria = async ({ CategoriaId, nombreCategoria, descripcion }) => {
+export const createCategoria = async ({ nombreCategoria, descripcion }) => {
+  const CategoriaId = uuidv4();
   const [result] = await dbPool.query(
     'INSERT INTO categorias (CategoriaId, Nombre, Descripcion) VALUES (?, ?, ?)',
     [CategoriaId, nombreCategoria, descripcion]
   );
-  return result;
+  return { CategoriaId, nombreCategoria, descripcion };
 };
 
 // Actualizar categoría
@@ -53,14 +52,14 @@ export const deleteCategoria = async (id) => {
   return result;
 };
 
-// ========== NUEVAS FUNCIONES CON PAGINACIÓN ==========
-
-// Obtener categorías con paginación y filtros
+// 🔥 NUEVA FUNCIÓN: Obtener categorías con paginación y filtros
 export const getCategoriasPaginated = async ({ 
   page = 1, 
   limit = 10, 
   filtroCampo = null, 
-  filtroValor = null 
+  filtroValor = null,
+  sortBy = 'Nombre',
+  sortOrder = 'ASC'
 }) => {
   const offset = (page - 1) * limit;
   let whereClause = '';
@@ -86,9 +85,16 @@ export const getCategoriasPaginated = async ({
     }
   }
 
+  // Validar sortOrder
+  const order = sortOrder.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+  
+  // Validar sortBy (protección contra SQL injection)
+  const columnasPermitidas = ['CategoriaId', 'Nombre', 'Descripcion'];
+  const sortColumn = columnasPermitidas.includes(sortBy) ? sortBy : 'Nombre';
+
   // Consulta principal con LIMIT/OFFSET
   const [rows] = await dbPool.query(
-    `SELECT * FROM categorias ${whereClause} ORDER BY Nombre LIMIT ? OFFSET ?`,
+    `SELECT * FROM categorias ${whereClause} ORDER BY ${sortColumn} ${order} LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );
 
@@ -106,7 +112,7 @@ export const getCategoriasPaginated = async ({
   };
 };
 
-// Buscar categorías con paginación
+// 🔥 NUEVA FUNCIÓN: Buscar categorías con paginación (wrapper de getCategoriasPaginated)
 export const buscarCategoriasPaginated = async ({ page, limit, columna, valor }) => {
   return await getCategoriasPaginated({ 
     page, 

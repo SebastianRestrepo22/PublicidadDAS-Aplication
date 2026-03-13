@@ -1,27 +1,31 @@
 import express from 'express';
 import {
-  getAllCategorias,  // Esta función devuelve TODAS (sin paginación)
+  getAllCategorias,
   getCategoriaById,
   createCategoria,
   deleteCategoria,
   updateCategoria,
+  // 🔥 Nuevas funciones importadas
   getCategoriasPaginated,
   buscarCategorias
 } from '../controllers/categoria.controller.js';
 
 const router = express.Router();
 
-// Rutas con paginación (para tu módulo)
+// 🔥 Ruta principal con paginación (GET /api/categorias)
 router.get('/', getCategoriasPaginated);
+
+// 🔥 Ruta de búsqueda con paginación (GET /api/categorias/buscar)
 router.get('/buscar', buscarCategorias);
 
-// Ruta específica para obtener TODAS (para el módulo de productos de tu compañero)
-router.get('/todas', getAllCategorias);
-
-// Rutas CRUD
+// Rutas específicas (deben ir después de las rutas dinámicas con parámetros)
 router.get('/:id', getCategoriaById);
 router.post('/', createCategoria);
 router.put('/:id', updateCategoria);
 router.delete('/:id', deleteCategoria);
+
+// 📌 Mantenemos getAllCategorias por si acaso, pero no la usamos en las rutas
+// Si quieres mantener compatibilidad con código antiguo, puedes agregar:
+// router.get('/todas', getAllCategorias);
 
 export default router;

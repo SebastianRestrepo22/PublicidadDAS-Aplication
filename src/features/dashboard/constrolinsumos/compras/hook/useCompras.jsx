@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react";
 import {
-  getAllCompras,
+  getComprasPaginated,
+  buscarCompras,
   getAllProductos,
-  getAllProveedores,
+  getAllProveedoresSimple,
   updateCompraEstado
 } from "../services/services.compras";
 import { toast } from "react-toastify";
 
-// Constantes para los estados
 export const ESTADOS_COMPRA = {
   PENDIENTE: 'pendiente',
   RECIBIDO: 'recibido',
-  ANULADA: 'anulada'  // Agregamos este estado
+  ANULADA: 'anulada'
 };
 
 export const useCompras = () => {
@@ -19,24 +19,46 @@ export const useCompras = () => {
   const [productos, setProductos] = useState([]);
   const [proveedores, setProveedores] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  // Estados para paginación
+  const [paginatedData, setPaginatedData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [filtroCampo, setFiltroCampo] = useState("");
+  const [filtroValor, setFiltroValor] = useState("");
+
+  const fetchProductos = async () => {
+    try {
+      const resProductos = await getAllProductos();
+      setProductos(resProductos || []);
+      return resProductos;
+    } catch (err) {
+      console.error("Error cargando productos:", err);
+      return [];
+    }
+  };
+
+  const fetchProveedores = async () => {
+    try {
+      const resProveedores = await getAllProveedoresSimple();
+      setProveedores(resProveedores || []);
+      return resProveedores;
+    } catch (err) {
+      console.error("Error cargando proveedores:", err);
+      return [];
+    }
+  };
 
   const fetchCatalogos = async () => {
     setLoading(true);
     try {
-      const [resProductos, resProveedores] = await Promise.all([
-        getAllProductos().catch(err => {
-          console.error("Error cargando productos:", err);
-          toast.warning("No se pudieron cargar los productos.");
-          return [];
-        }),
-        getAllProveedores().catch(err => {
-          console.error("Error cargando proveedores:", err);
-          toast.warning("No se pudieron cargar los proveedores.");
-          return [];
-        })
+      await Promise.all([
+        fetchProductos(),
+        fetchProveedores()
       ]);
-      setProductos(resProductos || []);
-      setProveedores(resProveedores || []);
     } catch (err) {
       console.error("Error cargando catálogos:", err);
       toast.error("Error al cargar datos iniciales");
@@ -46,69 +68,149 @@ export const useCompras = () => {
   };
 
   const fetchCompras = async () => {
+    console.log("🔍 fetchCompras - INICIANDO con:", {
+      currentPage,
+      itemsPerPage,
+      filtroCampo,
+      filtroValor
+    });
+
     try {
-      const data = await getAllCompras();
-      setCompras(data || []);
+      let resultado;
+
+      if (filtroCampo && filtroValor) {
+        resultado = await buscarCompras(filtroCampo, filtroValor, currentPage, itemsPerPage);
+      } else {
+        resultado = await getComprasPaginated(currentPage, itemsPerPage);
+      }
+
+      console.log("📥 fetchCompras - RESPUESTA CRUDA:", resultado);
+
+      if (!resultado) {
+        console.error("❌ resultado es null/undefined");
+        setInitialLoading(false);
+        return;
+      }
+
+      // 🔥 Extraer datos y paginación
+      const data = resultado?.data || [];
+      const pagination = resultado?.pagination || { 
+        totalItems: 0, 
+        totalPages: 1, 
+        currentPage, 
+        itemsPerPage 
+      };
+
+      console.log("✅ fetchCompras - DATOS EXTRAÍDOS:", {
+        cantidad: data.length,
+        data: data,
+        pagination
+      });
+
+      // 🔥 ACTUALIZAR ESTADOS
+      setPaginatedData(data);
+      setCompras(data);
+      setTotalItems(pagination.totalItems);
+      setTotalPages(pagination.totalPages);
+      
+      setInitialLoading(false);
+
     } catch (err) {
-      console.error("Error al cargar compras:", err);
-      toast.error("No se pudieron cargar las compras");
+      console.error("❌ fetchCompras - ERROR:", err);
+      setPaginatedData([]);
+      setCompras([]);
+      setTotalItems(0);
+      setTotalPages(1);
+      setInitialLoading(false);
     }
   };
 
+  // 🔥 Cargar catálogos al montar
   useEffect(() => {
     fetchCatalogos();
-    fetchCompras();
   }, []);
+
+  // 🔥 Cargar compras al montar el componente
+  useEffect(() => {
+    console.log("🔄 Cargando compras iniciales...");
+    fetchCompras();
+  }, []); // ← Esto asegura que se carguen al inicio
+
+  // 🔥 Resetear a página 1 cuando cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filtroCampo, filtroValor]);
+
+  // 🔥 Cargar compras cuando cambian: página, items por página o filtros
+  useEffect(() => {
+    console.log("🔄 EJECUTANDO fetchCompras POR CAMBIO EN DEPENDENCIAS");
+    fetchCompras();
+  }, [currentPage, itemsPerPage, filtroCampo, filtroValor]);
+
+  // 🔥 Log para monitorear cambios en paginatedData
+  useEffect(() => {
+    console.log("🔄 ESTADO ACTUALIZADO - paginatedData:", {
+      length: paginatedData?.length,
+      data: paginatedData
+    });
+  }, [paginatedData]);
 
   const actualizarEstado = async (idCompra, nuevoEstado, productosAActualizar = null, motivo = "") => {
     try {
-      console.log("Actualizando estado:", { idCompra, nuevoEstado, motivo });
-      
       const result = await updateCompraEstado(idCompra, nuevoEstado, {
         productos: productosAActualizar,
         motivoCancelacion: motivo
       });
-      
-      console.log("Respuesta del servidor:", result);
-      
-      // Actualizar la compra en el estado local
+
       setCompras((prev) =>
         prev.map((c) =>
           c.CompraId === idCompra ? { ...c, Estado: nuevoEstado, MotivoCancelacion: motivo } : c
         )
       );
-      
-      // Si se actualizó el inventario, recargar productos
+
+      setPaginatedData((prev) =>
+        prev.map((c) =>
+          c.CompraId === idCompra ? { ...c, Estado: nuevoEstado, MotivoCancelacion: motivo } : c
+        )
+      );
+
       if (nuevoEstado === ESTADOS_COMPRA.RECIBIDO) {
-        await fetchCatalogos();
+        await fetchProductos();
       }
-      
+
       toast.success(result.message || 'Estado actualizado correctamente');
       return result;
     } catch (err) {
-      console.error("Error detallado al actualizar estado:", err);
-      console.error("Respuesta del error:", err.response?.data);
+      console.error("Error al actualizar estado:", err);
       toast.error(err.response?.data?.error || "Error al actualizar estado");
       throw err;
     }
   };
 
   const puedeCambiarEstado = (estadoActual, nuevoEstado) => {
-    // Solo permitir cambiar de PENDIENTE a RECIBIDO
-    // Una vez RECIBIDO o ANULADO, no se puede cambiar
-    if (estadoActual === ESTADOS_COMPRA.PENDIENTE && nuevoEstado === ESTADOS_COMPRA.RECIBIDO) {
-      return true;
-    }
-    return false;
+    return estadoActual === ESTADOS_COMPRA.PENDIENTE && nuevoEstado === ESTADOS_COMPRA.RECIBIDO;
   };
 
   return {
     compras,
+    paginatedData,
     productos,
     proveedores,
     loading,
+    initialLoading,
     ESTADOS_COMPRA,
+    currentPage,
+    setCurrentPage,
+    itemsPerPage,
+    setItemsPerPage,
+    totalItems,
+    totalPages,
+    filtroCampo,
+    setFiltroCampo,
+    filtroValor,
+    setFiltroValor,
     fetchCompras,
+    fetchProductos,
     fetchCatalogos,
     actualizarEstado,
     puedeCambiarEstado,

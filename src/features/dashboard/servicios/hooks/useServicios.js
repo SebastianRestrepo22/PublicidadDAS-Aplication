@@ -4,16 +4,12 @@ import { toast } from "react-toastify";
 import axios from "axios";
 import {
     deleteDataservicio,
-    GetDataservicios,
     postDataservicios,
     updateDataservicios,
-    cambiarEstadoServicio,
-    getTamanosByServicio,
-    createTamano,
-    updateTamanosServicio
+    cambiarEstadoServicio
 } from "../services/services.servicios.js";
 
-export const useServicios = (mode, id) => {
+export const useServicios = (mode, id, onRefrescarLista) => {
     const navigate = useNavigate();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [values, setValues] = useState({
@@ -21,32 +17,18 @@ export const useServicios = (mode, id) => {
         Nombre: "",
         Descripcion: "",
         Imagen: "",
-        TipoPrecio: "UNICO",
-        Precio: "",
-        Descuento: "",
         CategoriaId: "",
     });
-    const [tamanos, setTamanos] = useState([]);
     const [estadoEdit, setEstadoEdit] = useState("Activo");
     const [submitted, setSubmitted] = useState(false);
     const [originalNombre, setOriginalNombre] = useState('');
     const [nombreError, setNombreError] = useState('');
     const [editData, setEditData] = useState(null);
     const [openEliminar, setOpenEliminar] = useState(false);
-    const [allData, setAllData] = useState([]);
-    // 🔥 Necesitamos saber la página actual para recargar
-    const [currentPagination, setCurrentPagination] = useState({
-        page: 1,
-        itemsPerPage: 5,
-        filtroEstado: '',
-        filtroCampo: '',
-        filtroValor: ''
-    });
 
-    // Cargar datos para ver/editar
     useEffect(() => {
         if (mode === "view" || mode === "edit") {
-            const cargarServicioCompleto = async () => {
+            const cargarServicio = async () => {
                 try {
                     const response = await axios.get(`http://localhost:3000/servicio/${id}`);
                     const servicio = response.data;
@@ -57,28 +39,11 @@ export const useServicios = (mode, id) => {
                             Nombre: servicio.Nombre || "",
                             Descripcion: servicio.Descripcion || "",
                             Imagen: servicio.Imagen || "",
-                            TipoPrecio: servicio.TipoPrecio || "UNICO",
-                            Precio: servicio.Precio || "",
-                            Descuento: servicio.Descuento !== undefined && servicio.Descuento !== null && servicio.Descuento > 0
-                                ? String(servicio.Descuento)
-                                : "",
                             CategoriaId: servicio.CategoriaId || "",
                         });
                         setEstadoEdit(servicio.Estado || "Activo");
                         setOriginalNombre(servicio.Nombre);
                         setNombreError('');
-
-                        if (servicio.TipoPrecio === 'POR_TAMANO') {
-                            try {
-                                const tamanosData = await getTamanosByServicio(id);
-                                setTamanos(tamanosData);
-                            } catch (error) {
-                                console.error("Error cargando tamaños:", error);
-                                setTamanos([]);
-                            }
-                        } else {
-                            setTamanos([]);
-                        }
                     } else {
                         toast.error('Servicio no encontrado');
                         goToBackToList();
@@ -89,64 +54,9 @@ export const useServicios = (mode, id) => {
                     goToBackToList();
                 }
             };
-            cargarServicioCompleto();
+            cargarServicio();
         }
     }, [mode, id]);
-
-    // Cargar datos iniciales para la lista
-    useEffect(() => {
-        if (mode === "list") {
-            const cargarDatos = async () => {
-                try {
-                    const todos = await GetDataservicios(
-                        currentPagination.filtroEstado === 'Activo',
-                        currentPagination.page,
-                        currentPagination.itemsPerPage,
-                        currentPagination.filtroCampo,
-                        currentPagination.filtroValor
-                    );
-                    if (todos?.data) {
-                        setAllData(todos.data);
-                    }
-                } catch (error) {
-                    console.error("Error cargando datos:", error);
-                }
-            };
-            cargarDatos();
-        }
-    }, [mode, currentPagination]);
-
-    // 🔥 Función para refrescar los datos manteniendo la paginación actual
-    const refrescarDatos = async () => {
-        if (mode !== "list") return;
-        
-        try {
-            const resultado = await GetDataservicios(
-                currentPagination.filtroEstado === 'Activo',
-                currentPagination.page,
-                currentPagination.itemsPerPage,
-                currentPagination.filtroCampo,
-                currentPagination.filtroValor
-            );
-            
-            if (resultado?.data) {
-                setAllData(resultado.data);
-            }
-        } catch (error) {
-            console.error("Error refrescando datos:", error);
-        }
-    };
-
-    // 🔥 Función para actualizar la paginación (la llamará el componente padre)
-    const actualizarPaginacion = (pagina, itemsPorPagina, filtroEstado, filtroCampo, filtroValor) => {
-        setCurrentPagination({
-            page: pagina,
-            itemsPerPage: itemsPorPagina,
-            filtroEstado: filtroEstado || '',
-            filtroCampo: filtroCampo || '',
-            filtroValor: filtroValor || ''
-        });
-    };
 
     const goToBackToList = () => {
         navigate("/dashboard/servicio");
@@ -168,37 +78,6 @@ export const useServicios = (mode, id) => {
 
     const handleChanges = (e) => {
         const { name, value } = e.target;
-
-        if (name === "Descuento") {
-            if (value === "") {
-                setValues({ ...values, [name]: "" });
-                return;
-            }
-            if (!isNaN(value) && parseFloat(value) >= 0 && parseFloat(value) <= 100) {
-                setValues({ ...values, [name]: value });
-            }
-            return;
-        }
-
-        if (name === "Precio") {
-            if (values.TipoPrecio === 'UNICO') {
-                setValues({ ...values, [name]: value === "" ? "" : parseFloat(value) });
-            }
-            return;
-        }
-
-        if (name === "TipoPrecio") {
-            setValues({
-                ...values,
-                [name]: value,
-                Precio: value === 'UNICO' ? values.Precio : ""
-            });
-            if (value === 'UNICO') {
-                setTamanos([]);
-            }
-            return;
-        }
-
         setValues({ ...values, [name]: value });
     };
 
@@ -224,12 +103,8 @@ export const useServicios = (mode, id) => {
             Nombre: "",
             Descripcion: "",
             Imagen: "",
-            TipoPrecio: "UNICO",
-            Precio: "",
-            Descuento: "",
             CategoriaId: "",
         });
-        setTamanos([]);
         setEstadoEdit("Activo");
         setEditData(null);
         setSubmitted(false);
@@ -237,7 +112,6 @@ export const useServicios = (mode, id) => {
         setIsSubmitting(false);
     };
 
-    // 🔥 HANDLE TOGGLE ESTADO - Ahora refresca datos
     const handleToggleEstado = async (servicioId, nuevoEstado) => {
         try {
             const response = await cambiarEstadoServicio(servicioId, nuevoEstado);
@@ -245,10 +119,10 @@ export const useServicios = (mode, id) => {
             if (response.status === 200) {
                 toast.success(`Servicio ${nuevoEstado === 'Activo' ? 'activado' : 'desactivado'} correctamente`);
                 
-                // Refrescar datos manteniendo la paginación actual
-                await refrescarDatos();
+                if (mode === "list" && onRefrescarLista) {
+                    await onRefrescarLista();
+                }
                 
-                // Si estamos en modo vista/edición, actualizar editData
                 if (editData && editData.ServicioId === servicioId) {
                     setEditData(prev => ({ ...prev, Estado: nuevoEstado }));
                 }
@@ -284,46 +158,7 @@ export const useServicios = (mode, id) => {
             hasErrors = true;
         }
 
-        if (values.TipoPrecio === 'UNICO') {
-            if (!values.Precio || parseFloat(values.Precio) <= 0) {
-                toast.error("Precio requerido (mayor a 0)");
-                hasErrors = true;
-            }
-        } else {
-            if (tamanos.length === 0) {
-                toast.error("Debe agregar al menos un tamaño");
-                hasErrors = true;
-            } else {
-                const tamanoInvalido = tamanos.some(t =>
-                    !t.NombreTamano?.trim() || !t.Precio || parseFloat(t.Precio) <= 0
-                );
-                if (tamanoInvalido) {
-                    toast.error("Complete todos los campos de los tamaños correctamente");
-                    hasErrors = true;
-                }
-            }
-        }
-
-        if (values.Descuento && values.Descuento !== "" && (parseFloat(values.Descuento) < 0 || parseFloat(values.Descuento) > 100)) {
-            toast.error("El descuento debe estar entre 0 y 100%");
-            hasErrors = true;
-        }
-
         return hasErrors;
-    };
-
-    const actualizarTamanosEnEdicion = async (servicioId) => {
-        if (values.TipoPrecio !== 'POR_TAMANO' || tamanos.length === 0) {
-            return true;
-        }
-
-        try {
-            const response = await updateTamanosServicio(servicioId, tamanos);
-            return response.status === 200;
-        } catch (error) {
-            console.error("Error actualizando tamaños:", error);
-            return false;
-        }
     };
 
     const handleSubmit = async (e) => {
@@ -345,16 +180,8 @@ export const useServicios = (mode, id) => {
                 Nombre: values.Nombre?.trim() || "",
                 Descripcion: values.Descripcion?.trim() || "",
                 Imagen: values.Imagen?.trim() || "",
-                TipoPrecio: values.TipoPrecio,
-                Descuento: values.Descuento === "" || values.Descuento === null || values.Descuento === undefined
-                    ? 0
-                    : parseFloat(values.Descuento) || 0,
                 CategoriaId: values.CategoriaId || "",
             };
-
-            if (values.TipoPrecio === 'UNICO') {
-                datosEnvio.Precio = parseFloat(values.Precio) || 0;
-            }
 
             if (mode === "edit" && editData) {
                 datosEnvio.Estado = estadoEdit;
@@ -362,12 +189,12 @@ export const useServicios = (mode, id) => {
                 const response = await updateDataservicios(editData.ServicioId, datosEnvio);
 
                 if (response.status === 200) {
-                    if (values.TipoPrecio === 'POR_TAMANO') {
-                        await actualizarTamanosEnEdicion(editData.ServicioId);
-                    }
-
                     toast.success("Servicio actualizado correctamente");
-                    await refrescarDatos(); // 🔥 Refrescar antes de volver
+                    
+                    if (onRefrescarLista) {
+                        await onRefrescarLista();
+                    }
+                    
                     goToBackToList();
                 } else {
                     toast.error("Error al actualizar el servicio");
@@ -379,22 +206,10 @@ export const useServicios = (mode, id) => {
                 if (response.status === 201) {
                     toast.success("Servicio creado correctamente");
 
-                    const servicioId = response.data?.ServicioId;
-
-                    if (values.TipoPrecio === 'POR_TAMANO' && tamanos.length > 0 && servicioId) {
-                        for (const tamano of tamanos) {
-                            try {
-                                await createTamano(servicioId, {
-                                    NombreTamano: tamano.NombreTamano,
-                                    Precio: parseFloat(tamano.Precio)
-                                });
-                            } catch (error) {
-                                console.error("Error creando tamaño:", error);
-                            }
-                        }
+                    if (onRefrescarLista) {
+                        await onRefrescarLista();
                     }
-
-                    await refrescarDatos(); // 🔥 Refrescar antes de volver
+                    
                     goToBackToList();
                 } else {
                     toast.error("Error al crear el servicio");
@@ -402,49 +217,48 @@ export const useServicios = (mode, id) => {
             }
         } catch (error) {
             console.error("Error al procesar la solicitud:", error);
-
-            if (error.response) {
-                toast.error(error.response.data?.message || `Error ${error.response.status}`);
-            } else if (error.request) {
-                toast.error("No se pudo conectar con el servidor");
-            } else {
-                toast.error("Error al procesar la solicitud");
-            }
+            toast.error(error.response?.data?.message || "Error al procesar la solicitud");
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const handleDelete = async (id) => {
-        try {
-            const response = await deleteDataservicio(id);
+  const handleDelete = async (id) => {
+    try {
+        const response = await deleteDataservicio(id);
 
-            if (response.status === 200 || response.status === 201) {
-                toast.success(response.data.message);
-                
-                await refrescarDatos(); // 🔥 Refrescar después de eliminar
-                
-                if (mode !== "list") {
-                    goToBackToList();
-                }
-                
-                setOpenEliminar(false);
-                setEditData(null);
-            } else {
-                toast.error(response.message || "No se pudo eliminar el servicio");
+        if (response.status === 200) {
+            toast.success(response.data.message);
+            
+            if (mode === "list" && onRefrescarLista) {
+                await onRefrescarLista();
             }
-        } catch (error) {
-            console.error("Error al eliminar servicio:", error);
-
-            if (error.response?.status === 400) {
-                toast.error(error.response.data?.message || "No se puede eliminar el servicio porque tiene ventas asociadas");
-            } else if (error.response?.data?.message) {
-                toast.error(error.response.data.message);
-            } else {
-                toast.error("Error al eliminar el servicio");
+            
+            if (mode !== "list") {
+                goToBackToList();
             }
+            
+            setOpenEliminar(false);
+            setEditData(null);
+        } 
+        // Manejar respuesta 409: servicio asociado
+        else if (response.status === 409) {
+            toast.warning(response.data.message);
+        } 
+        else {
+            toast.error(response.message || "No se pudo eliminar el servicio");
         }
-    };
+    } catch (error) {
+        console.error("Error al eliminar servicio:", error);
+        
+        // Manejar error de red o respuesta con mensaje de asociación
+        if (error.response?.status === 409) {
+            toast.warning(error.response.data.message);
+        } else {
+            toast.error(error.response?.data?.message || "Error al eliminar el servicio");
+        }
+    }
+};
 
     const handleDeleteClick = (servicio) => {
         setEditData(servicio);
@@ -452,22 +266,13 @@ export const useServicios = (mode, id) => {
     };
 
     return {
-        values,
-        setValues,
-        tamanos,
-        setTamanos,
-        estadoEdit,
-        setEstadoEdit,
-        submitted,
-        setSubmitted,
+        values, setValues,
+        estadoEdit, setEstadoEdit,
+        submitted, setSubmitted,
         nombreError,
-        editData,
-        setEditData,
-        openEliminar,
-        setOpenEliminar,
+        editData, setEditData,
+        openEliminar, setOpenEliminar,
         isSubmitting,
-        allData,
-        setAllData,
         handleChanges,
         handleNombreBlur,
         handleToggleEstado,
@@ -478,8 +283,6 @@ export const useServicios = (mode, id) => {
         goToCreate,
         goToView,
         goToEdit,
-        resetForm,
-        actualizarPaginacion, 
-        refrescarDatos
+        resetForm
     };
 };

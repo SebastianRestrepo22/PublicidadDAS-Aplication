@@ -96,6 +96,24 @@ export const ComprasList = ({
   totalItems,
   onItemsPerPageChange
 }) => {
+  // 🔍 LOGS DE DEPURACIÓN
+  console.log("🎨 ComprasList - Props recibidas:", {
+    paginatedDataLength: paginatedData?.length,
+    totalItems,
+    currentPage,
+    totalPages,
+    itemsPerPage,
+    filtroCampo,
+    filtroText
+  });
+
+  if (paginatedData?.length > 0) {
+    console.log("🎨 Primer item:", paginatedData[0]);
+    console.log("🎨 IDs en lista:", paginatedData.map(c => c.CompraId));
+  } else {
+    console.warn("🎨 paginatedData está vacío o es undefined");
+  }
+
   // Estado para actualizar los minutos cada minuto
   const [tiempoActual, setTiempoActual] = useState(new Date());
   // Estado para el modal de cancelación
@@ -199,82 +217,83 @@ export const ComprasList = ({
             </tr>
           </thead>
           <tbody className="divide-y">
-            {paginatedData.map((compra) => {
-              const estado = compra.Estado || ESTADOS_COMPRA.PENDIENTE;
-              const config = estadoConfig[estado] || estadoConfig[ESTADOS_COMPRA.PENDIENTE];
-              
-              // Calcular minutos restantes solo para compras pendientes
-              const minutosRestantes = estado === ESTADOS_COMPRA.PENDIENTE 
-                ? calcularMinutosRestantes(compra.FechaRegistro)
-                : null;
-              
-              // Determinar si está por expirar (menos de 10 minutos)
-              const porExpirar = minutosRestantes !== null && minutosRestantes <= 10 && minutosRestantes > 0;
-              
-              return (
-                <tr key={compra.CompraId} className="hover:bg-slate-50">
-                  <td className="py-4 px-6">{getShortId(compra.CompraId)}</td>
-                  <td className="py-4 px-6">{getShortId(compra.ProveedorId)}</td>
-                  <td className="py-4 px-6">{formatearFecha(compra.FechaRegistro)}</td>
-                  <td className="py-4 px-6 text-center font-medium">
-                    {formatPrice(compra.Total)}
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      {/* Solo mostramos el estado actual */}
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${config.color}`}>
-                        <span>{typeof config.icon === 'string' ? config.icon : <config.icon size={14} />}</span>
-                        <span>{config.label}</span>
-                      </span>
-                      
-                      {/* Solo mostramos minutos restantes si está pendiente */}
-                      {estado === ESTADOS_COMPRA.PENDIENTE && minutosRestantes !== null && minutosRestantes > 0 && (
-                        <span className={`text-xs font-medium ${
-                          porExpirar ? 'text-red-600 animate-pulse' : 'text-gray-500'
-                        }`}>
-                          {formatearMinutosRestantes(minutosRestantes)}
+            {paginatedData && paginatedData.length > 0 ? (
+              paginatedData.map((compra) => {
+                const estado = compra.Estado || ESTADOS_COMPRA.PENDIENTE;
+                const config = estadoConfig[estado] || estadoConfig[ESTADOS_COMPRA.PENDIENTE];
+                
+                // Calcular minutos restantes solo para compras pendientes
+                const minutosRestantes = estado === ESTADOS_COMPRA.PENDIENTE 
+                  ? calcularMinutosRestantes(compra.FechaRegistro)
+                  : null;
+                
+                // Determinar si está por expirar (menos de 10 minutos)
+                const porExpirar = minutosRestantes !== null && minutosRestantes <= 10 && minutosRestantes > 0;
+                
+                return (
+                  <tr key={compra.CompraId} className="hover:bg-slate-50">
+                    <td className="py-4 px-6">{getShortId(compra.CompraId)}</td>
+                    <td className="py-4 px-6">{getShortId(compra.ProveedorId)}</td>
+                    <td className="py-4 px-6">{formatearFecha(compra.FechaRegistro)}</td>
+                    <td className="py-4 px-6 text-center font-medium">
+                      {formatPrice(compra.Total)}
+                    </td>
+                    <td className="py-4 px-6 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        {/* Solo mostramos el estado actual */}
+                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${config.color}`}>
+                          <span>{typeof config.icon === 'string' ? config.icon : <config.icon size={14} />}</span>
+                          <span>{config.label}</span>
                         </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex justify-center items-center gap-2">
-                      {/* Botón de ver detalles - siempre visible */}
-                      <button
-                        onClick={() => onView(compra)}
-                        className="p-2 hover:bg-emerald-50 rounded-full transition-colors"
-                        title="Ver detalles"
-                        disabled={cancelando}
-                      >
-                        <Eye size={18} className="text-emerald-600" />
-                      </button>
-                      
-                      {/* Botón de cancelar - solo para compras pendientes */}
-                      {estado === ESTADOS_COMPRA.PENDIENTE && (
+                        
+                        {/* Solo mostramos minutos restantes si está pendiente */}
+                        {estado === ESTADOS_COMPRA.PENDIENTE && minutosRestantes !== null && minutosRestantes > 0 && (
+                          <span className={`text-xs font-medium ${
+                            porExpirar ? 'text-red-600 animate-pulse' : 'text-gray-500'
+                          }`}>
+                            {formatearMinutosRestantes(minutosRestantes)}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex justify-center items-center gap-2">
+                        {/* Botón de ver detalles - siempre visible */}
                         <button
-                          onClick={() => handleCancelClick(compra)}
-                          className="p-2 hover:bg-red-50 rounded-full transition-colors"
-                          title="Cancelar compra"
+                          onClick={() => onView(compra)}
+                          className="p-2 hover:bg-emerald-50 rounded-full transition-colors"
+                          title="Ver detalles"
                           disabled={cancelando}
                         >
-                          <XCircle size={18} className={`text-red-500 ${cancelando ? 'opacity-50' : ''}`} />
+                          <Eye size={18} className="text-emerald-600" />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {paginatedData.length === 0 && (
+                        
+                        {/* Botón de cancelar - solo para compras pendientes */}
+                        {estado === ESTADOS_COMPRA.PENDIENTE && (
+                          <button
+                            onClick={() => handleCancelClick(compra)}
+                            className="p-2 hover:bg-red-50 rounded-full transition-colors"
+                            title="Cancelar compra"
+                            disabled={cancelando}
+                          >
+                            <XCircle size={18} className={`text-red-500 ${cancelando ? 'opacity-50' : ''}`} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
               <tr>
                 <td colSpan={6} className="py-8 text-center text-gray-500">
-                  No hay compras a mostrar
+                  {paginatedData === undefined ? "Cargando compras..." : "No hay compras a mostrar"}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-        {paginatedData.length > 0 && (
+        {paginatedData && paginatedData.length > 0 && (
           <div className="px-6 py-4 border-t border-slate-200">
             <Pagination
               currentPage={currentPage}

@@ -296,3 +296,114 @@ export const getVentaByPedidoIdModel = async (pedidoClienteId) => {
     throw error;
   }
 };
+
+/**
+ * Obtener ventas con paginación, búsqueda y filtros
+ */
+export const getVentasPaginated = async ({ 
+  page = 1, 
+  limit = 10, 
+  filtroCampo = null, 
+  filtroValor = null,
+  fechaInicio = null,
+  fechaFin = null
+}) => {
+  const offset = (page - 1) * limit;
+  let whereConditions = [];
+  let params = [];
+
+  // Filtro por rango de fechas
+  if (fechaInicio) {
+    whereConditions.push('v.FechaVenta >= ?');
+    params.push(fechaInicio);
+  }
+  if (fechaFin) {
+    whereConditions.push('v.FechaVenta <= ?');
+    params.push(fechaFin);
+  }
+
+  // Mapeo de campos del frontend a columnas reales
+  const columnasMap = {
+    VentaId: 'v.VentaId',
+    PedidoClienteId: 'v.PedidoClienteId',
+    ClienteNombre: 'v.ClienteNombre',
+    Estado: 'v.Estado',
+    Origen: 'v.Origen',
+    Total: 'v.Total'
+  };
+
+  // Agregar filtro de búsqueda si existe
+  if (filtroCampo && filtroValor && columnasMap[filtroCampo]) {
+    const columnaReal = columnasMap[filtroCampo];
+    
+    if (columnaReal === 'v.Total') {
+      const valorNum = Number(filtroValor);
+      if (!isNaN(valorNum)) {
+        whereConditions.push(`${columnaReal} = ?`);
+        params.push(valorNum);
+      }
+    } else if (columnaReal === 'v.Estado' || columnaReal === 'v.Origen') {
+      whereConditions.push(`${columnaReal} = ?`);
+      params.push(filtroValor);
+    } else {
+      whereConditions.push(`${columnaReal} LIKE ?`);
+      params.push(`%${filtroValor}%`);
+    }
+  }
+
+  const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+  // 🔹 Consulta principal con LEFT JOIN para contar items (sin cargar todos los detalles)
+  const [rows] = await dbPool.query(`
+    SELECT 
+      v.VentaId,
+      v.Origen,
+      v.PedidoClienteId,
+      v.ClienteId,
+      v.ClienteNombre,
+      v.ClienteTelefono,
+      v.ClienteCorreo,
+      v.UsuarioVendedorId,
+      u.NombreCompleto AS UsuarioVendedorNombre,
+      v.FechaVenta,
+      v.Subtotal,
+      v.IVA,
+      v.Total,
+      v.Estado,
+      COUNT(dv.DetalleVentaId) AS ItemsCount,
+      SUM(CASE WHEN dv.TipoItem = 'producto' THEN 1 ELSE 0 END) AS ProductosCount,
+      SUM(CASE WHEN dv.TipoItem = 'servicio' THEN 1 ELSE 0 END) AS ServiciosCount
+    FROM ventas v
+    LEFT JOIN usuarios u ON v.UsuarioVendedorId = u.CedulaId
+    LEFT JOIN detalleventas dv ON v.VentaId = dv.VentaId
+    ${whereClause}
+    GROUP BY v.VentaId
+    ORDER BY v.FechaVenta DESC
+    LIMIT ? OFFSET ?
+  `, [...params, limit, offset]);
+
+  // 🔹 Consulta de conteo para totalPages
+  const [countResult] = await dbPool.query(`
+    SELECT COUNT(DISTINCT v.VentaId) as total 
+    FROM ventas v
+    ${whereClause}
+  `, params);
+
+  // ✅ Transformar los conteos a números y agregar estructura de detalle simulada
+  const rowsWithCounts = rows.map(row => ({
+    ...row,
+    ItemsCount: parseInt(row.ItemsCount) || 0,
+    ProductosCount: parseInt(row.ProductosCount) || 0,
+    ServiciosCount: parseInt(row.ServiciosCount) || 0,
+    // Crear un array "detalle" simulado solo con la longitud (para compatibilidad con el frontend)
+    detalle: Array(row.ItemsCount).fill(null)
+  }));
+
+  // ✅ RETORNO con clave "data" explícita
+  return {
+    data: rowsWithCounts,
+    totalItems: countResult[0]?.total || 0,
+    currentPage: Number(page),
+    itemsPerPage: Number(limit)
+  };
+};

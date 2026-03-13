@@ -5,7 +5,10 @@ import {
     deleteCompra as deleteCompraModel,
     updateCompra as updateCompraModel,
     updateCompraEstado as updateCompraEstadoModel,
-    getDetallesByCompraId
+    getDetallesByCompraId,
+    // 🔥 Nuevas funciones importadas
+    getComprasPaginated as getComprasPaginatedModel,
+    buscarComprasPaginated
 } from '../models/compras.model.js';
 
 import {
@@ -14,7 +17,7 @@ import {
     getDetallesConProducto
 } from '../models/detalleCompras.model.js';
 
-// Obtener todas las compras
+// ========== FUNCIÓN EXISTENTE (la mantenemos para compatibilidad) ==========
 export const getAllCompras = async (req, res) => {
   try {
     const compras = await getAllComprasModel();
@@ -25,7 +28,124 @@ export const getAllCompras = async (req, res) => {
   }
 };
 
-// Obtener compra por ID (con detalles)
+// ========== NUEVA FUNCIÓN: Obtener compras con paginación ==========
+export const getComprasPaginated = async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(parseInt(req.query.limit) || 10, 100);
+    const filtroCampo = req.query.filtroCampo || null;
+    const filtroValor = req.query.filtroValor || null;
+    const sortBy = req.query.sortBy || 'FechaRegistro';
+    const sortOrder = req.query.sortOrder || 'DESC';
+
+    const result = await getComprasPaginatedModel({ 
+      page, 
+      limit, 
+      filtroCampo, 
+      filtroValor,
+      sortBy,
+      sortOrder
+    });
+
+    // Si no hay datos en la página actual y es página > 1, mostrar página 1
+    if (result.data.length === 0 && page > 1) {
+      const fallback = await getComprasPaginatedModel({ 
+        page: 1, 
+        limit, 
+        filtroCampo, 
+        filtroValor,
+        sortBy,
+        sortOrder
+      });
+      
+      return res.status(200).json({
+        data: fallback.data,
+        pagination: {
+          totalItems: fallback.totalItems,
+          totalPages: Math.ceil(fallback.totalItems / limit),
+          currentPage: 1,
+          itemsPerPage: limit,
+          hasNextPage: fallback.totalItems > limit,
+          hasPrevPage: false
+        }
+      });
+    }
+
+    const totalPages = Math.ceil(result.totalItems / limit);
+
+    res.status(200).json({
+      data: result.data,
+      pagination: {
+        totalItems: result.totalItems,
+        totalPages: totalPages,
+        currentPage: result.currentPage,
+        itemsPerPage: result.itemsPerPage,
+        hasNextPage: result.currentPage < totalPages,
+        hasPrevPage: result.currentPage > 1
+      }
+    });
+  } catch (err) {
+    console.error("Error al obtener compras con paginación:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ========== NUEVA FUNCIÓN: Buscar compras con paginación ==========
+export const buscarCompras = async (req, res) => {
+  const { campo, valor, page = 1, limit = 10 } = req.query;
+
+  // Mapeo de campos amigables a nombres de columnas
+  const columnasPermitidas = {
+    id: 'CompraId',
+    proveedor: 'ProveedorId',
+    fecha: 'FechaRegistro',
+    estado: 'Estado',
+    total: 'Total'
+  };
+
+  const columna = columnasPermitidas[campo];
+
+  if (!columna) {
+    return res.status(400).json({ 
+      message: 'Campo de búsqueda inválido. Use: id, proveedor, fecha, estado o total' 
+    });
+  }
+
+  if (!valor || valor.trim() === '') {
+    return res.status(400).json({ 
+      message: 'El valor de búsqueda no puede estar vacío' 
+    });
+  }
+
+  try {
+    const result = await buscarComprasPaginated({ 
+      page: parseInt(page), 
+      limit: parseInt(limit), 
+      columna, 
+      valor: valor.trim() 
+    });
+
+    const totalPages = Math.ceil(result.totalItems / parseInt(limit));
+
+    res.status(200).json({
+      data: result.data,
+      pagination: {
+        totalItems: result.totalItems,
+        totalPages: totalPages,
+        currentPage: result.currentPage,
+        itemsPerPage: result.itemsPerPage,
+        hasNextPage: result.currentPage < totalPages,
+        hasPrevPage: result.currentPage > 1
+      }
+    });
+  } catch (err) {
+    console.error('Error al buscar compras con paginación:', err);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};
+
+// ========== FUNCIONES CRUD EXISTENTES (sin cambios) ==========
+
 export const getCompraById = async (req, res) => {
   const id = req.params.id;
 
@@ -44,7 +164,6 @@ export const getCompraById = async (req, res) => {
   }
 };
 
-// Crear nueva compra
 export const createCompra = async (req, res) => {
   const { ProveedorId, Total, FechaRegistro, Estado } = req.body;
 
@@ -72,7 +191,6 @@ export const createCompra = async (req, res) => {
   }
 };
 
-// Eliminar compra
 export const deleteCompra = async (req, res) => {
   const id = req.params.id;
 
@@ -90,7 +208,6 @@ export const deleteCompra = async (req, res) => {
   }
 };
 
-// Actualizar compra completa
 export const updateCompra = async (req, res) => {
   const id = req.params.id;
 
