@@ -342,27 +342,38 @@ export const Clientes = () => {
   };
 
   const handleDelete = async (id) => {
-    try {
-      const response = await deleteDataClient(id);
+  try {
+    const response = await deleteDataClient(id);
 
-      if (response.status === 200 || response.status === 201) {
-        toast.success(response.data.message);
+    if (response.status === 200 || response.status === 201) {
+      toast.success(response.data.message);
+      
+      // Cerrar el modal primero
+      setOpenEliminar(false);
+      
+      // Resetear la paginación si es necesario
+      // Si después de eliminar, la página actual queda vacía, retroceder una página
+      if (paginatedData.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      } else {
+        //Forzar recarga de la página actual
         await cargarClientes();
-        setOpenEliminar(false);
-      } else {
-        toast.error(response.data?.message || "No se pudo eliminar el cliente");
       }
-    } catch (error) {
-      if (error.response?.status === 409) {
-        toast.warning(error.response.data.message || "No se puede eliminar porque tiene pedidos asociados");
-      } else {
-        toast.error(error.response?.data?.message || "Error al eliminar el cliente");
-      }
-      if (error.response?.status !== 409) {
-        setOpenEliminar(false);
-      }
+      
+    } else {
+      toast.error(response.data?.message || "No se pudo eliminar el cliente");
     }
-  };
+  } catch (error) {
+    if (error.response?.status === 409) {
+      toast.warning(error.response.data.message || "No se puede eliminar porque tiene pedidos asociados");
+    } else {
+      toast.error(error.response?.data?.message || "Error al eliminar el cliente");
+    }
+    if (error.response?.status !== 409) {
+      setOpenEliminar(false);
+    }
+  }
+};
 
   const handlePageChange = (page) => {
     setCurrentPage(page);

@@ -162,7 +162,7 @@ Si no solicitaste crear una cuenta, puedes ignorar este mensaje con seguridad.
   }
 };
 
-// NUEVA FUNCIÓN: notificar cambio de estado de pedido
+// notificar cambio de estado de pedido
 export const sendPedidoEstadoEmail = async (to, nombreCliente, pedidoId, nuevoEstado, motivo = "") => {
   let subject = "";
   let html = "";
@@ -306,14 +306,14 @@ export const sendVentaFacturaEmail = async (to, nombreCliente, ventaId, total, d
   });
 
   const totalFormateado = formatterCOP.format(total);
-  
+
   // Calcular subtotal e IVA (19%)
   const subtotal = total / 1.19;
   const iva = total - subtotal;
-  
+
   // Número de factura formateado (últimos 8 dígitos del UUID)
   const facturaNumero = ventaId.toString().replace(/-/g, '').slice(-8).toUpperCase();
-  
+
   // Fecha actual formateada
   const fechaActual = new Date().toLocaleDateString("es-CO", {
     year: 'numeric',
@@ -323,180 +323,138 @@ export const sendVentaFacturaEmail = async (to, nombreCliente, ventaId, total, d
     minute: '2-digit'
   });
 
-  // Generar HTML de los detalles - VERSIÓN RESPONSIVE CON TABLAS
+  // Generar HTML de los detalles 
+  // Generar HTML de los detalles
   const detallesHtml = detalles.map((det, index) => {
-    // Determinar variante (color o tamaño)
+    // Determinar variante
     let varianteTexto = '';
-    
+
     if (det.TipoItem === 'producto' && det.ColorId) {
       const colorNombre = det.ColorNombre || 'Color no especificado';
-      const colorHex = det.ColorHex || '#ccc';
       varianteTexto = `
-        <tr>
-          <td colspan="4" style="padding: 0 8px 8px 8px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
-              <tr>
-                <td width="20" style="padding: 0;">
-                  <div style="width: 16px; height: 16px; border-radius: 50%; background-color: ${colorHex}; border: 1px solid #ddd;"></div>
-                </td>
-                <td style="padding: 0 0 0 5px; font-size: 12px; color: #666;">${colorNombre}</td>
-              </tr>
-            </table>
-          </td>
-        </tr>`;
-    } else if (det.TipoItem === 'servicio' && det.ServicioTamanoId) {
-      const tamanoNombre = det.NombreTamano || 'Tamaño no especificado';
-      varianteTexto = `
-        <tr>
-          <td colspan="4" style="padding: 0 8px 8px 8px;">
-            <span style="background-color: #e3f2fd; color: #1976d2; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; display: inline-block;">${tamanoNombre}</span>
-          </td>
-        </tr>`;
-    }
-
-    // Descripción personalizada
-    const descripcionExtra = det.DescripcionPersonalizada 
-      ? `<tr><td colspan="4" style="padding: 0 8px 8px 8px; font-size: 11px; color: #666; font-style: italic;">📝 ${det.DescripcionPersonalizada}</td></tr>` 
-      : '';
-
-    // Imagen si existe (para servicios)
-    const imagenHtml = det.UrlImagenPersonalizada && det.TipoItem === 'servicio'
-      ? `<tr><td colspan="4" style="padding: 0 8px 8px 8px;"><img src="${det.UrlImagenPersonalizada}" alt="Referencia" style="max-width: 60px; max-height: 60px; border-radius: 4px; border: 1px solid #eee;"></td></tr>`
-      : '';
-
-    return `
       <tr>
-        <td colspan="4" style="padding: 12px 8px 4px 8px; font-weight: 500; color: #2c3e50; ${index % 2 === 0 ? 'background-color: #fafafa;' : ''}">${det.NombreSnapshot || det.Nombre}</td>
-      </tr>
-      ${varianteTexto}
-      ${descripcionExtra}
-      ${imagenHtml}
-      <tr>
-        <td width="60%" style="padding: 4px 8px 12px 8px; ${index % 2 === 0 ? 'background-color: #fafafa;' : ''}">
+        <td colspan="4" style="padding: 0 8px 8px 8px;">
           <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
             <tr>
-              <td style="font-size: 12px; color: #666;">Cant:</td>
-              <td style="font-size: 12px; font-weight: 500; color: #2c3e50;">${det.Cantidad}</td>
+              <td width="20" style="padding: 0;">
+                <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #000; border: 1px solid #333;"></div>
+              </td>
+              <td style="padding: 0 0 0 5px; font-size: 11px; color: #555;">Color: ${colorNombre}</td>
             </tr>
           </table>
         </td>
-        <td width="20%" style="padding: 4px 8px 12px 8px; text-align: right; ${index % 2 === 0 ? 'background-color: #fafafa;' : ''}">
-          <div style="font-size: 12px; color: #666;">P.Unit:</div>
-          <div style="font-size: 12px; font-weight: 500; color: #2c3e50; white-space: nowrap;">${formatterCOP.format(det.PrecioUnitario)}</div>
+      </tr>`;
+    } else if (det.TipoItem === 'servicio' && det.NombreTamano) {
+      const tamanoNombre = det.NombreTamano || 'Tamaño no especificado';
+      varianteTexto = `
+      <tr>
+        <td colspan="4" style="padding: 0 8px 8px 8px;">
+          <span style="background-color: #f0f0f0; color: #333; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 500; border: 1px solid #ccc; display: inline-block;">Tamaño: ${tamanoNombre}</span>
         </td>
-        <td width="20%" style="padding: 4px 8px 12px 8px; text-align: right; ${index % 2 === 0 ? 'background-color: #fafafa;' : ''}">
-          <div style="font-size: 12px; color: #666;">Subtotal:</div>
-          <div style="font-size: 12px; font-weight: 600; color: #1e3c72; white-space: nowrap;">${formatterCOP.format(det.Subtotal)}</div>
-        </td>
-      </tr>
-      ${index < detalles.length - 1 ? '<tr><td colspan="4" style="border-bottom: 1px solid #eaecef;"></td></tr>' : ''}
-    `;
+      </tr>`;
+    }
+    return `
+    <tr style="${index % 2 === 0 ? 'background-color: #f9f9f9;' : ''}">
+      <td colspan="4" style="padding: 12px 8px 4px 8px; font-weight: 600; color: #222; border-top: 1px solid #e0e0e0;">${det.NombreSnapshot || det.Nombre}</td>
+    </tr>
+    ${varianteTexto}
+    <tr style="${index % 2 === 0 ? 'background-color: #f9f9f9;' : ''}">
+      <td width="60%" style="padding: 4px 8px 12px 8px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+          <tr>
+            <td style="font-size: 11px; color: #555;">Cantidad:</td>
+            <td style="font-size: 12px; font-weight: 500; color: #222; padding-left: 5px;">${det.Cantidad}</td>
+          </tr>
+        </table>
+      </td>
+      <td width="20%" style="padding: 4px 8px 12px 8px; text-align: right;">
+        <div style="font-size: 11px; color: #555;">P.Unit:</div>
+        <div style="font-size: 11px; font-weight: 500; color: #222; white-space: nowrap;">${formatterCOP.format(det.PrecioUnitario)}</div>
+      </td>
+      <td width="20%" style="padding: 4px 8px 12px 8px; text-align: right;">
+        <div style="font-size: 11px; color: #555;">Total:</div>
+        <div style="font-size: 12px; font-weight: 600; color: #000; white-space: nowrap;">${formatterCOP.format(det.Subtotal)}</div>
+      </td>
+    </tr>
+  `;
   }).join('');
 
-  const subject = `Factura Electrónica de Venta No. ${facturaNumero} - PublicidadDAS`;
-  
+  const subject = `Factura de Venta No. ${facturaNumero} - PublicidadDAS`;
+
   const html = `
     <!DOCTYPE html>
     <html lang="es">
     <head>
       <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Factura de Venta - PublicidadDAS</title>
       <style>
-        /* Reset básico para emails */
-        body, table, td, p, a {
-          -webkit-text-size-adjust: 100%;
-          -ms-text-size-adjust: 100%;
+        /* Reset y estilos base */
+        body, table, td, p {
+          margin: 0;
+          padding: 0;
+          font-family: 'Helvetica', 'Arial', sans-serif;
+          line-height: 1.4;
         }
-        table, td {
-          border-collapse: collapse;
-          mso-table-lspace: 0pt;
-          mso-table-rspace: 0pt;
+        
+        /* Estilos de impresión */
+        @media print {
+          body { background: white; }
+          .no-print { display: none; }
+          table { page-break-inside: avoid; }
         }
-        img {
-          border: 0;
-          height: auto;
-          line-height: 100%;
-          outline: none;
-          text-decoration: none;
-          -ms-interpolation-mode: bicubic;
-        }
-        /* Media queries para móviles */
-        @media only screen and (max-width: 480px) {
-          table[class="container"] {
-            width: 100% !important;
-          }
-          td[class="container-padding"] {
-            padding-left: 10px !important;
-            padding-right: 10px !important;
-          }
-          td[class="header-cell"] {
-            display: block !important;
-            width: 100% !important;
-            text-align: center !important;
-            padding: 10px !important;
-          }
-          td[class="factura-numero-cell"] {
-            display: block !important;
-            width: 100% !important;
-            text-align: center !important;
-            padding: 10px !important;
-          }
-          td[class="totales-cell"] {
-            display: block !important;
-            width: 100% !important;
-            text-align: center !important;
-          }
-          div[class="mobile-center"] {
-            text-align: center !important;
-          }
+        
+        /* Responsive */
+        @media only screen and (max-width: 600px) {
+          .container { width: 100% !important; }
+          .stack { display: block !important; width: 100% !important; }
+          .text-right-mobile { text-align: left !important; }
         }
       </style>
     </head>
-    <body style="margin: 0; padding: 0; font-family: 'Helvetica', 'Arial', sans-serif; background-color: #f0f2f5;">
+    <body style="margin: 0; padding: 20px; background-color: #f5f5f5;">
       
       <!-- CONTENEDOR PRINCIPAL -->
-      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f0f2f5; width: 100%;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
         <tr>
-          <td align="center" style="padding: 20px 10px;">
+          <td align="center" style="padding: 10px;">
             
-            <!-- CARD PRINCIPAL -->
-            <table class="container" width="100%" max-width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.1);">
+            <!-- CARD PRINCIPAL - ESTILO B/N -->
+            <table class="container" width="100%" max-width="700" cellpadding="0" cellspacing="0" border="0" style="max-width: 700px; width: 100%; background-color: #ffffff; border: 1px solid #cccccc; box-shadow: 0 4px 8px rgba(0,0,0,0.05);">
               
-              <!-- ENCABEZADO CON LOGO -->
+              <!-- ENCABEZADO - SIN COLORES -->
               <tr>
-                <td style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); padding: 20px;">
+                <td style="border-bottom: 2px solid #333; padding: 20px;">
                   <table width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
-                      <td class="header-cell" style="color: white; text-align: left;" width="60%">
-                        <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: white;">PublicidadDAS</h1>
-                        <p style="margin: 5px 0 0; opacity: 0.9; font-size: 13px; color: white;">Soluciones en Publicidad y Marketing</p>
+                      <td class="stack" style="vertical-align: top;" width="60%">
+                        <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #000; letter-spacing: -0.5px;">PUBLICIDADDAS</h1>
+                        <p style="margin: 5px 0 0; color: #555; font-size: 12px;">Soluciones en Publicidad y Marketing</p>
                       </td>
-                      <td class="header-cell" style="color: white; text-align: right;" width="40%">
-                        <div style="font-size: 13px; margin-bottom: 3px; color: white;">NIT: 901.234.567-8</div>
-                        <div style="font-size: 13px; color: white;">Régimen Común</div>
+                      <td class="stack text-right-mobile" style="vertical-align: top; text-align: right;" width="40%">
+                        <p style="margin: 0 0 3px; color: #333; font-size: 12px;"><strong>NIT:</strong> 901.234.567-8</p>
+                        <p style="margin: 0; color: #333; font-size: 12px;">Régimen Común</p>
                       </td>
                     </tr>
                   </table>
                 </td>
               </tr>
 
-              <!-- TÍTULO Y NÚMERO DE FACTURA -->
+              <!-- TÍTULO Y NÚMERO -->
               <tr>
                 <td style="padding: 20px;">
                   <table width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
-                      <td class="header-cell" style="text-align: left;" width="60%">
-                        <h2 style="margin: 0; color: #1e3c72; font-size: 22px;">FACTURA DE VENTA</h2>
-                        <p style="margin: 5px 0 0; color: #666; font-size: 13px;">Documento equivalente a factura</p>
+                      <td class="stack" style="vertical-align: bottom;" width="60%">
+                        <h2 style="margin: 0; color: #000; font-size: 22px; font-weight: 600;">FACTURA DE VENTA</h2>
+                        <p style="margin: 3px 0 0; color: #666; font-size: 11px;">Documento equivalente a factura electrónica</p>
                       </td>
-                      <td class="factura-numero-cell" style="text-align: right;" width="40%">
-                        <table cellpadding="0" cellspacing="0" border="0" style="background: #f8f9fa; border-radius: 8px; width: 100%;">
+                      <td class="stack text-right-mobile" style="vertical-align: bottom; text-align: right;" width="40%">
+                        <table cellpadding="0" cellspacing="0" border="1" style="border-collapse: collapse; border-color: #ccc; width: 100%;">
                           <tr>
-                            <td style="padding: 12px; text-align: center;">
-                              <div style="font-size: 12px; color: #666; margin-bottom: 3px;">FACTURA No.</div>
-                              <div style="font-size: 20px; font-weight: bold; color: #1e3c72; letter-spacing: 1px;">${facturaNumero}</div>
+                            <td style="padding: 8px; text-align: center; background-color: #f0f0f0;">
+                              <div style="font-size: 10px; color: #555;">No. FACTURA</div>
+                              <div style="font-size: 18px; font-weight: bold; color: #000; letter-spacing: 1px;">${facturaNumero}</div>
                             </td>
                           </tr>
                         </table>
@@ -509,32 +467,23 @@ export const sendVentaFacturaEmail = async (to, nombreCliente, ventaId, total, d
               <!-- INFORMACIÓN DEL CLIENTE -->
               <tr>
                 <td style="padding: 0 20px;">
-                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #f8f9fa; border-radius: 8px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="1" style="border-collapse: collapse; border-color: #ccc; border-style: solid;">
                     <tr>
                       <td style="padding: 15px;">
                         <table width="100%" cellpadding="0" cellspacing="0" border="0">
                           <tr>
-                            <td width="50%" style="padding-right: 10px; vertical-align: top;">
-                              <h3 style="margin: 0 0 10px; color: #1e3c72; font-size: 15px;">Cliente</h3>
-                              <div style="margin-bottom: 5px;">
-                                <span style="color: #666; font-size: 12px;">Nombre:</span>
-                                <span style="font-weight: 500; margin-left: 5px; color: #2c3e50; font-size: 13px;">${nombreCliente}</span>
-                              </div>
-                              <div>
-                                <span style="color: #666; font-size: 12px;">Email:</span>
-                                <span style="margin-left: 5px; color: #2c3e50; font-size: 13px; word-break: break-all;">${to}</span>
-                              </div>
+                            <td class="stack" style="vertical-align: top; padding-right: 15px;" width="50%">
+                              <h3 style="margin: 0 0 10px; color: #000; font-size: 14px; border-bottom: 1px solid #ccc; padding-bottom: 3px;">DATOS DEL CLIENTE</h3>
+                              <p style="margin: 0 0 3px; color: #333; font-size: 12px;"><strong>Nombre:</strong> ${nombreCliente}</p>
+                              <p style="margin: 0 0 3px; color: #333; font-size: 12px; word-break: break-all;"><strong>Email:</strong> ${to}</p>
                             </td>
-                            <td width="50%" style="padding-left: 10px; vertical-align: top;">
-                              <h3 style="margin: 0 0 10px; color: #1e3c72; font-size: 15px;">Detalles</h3>
-                              <div style="margin-bottom: 5px;">
-                                <span style="color: #666; font-size: 12px;">Fecha:</span>
-                                <span style="font-weight: 500; margin-left: 5px; color: #2c3e50; font-size: 13px;">${fechaActual}</span>
-                              </div>
-                              <div>
-                                <span style="color: #666; font-size: 12px;">Estado:</span>
-                                <span style="background-color: #27ae60; color: white; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-left: 5px; display: inline-block;">PAGADA</span>
-                              </div>
+                            <td class="stack" style="vertical-align: top; padding-left: 15px;" width="50%">
+                              <h3 style="margin: 0 0 10px; color: #000; font-size: 14px; border-bottom: 1px solid #ccc; padding-bottom: 3px;">DETALLES</h3>
+                              <p style="margin: 0 0 3px; color: #333; font-size: 12px;"><strong>Fecha:</strong> ${fechaActual}</p>
+                              <p style="margin: 0; color: #333; font-size: 12px;">
+                                <strong>Estado:</strong> 
+                                <span style="border: 1px solid #000; padding: 2px 8px; font-size: 10px; font-weight: bold; margin-left: 5px;">PAGADA</span>
+                              </p>
                             </td>
                           </tr>
                         </table>
@@ -547,24 +496,24 @@ export const sendVentaFacturaEmail = async (to, nombreCliente, ventaId, total, d
               <!-- DETALLE DE PRODUCTOS -->
               <tr>
                 <td style="padding: 20px;">
-                  <h3 style="margin: 0 0 15px; color: #1e3c72; font-size: 16px;">Detalle de productos y servicios</h3>
+                  <h3 style="margin: 0 0 15px; color: #000; font-size: 16px; border-bottom: 2px solid #333; padding-bottom: 5px;">DETALLE DE PRODUCTOS Y SERVICIOS</h3>
                   
                   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
-                    <!-- Encabezado de la tabla -->
+                    <!-- Encabezado B/N -->
                     <tr>
-                      <td colspan="4" style="background-color: #1e3c72; border-radius: 8px;">
+                      <td colspan="4" style="background-color: #333;">
                         <table width="100%" cellpadding="0" cellspacing="0" border="0">
                           <tr>
-                            <td width="60%" style="padding: 12px; color: white; font-size: 13px; font-weight: 600;">Descripción</td>
-                            <td width="15%" style="padding: 12px; color: white; font-size: 13px; font-weight: 600; text-align: center;">Cant.</td>
-                            <td width="15%" style="padding: 12px; color: white; font-size: 13px; font-weight: 600; text-align: right;">P.Unit</td>
-                            <td width="10%" style="padding: 12px; color: white; font-size: 13px; font-weight: 600; text-align: right;">Total</td>
+                            <td width="60%" style="padding: 10px 8px; color: white; font-size: 12px; font-weight: 600;">DESCRIPCIÓN</td>
+                            <td width="15%" style="padding: 10px 8px; color: white; font-size: 12px; font-weight: 600; text-align: center;">CANT.</td>
+                            <td width="15%" style="padding: 10px 8px; color: white; font-size: 12px; font-weight: 600; text-align: right;">P.UNIT</td>
+                            <td width="10%" style="padding: 10px 8px; color: white; font-size: 12px; font-weight: 600; text-align: right;">TOTAL</td>
                           </tr>
                         </table>
                       </td>
                     </tr>
 
-                    <!-- Detalles de productos -->
+                    <!-- Detalles -->
                     ${detallesHtml}
                   </table>
                 </td>
@@ -575,27 +524,27 @@ export const sendVentaFacturaEmail = async (to, nombreCliente, ventaId, total, d
                 <td style="padding: 0 20px 20px;">
                   <table width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
-                      <td class="totales-cell" style="text-align: right;">
-                        <table cellpadding="0" cellspacing="0" border="0" style="background: #f8f9fa; border-radius: 12px; width: 100%; max-width: 350px; margin-left: auto;">
+                      <td style="text-align: right;">
+                        <table cellpadding="0" cellspacing="0" border="1" style="border-collapse: collapse; border-color: #ccc; width: 100%; max-width: 350px; margin-left: auto;">
                           <tr>
                             <td style="padding: 15px;">
                               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                                 <tr>
-                                  <td style="padding-bottom: 8px; border-bottom: 1px dashed #d0d7de;">
+                                  <td style="padding-bottom: 8px; border-bottom: 1px solid #ccc;">
                                     <table width="100%" cellpadding="0" cellspacing="0" border="0">
                                       <tr>
-                                        <td style="color: #4a5568; font-size: 13px;">Subtotal:</td>
-                                        <td style="font-weight: 500; text-align: right; font-size: 13px;">${formatterCOP.format(subtotal)}</td>
+                                        <td style="color: #555; font-size: 12px;">Subtotal:</td>
+                                        <td style="font-weight: 500; text-align: right; font-size: 12px;">${formatterCOP.format(subtotal)}</td>
                                       </tr>
                                     </table>
                                   </td>
                                 </tr>
                                 <tr>
-                                  <td style="padding: 8px 0; border-bottom: 1px dashed #d0d7de;">
+                                  <td style="padding: 8px 0; border-bottom: 1px solid #ccc;">
                                     <table width="100%" cellpadding="0" cellspacing="0" border="0">
                                       <tr>
-                                        <td style="color: #4a5568; font-size: 13px;">IVA (19%):</td>
-                                        <td style="font-weight: 500; text-align: right; font-size: 13px;">${formatterCOP.format(iva)}</td>
+                                        <td style="color: #555; font-size: 12px;">IVA (19%):</td>
+                                        <td style="font-weight: 500; text-align: right; font-size: 12px;">${formatterCOP.format(iva)}</td>
                                       </tr>
                                     </table>
                                   </td>
@@ -604,8 +553,8 @@ export const sendVentaFacturaEmail = async (to, nombreCliente, ventaId, total, d
                                   <td style="padding-top: 10px;">
                                     <table width="100%" cellpadding="0" cellspacing="0" border="0">
                                       <tr>
-                                        <td style="font-size: 16px; font-weight: bold; color: #1e3c72;">TOTAL:</td>
-                                        <td style="font-size: 20px; font-weight: bold; color: #1e3c72; text-align: right;">${totalFormateado}</td>
+                                        <td style="font-size: 16px; font-weight: bold; color: #000;">TOTAL:</td>
+                                        <td style="font-size: 18px; font-weight: bold; color: #000; text-align: right;">${totalFormateado}</td>
                                       </tr>
                                     </table>
                                   </td>
@@ -622,23 +571,23 @@ export const sendVentaFacturaEmail = async (to, nombreCliente, ventaId, total, d
 
               <!-- PIE DE PÁGINA -->
               <tr>
-                <td style="background-color: #f8f9fa; padding: 20px; border-top: 2px solid #eaecef;">
+                <td style="background-color: #f5f5f5; padding: 20px; border-top: 2px solid #333;">
                   <table width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
-                      <td style="padding-bottom: 15px;">
-                        <h4 style="margin: 0 0 8px; color: #1e3c72; font-size: 14px;">Información de interés</h4>
-                        <p style="margin: 0 0 3px; color: #4a5568; font-size: 11px;">✔️ Esta factura se asimila a una factura electrónica para efectos legales.</p>
-                        <p style="margin: 0 0 3px; color: #4a5568; font-size: 11px;">✔️ Los productos y servicios cumplen con las especificaciones acordadas.</p>
-                        <p style="margin: 0; color: #4a5568; font-size: 11px;">✔️ Reclamos dentro de los 5 días hábiles siguientes.</p>
+                      <td style="padding-bottom: 10px;">
+                        <h4 style="margin: 0 0 8px; color: #000; font-size: 13px;">INFORMACIÓN IMPORTANTE</h4>
+                        <p style="margin: 0 0 2px; color: #555; font-size: 10px;">• Esta factura es válida como comprobante de pago.</p>
+                        <p style="margin: 0 0 2px; color: #555; font-size: 10px;">• Los productos/servicios cumplen con las especificaciones acordadas.</p>
+                        <p style="margin: 0; color: #555; font-size: 10px;">• Reclamos hasta 5 días hábiles después de la compra.</p>
                       </td>
                     </tr>
                     <tr>
-                      <td style="text-align: center; padding-top: 15px; border-top: 1px solid #d0d7de;">
-                        <p style="margin: 0; color: #94a3b8; font-size: 10px;">
+                      <td style="text-align: center; padding-top: 15px; border-top: 1px solid #ccc;">
+                        <p style="margin: 0; color: #777; font-size: 9px;">
                           PublicidadDAS - NIT 901.234.567-8 | Calle 123 #45-67, Bogotá | Tel: (601) 234 5678
                         </p>
-                        <p style="margin: 5px 0 0; color: #94a3b8; font-size: 10px;">
-                          © ${new Date().getFullYear()} PublicidadDAS - Todos los derechos reservados.
+                        <p style="margin: 3px 0 0; color: #777; font-size: 9px;">
+                          © ${new Date().getFullYear()} PublicidadDAS - Documento generado electrónicamente
                         </p>
                       </td>
                     </tr>
