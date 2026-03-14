@@ -23,7 +23,7 @@ import {
 import { getColoresProducto } from "../../dashboard/productos/services/services.products";
 
 export const CarritoCompras = () => {
-  const [editingQuantities, setEditingQuantities] = useState({});
+  const [editingQuantity, setEditingQuantity] = useState({});
 
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -80,38 +80,30 @@ export const CarritoCompras = () => {
     loadColorsForProducts();
   }, [cart, loadColorsForProducts]);
 
-  // Efecto para debug - SOLO cuando cambia el carrito
+  // Efecto para verificar stocks cuando cambian los colores cargados
   useEffect(() => {
-    if (colorsLoaded) {
-      console.log("🛒 [CARRITO] Estado actual del carrito:", cart);
-      cart.forEach(item => {
-        console.log(`  - ${item.Nombre}:`, {
-          customization: item.customization,
-          color: item.customization?.color,
-          colorId: item.customization?.color?.ColorId
-        });
-      });
-    }
-  }, [cart, colorsLoaded]);
+    if (!colorsLoaded || cart.length === 0) return;
 
-  // Función de depuración - opcional
-  useEffect(() => {
-    if (cart.length > 0) {
-      cart.forEach(item => {
-        if (item.ProductoId && item.customization?.color?.ColorId) {
-          const colors = productColors[item.ProductoId] || [];
-          const colorSeleccionado = colors.find(c => c.ColorId === item.customization.color.ColorId);
-          console.log(`🔍 Producto: ${item.Nombre}`, {
-            colorId: item.customization.color.ColorId,
-            colorNombre: item.customization.color.Nombre,
-            stockColor: colorSeleccionado?.Stock,
-            stockGeneral: item.Stock,
-            quantity: item.quantity
-          });
+    // Verificar cada item del carrito
+    cart.forEach(item => {
+      if (item.ProductoId && item.customization?.color?.ColorId) {
+        const colors = productColors[item.ProductoId] || [];
+        const colorSeleccionado = colors.find(c => c.ColorId === item.customization.color.ColorId);
+
+        if (colorSeleccionado) {
+          // Si el stock actual es menor que la cantidad en carrito
+          if (colorSeleccionado.Stock < item.quantity) {
+            console.warn(`⚠️ Stock insuficiente para ${item.Nombre} - ${item.customization.color.Nombre}`);
+            toast.warning(
+              `El stock de ${item.customization.color.Nombre} ha cambiado. ` +
+              `Ahora solo hay ${colorSeleccionado.Stock} unidades disponibles.`,
+              { autoClose: 5000 }
+            );
+          }
         }
-      });
-    }
-  }, [cart, productColors]);
+      }
+    });
+  }, [colorsLoaded, productColors, cart]);
 
   // Función para obtener el stock disponible según el color
   const getStockDisponible = (item) => {
@@ -122,10 +114,12 @@ export const CarritoCompras = () => {
       const colorSeleccionado = colors.find(c => c.ColorId === item.customization.color.ColorId);
 
       if (colorSeleccionado) {
-        // Si el color tiene stock, devolver ese stock
-        if (colorSeleccionado.Stock !== undefined) {
-          return colorSeleccionado.Stock;
+        // Actualizar el stock en el item para mantener consistencia
+        if (item.customization.color.Stock !== colorSeleccionado.Stock) {
+          // Actualizar el objeto en memoria (opcional, pero útil)
+          item.customization.color.Stock = colorSeleccionado.Stock;
         }
+        return colorSeleccionado.Stock;
       }
     }
 
@@ -219,7 +213,20 @@ export const CarritoCompras = () => {
       return;
     }
 
+    // Verificar que la cantidad actual no exceda el stock del nuevo color
+    if (editingColorItem.quantity > color.Stock) {
+      toast.warning(
+        `La cantidad actual (${editingColorItem.quantity}) excede el stock del nuevo color (${color.Stock}). ` +
+        `Se ajustará automáticamente al máximo disponible.`
+      );
+
+      // Actualizar la cantidad al máximo disponible del nuevo color
+      updateQuantity(editingColorItem.id, color.Stock);
+    }
+
+    // Actualizar el color
     updateItemColor(editingColorItem.id, color);
+
     setEditingColorItem(null);
     toast.success(`Color cambiado a ${color.Nombre}`);
   };
@@ -411,119 +418,71 @@ export const CarritoCompras = () => {
 
                               {/* Contador de cantidad */}
                               <div className="flex items-center gap-2">
+                                {/* Botón restar */}
                                 <button
                                   onClick={() => handleDecrease(item)}
-                                  className="w-8 h-8 flex items-center justify-center border border-slate-300 rounded-full hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                   disabled={item.quantity <= 1}
+                                  className="w-8 h-8 flex items-center justify-center bg-white border border-slate-300 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                 >
                                   <Minus className="h-4 w-4" />
                                 </button>
 
-                                {editingStock === item.id ? (
-                                  <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-lg border border-blue-300 shadow-sm">
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      max={getStockDisponible(item) || 999}
-                                      value={editingQuantities[item.id] ?? item.quantity}
-                                      onChange={(e) => {
-                                        const value = e.target.value;
-                                        if (/^\d*$/.test(value)) {
-                                          setEditingQuantities(prev => ({
-                                            ...prev,
-                                            [item.id]: value === "" ? "" : parseInt(value)
-                                          }));
-                                        }
-                                      }}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          const qty = editingQuantities[item.id] ?? item.quantity;
-                                          const stockDisp = getStockDisponible(item);
+                                {/* Input con estado local para edición */}
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max={getStockDisponible(item) || 999}
+                                  // Usar valor del estado local si existe, sino el del carrito
+                                  value={editingQuantity[item.id] ?? item.quantity}
+                                  onChange={(e) => {
+                                    const rawValue = e.target.value;
+                                    // Guardar en estado local lo que el usuario escribe (incluyendo vacío)
+                                    setEditingQuantity(prev => ({ ...prev, [item.id]: rawValue }));
+                                  }}
+                                  onBlur={(e) => {
+                                    const rawValue = e.target.value;
+                                    const stockDisp = getStockDisponible(item);
 
-                                          if (!qty || qty < 1 || (stockDisp !== null && stockDisp < qty)) {
-                                            if (item.customization?.color?.ColorId) {
-                                              toast.error(`Cantidad inválida (máx ${stockDisp} para este color)`);
-                                            } else {
-                                              toast.error(`Cantidad inválida (máx ${stockDisp})`);
-                                            }
-                                            setEditingQuantities(prev => ({ ...prev, [item.id]: item.quantity }));
-                                            return;
-                                          }
+                                    // Si está vacío o es inválido, restaurar a 1 o al mínimo válido
+                                    let finalValue = 1;
 
-                                          updateQuantity(item.id, qty);
-                                          setEditingStock(null);
-                                          setEditingQuantities(prev => ({ ...prev, [item.id]: undefined }));
-                                          toast.success("Cantidad actualizada");
-                                        }
-                                      }}
-                                      className="w-16 border border-blue-200 rounded-lg px-2 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-medium"
-                                      autoFocus
-                                    />
+                                    if (rawValue !== '' && !isNaN(parseInt(rawValue))) {
+                                      finalValue = parseInt(rawValue);
+                                      // Validar límites
+                                      if (finalValue < 1) finalValue = 1;
+                                      if (stockDisp !== null && finalValue > stockDisp) {
+                                        toast.warning(`Máximo ${stockDisp} unidades`);
+                                        finalValue = stockDisp;
+                                      }
+                                    }
 
-                                    <button
-                                      onClick={() => {
-                                        const qty = editingQuantities[item.id] ?? item.quantity;
-                                        const stockDisp = getStockDisponible(item);
+                                    // Actualizar el carrito con el valor validado
+                                    updateQuantity(item.id, finalValue);
 
-                                        if (!qty || qty < 1 || (stockDisp !== null && stockDisp < qty)) {
-                                          if (item.customization?.color?.ColorId) {
-                                            toast.error(`Cantidad inválida (máx ${stockDisp} para este color)`);
-                                          } else {
-                                            toast.error(`Cantidad inválida (máx ${stockDisp})`);
-                                          }
-                                          setEditingQuantities(prev => ({ ...prev, [item.id]: item.quantity }));
-                                          return;
-                                        }
+                                    // Limpiar estado local para este item
+                                    setEditingQuantity(prev => {
+                                      const nuevo = { ...prev };
+                                      delete nuevo[item.id];
+                                      return nuevo;
+                                    });
+                                  }}
+                                  onKeyDown={(e) => {
+                                    // Si presiona Enter, validar y actualizar inmediatamente
+                                    if (e.key === 'Enter') {
+                                      e.target.blur(); // Disparar onBlur para validar
+                                    }
+                                  }}
+                                  className="w-16 text-center py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                                />
 
-                                        updateQuantity(item.id, qty);
-                                        setEditingStock(null);
-                                        setEditingQuantities(prev => ({ ...prev, [item.id]: undefined }));
-                                        toast.success("Cantidad actualizada");
-                                      }}
-                                      className="px-2.5 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all font-bold shadow-sm hover:shadow flex items-center justify-center text-sm"
-                                      title="Guardar (Enter)"
-                                    >
-                                      ✓
-                                    </button>
-
-                                    <button
-                                      onClick={() => {
-                                        setEditingStock(null);
-                                        setEditingQuantities(prev => ({ ...prev, [item.id]: undefined }));
-                                      }}
-                                      className="px-2.5 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all font-bold shadow-sm hover:shadow flex items-center justify-center text-sm"
-                                      title="Cancelar (Esc)"
-                                    >
-                                      ✗
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <span className="font-bold text-lg w-8 text-center bg-gray-50 rounded-lg py-1 border border-gray-200">
-                                      {item.quantity}
-                                    </span>
-                                    <button
-                                      onClick={() => handleEditStock(item)}
-                                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-all font-medium border border-blue-200"
-                                    >
-                                      <Edit2 className="h-3.5 w-3.5" /> Editar
-                                    </button>
-                                  </>
-                                )}
-
+                                {/* Botón sumar */}
                                 <button
                                   onClick={() => handleIncrease(item)}
-                                  className={`w-8 h-8 flex items-center justify-center border rounded-full transition-all ${getStockDisponible(item) !== null && item.quantity >= getStockDisponible(item)
-                                    ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
-                                    : 'border-blue-300 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-400'
-                                    }`}
                                   disabled={getStockDisponible(item) !== null && item.quantity >= getStockDisponible(item)}
-                                  title={
-                                    getStockDisponible(item) !== null && item.quantity >= getStockDisponible(item)
-                                      ? `Stock máximo alcanzado (${getStockDisponible(item)} unidades)`
-                                      : "Aumentar cantidad"
-                                  }
+                                  className={`w-8 h-8 flex items-center justify-center border rounded-lg transition-all ${getStockDisponible(item) !== null && item.quantity >= getStockDisponible(item)
+                                      ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                                      : 'border-blue-300 bg-blue-500 text-white hover:bg-blue-600'
+                                    }`}
                                 >
                                   <Plus className="h-4 w-4" />
                                 </button>
@@ -926,101 +885,172 @@ export const CarritoCompras = () => {
       {/* MODAL PARA EDITAR COLOR */}
       {editingColorItem && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
-          <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">Cambiar color</h2>
-                <p className="text-sm text-slate-600">
-                  {editingColorItem.Nombre}
-                </p>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+
+            {/* Header del Modal - Fijo */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white/20 p-2 rounded-lg">
+                    <Palette className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Cambiar color</h2>
+                    <p className="text-xs text-blue-100">{editingColorItem.Nombre}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditingColorItem(null)}
+                  className="text-white/80 hover:text-white transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <button
-                onClick={() => setEditingColorItem(null)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
             </div>
 
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Palette className="h-5 w-5 text-slate-500" />
-                <span className="font-medium text-slate-700">
-                  Color actual: {getColorDisplay(editingColorItem) || "No seleccionado"}
-                </span>
+            {/* Contenido del Modal - Scrollable */}
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
+
+              {/* Información del color actual */}
+              <div className="bg-slate-50 rounded-lg p-4 mb-4 border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">Color actual:</span>
+                  <span className="font-medium text-slate-800 flex items-center gap-2">
+                    {getColorDisplay(editingColorItem) ? (
+                      <>
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: editingColorItem.customization?.color?.Hex || '#ccc' }}
+                        />
+                        {getColorDisplay(editingColorItem)}
+                      </>
+                    ) : (
+                      "No seleccionado"
+                    )}
+                  </span>
+                </div>
               </div>
 
-              <p className="text-sm text-slate-600 mb-4">
-                Selecciona un nuevo color para este producto:
-              </p>
+              {/* Información de cantidad actual - Integrada mejor */}
+              {editingColorItem.quantity > 0 && (
+                <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4 mb-4">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-blue-500 rounded-full p-1 mt-0.5">
+                      <span className="text-white text-xs font-bold">i</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">
+                        Cantidad actual: {editingColorItem.quantity} unidades
+                      </p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        Al cambiar de color, la cantidad se ajustará automáticamente si el nuevo color tiene menos stock.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Título de selección */}
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-slate-700">
+                  Selecciona un nuevo color:
+                </h3>
+              </div>
+
+              {/* Grid de colores */}
+              {loadingColors[editingColorItem.ProductoId] ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-slate-500 text-sm mt-2">Cargando colores...</p>
+                </div>
+              ) : (
+                <>
+                  {productColors[editingColorItem.ProductoId]?.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {productColors[editingColorItem.ProductoId].map((color) => {
+                        const currentColorObj = editingColorItem.customization?.color;
+                        const isCurrentColor = currentColorObj?.ColorId === color.ColorId;
+                        const excedeStock = editingColorItem.quantity > color.Stock;
+                        const sinStock = color.Stock === 0;
+
+                        return (
+                          <button
+                            key={color.ColorId}
+                            onClick={() => handleSelectColor(color)}
+                            disabled={sinStock}
+                            className={`
+                        relative p-3 rounded-xl border-2 transition-all
+                        ${isCurrentColor
+                                ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-200'
+                                : sinStock
+                                  ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                                  : excedeStock
+                                    ? 'border-yellow-400 bg-yellow-50 hover:bg-yellow-100'
+                                    : 'border-slate-200 hover:border-blue-300 hover:shadow-md'
+                              }
+                      `}
+                          >
+                            {/* Badge de advertencia */}
+                            {excedeStock && !isCurrentColor && (
+                              <span className="absolute -top-2 -right-2 bg-yellow-500 text-white text-xs px-1.5 py-0.5 rounded-full shadow-lg z-10">
+                                ⚠️
+                              </span>
+                            )}
+
+                            {/* Círculo de color */}
+                            <div className="flex justify-center mb-2">
+                              <div
+                                className="w-12 h-12 rounded-full border-2 border-white shadow-md"
+                                style={{ backgroundColor: color.Hex || '#ccc' }}
+                              />
+                            </div>
+
+                            {/* Nombre del color */}
+                            <p className="text-sm font-medium text-slate-700 text-center truncate">
+                              {color.Nombre}
+                            </p>
+
+                            {/* Stock */}
+                            <p className={`text-xs text-center mt-1 font-medium ${sinStock
+                              ? 'text-red-600'
+                              : excedeStock
+                                ? 'text-yellow-600'
+                                : 'text-green-600'
+                              }`}>
+                              {sinStock
+                                ? 'Agotado'
+                                : excedeStock
+                                  ? `${color.Stock} disp.`
+                                  : `${color.Stock} uds`
+                              }
+                            </p>
+
+                            {/* Indicador de selección actual */}
+                            {isCurrentColor && (
+                              <div className="absolute top-2 left-2 bg-blue-600 rounded-full p-0.5">
+                                <span className="text-white text-xs">✓</span>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-slate-50 rounded-lg border border-slate-200">
+                      <Palette className="h-12 w-12 mx-auto mb-3 text-slate-400" />
+                      <p className="text-slate-600 text-sm">No hay colores disponibles</p>
+                      <p className="text-xs text-slate-400 mt-1">para este producto</p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
-            {loadingColors[editingColorItem.ProductoId] ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="text-slate-600 mt-2">Cargando colores...</p>
-              </div>
-            ) : (
-              <>
-                {productColors[editingColorItem.ProductoId]?.length > 0 ? (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-6 max-h-[300px] overflow-y-auto pr-2">
-                    {productColors[editingColorItem.ProductoId].map((color) => {
-                      const currentColorObj = editingColorItem.customization?.color;
-                      const isCurrentColor = currentColorObj?.ColorId === color.ColorId;
-
-                      return (
-                        <button
-                          key={color.ColorId}
-                          onClick={() => handleSelectColor(color)}
-                          disabled={color.Stock === 0}
-                          className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all ${isCurrentColor
-                            ? "border-blue-600 bg-blue-50"
-                            : color.Stock === 0
-                              ? "border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed"
-                              : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                            }`}
-                        >
-                          <div
-                            className="w-12 h-12 rounded-full border border-slate-300 mb-2"
-                            style={{ backgroundColor: color.Hex || '#ccc' }}
-                          />
-                          <span className="text-sm font-medium text-slate-700">
-                            {color.Nombre}
-                          </span>
-                          <span className={`text-xs mt-1 ${color.Stock === 0
-                            ? "text-red-600"
-                            : "text-green-600"
-                            }`}>
-                            {color.Stock === 0 ? "Agotado" : `${color.Stock} uds`}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 text-slate-500">
-                    <Palette className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                    <p>No hay colores disponibles para este producto</p>
-                  </div>
-                )}
-              </>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  updateItemColor(editingColorItem.id, null);
-                  setEditingColorItem(null);
-                  toast.success("Color eliminado");
-                }}
-                className="flex-1 py-2 border-2 border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition"
-                disabled={!getColorDisplay(editingColorItem)}
-              >
-                Eliminar color
-              </button>
+            {/* Footer del Modal - Botones */}
+            <div className="border-t border-slate-200 p-4 bg-slate-50 flex gap-3">
               <button
                 onClick={() => setEditingColorItem(null)}
-                className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
+                className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-medium text-sm hover:from-blue-700 hover:to-blue-800 transition-all shadow-md"
               >
                 Cerrar
               </button>
