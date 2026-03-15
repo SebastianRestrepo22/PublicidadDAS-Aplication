@@ -1,30 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
-import {
-  Eye,
-  ArrowLeft,
-  ChevronDown,
-  ChevronUp,
-  Search,
-  X,
-  AlertCircle,
-  Calendar,
-  User,
-  DollarSign,
-  FileText,
-  Package,
-  CreditCard,
-  Truck,
-  Check,
-  ExternalLink,
-  Download,
-  Printer,
-  Filter,
-  RefreshCw,
-  Tag,
-  ShoppingBag,
-  Plus
-} from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Eye, ArrowLeft, Search, X, AlertCircle, FileText, DollarSign, User, Package, Plus, Download, Printer, ShoppingBag } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Pagination } from "../../components/paginacion/pagination.jsx";
@@ -33,310 +9,94 @@ import { getVentas, getVentaById, anularVenta } from "../venta/services/service.
 import Modal from "../../components/modals/modal.jsx";
 import { generarFacturaPDF } from "../../../../utils/generarFacturaPDF.js";
 
-// Función para formatear fecha
 const formatDate = (dateString) => {
   if (!dateString) return "—";
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat('es-ES', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(date);
+  return new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
 };
 
-// Función para acortar IDs - 3 CARACTERES
 const shortenId = (id) => {
   if (!id) return "—";
   const strId = String(id);
   return strId.length > 3 ? strId.slice(-3) : strId.padStart(3, '0');
 };
 
-// Formatear precio
-export const formatPrice = (value, currency = '$') => {
+const formatPrice = (value, currency = '$') => {
   if (value === null || value === undefined || value === '') return `${currency}0.00`;
-
-  // Convertir a número si es string
   const num = typeof value === 'string' ? parseFloat(value) : value;
-
-  // Verificar si es un número válido
   if (isNaN(num)) return `${currency}0.00`;
-
-  // Formatear con separador de miles y 2 decimales
   return `${currency}${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 };
 
-// Badge de estado
 const EstadoBadge = ({ estado }) => {
   const config = {
-    'pagado': { bg: 'bg-green-100', text: 'text-green-800', label: 'Pagado', icon: Check },
-    'anulado': { bg: 'bg-red-100', text: 'text-red-800', label: 'Anulado', icon: X }
+    'pagado': { bg: 'bg-green-100', text: 'text-green-800', label: 'Pagado' },
+    'anulado': { bg: 'bg-red-100', text: 'text-red-800', label: 'Anulado' }
   };
-
-  const { bg, text, label, icon: Icon } = config[estado] || config['pagado'];
-
-  return (
-    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${bg} ${text}`}>
-      {Icon && <Icon size={12} />}
-      {label}
-    </span>
-  );
+  const { bg, text, label } = config[estado] || config['pagado'];
+  return <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${bg} ${text}`}>{label}</span>;
 };
 
-// Badge de origen
 const OrigenBadge = ({ origen }) => {
   const config = {
     'pedido': { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Desde Pedido' },
     'manual': { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Venta Manual' }
   };
-
   const { bg, text, label } = config[origen] || config['manual'];
-
-  return (
-    <span className={`px-2 py-0.5 rounded text-xs font-medium ${bg} ${text}`}>
-      {label}
-    </span>
-  );
+  return <span className={`px-2 py-0.5 rounded text-xs font-medium ${bg} ${text}`}>{label}</span>;
 };
 
-// Componente de detalles expandibles 
 const DetallesProductosAcordeon = ({ detalles }) => {
   const [mostrarDetalles, setMostrarDetalles] = useState(false);
-  const [archivoAmpliado, setArchivoAmpliado] = useState(null);
-  const [tipoArchivo, setTipoArchivo] = useState(null);
-  const [imagenesCache, setImagenesCache] = useState({});
+  const [paginaActual, setPaginaActual] = useState(1);
+  const itemsPorPagina = 5;
 
-  useEffect(() => {
-    // Cargar imágenes base64 cuando se monta el componente
-    const cargarImagenesBase64 = async () => {
-      const nuevasImagenes = {};
+  // Validación más robusta
+  if (!detalles) {
+    console.warn('DetallesProductosAcordeon: detalles es null o undefined');
+    return <p className="text-gray-500 text-center py-4">No hay información de productos</p>;
+  }
 
-      for (const detalle of detalles) {
-        if (detalle.UrlImagenPersonalizada &&
-          detalle.UrlImagenPersonalizada !== 'pendiente' &&
-          !detalle.UrlImagenPersonalizada.startsWith('http') &&
-          !detalle.UrlImagenPersonalizada.startsWith('blob:')) {
+  if (!Array.isArray(detalles)) {
+    console.warn('DetallesProductosAcordeon: detalles no es un array', detalles);
+    return <p className="text-gray-500 text-center py-4">Formato de datos incorrecto</p>;
+  }
 
-          // Intentar cargar como base64
-          try {
-            // Aquí puedes hacer una petición al backend para obtener la imagen
-            // Por ahora, si la URL parece base64, la usamos directamente
-            if (detalle.UrlImagenPersonalizada.startsWith('data:')) {
-              nuevasImagenes[detalle.DetalleVentaId] = detalle.UrlImagenPersonalizada;
-            }
-          } catch (error) {
-            console.error("Error cargando imagen:", error);
-          }
-        }
-      }
-
-      setImagenesCache(nuevasImagenes);
-    };
-
-    cargarImagenesBase64();
-  }, [detalles]);
-
-  if (!detalles || detalles.length === 0) {
+  // Filtrar elementos nulos del array
+  const detallesValidos = detalles.filter(d => d !== null && d !== undefined);
+  
+  if (detallesValidos.length === 0) {
     return <p className="text-gray-500 text-center py-4">No hay productos en esta venta</p>;
   }
 
-  const totalProductos = detalles.length;
-  const totalCantidad = detalles.reduce((sum, d) => sum + (d.Cantidad || 0), 0);
-  const totalSubtotal = detalles.reduce((sum, d) => sum + ((d.Subtotal ? parseFloat(d.Subtotal) : 0) || 0), 0);
+  const totalProductos = detallesValidos.length;
+  const totalCantidad = detallesValidos.reduce((sum, d) => {
+    if (!d) return sum;
+    const cantidad = d.Cantidad || 0;
+    return sum + cantidad;
+  }, 0);
 
-  // Función para determinar el tipo de archivo por la URL
-  const determinarTipoArchivo = (url) => {
-    if (!url || url === 'pendiente') return null;
-
-    // Si es base64
-    if (url.startsWith('data:')) {
-      if (url.startsWith('data:image/')) return 'imagen';
-      if (url.startsWith('data:application/pdf')) return 'pdf';
-      return 'desconocido';
+  const totalSubtotal = detallesValidos.reduce((sum, d) => {
+    if (!d) return sum;
+    let subtotal = 0;
+    if (d.Subtotal !== undefined && d.Subtotal !== null) {
+      subtotal = typeof d.Subtotal === 'string' ? parseFloat(d.Subtotal) : d.Subtotal;
     }
+    return sum + (isNaN(subtotal) ? 0 : subtotal);
+  }, 0);
 
-    const extension = url.split('.').pop()?.toLowerCase();
-
-    if (url.startsWith('blob:')) return 'imagen';
-    if (url.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i)) return 'imagen';
-    if (url.match(/\.pdf$/i)) return 'pdf';
-    if (url.match(/\.(doc|docx)$/i)) return 'word';
-    if (url.match(/\.(xls|xlsx)$/i)) return 'excel';
-    if (url.match(/\.(ppt|pptx)$/i)) return 'powerpoint';
-    if (url.match(/\.(txt|rtf)$/i)) return 'texto';
-
-    return 'desconocido';
-  };
-
-  // Función para obtener el ícono según el tipo de archivo
-  const getIconoArchivo = (tipo) => {
-    switch (tipo) {
-      case 'imagen':
-        return <Eye size={12} className="text-blue-500" />;
-      case 'pdf':
-        return <FileText size={12} className="text-red-500" />;
-      case 'word':
-        return <FileText size={12} className="text-blue-700" />;
-      case 'excel':
-        return <FileText size={12} className="text-green-600" />;
-      case 'powerpoint':
-        return <FileText size={12} className="text-orange-500" />;
-      default:
-        return <FileText size={12} className="text-gray-500" />;
-    }
-  };
-
-  // Función para manejar el clic en el archivo
-  const handleArchivoClick = (url, detalleId) => {
-    if (url === 'pendiente') {
-      toast.info("La imagen aún no ha sido procesada");
-      return;
-    }
-
-    const tipo = determinarTipoArchivo(url);
-    setTipoArchivo(tipo);
-
-    // Si tenemos la imagen en caché y es base64, usarla
-    if (detalleId && imagenesCache[detalleId]) {
-      setArchivoAmpliado(imagenesCache[detalleId]);
-    } else {
-      setArchivoAmpliado(url);
-    }
-  };
-
-  // Función para obtener la URL correcta de la imagen
-  const getImagenUrl = (url, detalleId) => {
-    if (!url || url === 'pendiente') return null;
-
-    // Si la URL ya es completa (http o https), usarla directamente
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
-
-    // Si es una URL relativa que comienza con /uploads
-    if (url.startsWith('/uploads')) {
-      return `http://localhost:3000${url}`;
-    }
-
-    // Si es base64
-    if (url.startsWith('data:')) {
-      return url;
-    }
-
-    return url;
-  };
-
-  // Componente para mostrar el contenido ampliado según el tipo
-  const VisualizadorArchivo = ({ url, tipo, onClose }) => {
-    if (!url) return null;
-
-    // Si es imagen
-    if (tipo === 'imagen' || url.startsWith('blob:') || url.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i) || url.startsWith('data:image')) {
-      return (
-        <div className="p-4 max-w-4xl max-h-[90vh] overflow-auto">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-gray-800">Vista previa de la imagen</h3>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <div className="flex justify-center bg-gray-100 rounded-lg p-4">
-            <img
-              src={url}
-              alt="Imagen ampliada"
-              className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
-              onError={(e) => {
-                console.error("Error cargando imagen:", url);
-                e.target.onerror = null;
-                e.target.src = "https://via.placeholder.com/400?text=Error+al+cargar+imagen";
-              }}
-            />
-          </div>
-        </div>
-      );
-    }
-
-    // Si es PDF
-    if (tipo === 'pdf' || url.match(/\.pdf$/i) || url.startsWith('data:application/pdf')) {
-      return (
-        <div className="p-4 max-w-5xl max-h-[90vh] overflow-auto">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-gray-800">Vista previa del PDF</h3>
-            <div className="flex gap-2">
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-              >
-                <Download size={16} />
-                Descargar
-              </a>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-          </div>
-          <iframe
-            src={url.startsWith('data:') ? url : `${url}#toolbar=1&navpanes=1`}
-            title="Visor PDF"
-            className="w-full h-[70vh] border border-gray-300 rounded-lg"
-          />
-        </div>
-      );
-    }
-
-    // Si es otro tipo de documento (Word, Excel, etc)
-    return (
-      <div className="p-4 max-w-md">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold text-gray-800">Archivo adjunto</h3>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-          <FileText size={48} className="mx-auto mb-3 text-yellow-600" />
-          <p className="text-gray-700 mb-4">
-            Este archivo no puede visualizarse directamente en el navegador.
-          </p>
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <Download size={18} />
-            Descargar archivo
-          </a>
-        </div>
-      </div>
-    );
-  };
+  const totalPaginas = Math.ceil(detallesValidos.length / itemsPorPagina);
+  const inicio = (paginaActual - 1) * itemsPorPagina;
+  const detallesPaginados = detallesValidos.slice(inicio, inicio + itemsPorPagina);
 
   return (
     <div className="space-y-3">
-      {/* Header resumen - más compacto */}
-      <div
-        className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 cursor-pointer hover:shadow-sm transition-shadow"
-        onClick={() => setMostrarDetalles(!mostrarDetalles)}
-      >
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 cursor-pointer hover:shadow-sm transition-shadow" onClick={() => setMostrarDetalles(!mostrarDetalles)}>
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4 flex-wrap">
             <h4 className="font-semibold text-blue-800 flex items-center gap-1 text-sm">
-              <Package size={14} />
-              Detalle ({totalProductos} items)
+              <Package size={14} />Detalle ({totalProductos} items)
             </h4>
             <div className="flex gap-3 text-xs">
               <span className="bg-white px-2 py-1 rounded shadow-sm">
@@ -350,412 +110,238 @@ const DetallesProductosAcordeon = ({ detalles }) => {
             </div>
           </div>
           <button className="p-1.5 bg-white rounded-full shadow-sm hover:bg-gray-50">
-            {mostrarDetalles ? <ChevronUp size={16} className="text-blue-600" /> : <ChevronDown size={16} className="text-blue-600" />}
+            {mostrarDetalles ? '▲' : '▼'}
           </button>
         </div>
       </div>
 
       {mostrarDetalles && (
         <div className="border rounded-lg overflow-hidden shadow-sm text-sm">
-          {/* Encabezado más compacto */}
           <div className="bg-gray-100 p-2 border-b grid grid-cols-12 text-xs font-medium text-gray-700">
-            <div className="col-span-5">Producto/Servicio</div>
+            <div className="col-span-6">Producto/Servicio</div>
             <div className="col-span-1 text-center">Tipo</div>
             <div className="col-span-1 text-center">Cant.</div>
             <div className="col-span-2 text-right">P.Unit</div>
             <div className="col-span-2 text-right">Subtotal</div>
-            <div className="col-span-1 text-center">Archivo</div>
           </div>
 
-          {/* Filas más compactas */}
           <div className="max-h-80 overflow-y-auto divide-y">
-            {detalles.map((item, index) => {
-              const tieneArchivo = item.UrlImagenPersonalizada && item.UrlImagenPersonalizada !== 'pendiente';
-              const tipoArchivoItem = tieneArchivo ? determinarTipoArchivo(item.UrlImagenPersonalizada) : null;
-              const imagenUrl = getImagenUrl(item.UrlImagenPersonalizada, item.DetalleVentaId);
+            {detallesPaginados.map((item, index) => {
+              if (!item) return null;
 
               return (
                 <div key={item.DetalleVentaId || index} className="p-2 hover:bg-gray-50 grid grid-cols-12 text-xs items-center">
-                  {/* Producto/Servicio con variantes inline */}
-                  <div className="col-span-5">
+                  <div className="col-span-6">
                     <div className="font-medium flex items-center gap-1">
-                      {item.NombreSnapshot}
-                      {/* Color como badge pequeño */}
+                      {item.NombreSnapshot || 'Producto/Servicio'}
                       {item.ColorId && (
                         <span className="inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">
                           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.ColorHex || '#ccc' }}></span>
                           <span>{item.ColorNombre || 'Color'}</span>
                         </span>
                       )}
-                      {/* Tamaño como badge */}
-                      {item.ServicioTamanoId && (
-                        <span className="ml-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium">
-                          {item.NombreTamano || 'Tamaño'}
-                        </span>
-                      )}
                     </div>
-                    {/* Descripción en línea si es corta */}
-                    {item.DescripcionPersonalizada && item.DescripcionPersonalizada.length < 30 && (
+                    {item.DescripcionPersonalizada && (
                       <div className="text-[10px] text-gray-500 italic truncate max-w-[200px]">
                         📝 {item.DescripcionPersonalizada}
                       </div>
                     )}
-                    {/* Descripción en tooltip si es larga */}
-                    {item.DescripcionPersonalizada && item.DescripcionPersonalizada.length >= 30 && (
-                      <div className="text-[10px] text-gray-500 italic truncate max-w-[200px]" title={item.DescripcionPersonalizada}>
-                        📝 {item.DescripcionPersonalizada.substring(0, 25)}...
-                      </div>
-                    )}
                   </div>
 
-                  {/* Tipo */}
                   <div className="col-span-1 text-center">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${item.TipoItem === 'producto' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'
-                      }`}>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${item.TipoItem === 'producto' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'}`}>
                       {item.TipoItem === 'producto' ? 'P' : 'S'}
                     </span>
                   </div>
 
-                  {/* Cantidad */}
-                  <div className="col-span-1 text-center font-medium">{item.Cantidad || 0}</div>
+                  <div className="col-span-1 text-center font-medium">
+                    {item.Cantidad || 0}
+                  </div>
 
-                  {/* Precio Unitario */}
-                  <div className="col-span-2 text-right font-medium">{formatPrice(item.PrecioUnitario)}</div>
+                  <div className="col-span-2 text-right font-medium">
+                    {formatPrice(item.PrecioUnitario)}
+                  </div>
 
-                  {/* Subtotal */}
-                  <div className="col-span-2 text-right font-semibold text-blue-600">{formatPrice(item.Subtotal)}</div>
-
-                  {/* Icono de archivo si existe */}
-                  <div className="col-span-1 text-center">
-                    {tieneArchivo && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleArchivoClick(item.UrlImagenPersonalizada, item.DetalleVentaId);
-                        }}
-                        className={`p-1.5 rounded-lg transition-all hover:scale-110 ${tipoArchivoItem === 'imagen'
-                          ? 'hover:bg-blue-50 text-blue-600'
-                          : 'hover:bg-amber-50 text-amber-600'
-                          }`}
-                        title={`Ver ${tipoArchivoItem || 'archivo'}`}
-                      >
-                        {getIconoArchivo(tipoArchivoItem)}
-                      </button>
-                    )}
+                  <div className="col-span-2 text-right font-semibold text-blue-600">
+                    {formatPrice(item.Subtotal)}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* Footer compacto */}
+          {/* PAGINACIÓN */}
+          {totalPaginas > 1 && (
+            <div className="bg-gray-50 p-3 border-t flex items-center justify-between">
+              <div className="text-xs text-slate-500">
+                Mostrando {inicio + 1} - {Math.min(inicio + itemsPorPagina, detallesValidos.length)} de {detallesValidos.length} items
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
+                  disabled={paginaActual === 1}
+                  className="px-3 py-1 border rounded hover:bg-white disabled:opacity-50 text-xs"
+                >
+                  Anterior
+                </button>
+                <span className="px-3 py-1 text-xs">
+                  {paginaActual} / {totalPaginas}
+                </span>
+                <button
+                  onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))}
+                  disabled={paginaActual === totalPaginas}
+                  className="px-3 py-1 border rounded hover:bg-white disabled:opacity-50 text-xs"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="bg-gray-50 p-2 border-t text-xs">
             <div className="flex justify-end gap-4">
               <span className="text-gray-600">Total items:</span>
               <span className="font-medium">{totalProductos}</span>
-              <span className="text-gray-600 ml-2">Total unidades:</span>
-              <span className="font-medium">{totalCantidad}</span>
               <span className="text-gray-600 ml-2 font-medium">Total:</span>
               <span className="font-bold text-blue-600">{formatPrice(totalSubtotal)}</span>
             </div>
           </div>
         </div>
       )}
-
-      {/* Modal para ver archivo ampliado */}
-      {archivoAmpliado && (
-        <Modal open={true} onClose={() => setArchivoAmpliado(null)}>
-          <VisualizadorArchivo
-            url={archivoAmpliado}
-            tipo={tipoArchivo}
-            onClose={() => setArchivoAmpliado(null)}
-          />
-        </Modal>
-      )}
     </div>
   );
 };
 
-// Modal de anulación con advertencia
-const ModalAnular = ({ open, onClose, onConfirm, venta }) => {
+const ModalAnular = ({ open, onClose, onConfirm, venta, motivo, setMotivo }) => {
   if (!venta) return null;
-
   return (
     <Modal open={open} onClose={onClose}>
       <div className="w-[450px] p-6 mx-auto text-center bg-white rounded-xl shadow-lg">
-        <div className="mb-4 flex justify-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-            <AlertCircle size={32} className="text-red-600" />
-          </div>
-        </div>
+        <div className="mb-4 flex justify-center"><div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center"><AlertCircle size={32} className="text-red-600" /></div></div>
         <h3 className="text-xl font-bold text-gray-800 mb-2">¿Anular esta venta?</h3>
-        <p className="text-gray-600 mb-4">
-          Estás a punto de anular la venta <span className="font-semibold">#{shortenId(venta.VentaId)}</span>
-        </p>
+        <p className="text-gray-600 mb-4">Estás a punto de anular la venta <span className="font-semibold">#{shortenId(venta.VentaId)}</span></p>
+        <div className="mb-4 text-left">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Motivo de anulación *</label>
+          <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows="3" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500" placeholder="Describa brevemente el motivo..." required />
+        </div>
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6 text-sm text-left">
-          <p className="font-medium text-yellow-800 mb-1">⚠️ Esta acción no se puede deshacer</p>
-          <p className="text-yellow-700">
-            La venta quedará como <strong>anulada</strong> en el historial.
-            Esta operación es irreversible y solo debe realizarse en caso de error.
-          </p>
+          <p className="font-medium text-yellow-800 mb-1">Esta acción no se puede deshacer</p>
+          <p className="text-yellow-700">La venta quedará como <strong>anulada</strong> en el historial.</p>
         </div>
         <div className="flex gap-3">
           <button
-            className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 font-medium"
-            onClick={() => onConfirm(venta.VentaId)}
+            className={`flex-1 py-3 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors ${!motivo?.trim()
+                ? 'bg-red-300 cursor-not-allowed'
+                : 'bg-red-600 hover:bg-red-700 text-white'
+              }`}
+            onClick={() => onConfirm(venta.VentaId, motivo)}
+            disabled={!motivo?.trim()}
           >
-            <X size={18} />
             Sí, anular venta
-          </button>
-          <button
-            className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors font-medium"
-            onClick={onClose}
-          >
-            Cancelar
-          </button>
+          </button>          <button className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors font-medium" onClick={onClose}>Cancelar</button>
         </div>
       </div>
     </Modal>
   );
 };
 
-// Modal de ver detalles - MEJORADO
 const ModalVerVenta = ({ open, onClose, venta }) => {
   if (!venta) return null;
-
-  const handleDescargarPDF = () => {
-    generarFacturaPDF(venta);
-  };
-
-  // Extraer información del vendedor
-  const vendedorNombre = venta.UsuarioVendedor?.NombreCompleto ||
-    venta.vendedor?.NombreCompleto ||
-    venta.UsuarioVendedorNombre ||
-    'No especificado';
-
-  const vendedorId = venta.UsuarioVendedor?.CedulaId ||
-    venta.vendedor?.CedulaId ||
-    venta.UsuarioVendedorId ||
-    '-';
-
-  // Extraer información del pedido asociado
-  const pedidoId = venta.PedidoCliente?.PedidoClienteId ||
-    venta.pedido?.PedidoClienteId ||
-    venta.PedidoClienteId;
-
-  const fechaPedido = venta.PedidoCliente?.FechaRegistro ||
-    venta.pedido?.FechaRegistro ||
-    venta.FechaPedido;
-
-  const estadoPedido = venta.PedidoCliente?.Estado ||
-    venta.pedido?.Estado ||
-    venta.EstadoPedido;
-
+  const handleDescargarPDF = () => { generarFacturaPDF(venta); };
+  const vendedorNombre = venta.UsuarioVendedorNombre || venta.UsuarioVendedor?.NombreCompleto || 'No especificado';
   return (
     <Modal open={open} onClose={onClose}>
       <div className="w-[800px] max-h-[90vh] overflow-y-auto p-6 mx-auto bg-white rounded-xl shadow-lg">
         <div className="flex justify-between items-center mb-4 border-b pb-3">
-          <h3 className="text-xl font-bold text-gray-800">
-            Detalles de Venta #{shortenId(venta.VentaId)}
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X size={20} />
-          </button>
+          <h3 className="text-xl font-bold text-gray-800">Detalles de Venta #{shortenId(venta.VentaId)}</h3>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><X size={20} /></button>
         </div>
-
         <div className="space-y-6">
           <div className="bg-slate-50 p-5 rounded-xl">
-            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <FileText size={16} /> Información General
-            </h4>
+            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><FileText size={16} /> Información General</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-xs text-slate-500">ID Venta</p>
-                <p className="font-mono text-sm font-medium">{venta.VentaId}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Origen</p>
-                <OrigenBadge origen={venta.Origen} />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Fecha</p>
-                <p className="text-sm">{formatDate(venta.FechaVenta)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Estado</p>
-                <EstadoBadge estado={venta.Estado} />
-              </div>
+              <div><p className="text-xs text-slate-500">ID Venta</p><p className="font-mono text-sm font-medium">{venta.VentaId}</p></div>
+              <div><p className="text-xs text-slate-500">Origen</p><OrigenBadge origen={venta.Origen} /></div>
+              <div><p className="text-xs text-slate-500">Fecha</p><p className="text-sm">{formatDate(venta.FechaVenta)}</p></div>
+              <div><p className="text-xs text-slate-500">Estado</p><EstadoBadge estado={venta.Estado} /></div>
             </div>
+            {venta.Estado === 'anulado' && venta.MotivoAnulacion && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-xs font-medium text-red-800 mb-1">Motivo de anulación:</p>
+                <p className="text-sm text-red-700">{venta.MotivoAnulacion}</p>
+              </div>
+            )}
           </div>
-
           <div className="bg-slate-50 p-5 rounded-xl">
-            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <User size={16} /> Cliente
-            </h4>
+            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><User size={16} /> Cliente</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-1">
-                <p className="text-xs text-slate-500">Nombre</p>
-                <p className="font-medium">{venta.ClienteNombre || 'No especificado'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Teléfono</p>
-                <p>{venta.ClienteTelefono || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Correo</p>
-                <p className="truncate">{venta.ClienteCorreo || '-'}</p>
-              </div>
+              <div className="md:col-span-1"><p className="text-xs text-slate-500">Nombre</p><p className="font-medium">{venta.ClienteNombre || 'No especificado'}</p></div>
+              <div><p className="text-xs text-slate-500">Teléfono</p><p>{venta.ClienteTelefono || '-'}</p></div>
+              <div><p className="text-xs text-slate-500">Correo</p><p className="truncate">{venta.ClienteCorreo || '-'}</p></div>
             </div>
           </div>
-
           <div className="bg-slate-50 p-5 rounded-xl">
-            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <User size={16} /> Vendedor
-            </h4>
+            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><User size={16} /> Vendedor</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-slate-500">Nombre</p>
-                <p className="font-medium">{vendedorNombre}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">ID Vendedor</p>
-                <p className="font-mono text-sm">{vendedorId}</p>
-              </div>
+              <div><p className="text-xs text-slate-500">Nombre</p><p className="font-medium">{vendedorNombre}</p></div>
+              <div><p className="text-xs text-slate-500">ID Vendedor</p><p className="font-mono text-sm">{venta.UsuarioVendedorId || '-'}</p></div>
             </div>
           </div>
-
-          {pedidoId && (
-            <div className="bg-slate-50 p-5 rounded-xl">
-              <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                <ShoppingBag size={16} /> Pedido Asociado
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-1">
-                  <p className="text-xs text-slate-500">ID Pedido</p>
-                  <p className="font-mono text-sm font-medium">{pedidoId}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">Fecha Pedido</p>
-                  <p>{fechaPedido ? formatDate(fechaPedido) : '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">Estado Pedido</p>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${estadoPedido === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                    estadoPedido === 'aprobado' ? 'bg-blue-100 text-blue-800' :
-                      estadoPedido === 'entregado' ? 'bg-green-100 text-green-800' :
-                        estadoPedido === 'cancelado' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                    }`}>
-                    {estadoPedido || '-'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="bg-slate-50 p-5 rounded-xl">
-            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <DollarSign size={16} /> Totales
-            </h4>
+            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><DollarSign size={16} /> Totales</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white p-3 rounded-lg border">
-                <p className="text-xs text-slate-500">Subtotal</p>
-                <p className="text-lg font-semibold">{formatPrice(venta.Subtotal)}</p>
-              </div>
-              <div className="bg-white p-3 rounded-lg border">
-                <p className="text-xs text-slate-500">IVA (19%)</p>
-                <p className="text-lg font-semibold">{formatPrice(venta.IVA)}</p>
-              </div>
-              <div className="bg-white p-3 rounded-lg border border-blue-200">
-                <p className="text-xs text-blue-600">Total</p>
-                <p className="text-xl font-bold text-blue-600">{formatPrice(venta.Total)}</p>
-              </div>
+              <div className="bg-white p-3 rounded-lg border"><p className="text-xs text-slate-500">Subtotal</p><p className="text-lg font-semibold">{formatPrice(venta.Subtotal)}</p></div>
+              <div className="bg-white p-3 rounded-lg border"><p className="text-xs text-slate-500">IVA (19%)</p><p className="text-lg font-semibold">{formatPrice(venta.IVA)}</p></div>
+              <div className="bg-white p-3 rounded-lg border border-blue-200"><p className="text-xs text-blue-600">Total</p><p className="text-xl font-bold text-blue-600">{formatPrice(venta.Total)}</p></div>
             </div>
           </div>
-
-          {venta.detalle && venta.detalle.length > 0 && (
+          {venta.detalle && Array.isArray(venta.detalle) && venta.detalle.length > 0 ? (
             <div className="bg-slate-50 p-5 rounded-xl">
               <DetallesProductosAcordeon detalles={venta.detalle} />
             </div>
-          )}
-        </div>
-
+          ) : (
+            <div className="bg-slate-50 p-5 rounded-xl text-center py-4 text-slate-500">
+              No hay detalles disponibles para esta venta
+            </div>
+          )}        </div>
         <div className="mt-6 pt-4 border-t flex justify-between items-center">
-          <button
-            onClick={handleDescargarPDF}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-          >
-            <Download size={18} />
-            Descargar Factura PDF
-          </button>
-          <button
-            className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-            onClick={onClose}
-          >
-            Cerrar
-          </button>
+          <button onClick={handleDescargarPDF} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"><Download size={18} />Descargar Factura PDF</button>
+          <button className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors" onClick={onClose}>Cerrar</button>
         </div>
       </div>
     </Modal>
   );
 };
 
-// Componente principal
 export const Ventas = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
-  const location = useLocation();
-
   const [ventas, setVentas] = useState([]);
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
   const [cargando, setCargando] = useState(true);
-  const [cargandoVenta, setCargandoVenta] = useState(false);
-
   const [openVer, setOpenVer] = useState(false);
   const [openAnular, setOpenAnular] = useState(false);
-
   const [campoFiltro, setCampoFiltro] = useState('');
   const [filtroValor, setFiltroValor] = useState('');
-
-  const [allData, setAllData] = useState([]);
   const [paginatedData, setPaginatedData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [motivoAnulacion, setMotivoAnulacion] = useState('');
 
-  // Cargar ventas con paginación y filtros
   const cargarVentas = async () => {
     setCargando(true);
     try {
-      const resultado = await getVentas(
-        currentPage,
-        itemsPerPage,
-        campoFiltro,
-        filtroValor,
-        null,
-        null
-      );
-
-      // Extracción segura de datos
-      const data = resultado && resultado.data && Array.isArray(resultado.data) ? resultado.data : [];
-      const pagination = resultado && resultado.pagination ? resultado.pagination : {};
-
-      setAllData(data);
+      const resultado = await getVentas(currentPage, itemsPerPage, campoFiltro, filtroValor, null, null);
+      const data = resultado?.data && Array.isArray(resultado.data) ? resultado.data : [];
+      const pagination = resultado?.pagination || {};
       setPaginatedData(data);
       setTotalItems(pagination.totalItems || 0);
       setTotalPages(pagination.totalPages || 1);
-
-      if (currentPage > (pagination.totalPages || 1) && (pagination.totalPages || 0) > 0) {
-        setCurrentPage(pagination.totalPages);
-      }
+      if (currentPage > (pagination.totalPages || 1) && (pagination.totalPages || 0) > 0) setCurrentPage(pagination.totalPages);
     } catch (error) {
       console.error("Error cargando ventas:", error);
       toast.error("Error al cargar las ventas");
-      setAllData([]);
       setPaginatedData([]);
       setTotalItems(0);
       setTotalPages(1);
@@ -764,38 +350,53 @@ export const Ventas = () => {
     }
   };
 
-  // useEffect que dispara la carga
-  useEffect(() => {
-    cargarVentas();
-  }, [currentPage, itemsPerPage, campoFiltro, filtroValor]);
+  useEffect(() => { cargarVentas(); }, [currentPage, itemsPerPage, campoFiltro, filtroValor]);
 
   const handleVerClick = async (venta) => {
-    setCargandoVenta(true);
-    try {
-      if (venta.detalle && venta.detalle.length > 0) {
-        setVentaSeleccionada(venta);
-      } else {
-        const ventaCompleta = await getVentaById(venta.VentaId);
-        setVentaSeleccionada(ventaCompleta);
+  try {
+    console.log('🔍 Venta seleccionada:', venta);
+    console.log('🔍 Detalles en venta:', venta.detalle);
+
+    if (venta.detalle && venta.detalle.length > 0) {
+      console.log('✅ Usando detalles existentes:', venta.detalle.length);
+      setVentaSeleccionada(venta);
+    } else {
+      console.log('🔄 Obteniendo detalles del backend para:', venta.VentaId);
+      const ventaCompleta = await getVentaById(venta.VentaId);
+      console.log('📦 Venta completa recibida:', ventaCompleta);
+      console.log('📦 Detalles en venta completa:', ventaCompleta?.detalle);
+      
+      // Verificar si ventaCompleta tiene la estructura correcta
+      if (!ventaCompleta) {
+        console.error('❌ No se recibió data del backend');
+        toast.error('No se pudo obtener la información de la venta');
+        return;
       }
-      setOpenVer(true);
-    } catch (error) {
-      console.error("Error al cargar venta:", error);
-      toast.error("Error al cargar los detalles de la venta");
-    } finally {
-      setCargandoVenta(false);
+      
+      // Asegurar que detalle sea un array
+      if (ventaCompleta.detalle && !Array.isArray(ventaCompleta.detalle)) {
+        console.warn('⚠️ detalle no es un array, convirtiendo...');
+        ventaCompleta.detalle = [ventaCompleta.detalle];
+      }
+      
+      setVentaSeleccionada(ventaCompleta);
     }
-  };
+    setOpenVer(true);
+  } catch (error) {
+    console.error("❌ Error al cargar venta:", error);
+    toast.error("Error al cargar los detalles de la venta");
+  }
+};
 
   const handleAnularClick = (venta) => {
     setVentaSeleccionada(venta);
+    setMotivoAnulacion('');
     setOpenAnular(true);
   };
 
-  const handleConfirmarAnular = async (ventaId) => {
+  const handleConfirmarAnular = async (ventaId, motivo) => {
     try {
-      const response = await anularVenta(ventaId);
-
+      const response = await anularVenta(ventaId, motivo);
       if (response.success) {
         toast.success("Venta anulada correctamente");
         setOpenAnular(false);
@@ -810,119 +411,40 @@ export const Ventas = () => {
     }
   };
 
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
-  };
-
-  const handleItemsPerPageChange = (newItemsPerPage) => {
-    setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1);
-  };
-
-  const handleLimpiarFiltros = () => {
-    setCampoFiltro('');
-    setFiltroValor('');
-  };
+  const handlePageChange = (page) => setCurrentPage(page);
+  const handleItemsPerPageChange = (newItemsPerPage) => { setItemsPerPage(newItemsPerPage); setCurrentPage(1); };
+  const handleLimpiarFiltros = () => { setCampoFiltro(''); setFiltroValor(''); };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Ventas</h1>
-
-          {/* FILTROS Y BOTÓN DE CREAR - IGUAL QUE EN PEDIDOS */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              {/* BOTÓN DE CREAR VENTA */}
-              <button
-                onClick={() => navigate("/dashboard/ventas/crear")}
-                className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap text-sm"
-              >
-                <Plus size={18} /> Nueva venta
-              </button>
-
+              <button onClick={() => navigate("/dashboard/ventas/crear")} className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap text-sm"><Plus size={18} /> Nueva venta</button>
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                 {campoFiltro === "Estado" ? (
-                  <select
-                    value={filtroValor}
-                    onChange={(e) => {
-                      setFiltroValor(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700"
-                  >
-                    <option value="">Todos los estados</option>
-                    <option value="pagado">Pagado</option>
-                    <option value="anulado">Anulado</option>
+                  <select value={filtroValor} onChange={(e) => { setFiltroValor(e.target.value); setCurrentPage(1); }} className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700">
+                    <option value="">Todos los estados</option><option value="pagado">Pagado</option><option value="anulado">Anulado</option>
                   </select>
                 ) : campoFiltro === "Origen" ? (
-                  <select
-                    value={filtroValor}
-                    onChange={(e) => {
-                      setFiltroValor(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700"
-                  >
-                    <option value="">Todos los orígenes</option>
-                    <option value="pedido">Desde Pedido</option>
-                    <option value="manual">Venta Manual</option>
+                  <select value={filtroValor} onChange={(e) => { setFiltroValor(e.target.value); setCurrentPage(1); }} className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700">
+                    <option value="">Todos los orígenes</option><option value="pedido">Desde Pedido</option><option value="manual">Venta Manual</option>
                   </select>
                 ) : (
-                  <input
-                    value={filtroValor}
-                    onChange={(e) => setFiltroValor(e.target.value)}
-                    type="text"
-                    placeholder={campoFiltro ? `Buscar por ${campoFiltro}` : "Seleccione un campo para buscar"}
-                    disabled={!campoFiltro}
-                    className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700 disabled:bg-gray-50 disabled:cursor-not-allowed"
-                  />
+                  <input value={filtroValor} onChange={(e) => setFiltroValor(e.target.value)} type="text" placeholder={campoFiltro ? `Buscar por ${campoFiltro}` : "Seleccione un campo para buscar"} disabled={!campoFiltro} className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700 disabled:bg-gray-50 disabled:cursor-not-allowed" />
                 )}
               </div>
-
-              <select
-                value={campoFiltro}
-                onChange={(e) => {
-                  setCampoFiltro(e.target.value);
-                  setFiltroValor('');
-                }}
-                className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]"
-              >
-                <option value="">Filtrar por Campo</option>
-                <option value="VentaId">ID Venta</option>
-                <option value="PedidoClienteId">ID Pedido</option>
-                <option value="ClienteNombre">Cliente</option>
-                <option value="Estado">Estado</option>
-                <option value="Origen">Origen</option>
+              <select value={campoFiltro} onChange={(e) => { setCampoFiltro(e.target.value); setFiltroValor(''); }} className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]">
+                <option value="">Filtrar por Campo</option><option value="VentaId">ID Venta</option><option value="PedidoClienteId">ID Pedido</option><option value="ClienteNombre">Cliente</option><option value="Estado">Estado</option><option value="Origen">Origen</option>
               </select>
-
-              {(campoFiltro || filtroValor) && (
-                <button
-                  onClick={handleLimpiarFiltros}
-                  className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1 whitespace-nowrap"
-                >
-                  <X size={16} />
-                  Limpiar filtros
-                </button>
-              )}
+              {(campoFiltro || filtroValor) && <button onClick={handleLimpiarFiltros} className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1 whitespace-nowrap"><X size={16} />Limpiar filtros</button>}
             </div>
           </div>
-
-          <ModalVerVenta
-            open={openVer}
-            onClose={() => setOpenVer(false)}
-            venta={ventaSeleccionada}
-          />
-
-          <ModalAnular
-            open={openAnular}
-            onClose={() => setOpenAnular(false)}
-            onConfirm={handleConfirmarAnular}
-            venta={ventaSeleccionada}
-          />
-
-          {/* TABLA DE VENTAS - IGUAL QUE EN PEDIDOS */}
+          <ModalVerVenta open={openVer} onClose={() => setOpenVer(false)} venta={ventaSeleccionada} />
+          <ModalAnular open={openAnular} onClose={() => setOpenAnular(false)} onConfirm={handleConfirmarAnular} venta={ventaSeleccionada} motivo={motivoAnulacion} setMotivo={setMotivoAnulacion} />
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <table className="min-w-full">
               <thead className="bg-slate-800">
@@ -939,98 +461,32 @@ export const Ventas = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {cargando ? (
-                  <tr>
-                    <td colSpan="8" className="px-6 py-8 text-center text-slate-500">
-                      <div className="flex justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                      </div>
-                      <p className="mt-2">Cargando ventas...</p>
-                    </td>
-                  </tr>
+                  <tr><td colSpan="8" className="px-6 py-8 text-center text-slate-500"><div className="flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div><p className="mt-2">Cargando ventas...</p></td></tr>
                 ) : paginatedData && paginatedData.length > 0 ? (
                   paginatedData.map((venta) => (
                     <tr key={venta.VentaId} className="hover:bg-slate-50">
-                      <td className="px-6 py-4 text-sm text-slate-700 font-mono font-bold">
-                        {shortenId(venta.VentaId)}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-medium">
-                        <div>{venta.ClienteNombre || 'Walk-in'}</div>
-                        {venta.ClienteTelefono && (
-                          <div className="text-xs text-slate-500">{venta.ClienteTelefono}</div>
-                        )}
-                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-700 font-mono font-bold">{shortenId(venta.VentaId)}</td>
+                      <td className="px-6 py-4 text-sm font-medium"><div>{venta.ClienteNombre || 'Walk-in'}</div>{venta.ClienteTelefono && <div className="text-xs text-slate-500">{venta.ClienteTelefono}</div>}</td>
                       <td className="px-6 py-4 text-sm">{formatDate(venta.FechaVenta)}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-blue-600">
-                        {formatPrice(venta.Total)}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <div className="font-medium">
-                          {venta.ItemsCount || venta.detalle?.length || 0} items
-                        </div>
-                        {(venta.ItemsCount || venta.detalle?.length) > 0 && (
-                          <div className="text-xs text-slate-500">
-                            {venta.ProductosCount || venta.detalle?.filter(d => d?.TipoItem === 'producto').length || 0} prod /
-                            {venta.ServiciosCount || venta.detalle?.filter(d => d?.TipoItem === 'servicio').length || 0} serv
-                          </div>
-                        )}
-                      </td> 
-                      <td className="px-6 py-4">
-                        <OrigenBadge origen={venta.Origen} />
-                      </td>
-                      <td className="px-6 py-4">
-                        <EstadoBadge estado={venta.Estado} />
-                      </td>
+                      <td className="px-6 py-4 text-sm font-bold text-blue-600">{formatPrice(venta.Total)}</td>
+                      <td className="px-6 py-4 text-sm"><div className="font-medium">{venta.ItemsCount || venta.detalle?.length || 0} items</div>{(venta.ItemsCount || venta.detalle?.length) > 0 && <div className="text-xs text-slate-500">{venta.ProductosCount || 0} prod / {venta.ServiciosCount || 0} serv</div>}</td>
+                      <td className="px-6 py-4"><OrigenBadge origen={venta.Origen} /></td>
+                      <td className="px-6 py-4"><EstadoBadge estado={venta.Estado} /></td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleVerClick(venta)}
-                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                            title="Ver detalles"
-                          >
-                            <Eye size={18} />
-                          </button>
-
-                          {/* SOLO mostrar botón de anular si es venta MANUAL y está PAGADA */}
-                          {venta.Estado === 'pagado' && venta.Origen === 'manual' && (
-                            <TiempoRestanteAnulacion
-                              fechaVenta={venta.FechaVenta}
-                              onAnular={() => handleAnularClick(venta)}
-                            />
-                          )}
+                          <button onClick={() => handleVerClick(venta)} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg" title="Ver detalles"><Eye size={18} /></button>
+                          {venta.Estado === 'pagado' && venta.Origen === 'manual' && <TiempoRestanteAnulacion fechaVenta={venta.FechaVenta} onAnular={() => handleAnularClick(venta)} />}
                         </div>
                       </td>
                     </tr>
                   ))
                 ) : (
-                  <tr>
-                    <td colSpan="8" className="px-6 py-8 text-center text-slate-500">
-                      <ShoppingBag size={48} className="mx-auto mb-3 text-slate-300" />
-                      <p className="text-lg font-medium">No hay ventas registradas</p>
-                      <p className="text-sm mt-1">
-                        {campoFiltro || filtroValor
-                          ? "Intenta con otros filtros"
-                          : "Las ventas se generan automáticamente desde los pedidos aprobados"}
-                      </p>
-                    </td>
-                  </tr>
+                  <tr><td colSpan="8" className="px-6 py-8 text-center text-slate-500"><ShoppingBag size={48} className="mx-auto mb-3 text-slate-300" /><p className="text-lg font-medium">No hay ventas registradas</p><p className="text-sm mt-1">{campoFiltro || filtroValor ? "Intenta con otros filtros" : "Las ventas se generan automáticamente desde los pedidos aprobados"}</p></td></tr>
                 )}
               </tbody>
             </table>
-
-            {paginatedData && paginatedData.length > 0 && (
-              <div className="px-6 py-4 border-t">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={handlePageChange}
-                  itemsPerPage={itemsPerPage}
-                  totalItems={totalItems}
-                  onItemsPerPageChange={handleItemsPerPageChange}
-                />
-              </div>
-            )}
+            {paginatedData && paginatedData.length > 0 && <div className="px-6 py-4 border-t"><Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} itemsPerPage={itemsPerPage} totalItems={totalItems} onItemsPerPageChange={handleItemsPerPageChange} /></div>}
           </div>
-
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-start gap-3">
               <AlertCircle size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
@@ -1046,20 +502,8 @@ export const Ventas = () => {
             </div>
           </div>
         </div>
-
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="colored"
-        />
       </div>
+      <ToastContainer position="top-right" autoClose={3000} theme="colored" />
     </div>
   );
 };

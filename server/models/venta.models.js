@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import { dbPool } from "../lib/db.js";
 
-// Obtener todas las ventas
 export const getAllVentasModel = async () => {
   try {
     const [rows] = await dbPool.query(`
@@ -19,7 +18,8 @@ export const getAllVentasModel = async () => {
         v.Subtotal,
         v.IVA,
         v.Total,
-        v.Estado
+        v.Estado,
+        v.MotivoAnulacion
       FROM ventas v
       LEFT JOIN usuarios u ON v.UsuarioVendedorId = u.CedulaId
       ORDER BY v.FechaVenta DESC
@@ -31,10 +31,10 @@ export const getAllVentasModel = async () => {
   }
 };
 
-// Obtener venta por ID
 export const getVentaByIdModel = async (ventaId) => {
   try {
-    const [rows] = await dbPool.query(
+    // 1. Obtener la venta principal
+    const [ventaRows] = await dbPool.query(
       `SELECT 
         v.*,
         u.NombreCompleto AS UsuarioVendedorNombre,
@@ -48,65 +48,75 @@ export const getVentaByIdModel = async (ventaId) => {
       WHERE v.VentaId = ?`,
       [ventaId]
     );
-    return rows[0] || null;
+
+    if (ventaRows.length === 0) {
+      return null;
+    }
+
+    const venta = ventaRows[0];
+
+    // 2. Obtener los detalles de la venta
+    const [detalleRows] = await dbPool.query(
+      `SELECT 
+        dv.*,
+        p.Nombre AS ProductoNombre,
+        s.Nombre AS ServicioNombre,
+        c.Nombre AS ColorNombre,
+        c.Hex AS ColorHex
+      FROM detalleventas dv
+      LEFT JOIN productos p ON dv.ProductoId = p.ProductoId
+      LEFT JOIN servicios s ON dv.ServicioId = s.ServicioId
+      LEFT JOIN colores c ON dv.ColorId = c.ColorId
+      WHERE dv.VentaId = ?`,
+      [ventaId]
+    );
+
+    // 3. Agregar los detalles a la venta
+    venta.detalle = detalleRows;
+
+    return venta;
+
   } catch (error) {
     console.error("Error en getVentaByIdModel:", error);
     throw error;
   }
 };
 
-// 🔥 CORREGIDO: Crear venta desde pedido
 export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) => {
   const connection = await dbPool.getConnection();
-  
+
   try {
     await connection.beginTransaction();
 
-    // Verificar si ya existe venta para este pedido
     const [ventaExistente] = await connection.query(
       "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
       [pedidoData.PedidoClienteId]
     );
-    
+
     if (ventaExistente.length > 0) {
       await connection.rollback();
-      console.log("Ya existe venta para este pedido:", ventaExistente[0].VentaId);
-      return { 
-        success: false, 
-        alreadyExists: true, 
-        VentaId: ventaExistente[0].VentaId 
+      return {
+        success: false,
+        alreadyExists: true,
+        VentaId: ventaExistente[0].VentaId
       };
     }
-    
+
     const VentaId = uuidv4();
-    
-    // 🔥 CORRECCIÓN: Limpiar y formatear correctamente el Total
-    // ✅ Usar parseFloat directo que maneja "64.80", "1500", etc. correctamente
+
     let subtotal = parseFloat(pedidoData.Total) || 0;
-    subtotal = parseFloat(subtotal.toFixed(2)); // Redondear a 2 decimales
-    
-    // Calcular IVA (19%) con 2 decimales
+    subtotal = parseFloat(subtotal.toFixed(2));
+
     const IVA = parseFloat((subtotal * 0.19).toFixed(2));
-    
-    // Total final con 2 decimales
     const total = parseFloat((subtotal + IVA).toFixed(2));
-    
-    console.log('Valores formateados:', {
-      subtotalOriginal: pedidoData.Total,
-      subtotalLimpio: subtotal,
-      IVA,
-      total
-    });
-    
-    // Determinar datos del cliente según el tipo
+
     let clienteId = null;
     let clienteNombre = null;
     let clienteTelefono = null;
     let clienteCorreo = null;
-    
+
     if (pedidoData.TipoCliente === 'registrado' && pedidoData.ClienteId) {
       clienteId = pedidoData.ClienteId;
-      // Obtener datos del cliente registrado
       const [clienteRows] = await connection.query(
         "SELECT NombreCompleto, Telefono, CorreoElectronico FROM usuarios WHERE CedulaId = ?",
         [pedidoData.ClienteId]
@@ -117,13 +127,11 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
         clienteCorreo = clienteRows[0].CorreoElectronico;
       }
     } else {
-      // Cliente walk-in
       clienteNombre = pedidoData.ClienteNombre || null;
       clienteTelefono = pedidoData.ClienteTelefono || null;
       clienteCorreo = pedidoData.ClienteCorreo || null;
     }
-    
-    // Crear la venta principal
+
     await connection.query(
       `INSERT INTO ventas (
         VentaId, Origen, PedidoClienteId, ClienteId, ClienteNombre, 
@@ -131,27 +139,27 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
         Subtotal, IVA, Total, Estado
       ) VALUES (?, 'pedido', ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, 'pagado')`,
       [
-        VentaId, 
-        pedidoData.PedidoClienteId, 
-        clienteId, 
-        clienteNombre, 
-        clienteTelefono, 
-        clienteCorreo, 
-        usuarioVendedorId || null, 
-        subtotal,  // ✅ Valor limpio
-        IVA,       // ✅ Valor limpio
-        total      // ✅ Valor limpio
+        VentaId,
+        pedidoData.PedidoClienteId,
+        clienteId,
+        clienteNombre,
+        clienteTelefono,
+        clienteCorreo,
+        usuarioVendedorId || null,
+        subtotal,
+        IVA,
+        total
       ]
     );
-    
+
     await connection.commit();
-    
+
     return {
       success: true,
       VentaId: VentaId,
       alreadyExists: false
     };
-    
+
   } catch (error) {
     await connection.rollback();
     console.error("Error en createVentaFromPedidoModel:", error);
@@ -161,13 +169,10 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
   }
 };
 
-// 🔥 CORREGIDO: Crear venta manual
 export const createVentaManualModel = async (ventaData, connection) => {
-  // Si no recibimos connection, significa que es llamado desde fuera
-  // y debemos manejar la transacción aquí
   const usarConnection = connection || await dbPool.getConnection();
-  const liberarConnection = !connection; // Solo liberar si creamos la conexión
-  
+  const liberarConnection = !connection;
+
   try {
     const VentaId = uuidv4();
     let {
@@ -181,49 +186,44 @@ export const createVentaManualModel = async (ventaData, connection) => {
       Total,
       Estado = 'pagado'
     } = ventaData;
-    
-    // 🔥 CORRECCIÓN: Helper seguro para limpiar números
+
     const limpiarNumero = (valor) => {
       if (typeof valor === 'string') {
-        // Solo aplicar limpieza especial si es formato europeo (ej: "1.234,56")
         if (valor.includes(',') && valor.match(/\.\d{3},/)) {
-          // Formato europeo: eliminar puntos de miles, convertir coma a punto
           valor = valor.replace(/\./g, '').replace(',', '.');
         } else {
-          // Formato estándar (ej: "64.80" o "1500"): eliminar solo caracteres no numéricos excepto punto y guion
           valor = valor.replace(/[^0-9.-]/g, '');
         }
       }
       const num = parseFloat(valor);
       return isNaN(num) ? 0 : parseFloat(num.toFixed(2));
     };
-    
+
     Subtotal = limpiarNumero(Subtotal || 0);
     IVA = limpiarNumero(IVA || (Subtotal * 0.19));
     Total = limpiarNumero(Total || (Subtotal + IVA));
-    
-    // Insertar venta
+
     await usarConnection.query(
       `INSERT INTO ventas (
         VentaId, Origen, ClienteId, ClienteNombre, ClienteTelefono, 
         ClienteCorreo, UsuarioVendedorId, FechaVenta, Subtotal, IVA, Total, Estado
       ) VALUES (?, 'manual', ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)`,
       [
-        VentaId, 
-        ClienteId || null, 
-        ClienteNombre || null, 
-        ClienteTelefono || null, 
-        ClienteCorreo || null, 
-        UsuarioVendedorId, 
-        Subtotal, 
-        IVA, 
-        Total, 
+        VentaId,
+        ClienteId || null,
+        ClienteNombre || null,
+        ClienteTelefono || null,
+        ClienteCorreo || null,
+        UsuarioVendedorId,
+        Subtotal,
+        IVA,
+        Total,
         Estado
       ]
     );
-    
+
     return VentaId;
-    
+
   } catch (error) {
     throw error;
   } finally {
@@ -233,40 +233,37 @@ export const createVentaManualModel = async (ventaData, connection) => {
   }
 };
 
-// Actualizar estado de venta (solo a ANULADO)
-export const anularVentaModel = async (ventaId) => {
+export const anularVentaModel = async (ventaId, motivoAnulacion) => {
   try {
-    // Verificar que la venta existe y no está ya anulada
     const [venta] = await dbPool.query(
       "SELECT Estado FROM ventas WHERE VentaId = ?",
       [ventaId]
     );
-    
+
     if (venta.length === 0) {
       return { success: false, message: "Venta no encontrada" };
     }
-    
+
     if (venta[0].Estado === 'anulado') {
       return { success: false, message: "La venta ya está anulada" };
     }
-    
+
     const [result] = await dbPool.query(
-      "UPDATE ventas SET Estado = 'anulado' WHERE VentaId = ?",
-      [ventaId]
+      "UPDATE ventas SET Estado = 'anulado', MotivoAnulacion = ? WHERE VentaId = ?",
+      [motivoAnulacion || null, ventaId]
     );
-    
-    return { 
-      success: true, 
-      affectedRows: result.affectedRows 
+
+    return {
+      success: true,
+      affectedRows: result.affectedRows
     };
-    
+
   } catch (error) {
     console.error("Error en anularVentaModel:", error);
     throw error;
   }
 };
 
-// Verificar si existe venta para un pedido
 export const existeVentaParaPedidoModel = async (pedidoClienteId) => {
   try {
     const [rows] = await dbPool.query(
@@ -280,7 +277,6 @@ export const existeVentaParaPedidoModel = async (pedidoClienteId) => {
   }
 };
 
-// Obtener venta por ID de pedido
 export const getVentaByPedidoIdModel = async (pedidoClienteId) => {
   try {
     const [rows] = await dbPool.query(
@@ -297,13 +293,10 @@ export const getVentaByPedidoIdModel = async (pedidoClienteId) => {
   }
 };
 
-/**
- * Obtener ventas con paginación, búsqueda y filtros
- */
-export const getVentasPaginated = async ({ 
-  page = 1, 
-  limit = 10, 
-  filtroCampo = null, 
+export const getVentasPaginated = async ({
+  page = 1,
+  limit = 10,
+  filtroCampo = null,
   filtroValor = null,
   fechaInicio = null,
   fechaFin = null
@@ -312,7 +305,6 @@ export const getVentasPaginated = async ({
   let whereConditions = [];
   let params = [];
 
-  // Filtro por rango de fechas
   if (fechaInicio) {
     whereConditions.push('v.FechaVenta >= ?');
     params.push(fechaInicio);
@@ -322,7 +314,6 @@ export const getVentasPaginated = async ({
     params.push(fechaFin);
   }
 
-  // Mapeo de campos del frontend a columnas reales
   const columnasMap = {
     VentaId: 'v.VentaId',
     PedidoClienteId: 'v.PedidoClienteId',
@@ -332,10 +323,9 @@ export const getVentasPaginated = async ({
     Total: 'v.Total'
   };
 
-  // Agregar filtro de búsqueda si existe
   if (filtroCampo && filtroValor && columnasMap[filtroCampo]) {
     const columnaReal = columnasMap[filtroCampo];
-    
+
     if (columnaReal === 'v.Total') {
       const valorNum = Number(filtroValor);
       if (!isNaN(valorNum)) {
@@ -353,7 +343,6 @@ export const getVentasPaginated = async ({
 
   const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
-  // 🔹 Consulta principal con LEFT JOIN para contar items (sin cargar todos los detalles)
   const [rows] = await dbPool.query(`
     SELECT 
       v.VentaId,
@@ -370,6 +359,7 @@ export const getVentasPaginated = async ({
       v.IVA,
       v.Total,
       v.Estado,
+      v.MotivoAnulacion,
       COUNT(dv.DetalleVentaId) AS ItemsCount,
       SUM(CASE WHEN dv.TipoItem = 'producto' THEN 1 ELSE 0 END) AS ProductosCount,
       SUM(CASE WHEN dv.TipoItem = 'servicio' THEN 1 ELSE 0 END) AS ServiciosCount
@@ -382,24 +372,20 @@ export const getVentasPaginated = async ({
     LIMIT ? OFFSET ?
   `, [...params, limit, offset]);
 
-  // 🔹 Consulta de conteo para totalPages
   const [countResult] = await dbPool.query(`
     SELECT COUNT(DISTINCT v.VentaId) as total 
     FROM ventas v
     ${whereClause}
   `, params);
 
-  // ✅ Transformar los conteos a números y agregar estructura de detalle simulada
   const rowsWithCounts = rows.map(row => ({
     ...row,
     ItemsCount: parseInt(row.ItemsCount) || 0,
     ProductosCount: parseInt(row.ProductosCount) || 0,
     ServiciosCount: parseInt(row.ServiciosCount) || 0,
-    // Crear un array "detalle" simulado solo con la longitud (para compatibilidad con el frontend)
-    detalle: Array(row.ItemsCount).fill(null)
+    detalle: [] 
   }));
 
-  // ✅ RETORNO con clave "data" explícita
   return {
     data: rowsWithCounts,
     totalItems: countResult[0]?.total || 0,

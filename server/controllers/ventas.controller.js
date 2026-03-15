@@ -7,6 +7,7 @@ import {
   createVentaManualModel,
   existeVentaParaPedidoModel,
   getVentasPaginated,
+  anularVentaModel,
 } from "../models/venta.models.js";
 import {
   getDetalleVentaByVentaIdModel,
@@ -35,13 +36,11 @@ export const getVentas = async (req, res) => {
       fechaFin: fechaFin || null
     });
 
-    // Validación defensiva
     const data = result && result.data && Array.isArray(result.data) ? result.data : [];
     const totalItems = typeof result?.totalItems === 'number' ? result.totalItems : 0;
     const currentPage = typeof result?.currentPage === 'number' ? result.currentPage : 1;
     const itemsPerPage = Math.max(1, parseInt(limit) || 10);
 
-    // Si no hay datos y la página > 1, volver a página 1
     if (data.length === 0 && currentPage > 1 && totalItems > 0) {
       const fallback = await getVentasPaginated({
         page: 1,
@@ -65,7 +64,6 @@ export const getVentas = async (req, res) => {
       });
     }
 
-    // ✅ Respuesta con estructura CORRECTA
     res.status(200).json({
       data: data,
       pagination: {
@@ -78,7 +76,6 @@ export const getVentas = async (req, res) => {
 
   } catch (error) {
     console.error('Error en getVentas:', error);
-    // ✅ Fallback con estructura CORRECTA
     res.status(200).json({
       data: [],
       pagination: {
@@ -141,7 +138,6 @@ export const createVentaDesdePedido = async (req, res) => {
       return res.status(400).json({ error: "El pedido no tiene detalles" });
     }
 
-    // Usar el modelo para crear la venta (UsuarioVendedorId puede ser null)
     const result = await createVentaFromPedidoModel(pedido, UsuarioVendedorId || null);
 
     if (!result.success) {
@@ -151,7 +147,6 @@ export const createVentaDesdePedido = async (req, res) => {
 
     const VentaId = result.VentaId;
 
-    // Crear los detalles usando el modelo
     await createDetallesVentaFromPedidoModel(connection, VentaId, detallesRows);
 
     await connection.commit();
@@ -160,21 +155,17 @@ export const createVentaDesdePedido = async (req, res) => {
     const detallesCompletos = await getDetalleVentaByVentaIdModel(VentaId);
     ventaCreada.detalle = detallesCompletos;
 
-    // ENVIAR CORREO DE FACTURA
     if (ventaCreada.ClienteCorreo) {
       try {
-        console.log("📧 Enviando factura a:", ventaCreada.ClienteCorreo);
-        console.log("📦 Detalles a enviar:", detallesCompletos.length);
-        
         await sendVentaFacturaEmail(
           ventaCreada.ClienteCorreo,
           ventaCreada.ClienteNombre || 'Cliente',
           ventaCreada.VentaId,
           ventaCreada.Total,
-          detallesCompletos  // Usar detallesCompletos, no ventaCreada.detalle
+          detallesCompletos
         );
       } catch (emailError) {
-        console.error("❌ Error enviando correo de factura:", emailError);
+        console.error("Error enviando correo de factura:", emailError);
       }
     }
 
@@ -197,34 +188,8 @@ export const createVentaManual = async (req, res) => {
   const connection = await dbPool.getConnection();
   
   try {
-    let ventaData;
-    
-    // Procesar datos según el tipo de contenido
-    if (req.is('multipart/form-data')) {
-      if (!req.body.ventaData) {
-        return res.status(400).json({ 
-          success: false,
-          error: "No se recibieron datos de la venta" 
-        });
-      }
-      
-      try {
-        ventaData = JSON.parse(req.body.ventaData);
-        console.log("📦 Datos desde FormData (parseados):", ventaData);
-        console.log("📸 Archivos recibidos:", req.files?.length || 0);
-      } catch (parseError) {
-        console.error("❌ Error parseando ventaData:", parseError);
-        return res.status(400).json({ 
-          success: false,
-          error: "Error al parsear los datos de la venta" 
-        });
-      }
-    } else {
-      ventaData = req.body;
-      console.log("📦 Datos desde JSON:", ventaData);
-    }
+    const ventaData = req.body;
 
-    // Validar datos básicos
     if (!ventaData) {
       return res.status(400).json({ 
         success: false,
@@ -248,74 +213,28 @@ export const createVentaManual = async (req, res) => {
       });
     }
 
-    // INICIAR TRANSACCIÓN
     await connection.beginTransaction();
 
-    // PASO 1: Crear la venta PRIMERO
     const VentaId = await createVentaManualModel(ventaData, connection);
 
-    // PASO 2: Mapear archivos a sus posiciones
-    // IMPORTANTE: Los archivos llegan en el MISMO ORDEN que los detalles que los requieren
-    let fileIndex = 0;
-    const archivosPorDetalle = [];
-
-    // Primero, identificar qué detalles TIENEN archivo (ImagenFile existe en el detalle original)
-    for (let i = 0; i < detalles.length; i++) {
-      const detalle = detalles[i];
-      
-      // Si este detalle debería tener un archivo (marcado como 'pendiente')
-      if (detalle.UrlImagenPersonalizada === 'pendiente') {
-        // Asignar el siguiente archivo disponible
-        if (req.files && fileIndex < req.files.length) {
-          const archivo = req.files[fileIndex];
-          // Construir URL pública del archivo
-          const urlArchivo = `${req.protocol}://${req.get('host')}/uploads/${archivo.filename}`;
-          archivosPorDetalle[i] = urlArchivo;
-          fileIndex++;
-          console.log(`✅ Detalle ${i} recibirá archivo: ${urlArchivo}`);
-        } else {
-          console.warn(`⚠️ Detalle ${i} requiere imagen pero no hay suficientes archivos`);
-          archivosPorDetalle[i] = null;
-        }
-      } else {
-        archivosPorDetalle[i] = null;
-      }
-    }
-
-    // PASO 3: Crear los detalles con las URLs de los archivos
-    for (let i = 0; i < detalles.length; i++) {
-      const detalle = detalles[i];
-      
-      // Determinar la URL final de la imagen
-      let urlImagen = detalle.UrlImagenPersonalizada;
-      
-      // Si tiene archivo asignado, usar esa URL
-      if (archivosPorDetalle[i]) {
-        urlImagen = archivosPorDetalle[i];
-      }
-      // Si no, mantener la URL original (podría ser una URL externa)
-      
+    for (const detalle of detalles) {
       await createDetalleVentaManualModel(connection, {
         VentaId,
         TipoItem: detalle.TipoItem,
         ProductoId: detalle.ProductoId,
         ServicioId: detalle.ServicioId,
-        ServicioTamanoId: detalle.ServicioTamanoId,
         NombreSnapshot: detalle.NombreSnapshot,
         Cantidad: parseInt(detalle.Cantidad) || 1,
         PrecioUnitario: parseFloat(detalle.PrecioUnitario) || 0,
         Descuento: detalle.Descuento || 0,
         Subtotal: parseFloat(detalle.Subtotal) || 0,
         ColorId: detalle.ColorId,
-        DescripcionPersonalizada: detalle.DescripcionPersonalizada,
-        UrlImagenPersonalizada: urlImagen
+        DescripcionPersonalizada: detalle.DescripcionPersonalizada
       });
     }
 
-    // PASO 4: Confirmar TODO
     await connection.commit();
 
-    // ENVIAR CORREO DE FACTURA
     if (ClienteCorreo) {
       try {
         const detallesCompletos = await getDetalleVentaByVentaIdModel(VentaId);
@@ -327,22 +246,20 @@ export const createVentaManual = async (req, res) => {
           detallesCompletos
         );
       } catch (emailError) {
-        console.error("❌ Error enviando correo de factura:", emailError);
+        console.error("Error enviando correo de factura:", emailError);
       }
     }
 
     res.status(201).json({
       success: true,
       message: "Venta creada exitosamente",
-      VentaId,
-      archivosProcesados: fileIndex
+      VentaId
     });
 
   } catch (error) {
     await connection.rollback();
-    console.error("❌ Error en createVentaManual:", error);
+    console.error("Error en createVentaManual:", error);
     
-    // Mensaje de error más amigable
     let mensajeError = error.message;
     if (error.message.includes('Stock insuficiente')) {
       mensajeError = error.message;
@@ -364,10 +281,10 @@ export const createVentaManual = async (req, res) => {
 
 export const anularVenta = async (req, res) => {
   const { id } = req.params;
+  const { motivo } = req.body;
   const connection = await dbPool.getConnection();
   
   try {
-    // Verificar que la venta existe
     const venta = await getVentaByIdModel(id);
     if (!venta) {
       return res.status(404).json({ error: "Venta no encontrada" });
@@ -377,16 +294,13 @@ export const anularVenta = async (req, res) => {
       return res.status(400).json({ error: "La venta ya está anulada" });
     }
 
-    // SOLO VALIDAR TIEMPO PARA VENTAS MANUALES
-    // Las ventas desde pedido NO tienen límite de tiempo
     if (venta.Origen === 'manual') {
-      // VALIDAR TIEMPO DESDE CREACIÓN (1 HORA)
       const fechaVenta = new Date(venta.FechaVenta);
       const ahora = new Date();
       const diferenciaMs = ahora - fechaVenta;
       const diferenciaHoras = diferenciaMs / (1000 * 60 * 60);
       
-      const TIEMPO_LIMITE_HORAS = 1; // 1 hora para anular ventas manuales
+      const TIEMPO_LIMITE_HORAS = 1;
       
       if (diferenciaHoras > TIEMPO_LIMITE_HORAS) {
         return res.status(400).json({ 
@@ -398,21 +312,15 @@ export const anularVenta = async (req, res) => {
           horasTranscurridas: Math.round(diferenciaHoras * 10) / 10
         });
       }
-    } else {
-      console.log(`🕒 Venta desde pedido ${id} - Sin límite de tiempo para anular`);
     }
 
-    // INICIAR TRANSACCIÓN
     await connection.beginTransaction();
 
-    // PASO 2: Actualizar estado
-    const [result] = await connection.query(
-      "UPDATE ventas SET Estado = 'anulado' WHERE VentaId = ?",
-      [id]
-    );
+    const result = await anularVentaModel(id, motivo);
 
-    if (result.affectedRows === 0) {
-      throw new Error("No se pudo actualizar el estado de la venta");
+    if (!result.success) {
+      await connection.rollback();
+      return res.status(400).json({ error: result.message || "No se pudo anular la venta" });
     }
 
     await connection.commit();
@@ -420,7 +328,6 @@ export const anularVenta = async (req, res) => {
     const ventaAnulada = await getVentaByIdModel(id);
     ventaAnulada.detalle = await getDetalleVentaByVentaIdModel(id);
 
-    // ENVIAR CORREO DE ANULACIÓN
     if (ventaAnulada.ClienteCorreo) {
       try {
         await sendVentaAnuladaEmail(
@@ -431,7 +338,6 @@ export const anularVenta = async (req, res) => {
         );
       } catch (emailError) {
         console.error("Error enviando correo de anulación:", emailError);
-        // No interrumpir el flujo si falla el correo
       }
     }
 
@@ -458,11 +364,48 @@ export const anularVenta = async (req, res) => {
 
 export const getDetallesByVenta = async (req, res) => {
   try {
-    const detalles = await getDetalleVentaByVentaIdModel(req.params.id);
+    const { ventaId } = req.params;
+    
+    const venta = await getVentaByIdModel(ventaId);
+    if (!venta) {
+      return res.status(404).json({ error: "Venta no encontrada" });
+    }
+    
+    const detalles = await getDetalleVentaByVentaIdModel(ventaId);
     res.status(200).json(detalles);
   } catch (error) {
     console.error("Error al obtener detalles:", error);
     res.status(500).json({ error: "Error al obtener detalles" });
+  }
+};
+
+export const createDetalle = async (req, res) => {
+  try {
+    const { ventaId } = req.params;
+    const detalleData = req.body;
+    
+    const venta = await getVentaByIdModel(ventaId);
+    if (!venta) {
+      return res.status(404).json({ error: "Venta no encontrada" });
+    }
+    
+    if (venta.Estado === 'anulado') {
+      return res.status(400).json({ error: "No se pueden agregar detalles a una venta anulada" });
+    }
+    
+    detalleData.VentaId = ventaId;
+    const detalleId = await createDetalleVentaManualModel(dbPool, detalleData);
+    
+    const detalles = await getDetalleVentaByVentaIdModel(ventaId);
+    
+    res.status(201).json({
+      success: true,
+      message: "Detalle creado exitosamente",
+      detalles
+    });
+  } catch (error) {
+    console.error("Error al crear detalle:", error);
+    res.status(500).json({ error: "Error al crear detalle" });
   }
 };
 
@@ -501,7 +444,6 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
       throw new Error("El pedido no tiene detalles");
     }
 
-    // Usar el modelo para crear la venta (UsuarioVendedorId puede ser null)
     const result = await createVentaFromPedidoModel(pedido, UsuarioVendedorId);
 
     if (!result.success) {
@@ -511,7 +453,6 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
 
     const VentaId = result.VentaId;
 
-    // Crear los detalles usando el modelo
     await createDetallesVentaFromPedidoModel(connection, VentaId, detallesRows);
 
     await connection.commit();
@@ -520,13 +461,11 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
     const detallesCompletos = await getDetalleVentaByVentaIdModel(VentaId);
     ventaCreada.detalle = detallesCompletos;
 
-    // ENVIAR CORREO DE FACTURA AQUÍ (esto es lo que faltaba)
     const correoCliente = pedido.ClienteCorreo || ventaCreada.ClienteCorreo;
     const nombreCliente = pedido.ClienteNombre || ventaCreada.ClienteNombre || 'Cliente';
 
     if (correoCliente) {
       try {
-        console.log("📧 [crearVentaDesdePedidoId] Enviando factura a:", correoCliente);
         await sendVentaFacturaEmail(
           correoCliente,
           nombreCliente,
@@ -534,7 +473,6 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
           ventaCreada.Total,
           detallesCompletos
         );
-        console.log("Correo enviado exitosamente");
       } catch (emailError) {
         console.error("Error enviando correo de factura:", emailError);
       }

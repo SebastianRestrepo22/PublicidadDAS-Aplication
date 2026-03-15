@@ -11,11 +11,7 @@ export const createVentaManual = async (ventaData) => {
     
     let config = { headers };
     
-    // Si es FormData, NO establecer Content-Type (axios lo hará automáticamente con el boundary)
-    if (ventaData instanceof FormData) {
-      console.log("📤 Enviando FormData con archivos...");
-      // No establecer Content-Type
-    } else {
+    if (!(ventaData instanceof FormData)) {
       headers['Content-Type'] = 'application/json';
     }
     
@@ -23,7 +19,7 @@ export const createVentaManual = async (ventaData) => {
     return response.data;
     
   } catch (error) {
-    console.error("❌ Error en createVentaManual:", error.response?.data || error);
+    console.error("Error en createVentaManual:", error.response?.data || error);
     if (error.response?.data) {
       throw error.response.data;
     }
@@ -53,22 +49,20 @@ export const getVentas = async (page = 1, limit = 10, filtroCampo = null, filtro
     });
     
     const responseData = response.data;
-    const data = responseData && responseData.data && Array.isArray(responseData.data) ? responseData.data : [];
-    const pagination = responseData && responseData.pagination ? responseData.pagination : { 
+    const data = responseData?.data && Array.isArray(responseData.data) ? responseData.data : [];
+    const pagination = responseData?.pagination || { 
       totalItems: 0, 
       totalPages: 1, 
       currentPage: page, 
       itemsPerPage: limit 
     };
     
-    // ✅ RETORNO CORRECTO
     return {
       data: data,
       pagination: pagination
     };
   } catch (error) {
     console.error("Error en getVentas:", error);
-    // ✅ Fallback CORRECTO
     return { 
       data: [], 
       pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } 
@@ -90,13 +84,17 @@ export const getVentaById = async (id) => {
   }
 };
 
-export const anularVenta = async (id) => {
+export const anularVenta = async (id, motivo) => {
   try {
-    const response = await axios.put(`${API_URL}/ventas/${id}/anular`, {}, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+    const response = await axios.put(
+      `${API_URL}/ventas/${id}/anular`, 
+      { motivo: motivo || null },
+      {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
       }
-    });
+    );
     return response.data;
   } catch (error) {
     console.error("Error en anularVenta:", error);

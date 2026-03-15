@@ -39,7 +39,7 @@ export const Productos = () => {
     // Si usa colores (UsaColores === 1 o "1")
     if (producto.UsaColores === 1 || producto.UsaColores === "1") {
       // Stock total de todos los colores
-      return producto.Colores && Array.isArray(producto.Colores) 
+      return producto.Colores && Array.isArray(producto.Colores)
         ? producto.Colores.reduce((sum, color) => sum + (color.Stock || 0), 0)
         : 0;
     } else {
@@ -55,7 +55,7 @@ export const Productos = () => {
 
   const prepararProductosOferta = useCallback((productosData) => {
     // SOLO productos activos y con descuento
-    const productosActivosConDescuento = productosData.filter(p => 
+    const productosActivosConDescuento = productosData.filter(p =>
       p.Estado === 'Activo' && p.Descuento > 0 && tieneStockDisponible(p)
     );
     const ofertasAleatorias = [...productosActivosConDescuento]
@@ -113,6 +113,11 @@ export const Productos = () => {
   // Productos filtrados
   const filteredProducts = useMemo(() => {
     return productos.filter((producto) => {
+      if (!tieneStockDisponible(producto)) {
+        return false;
+      }
+
+
       // Si seleccionó "ofertas", mostrar solo productos con descuento
       if (selectedCategory === "ofertas") {
         return producto.Descuento > 0;
@@ -132,7 +137,7 @@ export const Productos = () => {
   const handleAddClick = useCallback((producto) => {
     // Verificar stock según el tipo de producto
     const stockTotal = obtenerStockProducto(producto);
-    
+
     if (stockTotal === 0) {
       toast.error(`Producto ${producto.Nombre} sin stock disponible`);
       return;
@@ -165,7 +170,7 @@ export const Productos = () => {
 
   const handleAddFromModal = useCallback((producto) => {
     const stockTotal = obtenerStockProducto(producto);
-    
+
     if (stockTotal === 0) {
       toast.error(`Producto ${producto.Nombre} sin stock disponible`);
       return;
@@ -230,7 +235,7 @@ export const Productos = () => {
 
   // Contar productos con descuento que tienen stock
   const productosConDescuentoCount = useMemo(() => {
-    return productos.filter(p => 
+    return productos.filter(p =>
       p.Descuento > 0 && tieneStockDisponible(p)
     ).length;
   }, [productos, tieneStockDisponible]);
@@ -388,7 +393,7 @@ export const Productos = () => {
                   {filteredProducts.map((producto) => {
                     const stockTotal = obtenerStockProducto(producto);
                     const sinStock = stockTotal === 0;
-                    
+
                     return (
                       <div
                         key={producto.ProductoId}
@@ -432,13 +437,12 @@ export const Productos = () => {
 
                           {/* Mostrar stock según tipo */}
                           <div className="mb-2">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              sinStock
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${sinStock
                                 ? 'bg-red-100 text-red-800'
                                 : stockTotal > 10
                                   ? 'bg-green-100 text-green-800'
                                   : 'bg-yellow-100 text-yellow-800'
-                            }`}>
+                              }`}>
                               Stock: {stockTotal} {producto.UsaColores === 1 || producto.UsaColores === "1" ? '(total)' : 'unidades'}
                             </span>
                           </div>
@@ -699,7 +703,7 @@ export const Productos = () => {
                   {productosOferta.map((producto) => {
                     const stockTotal = obtenerStockProducto(producto);
                     const sinStock = stockTotal === 0;
-                    
+
                     return (
                       <div
                         key={producto.ProductoId}
