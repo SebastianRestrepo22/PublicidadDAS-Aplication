@@ -6,6 +6,8 @@ import {
   updatePedidoClienteModel,
   deletePedidoClienteModel,
   getClienteByIdModel,
+  getPedidosClientesPaginated,
+  buscarPedidosClientesPaginated
 } from "../models/pedidoCliente.model.js";
 import {
   createDetallePedidoModel,
@@ -14,116 +16,147 @@ import {
   deleteDetallesByPedidoIdModel
 } from "../models/detallePedidoCliente.model.js";
 import { crearVentaDesdePedidoId } from "./ventas.controller.js";
-import QRCode from "qrcode";
-import { getAllColoresDB } from "../models/color.model.js";
 import { v4 as uuidv4 } from "uuid";
 import fs from 'fs';
 import { dbPool } from "../lib/db.js";
 
 // ========================================
-// 📎 SUBIR VOUCHER A PEDIDO
+// 📋 OBTENER TODOS LOS PEDIDOS CON PAGINACIÓN
 // ========================================
-export const uploadVoucherToPedido = async (req, res) => {
+export const getPedidosClientes = async (req, res) => {
   try {
-    const { id } = req.params;
-    const file = req.file;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const filtroCampo = req.query.filtroCampo || null;
+    const filtroValor = req.query.filtroValor || null;
+    const tipoPago = req.query.tipoPago || null;
 
-    console.log('📥 [CONTROLLER] Recibida petición para subir voucher a pedido:', id);
-    console.log('📎 Archivo recibido:', file ? file.originalname : 'No hay archivo');
+    console.log('🔍 [CONTROLLER] Obteniendo pedidos con paginación:', { page, limit, filtroCampo, filtroValor, tipoPago });
 
-    if (!file) {
-      return res.status(400).json({ error: 'No se proporcionó ningún archivo' });
-    }
+    const result = await getPedidosClientesPaginated({ 
+      page, 
+      limit, 
+      filtroCampo, 
+      filtroValor,
+      tipoPago 
+    });
 
-    // Verificar que el pedido existe
-    const pedidoExistente = await getPedidoClienteByIdModel(id);
-    if (!pedidoExistente) {
-      console.log('❌ Pedido no encontrado:', id);
-      fs.unlink(file.path, (err) => {
-        if (err) console.error('Error eliminando archivo huérfano:', err);
-      });
-      return res.status(404).json({ error: 'Pedido no encontrado' });
-    }
-
-    // Construir URL del voucher
-    const protocol = req.protocol;
-    const host = req.get('host');
-    const voucherUrl = `${protocol}://${host}/uploads/vouchers/${file.filename}`;
-
-    console.log('📝 Actualizando pedido con voucher:', voucherUrl);
-
-    // Actualizar el pedido con el voucher
-    const result = await updatePedidoClienteModel(id, { Voucher: voucherUrl });
-
-    if (result.affectedRows === 0) {
-      throw new Error('No se pudo actualizar el pedido');
-    }
-
-    // Obtener el pedido actualizado con detalles
-    const pedidoActualizado = await getPedidoClienteByIdModel(id);
-    pedidoActualizado.detalle = await getDetallePedidoByPedidoIdModel(id);
-
-    // Enviar email de confirmación al cliente
-    if (pedidoActualizado.ClienteId) {
+    // Obtener detalles para cada pedido
+    for (let p of result.data) {
       try {
-        const cliente = await getClienteByIdModel(pedidoActualizado.ClienteId);
-        if (cliente?.CorreoElectronico) {
-          await sendVoucherEmail(
-            cliente.CorreoElectronico,
-            cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
-            id,
-            voucherUrl
-          );
-          console.log('📧 Email de voucher enviado');
-        }
-      } catch (emailError) {
-        console.error('⚠️ Error enviando email de voucher:', emailError);
+        p.detalle = await getDetallePedidoByPedidoIdModel(p.PedidoClienteId);
+      } catch (detalleError) {
+        console.error(`⚠️ Error obteniendo detalles para pedido ${p.PedidoClienteId}:`, detalleError.message);
+        p.detalle = [];
       }
     }
 
-    console.log('✅ Pedido actualizado con voucher exitosamente');
-
-    res.json({
-      success: true,
-      message: 'Voucher subido correctamente',
-      voucher: voucherUrl,
-      pedido: pedidoActualizado
-    });
-
-  } catch (error) {
-    console.error('❌ Error al subir voucher:', error);
-
-    if (req.file) {
-      fs.unlink(req.file.path, (err) => {
-        if (err) console.error('Error eliminando archivo tras error:', err);
+    if (result.data.length === 0 && page > 1) {
+      const fallback = await getPedidosClientesPaginated({ 
+        page: 1, 
+        limit, 
+        filtroCampo, 
+        filtroValor,
+        tipoPago 
+      });
+      
+      for (let p of fallback.data) {
+        p.detalle = await getDetallePedidoByPedidoIdModel(p.PedidoClienteId);
+      }
+      
+      return res.status(200).json({
+        data: fallback.data,
+        pagination: {
+          totalItems: fallback.totalItems,
+          totalPages: Math.ceil(fallback.totalItems / limit),
+          currentPage: 1,
+          itemsPerPage: limit
+        }
       });
     }
 
+    res.status(200).json({
+      data: result.data,
+      pagination: {
+        totalItems: result.totalItems,
+        totalPages: Math.ceil(result.totalItems / limit),
+        currentPage: result.currentPage,
+        itemsPerPage: result.itemsPerPage
+      }
+    });
+  } catch (error) {
+    console.error("❌ [CONTROLLER] Error al obtener pedidos:", error);
     res.status(500).json({
-      error: 'Error al procesar el voucher',
-      message: error.message
+      error: "Error al obtener pedidos",
+      details: error.message
     });
   }
 };
 
 // ========================================
-// ✅ CREAR PEDIDO - MANEJA FORMDATA Y JSON PURO
+// 🔍 BUSCAR PEDIDOS (NUEVA FUNCIÓN EXPORTADA)
+// ========================================
+export const buscarPedidos = async (req, res) => {
+  const { campo, valor, page = 1, limit = 10, tipoPago } = req.query;
+
+  const columnasPermitidas = {
+    id: 'PedidoClienteId',
+    cliente: 'NombreCliente',
+    fecha: 'FechaRegistro',
+    metodo: 'MetodoPago',
+    estado: 'Estado'
+  };
+
+  const columna = columnasPermitidas[campo];
+
+  if (!columna) {
+    return res.status(400).json({ message: 'Campo de búsqueda inválido' });
+  }
+
+  try {
+    const result = await buscarPedidosClientesPaginated({ 
+      page: parseInt(page), 
+      limit: parseInt(limit), 
+      columna, 
+      valor,
+      tipoPago 
+    });
+
+    // Obtener detalles
+    for (let p of result.data) {
+      p.detalle = await getDetallePedidoByPedidoIdModel(p.PedidoClienteId);
+    }
+
+    res.status(200).json({
+      data: result.data,
+      pagination: {
+        totalItems: result.totalItems,
+        totalPages: Math.ceil(result.totalItems / parseInt(limit)),
+        currentPage: result.currentPage,
+        itemsPerPage: result.itemsPerPage
+      }
+    });
+  } catch (error) {
+    console.error('Error al buscar pedidos:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};
+
+// ========================================
+// ✅ CREAR PEDIDO
 // ========================================
 export const createPedidoCliente = async (req, res) => {
   let nuevoPedido = null;
 
   try {
     console.log('🔍 [CONTROLLER] Creando pedido...');
-    console.log('📁 Archivo recibido:', req.file);
     console.log('📦 Body recibido:', req.body);
 
-    // 🔄 Detectar si viene como FormData (con archivo) o JSON puro
     let pedidoData;
     if (typeof req.body.pedido === 'string') {
       try {
         pedidoData = JSON.parse(req.body.pedido);
       } catch (error) {
-        console.error('❌ Error parseando JSON del pedido (FormData):', error);
         return res.status(400).json({
           error: 'Datos del pedido inválidos',
           details: error.message
@@ -150,7 +183,7 @@ export const createPedidoCliente = async (req, res) => {
       detalle = []
     } = pedidoData;
 
-    // 🔥 CORRECCIÓN: Validar y sanitizar el Total
+    // Validar Total
     const totalLimpio = parseFloat(Total);
     if (isNaN(totalLimpio) || totalLimpio <= 0) {
       return res.status(400).json({ error: "Total inválido o no numérico" });
@@ -166,25 +199,23 @@ export const createPedidoCliente = async (req, res) => {
       const protocol = req.protocol;
       const host = req.get('host');
       voucherUrl = `${protocol}://${host}/uploads/vouchers/${req.file.filename}`;
-      console.log('✅ URL del voucher:', voucherUrl);
     }
 
-    // Procesar fecha
     const fechaProcesada = FechaRegistro
       ? FechaRegistro.split("T")[0]
       : new Date().toISOString().split("T")[0];
 
-    // 🔥 CORRECCIÓN: Usar totalLimpio ya validado
+    // Crear pedido
     nuevoPedido = await createPedidoClienteModel({
       ClienteId: ClienteId || null,
       FechaRegistro: fechaProcesada,
-      Total: totalLimpio,  // ✅ Valor ya parseado y validado
+      Total: totalLimpio,
       MetodoPago,
       Voucher: voucherUrl || null,
       NombreRecibe: NombreRecibe || null,
       TelefonoEntrega: TelefonoEntrega || null,
       DireccionEntrega: DireccionEntrega || null,
-      Estado,
+      Estado: MetodoPago === "transferencia" ? "pendiente" : Estado,
       TipoCliente,
       ClienteNombre: ClienteNombre || null,
       ClienteTelefono: ClienteTelefono || null,
@@ -193,36 +224,19 @@ export const createPedidoCliente = async (req, res) => {
 
     console.log("✅ Pedido creado:", nuevoPedido.PedidoClienteId);
 
-    // Crear detalles del pedido
+    // Crear detalles del pedido (SIN TAMAÑO PARA SERVICIOS)
     for (let i = 0; i < detalle.length; i++) {
       const item = detalle[i];
-
-      console.log(`📝 [BACKEND] Procesando detalle ${i + 1}:`, {
-        ProductoId: item.ProductoId,
-        ServicioId: item.ServicioId,
-        UrlImagen: item.UrlImagen,
-        UrlImagenPersonalizada: item.UrlImagenPersonalizada,
-        tipoUrlImagen: typeof item.UrlImagenPersonalizada,
-        tieneImagenPersonalizada: !!item.UrlImagenPersonalizada
-      });
-
 
       const ProductoId = item.ProductoId || null;
       const ServicioId = item.ServicioId || null;
       const Cantidad = item.Cantidad ? parseInt(item.Cantidad) : 1;
-
-      // 🔥 CORRECCIÓN: Sanitizar precio del detalle
       const Precio = parseFloat(item.PrecioUnitario || item.Precio || 0);
-
       const ColorId = item.ColorId || null;
-      const Tamaño = ServicioId
-        ? (item.Tamaño ?? item.DimensionesId ?? "Mediana")
-        : null;
+      const Tamaño = null; // Siempre null para servicios
       const Descripcion = item.Descripcion || null;
-
-      // 🔴 IMPORTANTE: Separar imagen por defecto de imagen personalizada
       const UrlImagen = item.UrlImagen ? item.UrlImagen.trim() : null;
-      const UrlImagenPersonalizada = item.UrlImagenPersonalizada || null;
+      const UrlImagenPersonalizada = null; // Ya no se usa
 
       const Subtotal = parseFloat((Cantidad * Precio).toFixed(2));
 
@@ -243,21 +257,35 @@ export const createPedidoCliente = async (req, res) => {
         ProductoId,
         ServicioId,
         Cantidad,
-        Precio,  // ✅ Ya es número válido
+        Precio,
         ColorId,
         Tamaño,
         Descripcion,
         UrlImagen,
-        UrlImagenPersonalizada, // 🔴 IMAGEN DEL CLIENTE
+        UrlImagenPersonalizada,
         Subtotal
       });
-
-      console.log(`✅ Detalle ${i + 1} creado - Subtotal: $${Subtotal}`);
     }
 
-    // Obtener pedido completo con detalles
+    // Obtener pedido completo
     const pedidoCompleto = await getPedidoClienteByIdModel(nuevoPedido.PedidoClienteId);
     pedidoCompleto.detalle = await getDetallePedidoByPedidoIdModel(nuevoPedido.PedidoClienteId);
+
+    // Si es transferencia, crear venta automáticamente
+    if (MetodoPago === "transferencia") {
+      try {
+        await updatePedidoClienteModel(pedidoCompleto.PedidoClienteId, { Estado: "aprobado" });
+        
+        const resultadoVenta = await crearVentaDesdePedidoId(pedidoCompleto.PedidoClienteId, null);
+        pedidoCompleto.Estado = "aprobado";
+        pedidoCompleto.ventaCreada = {
+          id: resultadoVenta.VentaId,
+          estado: 'pagado'
+        };
+      } catch (ventaError) {
+        console.error('❌ Error creando venta automática:', ventaError);
+      }
+    }
 
     // Enviar email de confirmación
     if (pedidoCompleto.ClienteId) {
@@ -267,13 +295,12 @@ export const createPedidoCliente = async (req, res) => {
           cliente.CorreoElectronico,
           cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
           nuevoPedido.PedidoClienteId,
-          "pendiente",
-          "Tu pedido ha sido recibido y está en proceso"
+          pedidoCompleto.Estado,
+          "Tu pedido ha sido recibido"
         );
       }
     }
 
-    console.log("🎉 Pedido completado exitosamente");
     res.status(201).json(pedidoCompleto);
 
   } catch (error) {
@@ -282,12 +309,8 @@ export const createPedidoCliente = async (req, res) => {
     // Limpiar pedido huérfano
     if (nuevoPedido?.PedidoClienteId) {
       try {
-        console.log(`🗑️ Eliminando detalles del pedido huérfano: ${nuevoPedido.PedidoClienteId}`);
         await deleteDetallesByPedidoIdModel(nuevoPedido.PedidoClienteId);
-
-        console.log(`🗑️ Eliminando pedido huérfano: ${nuevoPedido.PedidoClienteId}`);
         await deletePedidoClienteModel(nuevoPedido.PedidoClienteId);
-        console.log(`✅ Pedido huérfano eliminado`);
       } catch (cleanupError) {
         console.error("❌ Error limpiando pedido huérfano:", cleanupError);
       }
@@ -306,256 +329,119 @@ export const createPedidoCliente = async (req, res) => {
   }
 };
 
-// ✅ ACTUALIZAR PEDIDO - CON ENVÍO DE CORREO AUTOMÁTICO
-// ========================================
+// ✅ ACTUALIZAR PEDIDO
 export const updatePedidoCliente = async (req, res) => {
   const { id } = req.params;
   let updates = { ...req.body };
 
-  // Declarar variables al inicio del ámbito de la función
-  let destinatario = null;
-  let nombreCliente = 'Cliente';
-
   try {
     console.log('🔍 [PEDIDOS] ===== INICIANDO ACTUALIZACIÓN =====');
-    console.log('📦 ID del pedido (PedidoClienteId):', id);
+    console.log('📦 ID del pedido:', id);
     console.log('📦 Updates recibidos:', updates);
-    console.log('📦 Nuevo estado:', updates.Estado);
 
-    // Validar que el estado sea uno de los permitidos
-    if (updates.Estado) {
-      const estadosPermitidos = ['pendiente', 'aprobado', 'cancelado', 'entregado'];
-      if (!estadosPermitidos.includes(updates.Estado)) {
-        return res.status(400).json({
-          message: `Estado no válido. Debe ser: ${estadosPermitidos.join(', ')}`
-        });
-      }
-    }
-
-    // Obtener el pedido actual ANTES de actualizar
+    // Obtener el pedido actual
     const pedidoActual = await getPedidoClienteByIdModel(id);
     if (!pedidoActual) {
-      console.log('❌ [PEDIDOS] Pedido no encontrado');
       return res.status(404).json({ message: 'Pedido no encontrado.' });
     }
 
-    console.log('📦 Pedido actual:', {
-      id: pedidoActual.PedidoClienteId,
-      estado: pedidoActual.Estado,
-      total: pedidoActual.Total,
-      tipoCliente: pedidoActual.TipoCliente
-    });
+    // Validar estados según método de pago
+    if (updates.Estado) {
+      if (pedidoActual.MetodoPago === "transferencia") {
+        const estadosPermitidosTransferencia = ['pendiente', 'aprobado', 'finalizado', 'cancelado'];
+        if (!estadosPermitidosTransferencia.includes(updates.Estado)) {
+          return res.status(400).json({
+            message: `Para transferencia, estado debe ser: ${estadosPermitidosTransferencia.join(', ')}`
+          });
+        }
+      } else if (pedidoActual.MetodoPago === "contra_entrega") {
+        const estadosPermitidosContraEntrega = ['pendiente', 'en_proceso', 'en_camino', 'entregado', 'cancelado'];
+        if (!estadosPermitidosContraEntrega.includes(updates.Estado)) {
+          return res.status(400).json({
+            message: `Para contra entrega, estado debe ser: ${estadosPermitidosContraEntrega.join(', ')}`
+          });
+        }
+      }
+    }
 
-    // Guardar el estado anterior para comparar
     const estadoAnterior = pedidoActual.Estado;
     const nuevoEstado = updates.Estado;
 
-    // 🔥 CORRECCIÓN: Si se está actualizando el Total, sanitizarlo
+    // Sanitizar Total si viene
     if (updates.Total !== undefined) {
       const totalLimpio = parseFloat(updates.Total);
       if (!isNaN(totalLimpio)) {
         updates.Total = totalLimpio;
-        console.log('🔧 Total sanitizado:', updates.Total);
       }
     }
 
     // Actualizar el pedido
     const result = await updatePedidoClienteModel(id, updates);
-    console.log('✅ Resultado de actualización:', result);
 
     // Obtener el pedido actualizado
     const updated = await getPedidoClienteByIdModel(id);
     updated.detalle = await getDetallePedidoByPedidoIdModel(id);
 
-    console.log('📦 Pedido actualizado:', {
-      id: updated.PedidoClienteId,
-      nuevoEstado: updated.Estado,
-      total: updated.Total
-    });
-
-    // ===== ENVIAR CORREO AL CLIENTE SI EL ESTADO CAMBIÓ =====
-    if (nuevoEstado && estadoAnterior !== nuevoEstado) {
-      console.log(`📧 [EMAIL] Estado cambió de "${estadoAnterior}" a "${nuevoEstado}". Enviando correo...`);
-
+    // Si es transferencia y se aprueba, crear venta
+    if (pedidoActual.MetodoPago === "transferencia" && nuevoEstado === 'aprobado' && estadoAnterior !== 'aprobado') {
       try {
-        // Determinar el destinatario del correo
-        destinatario = null;
-        nombreCliente = 'Cliente';
-
-        // Caso 1: Cliente registrado
-        if (updated.ClienteId) {
-          const cliente = await getClienteByIdModel(updated.ClienteId);
-          if (cliente) {
-            destinatario = cliente.CorreoElectronico;
-            nombreCliente = cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`;
-          }
-        }
-        // Caso 2: Cliente walk-in con correo
-        else if (updated.ClienteCorreo) {
-          destinatario = updated.ClienteCorreo;
-          nombreCliente = updated.ClienteNombre || 'Cliente';
-        }
-        // Caso 3: Correo en datos de entrega (si existe)
-        else if (updated.CorreoEntrega) {
-          destinatario = updated.CorreoEntrega;
-          nombreCliente = updated.NombreRecibe || 'Cliente';
-        }
-
-        console.log('📧 Destinatario:', destinatario);
-        console.log('📧 Nombre cliente:', nombreCliente);
-
-        // Enviar correo si tenemos destinatario
-        if (destinatario) {
-          // Enviar de forma asíncrona (no esperar)
-          sendPedidoEstadoEmail(
-            destinatario,
-            nombreCliente,
-            id,
-            nuevoEstado,
-            updates.motivo || '' // Para cancelación u otros estados que requieran motivo
-          ).catch(err => console.error('Error en envío de correo:', err));
-
-          console.log(`📧 Correo encolado para ${destinatario}`);
-        } else {
-          console.log('⚠️ No se pudo determinar destinatario para el correo');
-        }
-      } catch (emailError) {
-        console.error('⚠️ Error preparando envío de correo:', emailError);
-        // No interrumpimos el flujo principal si falla el correo
-      }
-    }
-
-    // ===== SI EL ESTADO ES "aprobado", CREAR VENTA =====
-    if (updated.Estado === 'aprobado') {
-      console.log('🎯 [PEDIDOS] Estado "aprobado" detectado. Intentando crear venta...');
-
-      try {
-        // ✅ Usar null para UsuarioVendedorId (se asignará después)
-        const usuarioVendedorId = null;
-        console.log('👤 UsuarioVendedorId será null (se asignará después en el módulo de ventas)');
-
-        // 🔥 DEBUG: Log del total antes de crear la venta
-        console.log('💰 [DEBUG] Total que se pasará a crear venta:', {
-          pedidoId: updated.PedidoClienteId,
-          totalPedido: updated.Total,
-          tipoTotal: typeof updated.Total,
-          detallesCount: updated.detalle?.length || 0,
-          sumaDetalles: updated.detalle?.reduce((acc, d) => acc + (Number(d.Cantidad) * Number(d.Precio)), 0)
-        });
-
-        // Verificar si ya existe una venta para este pedido
         const [ventaExistente] = await dbPool.execute(
           "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
           [id]
         );
 
-        if (ventaExistente.length > 0) {
-          console.log('⚠️ Ya existe una venta para este pedido:', ventaExistente[0].VentaId);
-          updated.ventaCreada = {
-            id: ventaExistente[0].VentaId,
-            yaExiste: true,
-            mensaje: 'La venta ya había sido creada anteriormente'
-          };
-        } else {
-          // Llamar a la función para crear venta (con usuarioVendedorId = null)
-          console.log('🚀 Llamando a crearVentaDesdePedidoId con PedidoClienteId:', id);
-          console.log('🚀 UsuarioVendedorId:', usuarioVendedorId);
-
-          const resultadoVenta = await crearVentaDesdePedidoId(id, usuarioVendedorId);
-
-          console.log('✅ RESULTADO DE CREACIÓN DE VENTA:', JSON.stringify(resultadoVenta, null, 2));
-
+        if (ventaExistente.length === 0) {
+          const resultadoVenta = await crearVentaDesdePedidoId(id, null);
           updated.ventaCreada = {
             id: resultadoVenta.VentaId,
-            estado: 'pagado',
-            mensaje: 'Venta generada automáticamente'
+            estado: 'pagado'
           };
-
-          // También enviar factura por correo si se creó la venta
-          if (destinatario) {
-            try {
-              const { sendVentaFacturaEmail } = await import('../utils/email.js');
-              sendVentaFacturaEmail(
-                destinatario,
-                nombreCliente,
-                resultadoVenta.VentaId,
-                updated.Total,
-                updated.detalle.map(d => ({
-                  ...d,
-                  NombreSnapshot: d.ProductoId ?
-                    (productos?.find(p => p.ProductoId === d.ProductoId)?.Nombre || 'Producto') :
-                    (servicios?.find(s => s.ServicioId === d.ServicioId)?.Nombre || 'Servicio')
-                }))
-              ).catch(err => console.error('Error enviando factura:', err));
-            } catch (facturaError) {
-              console.error('Error enviando factura:', facturaError);
-            }
-          }
+        } else {
+          updated.ventaCreada = {
+            id: ventaExistente[0].VentaId,
+            yaExiste: true
+          };
         }
-
       } catch (ventaError) {
-        console.error('❌ [PEDIDOS] ERROR AL CREAR VENTA:');
-        console.error('❌ Mensaje:', ventaError.message);
-        console.error('❌ Stack:', ventaError.stack);
-
-        updated.errorVenta = {
-          mensaje: ventaError.message,
-          stack: ventaError.stack
-        };
+        console.error('❌ Error al crear venta:', ventaError);
+        updated.errorVenta = ventaError.message;
       }
-    } else {
-      console.log('⏭️ [PEDIDOS] Estado no es "aprobado", no se crea venta');
     }
 
-    console.log('✅ [PEDIDOS] ===== ACTUALIZACIÓN COMPLETADA =====');
-    res.json({
-      ...updated,
-      correoEnviado: destinatario ? true : false,
-      mensajeCorreo: destinatario ?
-        `Notificación enviada a ${destinatario}` :
-        'No se pudo enviar notificación (cliente sin correo)'
-    });
+    // Enviar correo si cambió el estado
+    if (nuevoEstado && estadoAnterior !== nuevoEstado) {
+      let destinatario = null;
+      let nombreCliente = 'Cliente';
+
+      if (updated.ClienteId) {
+        const cliente = await getClienteByIdModel(updated.ClienteId);
+        if (cliente) {
+          destinatario = cliente.CorreoElectronico;
+          nombreCliente = cliente.NombreCompleto;
+        }
+      } else if (updated.ClienteCorreo) {
+        destinatario = updated.ClienteCorreo;
+        nombreCliente = updated.ClienteNombre || 'Cliente';
+      }
+
+      if (destinatario) {
+        sendPedidoEstadoEmail(
+          destinatario,
+          nombreCliente,
+          id,
+          nuevoEstado,
+          updates.motivo || ''
+        ).catch(err => console.error('Error enviando correo:', err));
+      }
+    }
+
+    res.json(updated);
 
   } catch (error) {
-    console.error('❌ [PEDIDOS] ERROR GENERAL:');
-    console.error('❌ Mensaje:', error.message);
-    console.error('❌ Stack:', error.stack);
+    console.error('❌ [PEDIDOS] Error:', error);
     res.status(500).json({
-      message: 'Error al actualizar el pedido.',
+      message: 'Error al actualizar el pedido',
       error: error.message
-    });
-  }
-};
-
-// ========================================
-// 📋 OBTENER TODOS LOS PEDIDOS
-// ========================================
-export const getPedidosClientes = async (req, res) => {
-  try {
-    console.log('🔍 [CONTROLLER] Obteniendo todos los pedidos...');
-
-    const pedidos = await getAllPedidosClientesModel();
-
-    console.log(`✅ [CONTROLLER] Pedidos obtenidos: ${pedidos.length}`);
-
-    // Manejar errores al obtener detalles individualmente
-    for (let p of pedidos) {
-      try {
-        p.detalle = await getDetallePedidoByPedidoIdModel(p.PedidoClienteId);
-        console.log(`   📋 Pedido ${p.PedidoClienteId}: ${p.detalle.length} detalles`);
-      } catch (detalleError) {
-        console.error(`   ⚠️ Error obteniendo detalles para pedido ${p.PedidoClienteId}:`, detalleError.message);
-        p.detalle = [];
-      }
-    }
-
-    res.status(200).json(pedidos);
-  } catch (error) {
-    console.error("❌ [CONTROLLER] Error al obtener pedidos:", error);
-    res.status(500).json({
-      error: "Error al obtener pedidos",
-      details: error.message,
-      sqlError: error.code
     });
   }
 };
@@ -606,15 +492,88 @@ export const getMisPedidos = async (req, res) => {
     if (!clienteId) {
       return res.status(401).json({ error: "Usuario no autenticado" });
     }
-    const pedidos = await getAllPedidosClientesModel();
-    const pedidosDelCliente = pedidos.filter(p => p.ClienteId === clienteId);
-    for (let p of pedidosDelCliente) {
+    
+    const pedidos = await getAllPedidosClientesModel(clienteId);
+    
+    for (let p of pedidos) {
       p.detalle = await getDetallePedidoByPedidoIdModel(p.PedidoClienteId);
     }
-    res.status(200).json(pedidosDelCliente);
+    
+    res.status(200).json(pedidos);
   } catch (error) {
     console.error("Error al obtener mis pedidos:", error);
     res.status(500).json({ error: "Error al obtener tus pedidos" });
   }
 };
 
+// ========================================
+// 📎 SUBIR VOUCHER A PEDIDO
+// ========================================
+export const uploadVoucherToPedido = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: 'No se proporcionó ningún archivo' });
+    }
+
+    const pedidoExistente = await getPedidoClienteByIdModel(id);
+    if (!pedidoExistente) {
+      fs.unlink(file.path, (err) => {
+        if (err) console.error('Error eliminando archivo huérfano:', err);
+      });
+      return res.status(404).json({ error: 'Pedido no encontrado' });
+    }
+
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const voucherUrl = `${protocol}://${host}/uploads/vouchers/${file.filename}`;
+
+    const result = await updatePedidoClienteModel(id, { Voucher: voucherUrl });
+
+    if (result.affectedRows === 0) {
+      throw new Error('No se pudo actualizar el pedido');
+    }
+
+    const pedidoActualizado = await getPedidoClienteByIdModel(id);
+    pedidoActualizado.detalle = await getDetallePedidoByPedidoIdModel(id);
+
+    if (pedidoActualizado.ClienteId) {
+      try {
+        const cliente = await getClienteByIdModel(pedidoActualizado.ClienteId);
+        if (cliente?.CorreoElectronico) {
+          await sendVoucherEmail(
+            cliente.CorreoElectronico,
+            cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
+            id,
+            voucherUrl
+          );
+        }
+      } catch (emailError) {
+        console.error('⚠️ Error enviando email de voucher:', emailError);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Voucher subido correctamente',
+      voucher: voucherUrl,
+      pedido: pedidoActualizado
+    });
+
+  } catch (error) {
+    console.error('❌ Error al subir voucher:', error);
+
+    if (req.file) {
+      fs.unlink(req.file.path, (err) => {
+        if (err) console.error('Error eliminando archivo tras error:', err);
+      });
+    }
+
+    res.status(500).json({
+      error: 'Error al procesar el voucher',
+      message: error.message
+    });
+  }
+};

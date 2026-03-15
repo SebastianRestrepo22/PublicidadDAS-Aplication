@@ -11,7 +11,8 @@ import { ESTADOS_COMPRA } from "../hook/useCompras";
 import { generarFacturaCompraPDF } from './InvoicePDF.jsx';
 
 const getShortId = (id) => {
-  const str = String(id || "");
+  if (!id) return "---";
+  const str = String(id);
   return str.length > 3 ? str.substring(0, 3) : str;
 };
 
@@ -61,9 +62,9 @@ const estadoConfig = {
 
 export const ComprasView = ({
   selectedCompra,
-  productos,
+  productos = [], // ✅ Valor por defecto
   colores = [],
-  proveedores,
+  proveedores = [], // ✅ Valor por defecto
   onBack,
   getProveedorDisplay,
   onActualizarEstado,
@@ -79,11 +80,31 @@ export const ComprasView = ({
   const [proximoEstado, setProximoEstado] = useState(null);
   const [detalleExpandido, setDetalleExpandido] = useState({});
 
-  if (!selectedCompra) return null;
+  // ✅ Validación temprana - Si no hay selectedCompra, no renderizar nada
+  if (!selectedCompra) {
+    console.warn("[ComprasView] No hay selectedCompra, retornando null");
+    return null;
+  }
+
+  // ✅ Validación de propiedades requeridas
+  if (!selectedCompra.CompraId) {
+    console.error("[ComprasView] selectedCompra no tiene CompraId:", selectedCompra);
+    return (
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <p className="text-red-500">Error: Datos de compra incompletos</p>
+        <button onClick={onBack} className="mt-4 bg-gray-200 px-4 py-2 rounded-lg">
+          Volver
+        </button>
+      </div>
+    );
+  }
 
   const estadoActual = selectedCompra.Estado || ESTADOS_COMPRA.PENDIENTE;
   const configActual = estadoConfig[estadoActual] || estadoConfig[ESTADOS_COMPRA.PENDIENTE];
   const IconoActual = configActual.icon;
+
+  // Asegurar que detalle sea un array
+  const detalleCompra = Array.isArray(selectedCompra.detalle) ? selectedCompra.detalle : [];
 
   // Solo se puede cancelar si está pendiente
   const puedeCancelar = () =>
@@ -126,7 +147,7 @@ export const ComprasView = ({
     setUpdating(true);
     try {
       const productosAActualizar = nuevoEstado === ESTADOS_COMPRA.RECIBIDO
-        ? selectedCompra.detalle.map(d => ({
+        ? detalleCompra.map(d => ({
           ProductoId: d.ProductoId,
           Cantidad: d.Cantidad,
           colores: d.colores || []
@@ -165,8 +186,6 @@ export const ComprasView = ({
   };
 
   const handleConfirmCancel = async (motivo) => {
-    // Al cancelar, mantenemos el estado como PENDIENTE pero con motivo
-    // O podrías tener un estado especial "CANCELADO" si lo prefieres
     await ejecutarCambioEstado(ESTADOS_COMPRA.PENDIENTE, motivo);
     setShowCancelModal(false);
   };
@@ -186,85 +205,66 @@ export const ComprasView = ({
   const tieneOpciones = opcionesEstado.length > 0;
 
   const handleDescargarFactura = () => {
-  try {
-    console.log(" DATOS COMPLETOS DE LA COMPRA:", JSON.stringify(selectedCompra, null, 2));
-    
-    // Buscar el proveedor
-    const proveedor = proveedores.find(p => p.ProveedorId === selectedCompra.ProveedorId);
-    
-    if (!selectedCompra.detalle || selectedCompra.detalle.length === 0) {
-      toast.error('No hay productos en esta compra para facturar');
-      return;
-    }
-
-    // ENRIQUECER LOS DETALLES CON NOMBRES DE PRODUCTOS Y COLORES
-    const detallesConNombres = selectedCompra.detalle.map(d => {
-      // Buscar el producto completo
-      const productoCompleto = productos.find(p => p.ProductoId === d.ProductoId);
+    try {
+      console.log(" DATOS COMPLETOS DE LA COMPRA:", JSON.stringify(selectedCompra, null, 2));
       
-      console.log(` PROCESANDO DETALLE:`, {
-        detalleOriginal: d,
-        productoCompleto: productoCompleto
-      });
-
-      // PROCESAR COLORES - ESTO ES CRÍTICO
-      let coloresProcesados = [];
+      // Buscar el proveedor
+      const proveedor = proveedores.find(p => p.ProveedorId === selectedCompra.ProveedorId);
       
-      // Verificar si hay colores en el detalle
-      if (d.colores && Array.isArray(d.colores) && d.colores.length > 0) {
-        console.log(` COLORES ENCONTRADOS (${d.colores.length}):`, d.colores);
+      if (!detalleCompra || detalleCompra.length === 0) {
+        toast.error('No hay productos en esta compra para facturar');
+        return;
+      }
+
+      // ENRIQUECER LOS DETALLES CON NOMBRES DE PRODUCTOS Y COLORES
+      const detallesConNombres = detalleCompra.map(d => {
+        // Buscar el producto completo
+        const productoCompleto = productos.find(p => p.ProductoId === d.ProductoId);
         
-        coloresProcesados = d.colores.map(color => {
-          // Asegurarnos de que cada color tenga todos los campos necesarios
-          return {
+        console.log(` PROCESANDO DETALLE:`, {
+          detalleOriginal: d,
+          productoCompleto: productoCompleto
+        });
+
+        // PROCESAR COLORES
+        let coloresProcesados = [];
+        
+        if (d.colores && Array.isArray(d.colores) && d.colores.length > 0) {
+          console.log(` COLORES ENCONTRADOS (${d.colores.length}):`, d.colores);
+          
+          coloresProcesados = d.colores.map(color => ({
             Nombre: color.Nombre || color.nombre || 'Color sin nombre',
             Stock: Number(color.Stock || color.stock || color.Cantidad || 0),
             Hex: color.Hex || color.hex || '#CCCCCC',
-            // Preservar cualquier otro campo
             ...color
-          };
-        });
-      } else {
-        console.log(` Este producto NO TIENE COLORES`);
-      }
+          }));
+        }
 
-      // Construir el detalle enriquecido
-      const detalleEnriquecido = {
-        ...d,
-        ProductoNombre: productoCompleto?.Nombre || d.ProductoNombre || d.nombreProducto || 'Producto sin nombre',
-        Cantidad: Number(d.Cantidad) || 0,
-        PrecioUnitario: Number(d.PrecioUnitario) || 0,
-        Subtotal: Number(d.Subtotal) || (Number(d.Cantidad) * Number(d.PrecioUnitario)) || 0,
-        colores: coloresProcesados  // Aquí van los colores procesados
-      };
+        return {
+          ...d,
+          ProductoNombre: productoCompleto?.Nombre || d.ProductoNombre || d.nombreProducto || 'Producto sin nombre',
+          Cantidad: Number(d.Cantidad) || 0,
+          PrecioUnitario: Number(d.PrecioUnitario) || 0,
+          Subtotal: Number(d.Subtotal) || (Number(d.Cantidad) * Number(d.PrecioUnitario)) || 0,
+          colores: coloresProcesados
+        };
+      });
 
-      console.log(` DETALLE ENRIQUECIDO:`, detalleEnriquecido);
-      return detalleEnriquecido;
-    });
+      console.log(" TODOS LOS DETALLES PROCESADOS:", JSON.stringify(detallesConNombres, null, 2));
 
-    console.log(" TODOS LOS DETALLES PROCESADOS:", JSON.stringify(detallesConNombres, null, 2));
+      generarFacturaCompraPDF(
+        selectedCompra,
+        detallesConNombres,
+        proveedor
+      );
 
-    // Verificar específicamente el producto con colores
-    const productoConColores = detallesConNombres.find(d => d.colores && d.colores.length > 0);
-    if (productoConColores) {
-      console.log(" PRODUCTO CON COLORES ENCONTRADO:", productoConColores);
-    } else {
-      console.log(" NO SE ENCONTRARON PRODUCTOS CON COLORES");
+      toast.success('Factura generada correctamente');
+    } catch (error) {
+      console.error(' Error al generar factura:', error);
+      toast.error(`Error al generar la factura: ${error.message}`);
     }
+  };
 
-    // Generar la factura
-    generarFacturaCompraPDF(
-      selectedCompra,
-      detallesConNombres,  // Pasar los detalles enriquecidos
-      proveedor
-    );
-
-    toast.success('Factura generada correctamente');
-  } catch (error) {
-    console.error(' Error al generar factura:', error);
-    toast.error(`Error al generar la factura: ${error.message}`);
-  }
-};
   return (
     <>
       <div className="bg-white rounded-xl shadow-sm border p-6 max-w-full overflow-hidden">
@@ -308,7 +308,9 @@ export const ComprasView = ({
               <Store size={12} /> Proveedor
             </div>
             <div className="font-medium text-sm truncate">
-              {getProveedorDisplay(selectedCompra.ProveedorId, selectedCompra.nombreProveedor)}
+              {getProveedorDisplay ? 
+                getProveedorDisplay(selectedCompra.ProveedorId, selectedCompra.nombreProveedor) : 
+                selectedCompra.nombreProveedor || `ID: ${getShortId(selectedCompra.ProveedorId)}`}
             </div>
           </div>
 
@@ -341,93 +343,99 @@ export const ComprasView = ({
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-base font-semibold flex items-center gap-2">
               <Package size={16} />
-              Artículos ({selectedCompra.detalle?.length || 0})
+              Artículos ({detalleCompra.length})
             </h4>
           </div>
 
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-            {(selectedCompra.detalle || []).map((d, index) => {
-              const producto = productos.find(p => p.ProductoId === d.ProductoId);
-              const tieneColores = d.colores && d.colores.length > 0;
+            {detalleCompra.length > 0 ? (
+              detalleCompra.map((d, index) => {
+                const producto = productos.find(p => p.ProductoId === d.ProductoId);
+                const tieneColores = d.colores && d.colores.length > 0;
 
-              return (
-                <div key={d.DetalleCompraId || index} className="bg-slate-50 border rounded-lg p-3">
-                  {/* Fila principal del producto */}
-                  <div className="flex flex-wrap items-start gap-2">
-                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0 border">
-                      <Package size={14} className="text-slate-500" />
-                    </div>
+                return (
+                  <div key={d.DetalleCompraId || index} className="bg-slate-50 border rounded-lg p-3">
+                    {/* Fila principal del producto */}
+                    <div className="flex flex-wrap items-start gap-2">
+                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0 border">
+                        <Package size={14} className="text-slate-500" />
+                      </div>
 
-                    <div className="flex-1 min-w-[200px]">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">
-                          {producto?.Nombre || `Producto ID: ${getShortId(d.ProductoId)}`}
-                        </span>
-                        {producto?.SKU && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-slate-200 rounded-full">
-                            SKU: {producto.SKU}
+                      <div className="flex-1 min-w-[200px]">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm">
+                            {producto?.Nombre || d.ProductoNombre || `Producto ID: ${getShortId(d.ProductoId)}`}
+                          </span>
+                          {producto?.SKU && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-slate-200 rounded-full">
+                              SKU: {producto.SKU}
+                            </span>
+                          )}
+                        </div>
+
+                        {tieneColores && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full mt-1 inline-block bg-purple-100 text-purple-700">
+                            Stock por Color
                           </span>
                         )}
                       </div>
 
-                      {tieneColores && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full mt-1 inline-block bg-purple-100 text-purple-700">
-                          Stock por Color
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-blue-700">
-                        {formatPrice(d.Subtotal)}
-                      </div>
-                      <div className="text-[10px] text-slate-500">
-                        {tieneColores
-                          ? `${d.colores.reduce((sum, c) => sum + (c.Stock || 0), 0)} unidades totales`
-                          : `${d.Cantidad} x ${formatPrice(d.PrecioUnitario)}`
-                        }
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-blue-700">
+                          {formatPrice(d.Subtotal)}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          {tieneColores
+                            ? `${d.colores.reduce((sum, c) => sum + (c.Stock || 0), 0)} unidades totales`
+                            : `${d.Cantidad || 0} x ${formatPrice(d.PrecioUnitario)}`
+                          }
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Detalle de colores */}
-                  {tieneColores && (
-                    <div className="mt-3 ml-10">
-                      <div className="text-xs font-medium text-purple-700 mb-2 flex items-center gap-1">
-                        <Palette size={12} />
-                        Detalle por colores:
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                        {d.colores.map((color, cIdx) => (
-                          <div
-                            key={cIdx}
-                            className="flex items-center gap-2 text-xs bg-white p-2 rounded-lg border shadow-sm"
-                          >
+                    {/* Detalle de colores */}
+                    {tieneColores && (
+                      <div className="mt-3 ml-10">
+                        <div className="text-xs font-medium text-purple-700 mb-2 flex items-center gap-1">
+                          <Palette size={12} />
+                          Detalle por colores:
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                          {d.colores.map((color, cIdx) => (
                             <div
-                              className="w-4 h-4 rounded-full border border-gray-200"
-                              style={{ backgroundColor: color.Hex || '#CCCCCC' }}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{color.Nombre || 'Color'}</div>
-                              <div className="text-green-600 font-semibold">
-                                +{color.Stock || 0} unidades
+                              key={cIdx}
+                              className="flex items-center gap-2 text-xs bg-white p-2 rounded-lg border shadow-sm"
+                            >
+                              <div
+                                className="w-4 h-4 rounded-full border border-gray-200"
+                                style={{ backgroundColor: color.Hex || '#CCCCCC' }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{color.Nombre || 'Color'}</div>
+                                <div className="text-green-600 font-semibold">
+                                  +{color.Stock || 0} unidades
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Descripción adicional */}
-                  {d.Descripcion && (
-                    <div className="mt-2 text-[10px] text-slate-600 bg-white p-2 rounded border">
-                      <span className="font-medium">📝 Nota:</span> {d.Descripcion}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    {/* Descripción adicional */}
+                    {d.Descripcion && (
+                      <div className="mt-2 text-[10px] text-slate-600 bg-white p-2 rounded border">
+                        <span className="font-medium">📝 Nota:</span> {d.Descripcion}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No hay detalles disponibles para esta compra
+              </div>
+            )}
           </div>
 
           {/* Total */}
@@ -520,7 +528,7 @@ export const ComprasView = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {(selectedCompra.detalle || []).map((d, idx) => {
+                  {detalleCompra.map((d, idx) => {
                     const producto = productos.find(p => p.ProductoId === d.ProductoId);
 
                     if (d.colores && d.colores.length > 0) {

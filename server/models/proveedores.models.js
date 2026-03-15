@@ -20,15 +20,14 @@ export const getProveedorById = async (id) => {
   return rows[0];
 };
 
-// Crear un nuevo proveedor
-export const createProveedor = async ({ ProveedorId, nombreProveedor, telefono, correo, direccion, estado }) => {
+export const createProveedor = async ({ ProveedorId, nombreProveedor, nit, telefono, correo, direccion, estado }) => {
   await dbPool.query(
     `INSERT INTO Proveedores 
-    (ProveedorId, NombreProveedor, Telefono, Correo, Direccion, Estado) 
-    VALUES (?, ?, ?, ?, ?, ?)`,
-    [ProveedorId, nombreProveedor, telefono, correo, direccion, estado]
+    (ProveedorId, NombreProveedor, Nit, Telefono, Correo, Direccion, Estado) 
+    VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [ProveedorId, nombreProveedor, nit, telefono, correo, direccion, estado]
   );
-  return { ProveedorId, nombreProveedor, telefono, correo, direccion, estado };
+  return { ProveedorId, nombreProveedor, nit, telefono, correo, direccion, estado };
 };
 
 // Eliminar un proveedor
@@ -40,16 +39,16 @@ export const deleteProveedor = async (id) => {
   return result;
 };
 
-// Actualizar un proveedor
 export const updateProveedor = async (id, data) => {
-  const { nombreProveedor, telefono, correo, direccion, estado } = data;
+  const { nombreProveedor, nit, telefono, correo, direccion, estado } = data;
 
   const [result] = await dbPool.query(
     `UPDATE Proveedores
-    SET NombreProveedor = ?, Telefono = ?, Correo = ?, Direccion = ?, Estado = ?
+    SET NombreProveedor = ?, Nit = ?, Telefono = ?, Correo = ?, Direccion = ?, Estado = ?
     WHERE ProveedorId = ?`,
     [
       sanitize(nombreProveedor),
+      sanitize(nit),
       sanitize(telefono),
       sanitize(correo),
       sanitize(direccion),
@@ -61,7 +60,6 @@ export const updateProveedor = async (id, data) => {
   return result;
 };
 
-// ========== NUEVAS FUNCIONES CON PAGINACIÓN ==========
 
 // Obtener proveedores con paginación y filtros
 export const getProveedoresPaginated = async ({ 
@@ -74,12 +72,11 @@ export const getProveedoresPaginated = async ({
   let whereClause = '';
   let params = [];
 
-  // Construir cláusula WHERE si hay filtros
   if (filtroCampo && filtroValor) {
-    // Mapear nombres de campos amigables a nombres de columnas
     const campoMap = {
       id: 'ProveedorId',
       nombre: 'NombreProveedor',
+      nit: 'Nit', // Agregar NIT
       telefono: 'Telefono',
       correo: 'Correo',
       direccion: 'Direccion',
@@ -92,7 +89,6 @@ export const getProveedoresPaginated = async ({
       whereClause = 'WHERE ProveedorId = ?';
       params.push(filtroValor);
     } else if (columna === 'Estado') {
-      // Para el estado, buscamos exacto
       const valorNormalizado = filtroValor.toLowerCase() === 'activo' ? 1 : 
                                filtroValor.toLowerCase() === 'inactivo' ? 0 : filtroValor;
       whereClause = 'WHERE Estado = ?';
@@ -103,13 +99,11 @@ export const getProveedoresPaginated = async ({
     }
   }
 
-  // Consulta principal con LIMIT/OFFSET
   const [rows] = await dbPool.query(
     `SELECT * FROM Proveedores ${whereClause} ORDER BY NombreProveedor LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );
 
-  // Consulta para obtener el total de registros
   const [countResult] = await dbPool.query(
     `SELECT COUNT(*) as total FROM Proveedores ${whereClause}`,
     params

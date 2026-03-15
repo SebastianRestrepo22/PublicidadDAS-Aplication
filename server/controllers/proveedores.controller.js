@@ -4,7 +4,6 @@ import {
     createProveedor as createProveedorModel,
     deleteProveedor as deleteProveedorModel,
     updateProveedor as updateProveedorModel,
-    // 🔥 Nuevas funciones importadas
     getProveedoresPaginated as getProveedoresPaginatedModel,
     buscarProveedoresPaginated
 } from '../models/proveedores.models.js';
@@ -85,6 +84,7 @@ export const buscarProveedores = async (req, res) => {
   const columnasPermitidas = {
     id: 'ProveedorId',
     nombre: 'NombreProveedor',
+    nit: 'Nit',
     telefono: 'Telefono',
     correo: 'Correo',
     direccion: 'Direccion',
@@ -95,7 +95,7 @@ export const buscarProveedores = async (req, res) => {
 
   if (!columna) {
     return res.status(400).json({ 
-      message: 'Campo de búsqueda inválido. Use: id, nombre, telefono, correo, direccion o estado' 
+      message: 'Campo de búsqueda inválido. Use: id, nombre, nit, telefono, correo, direccion o estado' 
     });
   }
 
@@ -148,10 +148,10 @@ export const getProveedorById = async (req, res) => {
 };
 
 export const createProveedor = async (req, res) => {
-  const { nombreProveedor, telefono, correo, direccion, estado } = req.body;
+  const { nombreProveedor, nit, telefono, correo, direccion, estado } = req.body;
 
   if (!nombreProveedor || !telefono || !correo || !direccion || !estado) {
-    return res.status(400).json({ error: "Todos los campos son obligatorios" });
+    return res.status(400).json({ error: "Todos los campos son obligatorios (NIT es opcional)" });
   }
 
   try {
@@ -159,6 +159,7 @@ export const createProveedor = async (req, res) => {
     const result = await createProveedorModel({ 
       ProveedorId,
       nombreProveedor, 
+      nit: nit || null, // Permitir NIT nulo
       telefono, 
       correo, 
       direccion, 
@@ -166,7 +167,7 @@ export const createProveedor = async (req, res) => {
     });
     res.status(201).json({ 
       message: "Proveedor creado correctamente",
-      proveedor: { ProveedorId, nombreProveedor, telefono, correo, direccion, estado }
+      proveedor: { ProveedorId, nombreProveedor, nit, telefono, correo, direccion, estado }
     });
   } catch (err) {
     console.error(" Error al crear proveedor:", err.message);
@@ -196,11 +197,12 @@ export const updateProveedor = async (req, res) => {
     return res.status(400).json({ error: "ID invalido"})
   }
 
-  const {nombreProveedor, telefono, correo, direccion, estado} = req.body;
+  const { nombreProveedor, nit, telefono, correo, direccion, estado } = req.body;
 
   try {
     const result = await updateProveedorModel(id, {
       nombreProveedor,
+      nit: nit || null,
       telefono, 
       correo,
       direccion,

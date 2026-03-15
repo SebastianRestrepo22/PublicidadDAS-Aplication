@@ -1,4 +1,5 @@
 import { dbPool } from "../lib/db.js";
+import { v4 as uuidv4 } from 'uuid';
 
 // Obtener todas las categorías (sin paginación)
 export const getAllCategorias = async () => {

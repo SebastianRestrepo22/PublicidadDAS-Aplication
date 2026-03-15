@@ -3,7 +3,6 @@ import { dbPool } from '../lib/db.js';
 
 const sanitize = (v) => (v === undefined ? null : v);
 
-// ========== FUNCIONES EXISTENTES ==========
 
 // Obtener todas las compras (sin paginación)
 export const getAllCompras = async () => {
@@ -75,11 +74,16 @@ export const updateCompraEstado = async (id, estado, motivoCancelacion = null) =
 
 // Obtener detalles de una compra
 export const getDetallesByCompraId = async (compraId) => {
-  const [rows] = await dbPool.execute(
-    'SELECT * FROM DetalleCompras WHERE CompraId = ?',
-    [compraId]
-  );
-  return rows;
+  try {
+    const [rows] = await dbPool.query(
+      `SELECT * FROM detalle_compras WHERE CompraId = ?`,
+      [compraId]
+    );
+    return rows;
+  } catch (error) {
+    console.error('Error al obtener detalles:', error);
+    throw error;
+  }
 };
 
 // Actualizar stock de un producto
@@ -104,36 +108,56 @@ export const actualizarStockProducto = async (productoId, cantidad) => {
   return { productoId, stockAnterior: stockActual, stockNuevo: nuevoStock };
 };
 
-// Obtener compras pendientes con más de 1 hora
 export const getComprasPendientesExpiradas = async () => {
-  const [rows] = await dbPool.execute(`
-    SELECT * FROM Compras 
-    WHERE Estado = 'pendiente' 
-    AND FechaRegistro <= DATE_SUB(NOW(), INTERVAL 1 HOUR)
-    AND (MotivoCancelacion IS NULL OR MotivoCancelacion = '')
-  `);
-  return rows;
+  try {
+    const [rows] = await dbPool.query(`
+      SELECT 
+        CompraId,
+        ProveedorId,
+        FechaRegistro,
+        Estado,
+        Total
+      FROM compras 
+      WHERE Estado = 'pendiente' 
+      AND FechaRegistro < DATE_SUB(NOW(), INTERVAL 2 HOUR)
+      AND (FechaRegistro IS NOT NULL)
+      ORDER BY FechaRegistro ASC
+    `);
+    
+    return rows;
+  } catch (error) {
+    console.error('Error al obtener compras expiradas:', error);
+    throw error;
+  }
 };
 
 // Anular compra automáticamente
-export const anularCompraAutomatica = async (id, motivo) => {
-  const [result] = await dbPool.execute(
-    `UPDATE Compras
-     SET Estado = 'anulada', 
-         MotivoCancelacion = ?
-     WHERE CompraId = ? AND Estado = 'pendiente'`,
-    [motivo, id]
-  );
-  return result;
+export const anularCompraAutomatica = async (compraId, motivo) => {
+  try {
+    const [result] = await dbPool.query(
+      `UPDATE compras 
+       SET Estado = 'anulada',
+           MotivoCancelacion = ?,
+           FechaAnulacion = NOW()
+       WHERE CompraId = ? 
+       AND Estado = 'pendiente'`,
+      [motivo, compraId]
+    );
+    
+    return result;
+  } catch (error) {
+    console.error('Error al anular compra:', error);
+    throw error;
+  }
 };
 
-// Verificar si una compra puede anularse automáticamente
+// ✅ Función: puedeAnularseAutomaticamente
 export const puedeAnularseAutomaticamente = async (id) => {
   const [rows] = await dbPool.execute(`
     SELECT * FROM Compras 
     WHERE CompraId = ? 
     AND Estado = 'pendiente' 
-    AND FechaRegistro <= DATE_SUB(NOW(), INTERVAL 1 HOUR)
+    AND FechaRegistro <= DATE_SUB(NOW(), INTERVAL 2 HOUR)  /* 🔥 CAMBIO: 1 HOUR → 2 HOUR */
   `, [id]);
   return rows.length > 0;
 };
@@ -147,7 +171,6 @@ export const getComprasPaginated = async ({
   sortBy = 'FechaRegistro',
   sortOrder = 'DESC'
 }) => {
-  // 🔥 Calcular offset y asegurar que sean ENTEROS válidos
   const offset = (page - 1) * limit;
   const limitNum = Math.max(1, parseInt(limit, 10) || 10);
   const offsetNum = Math.max(0, parseInt(offset, 10) || 0);
@@ -156,9 +179,6 @@ export const getComprasPaginated = async ({
   let params = [];
   let countParams = [];
 
-  console.log("🔍 getComprasPaginated - Parámetros de entrada:", { page, limit, filtroCampo, filtroValor, sortBy, sortOrder });
-
-  // Construir cláusula WHERE si hay filtros
   if (filtroCampo && filtroValor && filtroValor.trim() !== '') {
     const campoMap = {
       id: 'CompraId',
@@ -197,53 +217,29 @@ export const getComprasPaginated = async ({
     }
   }
 
-  // Validar sortOrder
   const order = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-  
-  // 🔥 Validar sortBy contra whitelist (CRÍTICO al usar query())
   const columnasPermitidas = ['CompraId', 'ProveedorId', 'FechaRegistro', 'Total', 'Estado'];
   const sortColumn = columnasPermitidas.includes(sortBy) ? sortBy : 'FechaRegistro';
 
-  console.log("🔍 whereClause:", whereClause || "(sin filtros)");
-  console.log("🔍 params:", params);
-  console.log("🔍 countParams:", countParams);
-  console.log("🔍 limitNum:", limitNum, "offsetNum:", offsetNum);
-
   try {
-    // Consulta principal con LIMIT y OFFSET
     let query = `SELECT * FROM Compras ${whereClause} ORDER BY ${sortColumn} ${order} LIMIT ? OFFSET ?`;
     let queryParams = [...params, limitNum, offsetNum];
     
-    console.log("📝 Query principal:", query);
-    console.log("📝 Query params:", queryParams);
-
-    // 🔥 CAMBIO CLAVE: Usar query() en lugar de execute() para evitar bug de mysql2
     const [rows] = await dbPool.query(query, queryParams);
 
-    // Consulta de conteo
     let countQuery = `SELECT COUNT(*) as total FROM Compras ${whereClause}`;
-    console.log("📝 Count query:", countQuery);
-    console.log("📝 Count params:", countParams);
-
-    // 🔥 También usar query() para el conteo
     const [countResult] = countParams.length > 0 
       ? await dbPool.query(countQuery, countParams)
       : await dbPool.query(countQuery);
 
-    console.log("✅ Filas obtenidas:", rows.length);
-    console.log("✅ Total registros:", countResult[0]?.total || 0);
-
     return {
-      data: rows,
+       rows,
       totalItems: countResult[0]?.total || 0,
       currentPage: page,
       itemsPerPage: limitNum
     };
   } catch (error) {
     console.error("❌ Error detallado en getComprasPaginated:", error);
-    console.error("❌ SQL:", error.sql);
-    console.error("❌ SQL State:", error.sqlState);
-    console.error("❌ SQL Message:", error.sqlMessage);
     throw error;
   }
 };

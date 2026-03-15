@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react"; 
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { ArrowLeft } from "lucide-react";
 
 import { useServicios } from "./hooks/useServicios";
-import { useCategorias } from "./hooks/useCategorias";
+import { useCategorias } from "../categoria/hook/useCategorias"; // Hook sin parámetros
 import { usePaginacion } from "./hooks/usePaginacion";
 
 import { BarraAcciones } from "./components/BarraAcciones";
@@ -20,7 +20,7 @@ export const ServiciosDashboard = () => {
     const { id } = useParams();
     const location = useLocation();
 
-    const mode = React.useMemo(() => {
+    const mode = useMemo(() => {
         if (location.pathname === "/dashboard/servicio/nuevo") return "create";
         if (id && location.pathname === `/dashboard/servicio/${id}/editar`) return "edit";
         if (id && location.pathname === `/dashboard/servicio/${id}`) return "view";
@@ -30,16 +30,44 @@ export const ServiciosDashboard = () => {
     const paginacion = usePaginacion(mode);
     const servicios = useServicios(mode, id, paginacion.refrescar);
 
-    const {
-        categorias,
-        openCategoriasModal,
-        setOpenCategoriasModal,
-        categoriaBusqueda,
-        setCategoriaBusqueda,
-        categoriasFiltradas,
-        seleccionarCategoria,
-        obtenerNombreCategoria
-    } = useCategorias(servicios.values, servicios.setValues);
+    // ✅ Usar el hook correctamente (sin parámetros)
+    const { 
+        allData,           // ← Datos de categorías (paginados)
+        cargarCategorias   // ← Función para recargar
+    } = useCategorias();
+
+    // ✅ Estado local para manejar las categorías del modal
+    const [categoriasLocales, setCategoriasLocales] = useState([]);
+    const [categoriaBusquedaLocal, setCategoriaBusquedaLocal] = useState("");
+    const [openCategoriasModalLocal, setOpenCategoriasModalLocal] = useState(false);
+
+    // ✅ Cargar categorías con getAllCategorias cuando se abre el modal
+    useEffect(() => {
+        const cargarCategoriasModal = async () => {
+            try {
+                const { getAllCategorias } = await import("../categoria/services/services.categoria");
+                const data = await getAllCategorias();
+                console.log("📦 Categorías cargadas manualmente:", data);
+                setCategoriasLocales(data);
+            } catch (error) {
+                console.error("Error cargando categorías:", error);
+                setCategoriasLocales([]);
+            }
+        };
+
+        if (openCategoriasModalLocal) {
+            cargarCategoriasModal();
+        }
+    }, [openCategoriasModalLocal]);
+
+    // ✅ Filtrar categorías localmente
+    const categoriasFiltradasLocales = useMemo(() => {
+        if (!Array.isArray(categoriasLocales)) return [];
+        if (!categoriaBusquedaLocal) return categoriasLocales;
+        return categoriasLocales.filter(cat => 
+            cat.Nombre?.toLowerCase().includes(categoriaBusquedaLocal.toLowerCase())
+        );
+    }, [categoriasLocales, categoriaBusquedaLocal]);
 
     const handleViewClick = (servicio) => {
         servicios.goToView(servicio.ServicioId);
@@ -49,6 +77,22 @@ export const ServiciosDashboard = () => {
         if (servicio.Estado === 'Activo') {
             servicios.goToEdit(servicio.ServicioId);
         }
+    };
+
+    const handleSelectCategoria = (categoria) => {
+        // Actualizar el formulario con la categoría seleccionada
+        servicios.setValues({ ...servicios.values, CategoriaId: categoria.CategoriaId });
+        setOpenCategoriasModalLocal(false);
+        setCategoriaBusquedaLocal("");
+    };
+
+    // ✅ Función local para obtener nombre de categoría
+    const obtenerNombreCategoriaLocal = (id) => {
+        if (!id) return "Seleccionar categoría";
+        // Buscar primero en categoriasLocales, luego en allData como fallback
+        const cat = categoriasLocales.find(c => c.CategoriaId === id) || 
+                   allData?.find(c => c.CategoriaId === id);
+        return cat ? cat.Nombre : "Categoría no encontrada";
     };
 
     return (
@@ -82,7 +126,7 @@ export const ServiciosDashboard = () => {
 
                         <TablaServicios
                             paginatedData={paginacion.paginatedData}
-                            categorias={categorias}
+                            categorias={allData || []} // Usar allData del hook como fallback
                             onView={handleViewClick}
                             onEdit={handleEditClick}
                             onDelete={servicios.handleDeleteClick}
@@ -113,7 +157,7 @@ export const ServiciosDashboard = () => {
                         {mode === "view" ? (
                             <DetalleServicio
                                 editData={servicios.editData}
-                                categorias={categorias}
+                                categorias={allData || []}
                                 onEdit={servicios.goToEdit}
                                 onDelete={servicios.handleDeleteClick}
                                 onBack={servicios.goToBackToList}
@@ -132,20 +176,24 @@ export const ServiciosDashboard = () => {
                                 handleNombreBlur={servicios.handleNombreBlur}
                                 handleSubmit={servicios.handleSubmit}
                                 onCancel={servicios.goToBackToList}
-                                abrirModalCategorias={() => setOpenCategoriasModal(true)}
-                                obtenerNombreCategoria={obtenerNombreCategoria}
+                                abrirModalCategorias={() => setOpenCategoriasModalLocal(true)}
+                                obtenerNombreCategoria={obtenerNombreCategoriaLocal}
                             />
                         )}
                     </div>
                 )}
 
+                {/* Modal de categorías */}
                 <ModalCategorias
-                    open={openCategoriasModal}
-                    onClose={() => setOpenCategoriasModal(false)}
-                    categoriasFiltradas={categoriasFiltradas}
-                    categoriaBusqueda={categoriaBusqueda}
-                    setCategoriaBusqueda={setCategoriaBusqueda}
-                    onSelectCategoria={seleccionarCategoria}
+                    open={openCategoriasModalLocal}
+                    onClose={() => {
+                        setOpenCategoriasModalLocal(false);
+                        setCategoriaBusquedaLocal("");
+                    }}
+                    categoriasFiltradas={categoriasFiltradasLocales}
+                    categoriaBusqueda={categoriaBusquedaLocal}
+                    setCategoriaBusqueda={setCategoriaBusquedaLocal}
+                    onSelectCategoria={handleSelectCategoria}
                     categoriaSeleccionada={servicios.values.CategoriaId}
                 />
 

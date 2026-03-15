@@ -3,36 +3,30 @@ import axios from "axios";
 const API_URL = 'http://localhost:3000';
 
 
-
-// ========== FUNCIONES CON PAGINACIÓN ==========
-
-export const getComprasPaginated = async (page = 1, limit = 5, filtroCampo = null, filtroValor = null) => {
+export const getComprasPaginated = async (page = 1, limit = 5, filtroCampo = null, filtroValor = null, sortBy = 'FechaRegistro', sortOrder = 'DESC') => {
   try {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      ...(filtroCampo && filtroValor && { filtroCampo, filtroValor })
+      sortBy,
+      sortOrder
     });
     
-    console.log("📤 getComprasPaginated - Enviando petición:", {
-      url: `${API_URL}/api/compras?${params}`,
-      page,
-      limit,
-      filtroCampo,
-      filtroValor
-    });
-
-    const response = await axios.get(`${API_URL}/api/compras?${params}`);
+    if (filtroCampo && filtroValor && filtroValor.trim() !== '') {
+      params.append('filtroCampo', filtroCampo);
+      params.append('filtroValor', filtroValor.trim());
+    }
     
-    console.log("📥 getComprasPaginated - Respuesta del backend:", response.data);
-    console.log("📥 getComprasPaginated - Estructura:", {
-      tieneData: !!response.data?.data,
-      esArray: Array.isArray(response.data),
-      dataLength: response.data?.data?.length || response.data?.length
+    console.log("📤 getComprasPaginated - URL:", `${'http://localhost:3000'}/api/compras?${params}`);
+
+    const response = await axios.get(`${'http://localhost:3000'}/api/compras?${params}`);
+    
+    console.log("📥 Respuesta:", {
+      dataLength: response.data?.data?.length,
+      pagination: response.data?.pagination
     });
 
-    // 🔥 IMPORTANTE: El backend YA devuelve { data, pagination }
-    // Solo debemos devolverlo tal cual
+    // ✅ El backend ya devuelve { data, pagination }, lo retornamos tal cual
     return response.data;
     
   } catch (error) {
@@ -50,41 +44,8 @@ export const getComprasPaginated = async (page = 1, limit = 5, filtroCampo = nul
 };
 
 export const buscarCompras = async (campo, valor, page = 1, limit = 5) => {
-  try {
-    const params = new URLSearchParams({
-      campo,
-      valor,
-      page: page.toString(),
-      limit: limit.toString()
-    });
-    
-    console.log("📤 buscarCompras - Enviando petición:", {
-      url: `${API_URL}/api/compras/buscar?${params}`,
-      campo,
-      valor,
-      page,
-      limit
-    });
-
-    const response = await axios.get(`${API_URL}/api/compras/buscar?${params}`);
-    
-    console.log("📥 buscarCompras - Respuesta del backend:", response.data);
-    
-    // El backend YA devuelve { data, pagination }
-    return response.data;
-    
-  } catch (error) {
-    console.error("❌ Error en buscarCompras:", error);
-    return { 
-      data: [], 
-      pagination: { 
-        totalItems: 0, 
-        totalPages: 1, 
-        currentPage: page, 
-        itemsPerPage: limit 
-      } 
-    };
-  }
+  
+  return await getComprasPaginated(page, limit, campo, valor);
 };
 
 // ========== FUNCIONES PARA COMPATIBILIDAD ==========
@@ -193,7 +154,7 @@ export const createDetalleCompra = async (detalleData) => {
   }
 };
 
-// ========== PRODUCTOS - Usando la estructura correcta ==========
+// ========== PRODUCTOS ==========
 
 export const getAllProductos = async () => {
   try {
@@ -204,7 +165,6 @@ export const getAllProductos = async () => {
     
     const response = await axios.get(`${'http://localhost:3000'}/producto`, { params });
     
-    // La respuesta tiene estructura { data: [...], pagination: {...} }
     return response.data?.data || [];
   } catch (error) {
     console.error("Error en getAllProductos:", error);

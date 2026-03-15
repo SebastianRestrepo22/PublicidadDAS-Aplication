@@ -5,7 +5,8 @@ import {
   buscarCategorias,
   createCategoria,
   updateCategoria,
-  deleteCategoria 
+  deleteCategoria,
+  getAllCategorias // 👈 Importamos la función
 } from '../services/services.categoria';
 
 export const useCategorias = () => {
@@ -28,7 +29,20 @@ export const useCategorias = () => {
   const [verificandoNombre, setVerificandoNombre] = useState(false);
   const [originalNombre, setOriginalNombre] = useState('');
 
-  // Cargar categorías
+  // ✅ Nueva función para cargar TODAS las categorías
+  const cargarTodasLasCategorias = async () => {
+    try {
+      const data = await getAllCategorias();
+      console.log("📦 Todas las categorías cargadas:", data);
+      setAllData(data); // Actualizar allData con todas las categorías
+      return data;
+    } catch (error) {
+      console.error("Error cargando todas las categorías:", error);
+      return [];
+    }
+  };
+
+  // Cargar categorías (paginadas)
   const cargarCategorias = async () => {
     try {
       let resultado;
@@ -65,30 +79,57 @@ export const useCategorias = () => {
   }, [currentPage, itemsPerPage, filtroCampo, filtroValor]);
 
   // Verificar nombre duplicado
-  const verificarNombreDuplicado = async (nombre, categoriaIdActual = null) => {
-    if (!nombre || nombre.trim().length < 2) {
-      setNombreDuplicado(false);
-      return false;
-    }
+const verificarNombreDuplicado = async (nombre, categoriaIdActual = null) => {
+  if (!nombre || nombre.trim().length < 2) {
+    setNombreDuplicado(false);
+    return false;
+  }
 
-    setVerificandoNombre(true);
+  setVerificandoNombre(true);
+  try {
+    const nombreLimpio = nombre.trim().toLowerCase();
+    
+    // 🔥 Opción A: Verificar en allData (rápido, pero puede estar desactualizado)
+    const existeEnCache = allData.some(c => 
+      c.Nombre.toLowerCase() === nombreLimpio && 
+      (categoriaIdActual ? c.CategoriaId !== categoriaIdActual : true)
+    );
+    
+    if (existeEnCache) {
+      setNombreDuplicado(true);
+      return true;
+    }
+    
+    // 🔥 Opción B: Verificar en el backend (más confiable)
+    // Solo si no se encontró en cache y hay conexión
     try {
-      // Usamos allData que ya tenemos cargado para verificar duplicados
-      const nombreLimpio = nombre.trim().toLowerCase();
-      const existe = allData.some(c => 
-        c.Nombre.toLowerCase() === nombreLimpio && 
+      const params = new URLSearchParams({
+        campo: 'nombre',
+        valor: nombreLimpio
+      });
+      const response = await axios.get(`${'http://localhost:3000/api/'}categorias/buscar?${params}`);
+      
+      const existeEnBackend = response.data?.data?.some(c => 
+        c.Nombre.toLowerCase() === nombreLimpio &&
         (categoriaIdActual ? c.CategoriaId !== categoriaIdActual : true)
       );
       
-      setNombreDuplicado(existe);
-      return existe;
-    } catch (error) {
-      console.error("Error verificando nombre:", error);
-      return false;
-    } finally {
-      setVerificandoNombre(false);
+      setNombreDuplicado(!!existeEnBackend);
+      return !!existeEnBackend;
+    } catch (err) {
+      // Si falla la llamada al backend, confiar en cache
+      console.warn("No se pudo verificar en backend, usando cache");
+      setNombreDuplicado(existeEnCache);
+      return existeEnCache;
     }
-  };
+    
+  } catch (error) {
+    console.error("Error verificando nombre:", error);
+    return false;
+  } finally {
+    setVerificandoNombre(false);
+  }
+};
 
   const validarFormulario = (esEditar = false) => {
     let isValid = true;
@@ -117,50 +158,52 @@ export const useCategorias = () => {
     return isValid;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitted(true);
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  setSubmitted(true);
 
-    const esEdicion = !!editData?.CategoriaId;
-    if (!validarFormulario(esEdicion)) return false;
+  const esEdicion = !!editData?.CategoriaId;
+  if (!validarFormulario(esEdicion)) return false;
 
-    try {
-      let response;
-      if (esEdicion) {
-        response = await updateCategoria(editData.CategoriaId, {
-          nombreCategoria: formData.nombreCategoria.trim(),
-          descripcion: formData.descripcion.trim()
-        });
-      } else {
-        response = await createCategoria({
-          nombreCategoria: formData.nombreCategoria.trim(),
-          descripcion: formData.descripcion.trim()
-        });
-      }
+  try {
+    let response;
+    if (esEdicion) {
+      response = await updateCategoria(editData.CategoriaId, {
+        nombreCategoria: formData.nombreCategoria.trim(),
+        descripcion: formData.descripcion.trim()
+      });
+    } else {
+      response = await createCategoria({
+        nombreCategoria: formData.nombreCategoria.trim(),
+        descripcion: formData.descripcion.trim()
+      });
+    }
 
-      if (response.status === 200 || response.status === 201) {
-        await cargarCategorias();
-        toast.success(esEdicion ? "Categoría actualizada correctamente" : "Categoría creada correctamente");
-        return true;
-      } else {
-        toast.error("Error al guardar la categoría");
-        return false;
-      }
-    } catch (error) {
-      console.error("Error en handleSubmit:", error);
-      const serverMessage = error?.response?.data?.error || error?.response?.data?.message;
-      if (serverMessage) {
-        if (serverMessage.includes("nombre") || serverMessage.includes("existe")) {
-          setNombreError(serverMessage);
-        } else {
-          toast.warning(serverMessage);
-        }
-      } else {
-        toast.error("Error al procesar la solicitud");
-      }
+    if (response?.status === 200 || response?.status === 201) {
+      await cargarCategorias();
+      toast.success(esEdicion ? "Categoría actualizada correctamente" : "Categoría creada correctamente");
+      return true;
+    } else {
+      toast.error("Error al guardar la categoría");
       return false;
     }
-  };
+  } catch (error) {
+    console.error("Error en handleSubmit:", error);
+    
+    const serverMessage = error?.response?.data?.error || error?.response?.data?.message;
+    
+    if (serverMessage) {
+      if (serverMessage.toLowerCase().includes("nombre") || serverMessage.toLowerCase().includes("existe")) {
+        setNombreError(serverMessage);
+      } else {
+        toast.warning(serverMessage);
+      }
+    } else {
+      toast.error("Error de conexión con el servidor");
+    }
+    return false;
+  }
+};
 
   const handleDelete = async (id) => {
     try {
@@ -227,6 +270,7 @@ export const useCategorias = () => {
     
     // Funciones
     cargarCategorias,
+    cargarTodasLasCategorias, 
     handleSubmit,
     handleDelete,
     verificarNombreDuplicado,

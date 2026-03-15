@@ -9,7 +9,6 @@ import { toast, ToastContainer } from "react-toastify";
 import axios from "axios";
 import { buscarProductosPorCampo } from "./services/services.compras";
 
-
 const getShortId = (id) => {
   const str = String(id || "");
   return str.length > 3 ? str.substring(0, 3) : str;
@@ -69,9 +68,7 @@ const validarFormulario = (form, detalles, listaProveedores) => {
 };
 
 export const Compras = () => {
-  // 🔥 AQUÍ VA LA PRIMERA PARTE: Desestructurar el hook con las nuevas propiedades
   const {
-    // Datos paginados
     paginatedData,
     currentPage,
     setCurrentPage,
@@ -83,8 +80,6 @@ export const Compras = () => {
     setFiltroCampo,
     filtroValor,
     setFiltroValor,
-
-    // Propiedades existentes
     compras,
     productos,
     proveedores,
@@ -193,13 +188,11 @@ export const Compras = () => {
     }
   };
 
-
-
   const loadProductosPaginados = async (page = 1, search = "") => {
     setLoadingProductos(true);
     try {
       const resultado = await buscarProductosPorCampo(
-        search ? "nombre" : null,  // Si hay búsqueda, buscar por nombre
+        search ? "nombre" : null,
         search,
         page,
         itemsPerPage
@@ -237,19 +230,16 @@ export const Compras = () => {
 
   const goToView = async (compra) => {
     try {
-      console.log(" [goToView] Compra recibida:", compra);
-      console.log(" [goToView] Productos disponibles:", productos.length);
+      console.log("📦 [goToView] Compra recibida:", compra);
+      console.log("📦 [goToView] Productos disponibles:", productos?.length);
+      console.log("📦 [goToView] Colores disponibles:", colores?.length);
 
       const detalles = await getDetallesByCompraId(compra.CompraId);
-      console.log(" [goToView] Detalles recuperados de la BD:", detalles);
-      console.log(" [goToView] Tipo de detalles:", typeof detalles);
-      console.log(" [goToView] ¿Es array?", Array.isArray(detalles));
-      console.log(" [goToView] Longitud de detalles:", detalles?.length);
+      console.log("📦 [goToView] Detalles recuperados de la BD:", detalles);
 
       if (!detalles || detalles.length === 0) {
-        console.warn(" [goToView] No hay detalles para esta compra");
-
-        const proveedor = proveedores.find(p => p.ProveedorId === compra.ProveedorId);
+        console.warn("📦 [goToView] No hay detalles para esta compra");
+        const proveedor = proveedores?.find(p => p.ProveedorId === compra.ProveedorId);
         const nombreProveedor = proveedor?.NombreProveedor || "";
 
         setSelectedCompra({
@@ -261,21 +251,17 @@ export const Compras = () => {
         return;
       }
 
-      console.log(" [goToView] Primer detalle (raw):", detalles[0]);
-      console.log(" [goToView] Propiedades del primer detalle:", Object.keys(detalles[0]));
-
-      const proveedor = proveedores.find(p => p.ProveedorId === compra.ProveedorId);
+      const proveedor = proveedores?.find(p => p.ProveedorId === compra.ProveedorId);
       const nombreProveedor = proveedor?.NombreProveedor || "";
 
       const detallesConProducto = (detalles || []).map(d => {
         const precioUnitario = Number(d.PrecioUnitario) || 0;
         const cantidad = Number(d.Cantidad) || 0;
 
-        console.log(" [goToView] Procesando detalle:", d.DetalleCompraId);
-
+        // Procesar colores si existen
         let coloresDetalle = [];
         if (d.colores) {
-          console.log(" [goToView] colores en detalle:", d.colores);
+          console.log(`📦 Procesando colores para detalle ${d.DetalleCompraId}:`, d.colores);
           if (Array.isArray(d.colores)) {
             coloresDetalle = d.colores;
           } else if (typeof d.colores === 'string') {
@@ -287,8 +273,7 @@ export const Compras = () => {
           }
         }
 
-        const producto = productos.find(p => p.ProductoId === d.ProductoId);
-        console.log(" [goToView] Producto encontrado:", producto?.Nombre);
+        const producto = productos?.find(p => p.ProductoId === d.ProductoId);
 
         return {
           ...d,
@@ -303,27 +288,13 @@ export const Compras = () => {
         };
       });
 
-      console.log(" [goToView] Detalles con producto mapeados:", detallesConProducto);
-      console.log(" [goToView] Primer detalle mapeado:", detallesConProducto[0]);
-
-      if (detallesConProducto[0]) {
-        console.log(" [goToView] Estructura final:", {
-          DetalleCompraId: detallesConProducto[0].DetalleCompraId,
-          ProductoId: detallesConProducto[0].ProductoId,
-          ProductoNombre: detallesConProducto[0].ProductoNombre,
-          Cantidad: detallesConProducto[0].Cantidad,
-          PrecioUnitario: detallesConProducto[0].PrecioUnitario,
-          Subtotal: detallesConProducto[0].Subtotal
-        });
-      }
-
       setSelectedCompra({
         ...compra,
         detalle: detallesConProducto,
         nombreProveedor
       });
 
-      console.log(" [goToView] selectedCompra actualizado:", {
+      console.log("📦 [goToView] selectedCompra actualizado:", {
         compraId: compra.CompraId,
         total: compra.Total,
         detallesCount: detallesConProducto.length
@@ -331,7 +302,7 @@ export const Compras = () => {
 
       setViewMode("view");
     } catch (err) {
-      console.error(" Error al cargar datos para vista detallada:", err);
+      console.error("❌ Error al cargar datos para vista detallada:", err);
       toast.error("No se pudieron cargar los detalles de la compra.");
       goToBackToList();
     }
@@ -365,9 +336,6 @@ export const Compras = () => {
     setErrores([]);
   };
 
-
-
-
   const goToSelectProducto = (from, index) => {
     setReturnTo(from);
     setCurrentDetailIndex(index);
@@ -387,18 +355,22 @@ export const Compras = () => {
         return nuevos;
       });
 
-      // Recargar productos después de seleccionar
       await fetchProductos();
     }
     setViewMode(returnTo || "list");
   };
 
-
-
   const getProductoDisplay = (id) => {
     if (!id) return "Seleccionar producto";
-    const prod = productos.find(p => p.ProductoId === id);
+    const prod = productos?.find(p => p.ProductoId === id);
     return prod ? `${getShortId(prod.ProductoId)} - ${prod.Nombre}` : `ID: ${getShortId(id)}`;
+  };
+
+  const getProveedorDisplay = (id, nombreProveedor = "") => {
+    if (nombreProveedor) return nombreProveedor;
+    if (!id) return "Sin proveedor";
+    const prov = proveedores?.find(p => p.ProveedorId === id);
+    return prov ? prov.NombreProveedor : `ID: ${getShortId(id)}`;
   };
 
   const añadirDetalleCrear = () => {
@@ -482,13 +454,11 @@ export const Compras = () => {
         await createDetalleCompra(detalleData);
       }
 
-      // 🔥 IMPORTANTE: Forzar a página 1 y recargar datos
-      setCurrentPage(1);  // Volver a la primera página
-      await fetchCompras();  // Recargar compras
+      setCurrentPage(1);
+      await fetchCompras();
 
       toast.success(`Compra creada exitosamente. Total: ${formatPrice(total)}`);
 
-      // Volver a la lista
       goToBackToList();
 
     } catch (err) {
@@ -522,9 +492,8 @@ export const Compras = () => {
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Compras</h1>
 
         {viewMode === "list" && (
-          // 🔥 AQUÍ VA LA SEGUNDA PARTE: Pasar los datos paginados al componente
           <ComprasList
-            paginatedData={paginatedData}  // ← Usar paginatedData en lugar de filtrar localmente
+            paginatedData={paginatedData}
             filtroText={filtroValor}
             setFiltroText={setFiltroValor}
             filtroCampo={filtroCampo}
@@ -565,12 +534,14 @@ export const Compras = () => {
         {viewMode === "view" && selectedCompra && (
           <ComprasView
             selectedCompra={selectedCompra}
-            productos={productos}
-            proveedores={proveedores}
+            productos={productos || []}
+            colores={colores || []}  // ✅ IMPORTANTE: Pasar colores
+            proveedores={proveedores || []}
             onBack={goToBackToList}
             getProveedorDisplay={getProveedorDisplay}
             onActualizarEstado={handleActualizarEstado}
             puedeCambiarEstado={puedeCambiarEstado}
+            userRole="admin"
           />
         )}
 

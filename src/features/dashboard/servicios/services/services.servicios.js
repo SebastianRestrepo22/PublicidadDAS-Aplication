@@ -17,7 +17,7 @@ export const GetDataservicios = async (soloActivos = false, page = 1, limit = 10
       params.filtroValor = filtroValor;
     }
     
-    const response = await axios.get(`${url}servicio`, { params });
+    const response = await axios.get(`${'http://localhost:3000/'}servicio`, { params });
     
     const responseData = response.data;
     const data = responseData?.data && Array.isArray(responseData.data) ? responseData.data : [];
@@ -43,7 +43,7 @@ export const GetDataservicios = async (soloActivos = false, page = 1, limit = 10
 
 export const postDataservicios = async (data) => {
     try {
-        const response = await axios.post(url + 'servicio', data)
+        const response = await axios.post('http://localhost:3000/' + 'servicio', data)
         return response
     } catch (error) {
         console.error("Error en postDataservicios:", error)
@@ -53,7 +53,7 @@ export const postDataservicios = async (data) => {
 
 export const updateDataservicios = async (id, data) => {
     try {
-        const response = await axios.put(url + `servicio/${id}`, data);
+        const response = await axios.put('http://localhost:3000/' + `servicio/${id}`, data);
         return response;
     } catch (error) {
         console.error("Error en updateDataservicios:", error)
@@ -63,7 +63,7 @@ export const updateDataservicios = async (id, data) => {
 
 export const deleteDataservicio = async (id) => {
     try {
-        const response = await axios.delete(url + `servicio/${id}`);
+        const response = await axios.delete('http://localhost:3000/' + `servicio/${id}`);
         return response;  // Retornar response completo, no solo data
     } catch (error) {
         console.error("Error en deleteDataservicio:", error);
@@ -73,7 +73,7 @@ export const deleteDataservicio = async (id) => {
 }
 export const cambiarEstadoServicio = async (id, nuevoEstado) => {
     try {
-        const response = await axios.patch(url + `servicio/${id}/estado`, { Estado: nuevoEstado });
+        const response = await axios.patch('http://localhost:3000/' + `servicio/${id}/estado`, { Estado: nuevoEstado });
         return response;
     } catch (error) {
         console.error("Error en cambiarEstadoServicio:", error)
@@ -92,7 +92,7 @@ export const buscarservicios = async (campo, valor, page = 1, limit = 10, estado
     
     if (estado) params.estado = estado;
     
-    const response = await axios.get(`${url}servicio/buscar`, { params });
+    const response = await axios.get(`${'http://localhost:3000/'}servicio/buscar`, { params });
     
     const responseData = response.data;
     const data = responseData?.data && Array.isArray(responseData.data) ? responseData.data : [];

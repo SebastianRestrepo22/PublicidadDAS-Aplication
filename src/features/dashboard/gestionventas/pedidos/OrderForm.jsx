@@ -110,9 +110,7 @@ export const OrderForm = ({
         Precio: producto.Precio || 0,
         Descripcion: producto.Descripcion || "",
         UrlImagen: producto.Imagen || "",
-        UrlImagenPersonalizada: null,
         ColorId: nuevos[currentDetailIndex].ColorId || null,
-        Tamaño: null,
         Stock: producto.Stock
       };
       setDetallesCrear(nuevos);
@@ -120,7 +118,7 @@ export const OrderForm = ({
     setModalProductosAbierto(false);
   };
 
-  // Handlers para servicios
+  // Handlers para servicios (AHORA SIN TAMAÑO NI ARCHIVOS)
   const abrirModalServicios = (index) => {
     setCurrentDetailIndex(index);
     setSearchTermServicios("");
@@ -139,97 +137,26 @@ export const OrderForm = ({
         Precio: servicio.Precio || 0,
         Descripcion: servicio.Descripcion || "",
         UrlImagen: servicio.Imagen || "",
-        UrlImagenPersonalizada: null,
-        RequiereImagen: servicio.RequiereImagen === 1 || servicio.RequiereImagen === true,
-        Tamaño: "Mediana",
-        ColorId: null
+        // 🔴 ELIMINADO: Tamaño y RequiereImagen ya no se usan
+        ColorId: null // Los servicios no tienen color
       };
       setDetallesCrear(nuevos);
     }
     setModalServiciosAbierto(false);
   };
 
-  // 🔴 NUEVO HANDLER PARA SUBIR ARCHIVOS (IMÁGENES, PDF, WORD, EXCEL, ETC.)
-  const handleUploadArchivo = (index, file) => {
-    console.log('📎 [UPLOAD] Iniciando subida de archivo:', {
-      index,
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type
-    });
+  // 🔴 ELIMINADO COMPLETAMENTE: handleUploadArchivo, handleEliminarArchivo
+  // Ya no se necesitan porque los servicios ya no requieren archivos adjuntos
 
-    // Validar tamaño (máx 10MB para cualquier archivo)
-    if (file && file.size > 10 * 1024 * 1024) {
-      toast.error('El archivo debe ser menor a 10MB');
-      return;
-    }
-
-    // Validar tipos permitidos
-    const tiposPermitidos = [
-      'image/', // Todas las imágenes
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-      'text/plain' // .txt
-    ];
-
-    const tipoPermitido = tiposPermitidos.some(tipo => file.type.startsWith(tipo));
-    if (!tipoPermitido) {
-      toast.error('Tipo de archivo no permitido. Solo imágenes, PDF, Word, Excel o TXT');
-      return;
-    }
-
-    const archivoUrl = URL.createObjectURL(file);
-    console.log('📎 [UPLOAD] URL creada:', archivoUrl);
-    
-    const nuevos = [...detallesCrear];
-    nuevos[index] = {
-      ...nuevos[index],
-      UrlImagenPersonalizada: archivoUrl,
-      ArchivoPersonalizadoFile: file,
-      nombreArchivo: file.name,
-      tipoArchivo: file.type,
-      tamañoArchivo: file.size
-    };
-    
-    console.log('📎 [UPLOAD] Estado actualizado:', {
-      index,
-      tieneArchivo: !!nuevos[index].UrlImagenPersonalizada,
-      nombre: file.name,
-      tipo: file.type
-    });
-    
-    setDetallesCrear(nuevos);
-  };
-
-  // 🔴 NUEVO HANDLER PARA ELIMINAR ARCHIVO
-  const handleEliminarArchivo = (index) => {
-    if (detallesCrear[index].UrlImagenPersonalizada?.startsWith('blob:')) {
-      URL.revokeObjectURL(detallesCrear[index].UrlImagenPersonalizada);
-    }
-    
-    const nuevos = [...detallesCrear];
-    nuevos[index] = {
-      ...nuevos[index],
-      UrlImagenPersonalizada: null,
-      ArchivoPersonalizadoFile: null,
-      nombreArchivo: null,
-      tipoArchivo: null,
-      tamañoArchivo: null
-    };
-    setDetallesCrear(nuevos);
-    
-    toast.success('Archivo eliminado');
-  };
-
-  // Handlers para colores
+  // Handlers para colores (solo para productos)
   const abrirModalColores = (index) => {
-    setCurrentDetailIndex(index);
-    setSearchTermColores("");
-    setCurrentPageColores(1);
-    setModalColoresAbierto(true);
+    // Solo abrir si es producto
+    if (detallesCrear[index].tipo === 'producto') {
+      setCurrentDetailIndex(index);
+      setSearchTermColores("");
+      setCurrentPageColores(1);
+      setModalColoresAbierto(true);
+    }
   };
 
   const seleccionarColor = (color) => {
@@ -243,11 +170,6 @@ export const OrderForm = ({
 
   // Handlers para detalles
   const cambiarTipoDetalle = (index, nuevoTipo) => {
-    // Limpiar URL del objeto si existe
-    if (detallesCrear[index].UrlImagenPersonalizada?.startsWith('blob:')) {
-      URL.revokeObjectURL(detallesCrear[index].UrlImagenPersonalizada);
-    }
-    
     const nuevos = [...detallesCrear];
     
     if (nuevoTipo === 'producto') {
@@ -256,16 +178,10 @@ export const OrderForm = ({
         tipo: 'producto',
         ProductoId: null,
         ServicioId: null,
-        Tamaño: null,
         ColorId: null,
         Precio: 0,
         UrlImagen: "",
-        UrlImagenPersonalizada: null,
-        ArchivoPersonalizadoFile: null,
-        nombreArchivo: null,
-        tipoArchivo: null,
-        tamañoArchivo: null,
-        RequiereImagen: false
+        Descripcion: ""
       };
       setTimeout(() => abrirModalProductos(index), 100);
     } else {
@@ -274,16 +190,10 @@ export const OrderForm = ({
         tipo: 'servicio',
         ServicioId: null,
         ProductoId: null,
-        ColorId: null,
-        Tamaño: "Mediana",
+        ColorId: null, // Los servicios no tienen color
         Precio: 0,
         UrlImagen: "",
-        UrlImagenPersonalizada: null,
-        ArchivoPersonalizadoFile: null,
-        nombreArchivo: null,
-        tipoArchivo: null,
-        tamañoArchivo: null,
-        RequiereImagen: false
+        Descripcion: ""
       };
       setTimeout(() => abrirModalServicios(index), 100);
     }
@@ -300,15 +210,8 @@ export const OrderForm = ({
         ProductoId: null,
         ServicioId: null,
         Cantidad: 1,
-        Tamaño: null,
         Descripcion: "",
         UrlImagen: "",
-        UrlImagenPersonalizada: null,
-        ArchivoPersonalizadoFile: null,
-        nombreArchivo: null,
-        tipoArchivo: null,
-        tamañoArchivo: null,
-        RequiereImagen: false,
         Precio: 0,
         ColorId: null
       }
@@ -316,11 +219,6 @@ export const OrderForm = ({
   };
 
   const eliminarDetalle = (index) => {
-    // Limpiar URL del objeto si existe
-    if (detallesCrear[index].UrlImagenPersonalizada?.startsWith('blob:')) {
-      URL.revokeObjectURL(detallesCrear[index].UrlImagenPersonalizada);
-    }
-    
     if (detallesCrear.length > 1) {
       setDetallesCrear(prev => prev.filter((_, i) => i !== index));
     } else {
@@ -330,11 +228,6 @@ export const OrderForm = ({
         ProductoId: null,
         ServicioId: null,
         UrlImagen: "",
-        UrlImagenPersonalizada: null,
-        ArchivoPersonalizadoFile: null,
-        nombreArchivo: null,
-        tipoArchivo: null,
-        tamañoArchivo: null,
         Precio: 0,
         ColorId: null
       };
@@ -360,10 +253,6 @@ export const OrderForm = ({
   };
 
   const getItemImagen = (detalle) => {
-    if (detalle.UrlImagenPersonalizada) {
-      return detalle.UrlImagenPersonalizada;
-    }
-    
     if (detalle.ProductoId) {
       const producto = productos.find(p => p.ProductoId === detalle.ProductoId);
       return producto?.Imagen || "";
@@ -644,7 +533,7 @@ export const OrderForm = ({
             <div className="grid grid-cols-12 gap-4 mb-2 px-4 py-2 bg-slate-100 rounded-lg text-xs font-semibold text-slate-600 uppercase">
               <div className="col-span-1">TIPO</div>
               <div className="col-span-3">PRODUCTO/SERVICIO</div>
-              <div className="col-span-2">COLOR/TAMAÑO</div>
+              <div className="col-span-2">COLOR</div>
               <div className="col-span-1 text-center">CANT.</div>
               <div className="col-span-2 text-right">PRECIO UNIT.</div>
               <div className="col-span-2 text-right">SUBTOTAL</div>
@@ -678,8 +567,7 @@ export const OrderForm = ({
                     onAbrirColores={abrirModalColores}
                     onActualizar={actualizarDetalle}
                     onEliminar={eliminarDetalle}
-                    onUploadArchivo={handleUploadArchivo}
-                    onEliminarArchivo={handleEliminarArchivo}
+                    // 🔴 ELIMINADO: onUploadArchivo y onEliminarArchivo
                     puedeEliminar={detallesCrear.length > 1}
                   />
                 );

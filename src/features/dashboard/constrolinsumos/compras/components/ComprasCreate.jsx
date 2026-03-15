@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ArrowLeft, ChevronRight, Package, Palette, Trash2 } from "lucide-react";
 import { ProductoColoresModal } from "../../../productos/components/ProductoColoresModal";
 import { ComprasSelectProveedorSimple } from "../components/ComprasSelectProveedorSimple";
-import { toast } from "react-toastify";  // ← IMPORTANTE: Agregar esta línea
+import { toast } from "react-toastify";
 
 const formatPrice = (value) => {
   const num = Number(value);
@@ -35,25 +35,10 @@ export const ComprasCreate = ({
   calcularTotal
 }) => {
 
-  // 🔥 LOGS PARA DEPURAR
-  console.log("📦 [ComprasCreate] productos recibidos:", productos);
-  console.log("📦 [ComprasCreate] cantidad de productos:", productos?.length);
-  console.log("📦 [ComprasCreate] tipo de productos:", typeof productos);
-  console.log("📦 [ComprasCreate] ¿es array?", Array.isArray(productos));
-
-  if (productos && productos.length > 0) {
-    console.log("📦 [ComprasCreate] primer producto:", productos[0]);
-    console.log("📦 [ComprasCreate] IDs de productos:", productos.map(p => p.ProductoId));
-  }
-
   const [showColorModal, setShowColorModal] = useState(false);
   const [detalleIndexColor, setDetalleIndexColor] = useState(null);
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const [coloresTemp, setColoresTemp] = useState([]);
-
-  useEffect(() => {
-    console.log("Colores recibidos en ComprasCreate:", colores);
-  }, [colores]);
 
   useEffect(() => {
     if (!formCrear.FechaRegistro) {
@@ -62,21 +47,14 @@ export const ComprasCreate = ({
   }, [formCrear.FechaRegistro, setFormCrear]);
 
   const abrirSelectorColor = (index, producto) => {
-    console.log("🔵 abrirSelectorColor llamado con:", { index, producto });
-    console.log("🔵 Colores disponibles en BD:", colores);
-
     if (!producto) {
-      console.warn("⚠️ No hay producto seleccionado");
       toast.warning("Debe seleccionar un producto primero");
       return;
     }
 
-    // Verificar si el producto usa colores
     const usaColores = producto.UsaColores === 1 || producto.UsaColores === true || producto.UsaColores === "1";
-    console.log("🔵 ¿Producto usa colores?", usaColores);
 
     if (!usaColores) {
-      console.warn("⚠️ Este producto no usa colores");
       toast.warning("Este producto no tiene configuración de colores");
       return;
     }
@@ -85,11 +63,8 @@ export const ComprasCreate = ({
     setProductoSeleccionado(producto);
 
     const coloresExistentes = detallesCrear[index]?.colores || [];
-    console.log("🔵 coloresExistentes en detalle:", coloresExistentes);
 
-    // Verificar si hay colores disponibles en la BD
     if (!colores || colores.length === 0) {
-      console.warn("⚠️ No hay colores disponibles en la base de datos");
       toast.warning("No hay colores disponibles");
       return;
     }
@@ -104,26 +79,20 @@ export const ComprasCreate = ({
       };
     });
 
-    console.log("🔵 coloresCompletos a enviar al modal:", coloresCompletos);
     setColoresTemp(coloresCompletos);
     setShowColorModal(true);
-    console.log("🔵 showColorModal cambiado a:", true);
   };
 
   const manejarSetColoresConStock = (nuevosColores) => {
-    console.log("manejarSetColoresConStock recibió:", nuevosColores);
-
     let coloresArray;
 
     if (typeof nuevosColores === 'function') {
-      console.log("Es una función, ejecutando con coloresTemp:", coloresTemp);
       coloresArray = nuevosColores(coloresTemp);
     } else {
       coloresArray = nuevosColores;
     }
 
     if (!Array.isArray(coloresArray)) {
-      console.error("Error: coloresArray no es un array", coloresArray);
       coloresArray = [];
     }
 
@@ -133,8 +102,6 @@ export const ComprasCreate = ({
       Nombre: String(color.Nombre || color.nombre || 'Color'),
       Hex: String(color.Hex || color.hex || '#CCCCCC')
     }));
-
-    console.log("Colores planos:", coloresPlanos);
 
     setColoresTemp(coloresPlanos);
 
@@ -149,8 +116,6 @@ export const ComprasCreate = ({
   };
 
   const guardarColoresDesdeModal = () => {
-    console.log("guardarColoresDesdeModal llamado, coloresTemp actuales:", coloresTemp);
-
     if (detalleIndexColor !== null) {
       const coloresParaGuardar = coloresTemp.map(color => {
         return {
@@ -160,8 +125,6 @@ export const ComprasCreate = ({
           Hex: String(color.Hex || '#CCCCCC')
         };
       });
-
-      console.log("Colores para guardar (objetos planos):", coloresParaGuardar);
 
       const cantidadTotal = coloresParaGuardar.reduce((sum, c) => {
         return sum + (Number(c.Stock) || 0);
@@ -179,7 +142,6 @@ export const ComprasCreate = ({
   };
 
   const cerrarModalSinGuardar = () => {
-    console.log("Cerrando modal sin guardar");
     setShowColorModal(false);
     setDetalleIndexColor(null);
     setProductoSeleccionado(null);
@@ -187,9 +149,6 @@ export const ComprasCreate = ({
   };
 
   const handleTipoStockChange = (index, tipo) => {
-    console.log("handleTipoStockChange:", { index, tipo });
-
-    // Actualizar el tipo de stock primero
     onActualizarDetalle(index, "tipoStock", tipo);
 
     if (tipo === 'general') {
@@ -199,47 +158,53 @@ export const ComprasCreate = ({
       const tieneColores = detallesCrear[index]?.colores?.length > 0;
 
       if (!tieneColores) {
-        // Obtener el ID del producto del detalle actual
         const productoId = detallesCrear[index]?.ProductoId;
-        console.log("ProductoId del detalle:", productoId);
 
         if (!productoId) {
-          console.error("❌ No hay producto seleccionado para este detalle");
           toast.error("Debe seleccionar un producto primero");
           onActualizarDetalle(index, "tipoStock", "general");
           return;
         }
 
-        // 🔥 VERIFICAR EL ARRAY DE PRODUCTOS
-        console.log("🔍 Array de productos completo:", productos);
-        console.log("🔍 Tipo de productos:", typeof productos);
-        console.log("🔍 ¿es array?", Array.isArray(productos));
-
-        // Buscar el producto en la lista de productos
         const producto = productos?.find(p => p.ProductoId === productoId);
-        console.log("Producto encontrado:", producto);
 
         if (producto) {
-          // Verificar si el producto usa colores
           const usaColores = producto.UsaColores === 1 || producto.UsaColores === true || producto.UsaColores === "1";
 
           if (!usaColores) {
-            console.warn("⚠️ Este producto no usa colores");
             toast.warning("Este producto no tiene configuración de colores");
             onActualizarDetalle(index, "tipoStock", "general");
             return;
           }
 
-          // Abrir el modal de colores
           abrirSelectorColor(index, producto);
         } else {
-          console.error("❌ Producto no encontrado para index:", index);
-          console.error("❌ ID buscado:", productoId);
-          console.error("❌ IDs disponibles:", productos?.map(p => p.ProductoId));
           toast.error("Error: Producto no encontrado en la lista");
           onActualizarDetalle(index, "tipoStock", "general");
         }
       }
+    }
+  };
+
+  // ✅ Función para manejar cambios en cantidad: permite editar, bloquea negativos y cero
+  const handleCantidadChange = (index, value) => {
+    // Permitir vacío mientras el usuario escribe
+    if (value === '') {
+      onActualizarDetalle(index, "Cantidad", '');
+      return;
+    }
+    // Solo permitir números positivos
+    const num = Number(value);
+    if (num > 0) {
+      onActualizarDetalle(index, "Cantidad", value);
+    }
+  };
+
+  // ✅ Validar al perder el foco: si está vacío o es inválido, restaurar a 1
+  const handleCantidadBlur = (index, value) => {
+    const num = Number(value);
+    if (!value || isNaN(num) || num <= 0) {
+      onActualizarDetalle(index, "Cantidad", 1);
     }
   };
 
@@ -268,7 +233,7 @@ export const ComprasCreate = ({
 
         {/* Información General */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {/* PROVEEDOR CON SELECT SIMPLE */}
+          {/* PROVEEDOR CON SELECT SIMPLE - Solo muestra nombre, no ID */}
           <div className="flex flex-col gap-1">
             <label className="font-medium text-sm">Proveedor *</label>
             <ComprasSelectProveedorSimple
@@ -278,7 +243,7 @@ export const ComprasCreate = ({
                 setFormCrear(prev => ({
                   ...prev,
                   ProveedorId: proveedor?.ProveedorId || "",
-                  nombreProveedor: proveedor?.NombreProveedor || ""
+                  nombreProveedor: proveedor?.NombreProveedor || "" // ✅ Solo guardamos el nombre para mostrar
                 }));
               }}
               error={errores.some(e => e.toLowerCase().includes('proveedor'))}
@@ -335,7 +300,6 @@ export const ComprasCreate = ({
 
           <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
             {detallesCrear.map((d, index) => {
-              // 🔥 IMPORTANTE: Obtener el producto aquí para usarlo en toda la fila
               const producto = productos.find(p => p.ProductoId === d.ProductoId);
               const tieneProducto = !!d.ProductoId;
               const usaColores = producto?.UsaColores === 1 || producto?.UsaColores === true || producto?.UsaColores === "1";
@@ -346,7 +310,7 @@ export const ComprasCreate = ({
                 <div key={index} className="bg-gray-50 border rounded-lg p-4">
                   {/* Fila principal */}
                   <div className="grid grid-cols-12 gap-3 items-start">
-                    {/* Producto */}
+                    {/* Producto - ✅ Muestra solo el nombre, no el ID */}
                     <div className="col-span-4">
                       <button
                         type="button"
@@ -363,7 +327,7 @@ export const ComprasCreate = ({
                         <div className="flex-1 min-w-0">
                           <p className={`font-medium text-xs truncate ${tieneProducto ? 'text-emerald-800' : 'text-gray-500'
                             }`}>
-                            {producto?.Nombre || "Seleccionar producto"}
+                            {producto?.Nombre || "Seleccionar producto"} {/* ✅ Solo nombre */}
                           </p>
                           {producto?.SKU && (
                             <p className="text-[10px] text-gray-500 truncate">SKU: {producto.SKU}</p>
@@ -391,17 +355,17 @@ export const ComprasCreate = ({
                       )}
                     </div>
 
-                    {/* Cantidad */}
+                    {/* Cantidad - ✅ Permite editar libremente, bloquea negativos y cero */}
                     <div className="col-span-2">
                       {tieneProducto ? (
                         tipoStock === 'general' ? (
                           <input
                             type="number"
-                            value={d.Cantidad || 1}
-                            onChange={(e) => onActualizarDetalle(index, "Cantidad", e.target.value)}
+                            value={d.Cantidad ?? 1}
+                            onChange={(e) => handleCantidadChange(index, e.target.value)}
+                            onBlur={(e) => handleCantidadBlur(index, e.target.value)}
                             className="w-full h-10 px-2 border rounded-lg text-xs text-center"
-                            min="1"
-                            placeholder="0"
+                            placeholder="1"
                           />
                         ) : (
                           <input
@@ -479,14 +443,10 @@ export const ComprasCreate = ({
                           <button
                             type="button"
                             onClick={() => {
-                              console.log("Botón Seleccionar colores clickeado - Index:", index);
-                              console.log("Producto en este índice:", producto);
                               if (producto) {
                                 abrirSelectorColor(index, producto);
                               } else {
-                                console.error("❌ Producto es undefined");
                                 toast.error("Debe seleccionar un producto primero");
-                                // Cambiar a general si no hay producto
                                 onActualizarDetalle(index, "tipoStock", "general");
                               }
                             }}

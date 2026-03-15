@@ -2,13 +2,14 @@ import axios from "axios";
 
 const url = 'http://localhost:3000/api/';
 
-// Listar todas las categorías (sin paginación - para compatibilidad)
 export const getAllCategorias = async () => {
   try {
-    const response = await axios.get('http://localhost:3000/api/' + "categorias/all");
-    return response;
+    //  Cambiar "all" por "todas" para coincidir con el backend
+    const response = await axios.get('http://localhost:3000/api/categorias/todas');
+    return response.data;  //  Devolver solo los datos, no el response completo
   } catch (error) {
-    return { status: false, message: "No está la API de categorías", error };
+    console.error("Error en getAllCategorias:", error);
+    return [];  //  Devolver array vacío para no romper el frontend
   }
 };
 
@@ -56,32 +57,22 @@ export const getCategoriaById = async (id) => {
   }
 };
 
-// Crear una nueva categoría
+// ✅ Crear categoría - CORREGIDO
 export const createCategoria = async (data) => {
-  try {
-    const response = await axios.post('http://localhost:3000/api/' + "categorias", data);
-    return response;
-  } catch (error) {
-    return { status: false, message: "No se puede crear la categoría", error };
-  }
+  const response = await axios.post(`${'http://localhost:3000/api/'}categorias`, data);
+  return response; // Devuelve response de axios (con .status)
+  // Si hay error, axios lo lanza automáticamente → el hook lo captura en catch
 };
 
-// Actualizar categoría
+
+// ✅ Actualizar categoría - CORREGIDO  
 export const updateCategoria = async (id, data) => {
-  try {
-    const response = await axios.put(`${'http://localhost:3000/api/'}categorias/${id}`, data);
-    return response;
-  } catch (error) {
-    return { status: false, message: "No se puede actualizar la categoría", error };
-  }
+  const response = await axios.put(`${'http://localhost:3000/api/'}categorias/${id}`, data);
+  return response;
 };
 
-// Eliminar categoría
+// ✅ Eliminar categoría - CORREGIDO
 export const deleteCategoria = async (id) => {
-  try {
-    const response = await axios.delete(`${'http://localhost:3000/api/'}categorias/${id}`);
-    return response;
-  } catch (error) {
-    return { status: false, message: "No se puede eliminar la categoría", error };
-  }
+  const response = await axios.delete(`${'http://localhost:3000/api/'}categorias/${id}`);
+  return response;
 };

@@ -6,30 +6,30 @@ import {
   deleteCompra,
   updateCompra,
   updateCompraEstado,
-  // 🔥 Nuevas funciones importadas
   getComprasPaginated,
-  buscarCompras
+  buscarCompras,
+  anularComprasExpiradas
 } from '../controllers/compras.controller.js';
 
 const router = express.Router();
 
-// 🔥 Ruta principal con paginación (GET /api/compras)
+//  Ruta principal con paginación
 router.get('/', getComprasPaginated);
 
-// 🔥 Ruta de búsqueda con paginación (GET /api/compras/buscar)
+//  Ruta de búsqueda con paginación
 router.get('/buscar', buscarCompras);
 
-// 📌 Ruta para obtener TODAS las compras (sin paginación) - para compatibilidad
+//  Ruta para obtener TODAS las compras (sin paginación) - compatibilidad
 router.get('/todas', getAllCompras);
 
-// Rutas CRUD (específicas después de las rutas con parámetros)
+//  Rutas CRUD estándar
 router.get('/:id', getCompraById);
 router.post('/', createCompra);
 router.put('/:id', updateCompra);
 router.delete('/:id', deleteCompra);
 router.patch('/:id/estado', updateCompraEstado);
 
-// Ruta para anulación automática
+// 🔥 Ruta para anulación automática de compras expiradas
 router.post('/auto-cancelar', async (req, res) => {
   try {
     const resultado = await anularComprasExpiradas();
@@ -39,7 +39,10 @@ router.post('/auto-cancelar', async (req, res) => {
     });
   } catch (error) {
     console.error('Error en anulación automática:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: 'Error interno del servidor', 
+      details: error.message 
+    });
   }
 });
 

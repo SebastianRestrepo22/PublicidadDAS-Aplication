@@ -3,14 +3,69 @@ import axios from "axios";
 const API_BASE = 'http://localhost:3000';
 
 /**
- * Obtiene todos los pedidos de clientes con sus detalles
+ * Obtiene todos los pedidos de clientes con paginación
  */
-export const getAllPedidosClientes = async () => {
+export const getAllPedidosClientes = async (page = 1, limit = 10, filtroCampo = '', filtroValor = '', tipoPago = '') => {
   try {
-    const response = await axios.get(`${API_BASE}/api/pedidos-clientes`);
-    return Array.isArray(response.data) ? response.data : [];
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('limit', limit);
+    
+    if (filtroCampo && filtroValor) {
+      params.append('filtroCampo', filtroCampo);
+      params.append('filtroValor', filtroValor);
+    }
+    
+    if (tipoPago) {
+      params.append('tipoPago', tipoPago);
+    }
+    
+    const response = await axios.get(`${API_BASE}/api/pedidos-clientes?${params.toString()}`);
+    
+    // La respuesta ahora tiene estructura { data, pagination }
+    return {
+      data: Array.isArray(response.data.data) ? response.data.data : [],
+      pagination: response.data.pagination || {
+        totalItems: 0,
+        totalPages: 1,
+        currentPage: 1,
+        itemsPerPage: limit
+      }
+    };
   } catch (error) {
     console.error("Error al obtener pedidos:", error);
+    throw error;
+  }
+};
+
+/**
+ * Buscar pedidos con paginación
+ */
+export const buscarPedidos = async (campo, valor, page = 1, limit = 10, tipoPago = '') => {
+  try {
+    const params = new URLSearchParams();
+    params.append('campo', campo);
+    params.append('valor', valor);
+    params.append('page', page);
+    params.append('limit', limit);
+    
+    if (tipoPago) {
+      params.append('tipoPago', tipoPago);
+    }
+    
+    const response = await axios.get(`${API_BASE}/api/pedidos-clientes/buscar?${params.toString()}`);
+    
+    return {
+      data: Array.isArray(response.data.data) ? response.data.data : [],
+      pagination: response.data.pagination || {
+        totalItems: 0,
+        totalPages: 1,
+        currentPage: 1,
+        itemsPerPage: limit
+      }
+    };
+  } catch (error) {
+    console.error("Error al buscar pedidos:", error);
     throw error;
   }
 };
@@ -29,14 +84,18 @@ export const getPedidoById = async (id) => {
 };
 
 /**
- * Crea un nuevo pedido - FUNCIÓN SIMPLIFICADA
+ * Crea un nuevo pedido - Versión simplificada (sin tamaño ni archivos para servicios)
  */
 export const createPedidoCliente = async (pedidoData) => {
   try {
     console.log('📤 Enviando pedido al backend...');
     console.log('📦 Datos estructurados:', JSON.stringify(pedidoData, null, 2));
     
-    const response = await axios.post(`${API_BASE}/api/pedidos-clientes`, pedidoData);
+    const response = await axios.post(`${API_BASE}/api/pedidos-clientes`, pedidoData, {
+      headers: { 
+        'Content-Type': 'multipart/form-data' 
+      }
+    });
     
     console.log('✅ Respuesta del backend:', response.data);
     return response.data;
@@ -65,10 +124,33 @@ export const createPedidoCliente = async (pedidoData) => {
  */
 export const updatePedidoCliente = async (id, pedidoData) => {
   try {
-    const response = await axios.put(`${API_BASE}/api/pedidos-clientes/${id}`, pedidoData);
+    // Determinar si es FormData o JSON
+    const isFormData = pedidoData instanceof FormData;
+    
+    const response = await axios.put(`${API_BASE}/api/pedidos-clientes/${id}`, pedidoData, {
+      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {}
+    });
     return response.data;
   } catch (error) {
     console.error("Error al actualizar pedido:", error);
+    throw error;
+  }
+};
+
+/**
+ * Cambiar estado de un pedido
+ */
+export const cambiarEstadoPedido = async (id, estado, motivo = '') => {
+  try {
+    const payload = { Estado: estado };
+    if (estado === 'cancelado' && motivo) {
+      payload.motivo = motivo;
+    }
+    
+    const response = await axios.put(`${API_BASE}/api/pedidos-clientes/${id}`, payload);
+    return response.data;
+  } catch (error) {
+    console.error("Error al cambiar estado:", error);
     throw error;
   }
 };
@@ -87,7 +169,7 @@ export const deletePedidoCliente = async (id) => {
 };
 
 /**
- * Obtiene los detalles de un pedido por su ID
+ * Obtiene los detalles de un pedido por su ID (VERSIÓN SIMPLIFICADA)
  */
 export const getDetallesByPedidoId = async (pedidoId) => {
   try {
@@ -95,74 +177,32 @@ export const getDetallesByPedidoId = async (pedidoId) => {
     
     const response = await axios.get(`${API_BASE}/api/detalle-pedido/${pedidoId}`);
     
-    console.log(`📬 [FRONT-SERVICE] Respuesta COMPLETA:`, {
+    console.log(`📬 [FRONT-SERVICE] Respuesta:`, {
       status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-      data: response.data,
-      dataType: typeof response.data,
-      isArray: Array.isArray(response.data),
       dataLength: Array.isArray(response.data) ? response.data.length : 'N/A'
     });
     
-    // 🔴 DEPURACIÓN DETALLADA del primer detalle
-    if (Array.isArray(response.data) && response.data.length > 0) {
-      console.log('📋 [FRONT-SERVICE] Primer detalle analizado:');
-      const primerDetalle = response.data[0];
-      console.log('   - Keys:', Object.keys(primerDetalle));
-      console.log('   - Valores:', {
-        DetallePedidoClienteId: primerDetalle.DetallePedidoClienteId,
-        ProductoId: primerDetalle.ProductoId,
-        ColorId: primerDetalle.ColorId,
-        Cantidad: primerDetalle.Cantidad,
-        Precio: primerDetalle.Precio,
-        Descripcion: primerDetalle.Descripcion,
-        UrlImagen: primerDetalle.UrlImagen
-      });
-      
-      // 🔴 VERIFICAR TIPOS DE DATOS
-      console.log('   - Tipos:', {
-        DetallePedidoClienteId: typeof primerDetalle.DetallePedidoClienteId,
-        ProductoId: typeof primerDetalle.ProductoId,
-        ColorId: typeof primerDetalle.ColorId,
-        Cantidad: typeof primerDetalle.Cantidad,
-        Precio: typeof primerDetalle.Precio
-      });
-    }
-    
-    // 🔴 RETORNAR SIEMPRE UN ARRAY
     if (!response.data) {
-      console.warn(`⚠️ [FRONT-SERVICE] Respuesta vacía`);
       return [];
     }
     
     if (Array.isArray(response.data)) {
-      console.log(`✅ [FRONT-SERVICE] Retornando ${response.data.length} detalles`);
+      // 🔴 ELIMINADO: Ya no procesamos UrlImagenPersonalizada ni Tamaño
       return response.data;
     }
     
-    // Si es un objeto, convertirlo a array
     if (typeof response.data === 'object' && response.data !== null) {
-      console.log(`🔄 [FRONT-SERVICE] Convirtiendo objeto a array`);
       return [response.data];
     }
     
-    console.warn(`⚠️ [FRONT-SERVICE] Tipo de dato inesperado: ${typeof response.data}`);
     return [];
     
   } catch (error) {
-    console.error(`❌ [FRONT-SERVICE] Error crítico:`, error);
-    
-    if (error.response) {
-      console.error(`📊 Status: ${error.response.status}`);
-      console.error(`📋 Data:`, error.response.data);
-      console.error(`🔗 URL: ${error.config?.url}`);
-      console.error(`📝 Método: ${error.config?.method}`);
-    }
-    
+    console.error(`❌ [FRONT-SERVICE] Error:`, error);
     return [];
   }
 };
+
 /**
  * Obtiene productos
  */
@@ -203,7 +243,7 @@ export const getAllColores = async () => {
 };
 
 /**
- * Subir archivo de voucher - FUNCIÓN NUEVA
+ * Subir archivo de voucher
  */
 export const uploadVoucher = async (file) => {
   try {
@@ -223,13 +263,36 @@ export const uploadVoucher = async (file) => {
   }
 };
 
+/**
+ * Obtiene todos los clientes
+ */
 export const getAllClientes = async () => {
   try {
-    // Usar la misma ruta que en ClientSelector
-    const response = await axios.get('http://localhost:3000/client');
+    const response = await axios.get(`${API_BASE}/client`);
     return response.data;
   } catch (error) {
     console.error('Error fetching clientes:', error);
     return [];
   }
+};
+
+/**
+ * Obtener pedidos por método de pago (utilidad)
+ */
+export const getPedidosByMetodoPago = async (metodoPago, page = 1, limit = 10) => {
+  return getAllPedidosClientes(page, limit, 'MetodoPago', metodoPago);
+};
+
+/**
+ * Obtener pedidos pendientes de contra entrega
+ */
+export const getPedidosContraEntregaPendientes = async (page = 1, limit = 10) => {
+  return getAllPedidosClientes(page, limit, 'Estado', 'pendiente', 'contra_entrega');
+};
+
+/**
+ * Obtener pedidos de transferencia aprobados
+ */
+export const getPedidosTransferenciaAprobados = async (page = 1, limit = 10) => {
+  return getAllPedidosClientes(page, limit, 'Estado', 'aprobado', 'transferencia');
 };

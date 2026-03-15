@@ -120,43 +120,65 @@ export const PedidosClientes = () => {
     }
   }, [detallesCrear, viewMode]);
 
-  // Cargar pedidos
-  const fetchPedidos = async () => {
-    try {
-      const base = await getAllPedidosClientes();
-      if (!Array.isArray(base)) {
-        setPedidos([]);
-        return;
-      }
 
-      const conDetalles = await Promise.all(
-        base.map(async (p) => {
-          try {
-            const det = await getDetallesByPedidoId(p.PedidoClienteId);
-            return {
-              ...p,
-              detalle: Array.isArray(det)
-                ? det.map(item => ({
+
+const fetchPedidos = async (page = currentPage) => {
+  try {
+    setLoading(true);
+    
+    // Construir parámetros de consulta
+    const params = new URLSearchParams({
+      page: page,
+      limit: itemsPerPage
+    });
+    
+    if (filtroCampo && filtroText) {
+      params.append('filtroCampo', filtroCampo);
+      params.append('filtroValor', filtroText);
+    }
+    
+    // Llamar al API con paginación
+    const response = await axios.get(`http://localhost:3000/api/pedidos-clientes?${params.toString()}`);
+    
+    const { data, pagination } = response.data;
+    
+    // Obtener detalles para cada pedido
+    const conDetalles = await Promise.all(
+      data.map(async (p) => {
+        try {
+          const det = await getDetallesByPedidoId(p.PedidoClienteId);
+          return {
+            ...p,
+            detalle: Array.isArray(det)
+              ? det.map(item => ({
                   ...item,
                   _tempId: item.DetallePedidoClienteId || generateTempId()
                 }))
-                : []
-            };
-          } catch {
-            return { ...p, detalle: [] };
-          }
-        })
-      );
-      setPedidos(conDetalles);
-    } catch (err) {
-      console.error("Error cargando pedidos:", err);
-      toast.error("Error al cargar pedidos");
-    }
-  };
+              : []
+          };
+        } catch {
+          return { ...p, detalle: [] };
+        }
+      })
+    );
+    
+    setPaginatedData(conDetalles);
+    setTotalItems(pagination.totalItems);
+    setTotalPages(pagination.totalPages);
+    setCurrentPage(pagination.currentPage);
+    
+  } catch (err) {
+    console.error("Error cargando pedidos:", err);
+    toast.error("Error al cargar pedidos");
+  } finally {
+    setLoading(false);
+  }
+};
 
-  useEffect(() => {
-    fetchPedidos();
-  }, []);
+// Modificar useEffect para usar fetchPedidos
+useEffect(() => {
+  fetchPedidos(currentPage);
+}, [currentPage, itemsPerPage, filtroCampo, filtroText]);
 
   // Filtrado
   useEffect(() => {
