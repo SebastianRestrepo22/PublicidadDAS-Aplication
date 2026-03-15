@@ -34,22 +34,21 @@ router.get('/dashboard/stats', async (req, res) => {
         COUNT(*) as pedidos
       FROM pedidosclientes
       WHERE FechaRegistro >= DATE_SUB(NOW(), INTERVAL 6 WEEK)
-        AND Estado IN ('aprobado', 'entregado')
+        AND Estado IN ('aprobado', 'entregado', 'finalizado')
       GROUP BY WEEK(FechaRegistro)
       ORDER BY MIN(FechaRegistro) ASC
     `);
 
-    // 4. Usuarios activos para el gráfico de pastel
-    const [usuariosData] = await pool.query(`
+    // 4. COMPRAS SEMANALES (reemplaza a usuarios activos)
+    const [comprasSemanales] = await pool.query(`
       SELECT 
-        COUNT(DISTINCT CASE WHEN FechaRegistro >= DATE_SUB(NOW(), INTERVAL 1 MONTH) 
-          THEN ClienteId END) as nuevos,
-        COUNT(DISTINCT CASE WHEN FechaRegistro >= DATE_SUB(NOW(), INTERVAL 3 MONTH) 
-          AND FechaRegistro < DATE_SUB(NOW(), INTERVAL 1 MONTH)
-          THEN ClienteId END) as activos,
-        COUNT(DISTINCT CASE WHEN FechaRegistro < DATE_SUB(NOW(), INTERVAL 3 MONTH) 
-          THEN ClienteId END) as inactivos
+        CONCAT('S', WEEK(FechaRegistro)) as semana,
+        COUNT(*) as compras
       FROM pedidosclientes
+      WHERE FechaRegistro >= DATE_SUB(NOW(), INTERVAL 6 WEEK)
+        AND Estado IN ('aprobado', 'entregado', 'finalizado')
+      GROUP BY WEEK(FechaRegistro)
+      ORDER BY MIN(FechaRegistro) ASC
     `);
 
     // 5. Totales para tarjetas
@@ -60,9 +59,10 @@ router.get('/dashboard/stats', async (req, res) => {
          AND Estado = 'pagado') as ventas_totales,
         (SELECT COUNT(*) FROM pedidosclientes 
          WHERE FechaRegistro >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
-         AND Estado IN ('aprobado', 'entregado')) as pedidos,
-        (SELECT COUNT(DISTINCT ClienteId) FROM pedidosclientes 
-         WHERE FechaRegistro >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) as usuarios_activos
+         AND Estado IN ('aprobado', 'entregado', 'finalizado')) as pedidos,
+        (SELECT COUNT(*) FROM pedidosclientes 
+         WHERE FechaRegistro >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
+         AND Estado IN ('aprobado', 'entregado', 'finalizado')) as compras_semanales
     `);
 
     // 6. Calcular variaciones
@@ -77,16 +77,18 @@ router.get('/dashboard/stats', async (req, res) => {
          AND Estado = 'pagado') as mes_anterior_ventas,
         (SELECT COUNT(*) FROM pedidosclientes 
          WHERE FechaRegistro >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
-         AND Estado IN ('aprobado', 'entregado')) as mes_actual_pedidos,
+         AND Estado IN ('aprobado', 'entregado', 'finalizado')) as mes_actual_pedidos,
         (SELECT COUNT(*) FROM pedidosclientes 
          WHERE FechaRegistro >= DATE_SUB(NOW(), INTERVAL 2 MONTH)
          AND FechaRegistro < DATE_SUB(NOW(), INTERVAL 1 MONTH)
-         AND Estado IN ('aprobado', 'entregado')) as mes_anterior_pedidos,
-        (SELECT COUNT(DISTINCT ClienteId) FROM pedidosclientes 
-         WHERE FechaRegistro >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) as usuarios_actual,
-        (SELECT COUNT(DISTINCT ClienteId) FROM pedidosclientes 
-         WHERE FechaRegistro >= DATE_SUB(NOW(), INTERVAL 2 MONTH)
-         AND FechaRegistro < DATE_SUB(NOW(), INTERVAL 1 MONTH)) as usuarios_anterior
+         AND Estado IN ('aprobado', 'entregado', 'finalizado')) as mes_anterior_pedidos,
+        (SELECT COUNT(*) FROM pedidosclientes 
+         WHERE FechaRegistro >= DATE_SUB(NOW(), INTERVAL 1 WEEK)
+         AND Estado IN ('aprobado', 'entregado', 'finalizado')) as semana_actual_compras,
+        (SELECT COUNT(*) FROM pedidosclientes 
+         WHERE FechaRegistro >= DATE_SUB(NOW(), INTERVAL 2 WEEK)
+         AND FechaRegistro < DATE_SUB(NOW(), INTERVAL 1 WEEK)
+         AND Estado IN ('aprobado', 'entregado', 'finalizado')) as semana_anterior_compras
     `);
 
     // ➕ 7. NUEVO: Top productos/servicios - Últimos 6 meses (para gráfico mensual)
@@ -132,14 +134,20 @@ router.get('/dashboard/stats', async (req, res) => {
       ? ((variaciones[0].mes_actual_pedidos - variaciones[0].mes_anterior_pedidos) / variaciones[0].mes_anterior_pedidos * 100).toFixed(1)
       : 100;
 
-    const variacionUsuarios = variaciones[0].usuarios_anterior > 0
-      ? ((variaciones[0].usuarios_actual - variaciones[0].usuarios_anterior) / variaciones[0].usuarios_anterior * 100).toFixed(1)
-      : 100;
+    // Calcular promedio de compras semanales
+    const comprasPromedio = comprasSemanales.length > 0
+      ? (comprasSemanales.reduce((sum, item) => sum + item.compras, 0) / comprasSemanales.length).toFixed(0)
+      : 0;
 
-    // Calcular crecimiento total
+    // Calcular crecimiento (basado en ventas)
     const crecimiento = ((variaciones[0].mes_actual_ventas - variaciones[0].mes_anterior_ventas) / variaciones[0].mes_anterior_ventas * 100).toFixed(1);
 
-    // ➕ Estructurar la respuesta COMPLETA con los nuevos campos
+    // Calcular variación de compras semanales
+    const variacionCompras = variaciones[0].semana_anterior_compras > 0
+      ? ((variaciones[0].semana_actual_compras - variaciones[0].semana_anterior_compras) / variaciones[0].semana_anterior_compras * 100).toFixed(1)
+      : 0;
+
+    // Estructurar la respuesta COMPLETA
     const dashboardData = {
       ventasMensuales: ventasMensuales.map(item => ({
         mes: item.mes,
@@ -153,34 +161,19 @@ router.get('/dashboard/stats', async (req, res) => {
         semana: item.semana,
         pedidos: Number(item.pedidos)
       })),
-      usuariosActivos: [
-        { 
-          name: "Nuevos", 
-          value: Number(usuariosData[0]?.nuevos || 0), 
-          color: "#3b82f6" 
-        },
-        { 
-          name: "Activos", 
-          value: Number(usuariosData[0]?.activos || 0), 
-          color: "#10b981" 
-        },
-        { 
-          name: "Inactivos", 
-          value: Number(usuariosData[0]?.inactivos || 0), 
-          color: "#f59e0b" 
-        }
-      ],
+      comprasSemanales: comprasSemanales.map(item => ({
+        semana: item.semana,
+        compras: Number(item.compras)
+      })),
       totales: {
         ventasTotales: Number(totales[0]?.ventas_totales || 0),
         pedidos: Number(totales[0]?.pedidos || 0),
-        usuariosActivos: Number(totales[0]?.usuarios_activos || 0),
+        comprasSemanales: Number(comprasPromedio || 0),
         crecimiento: Number(crecimiento || 0),
         variacionVentas: Number(variacionVentas || 0),
         variacionPedidos: Number(variacionPedidos || 0),
-        variacionUsuarios: Number(variacionUsuarios || 0),
-        variacionCrecimiento: Number(variacionVentas || 0)
+        variacionCrecimiento: Number(variacionCompras || 0)
       },
-      // ➕ NUEVOS CAMPOS: Top productos/servicios
       topProductosMensuales: topProductosMensuales.map(item => ({
         nombre: item.nombre,
         tipo: item.tipo,
