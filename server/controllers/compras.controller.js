@@ -1,4 +1,3 @@
-// controllers/compras.controller.js
 import { dbPool } from "../lib/db.js";
 
 // 📦 Obtener todas las compras (sin paginación)
@@ -39,13 +38,16 @@ export const createCompra = async (req, res) => {
     
     console.log('📝 Creando compra con datos:', req.body);
     
+    // 🔥 USAR SIEMPRE LA FECHA ACTUAL para evitar anulación inmediata
+    const fechaActual = new Date();
+    
     // 1. Generar UUID primero
     const [uuidResult] = await dbPool.query('SELECT UUID() as uuid');
     const compraId = uuidResult[0].uuid;
     
     console.log('🔑 UUID generado:', compraId);
     
-    // 2. Insertar la compra con el UUID generado
+    // 2. Insertar la compra con el UUID generado y FECHA ACTUAL
     await dbPool.query(
       `INSERT INTO compras 
        (CompraId, ProveedorId, Total, Estado, FechaRegistro) 
@@ -55,7 +57,7 @@ export const createCompra = async (req, res) => {
         ProveedorId, 
         Total || 0, 
         Estado || 'pendiente', 
-        FechaRegistro || new Date()
+        fechaActual // 🔥 Usar fecha actual, no la que viene del frontend
       ]
     );
     
@@ -69,7 +71,7 @@ export const createCompra = async (req, res) => {
         ProveedorId,
         Total: Total || 0,
         Estado: Estado || 'pendiente',
-        FechaRegistro: FechaRegistro || new Date()
+        FechaRegistro: fechaActual
       },
       CompraId: compraId
     });
@@ -242,16 +244,30 @@ export const anularComprasExpiradas = async () => {
     console.log('🕒 Ejecutando anulación automática de compras...');
     console.log(`🕒 Hora actual: ${new Date().toLocaleString()}`);
     
+    // 🔥 SOLO anular compras que tengan más de 2 horas EXACTAS
     const [result] = await dbPool.query(
       `UPDATE compras 
        SET Estado = 'anulada', 
            MotivoCancelacion = CONCAT('Anulación automática por tiempo de espera excedido (2 horas) - ', NOW())
        WHERE Estado = 'pendiente' 
-       AND FechaRegistro < DATE_SUB(NOW(), INTERVAL 2 HOUR)`
+       AND FechaRegistro <= DATE_SUB(NOW(), INTERVAL 2 HOUR)
+       AND TIMESTAMPDIFF(MINUTE, FechaRegistro, NOW()) >= 120` // 🔥 Asegurar que sean 2 horas completas
     );
     
     if (result.affectedRows > 0) {
       console.log(`✅ ${result.affectedRows} compras anuladas automáticamente`);
+      
+      // Obtener las compras anuladas para más detalle
+      const [anuladas] = await dbPool.query(
+        `SELECT CompraId, ProveedorId, FechaRegistro 
+         FROM compras 
+         WHERE Estado = 'anulada' 
+         AND MotivoCancelacion LIKE 'Anulación automática%'
+         AND FechaRegistro <= DATE_SUB(NOW(), INTERVAL 2 HOUR)
+         ORDER BY FechaRegistro DESC`
+      );
+      
+      console.log('📋 Compras anuladas:', anuladas);
     } else {
       console.log('✅ No hay compras con más de 2 horas para anular');
     }
@@ -265,4 +281,3 @@ export const anularComprasExpiradas = async () => {
     throw error;
   }
 };
-
