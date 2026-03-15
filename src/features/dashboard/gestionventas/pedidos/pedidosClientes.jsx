@@ -34,6 +34,7 @@ export const PedidosClientes = () => {
   const [viewMode, setViewMode] = useState("list");
   const [selectedPedido, setSelectedPedido] = useState(null);
   const [updating, setUpdating] = useState(false);
+  const [loading, setLoading] = useState(false); // ← ESTADO FALTANTE
 
   // Catálogos
   const [productos, setProductos] = useState([]);
@@ -62,7 +63,6 @@ export const PedidosClientes = () => {
     ProductoId: "",
     ServicioId: "",
     Cantidad: 1,
-    Tamaño: "Mediana",
     Descripcion: "",
     UrlImagen: "",
     Precio: 0,
@@ -80,7 +80,6 @@ export const PedidosClientes = () => {
   const [uploading, setUploading] = useState(false);
 
   // Paginación
-  const [allData, setAllData] = useState([]);
   const [paginatedData, setPaginatedData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
@@ -120,99 +119,69 @@ export const PedidosClientes = () => {
     }
   }, [detallesCrear, viewMode]);
 
-
-
-const fetchPedidos = async (page = currentPage) => {
-  try {
-    setLoading(true);
-    
-    // Construir parámetros de consulta
-    const params = new URLSearchParams({
-      page: page,
-      limit: itemsPerPage
-    });
-    
-    if (filtroCampo && filtroText) {
-      params.append('filtroCampo', filtroCampo);
-      params.append('filtroValor', filtroText);
-    }
-    
-    // Llamar al API con paginación
-    const response = await axios.get(`http://localhost:3000/api/pedidos-clientes?${params.toString()}`);
-    
-    const { data, pagination } = response.data;
-    
-    // Obtener detalles para cada pedido
-    const conDetalles = await Promise.all(
-      data.map(async (p) => {
-        try {
-          const det = await getDetallesByPedidoId(p.PedidoClienteId);
-          return {
-            ...p,
-            detalle: Array.isArray(det)
-              ? det.map(item => ({
-                  ...item,
-                  _tempId: item.DetallePedidoClienteId || generateTempId()
-                }))
-              : []
-          };
-        } catch {
-          return { ...p, detalle: [] };
-        }
-      })
-    );
-    
-    setPaginatedData(conDetalles);
-    setTotalItems(pagination.totalItems);
-    setTotalPages(pagination.totalPages);
-    setCurrentPage(pagination.currentPage);
-    
-  } catch (err) {
-    console.error("Error cargando pedidos:", err);
-    toast.error("Error al cargar pedidos");
-  } finally {
-    setLoading(false);
-  }
-};
-
-// Modificar useEffect para usar fetchPedidos
-useEffect(() => {
-  fetchPedidos(currentPage);
-}, [currentPage, itemsPerPage, filtroCampo, filtroText]);
-
-  // Filtrado
-  useEffect(() => {
-    let filtered = Array.isArray(pedidos) ? pedidos : [];
-    if (filtroCampo && filtroText.trim()) {
-      filtered = filtered.filter(p => {
-        const val = String(p[filtroCampo] || "").toLowerCase();
-        return val.includes(filtroText.toLowerCase());
+  // Función para cargar pedidos con paginación
+  const fetchPedidos = async (page = currentPage) => {
+    try {
+      setLoading(true); // ← AHORA SÍ ESTÁ DEFINIDO
+      
+      const params = new URLSearchParams({
+        page: page,
+        limit: itemsPerPage
       });
+      
+      if (filtroCampo && filtroText) {
+        params.append('filtroCampo', filtroCampo);
+        params.append('filtroValor', filtroText);
+      }
+      
+      const response = await axios.get(`http://localhost:3000/api/pedidos-clientes?${params.toString()}`);
+      
+      const { data, pagination } = response.data;
+      
+      // Obtener detalles para cada pedido
+      const conDetalles = await Promise.all(
+        data.map(async (p) => {
+          try {
+            const det = await getDetallesByPedidoId(p.PedidoClienteId);
+            return {
+              ...p,
+              detalle: Array.isArray(det)
+                ? det.map(item => ({
+                    ...item,
+                    _tempId: item.DetallePedidoClienteId || generateTempId()
+                  }))
+                : []
+            };
+          } catch {
+            return { ...p, detalle: [] };
+          }
+        })
+      );
+      
+      setPaginatedData(conDetalles);
+      setTotalItems(pagination.totalItems);
+      setTotalPages(pagination.totalPages);
+      setCurrentPage(pagination.currentPage);
+      
+    } catch (err) {
+      console.error("Error cargando pedidos:", err);
+      toast.error("Error al cargar pedidos");
+    } finally {
+      setLoading(false); // ← AHORA SÍ ESTÁ DEFINIDO
     }
-    setAllData(filtered);
-    setTotalItems(filtered.length);
-    setCurrentPage(1);
-  }, [filtroText, filtroCampo, pedidos]);
+  };
 
-  // Paginación
+  // Cargar pedidos al montar el componente y cuando cambien filtros/paginación
   useEffect(() => {
-    if (Array.isArray(allData) && allData.length > 0) {
-      const tp = Math.ceil(allData.length / itemsPerPage);
-      setTotalPages(tp > 0 ? tp : 1);
-      if (currentPage > tp && tp > 0) setCurrentPage(tp);
-      const start = (currentPage - 1) * itemsPerPage;
-      setPaginatedData(allData.slice(start, start + itemsPerPage));
-    } else {
-      setPaginatedData([]);
-      setTotalPages(1);
-    }
-  }, [itemsPerPage, currentPage, allData]);
+    fetchPedidos(currentPage);
+  }, [currentPage, itemsPerPage, filtroCampo, filtroText]);
 
   // Navegación
   const goToList = () => {
     setViewMode("list");
     setSelectedPedido(null);
     setErrores([]);
+    fetchPedidos(1); // Recargar al volver a la lista
   };
 
   const goToCreate = () => {
@@ -227,9 +196,9 @@ useEffect(() => {
         ...pedido,
         detalle: Array.isArray(det)
           ? det.map(item => ({
-            ...item,
-            _tempId: item.DetallePedidoClienteId || generateTempId()
-          }))
+              ...item,
+              _tempId: item.DetallePedidoClienteId || generateTempId()
+            }))
           : []
       });
       setViewMode("view");
@@ -245,9 +214,9 @@ useEffect(() => {
         ...pedido,
         detalle: Array.isArray(det)
           ? det.map(item => ({
-            ...item,
-            _tempId: item.DetallePedidoClienteId || generateTempId()
-          }))
+              ...item,
+              _tempId: item.DetallePedidoClienteId || generateTempId()
+            }))
           : []
       });
       setErrores([]);
@@ -276,7 +245,6 @@ useEffect(() => {
       ProductoId: "",
       ServicioId: "",
       Cantidad: 1,
-      Tamaño: "Mediana",
       Descripcion: "",
       UrlImagen: "",
       Precio: 0,
@@ -310,56 +278,21 @@ useEffect(() => {
     try {
       setUploading(true);
 
-      console.log('🔍 DEBUG - detallesCrear original:',
-        detallesCrear.map(d => ({
-          id: d.id,
-          tieneCustomization: !!d.customization,
-          archivosAdjuntos: d.customization?.archivosAdjuntos,
-          urlArchivo: d.customization?.archivosAdjuntos?.[0]?.url
-        }))
-      );
-
-      // 🔴 PASO 1: Construir detalles incluyendo UrlImagenPersonalizada
+      // Construir detalles
       const detallesLimpios = detallesCrear.map(d => {
-        // Objeto base del detalle
         const detalle = {
           ProductoId: d.ProductoId?.trim() || null,
           ServicioId: d.ServicioId?.trim() || null,
-          Cantidad: Number(d.quantity || d.Cantidad) || 1,
-          Tamaño: d.Tamaño || d.customization?.Tamaño || "Mediana",
-          Descripcion: d.customization?.Descripcion || d.Descripcion || "",
-          UrlImagen: d.UrlImagen || d.Imagen || "",
+          Cantidad: Number(d.Cantidad) || 1,
+          Descripcion: d.Descripcion || "",
+          UrlImagen: d.UrlImagen || "",
           Precio: Number(d.Precio) || 0,
           ColorId: d.ColorId || null
         };
-
-        // 🔴 PASO 2: SI HAY ARCHIVOS ADJUNTOS, ASIGNAR UrlImagenPersonalizada
-        if (d.customization?.archivosAdjuntos?.length > 0) {
-          const archivo = d.customization.archivosAdjuntos[0];
-          if (archivo.url) {
-            // Construir URL completa si es necesario
-            const urlCompleta = archivo.url.startsWith('http')
-              ? archivo.url
-              : `http://localhost:3000${archivo.url}`;
-
-            detalle.UrlImagenPersonalizada = urlCompleta;
-            console.log('📸 ASIGNANDO UrlImagenPersonalizada:', urlCompleta);
-          }
-        }
-
         return detalle;
       });
 
-      // 🔴 PASO 3: VERIFICAR QUE SE ASIGNÓ
-      console.log('🔍 DEBUG - detallesLimpios FINAL:',
-        detallesLimpios.map(d => ({
-          tieneImagenPersonalizada: !!d.UrlImagenPersonalizada,
-          urlImagenPersonalizada: d.UrlImagenPersonalizada,
-          urlImagen: d.UrlImagen
-        }))
-      );
-
-      // 🔴 PASO 4: CONSTRUIR EL PEDIDO COMPLETO
+      // Construir el pedido completo
       const pedidoCompleto = {
         ClienteId: tipoClienteCrear === 'registrado' ? formCrear.ClienteId?.trim() || null : null,
         FechaRegistro: formCrear.FechaRegistro,
@@ -376,8 +309,6 @@ useEffect(() => {
         detalle: detallesLimpios
       };
 
-      console.log('🔍 DEBUG - PEDIDO COMPLETO A ENVIAR:', pedidoCompleto);
-
       const formData = new FormData();
       formData.append('pedido', JSON.stringify(pedidoCompleto));
 
@@ -389,18 +320,9 @@ useEffect(() => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      console.log('✅ RESPUESTA DEL SERVIDOR:', response.data);
-
-      // 🔴 PASO 5: VERIFICAR QUE EL SERVIDOR DEVOLVIÓ LA IMAGEN
-      if (response.data.detalle?.[0]?.UrlImagenPersonalizada) {
-        console.log('🎉 ¡IMAGEN GUARDADA CORRECTAMENTE!');
-      } else {
-        console.warn('⚠️ LA IMAGEN NO SE GUARDÓ - REVISAR BACKEND');
-      }
-
       toast.success("Pedido creado correctamente");
       goToList();
-      fetchPedidos();
+
     } catch (err) {
       console.error('❌ Error:', err);
       toast.error(`Error: ${err.response?.data?.error || err.message}`);
@@ -409,30 +331,22 @@ useEffect(() => {
     }
   };
 
-  // En PedidosClientes.jsx
   const handleUpdateEstado = async (estado, motivo = "") => {
     if (!selectedPedido) return;
 
     try {
       setUpdating(true);
 
-      // Para actualizaciones de estado, solo enviamos JSON
       const payload = { Estado: estado };
       if (estado === 'cancelado' && motivo) payload.motivo = motivo;
-
-      console.log(' Enviando actualización:', payload);
 
       const response = await axios.put(
         `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
         payload,
         {
-          headers: {
-            'Content-Type': 'application/json' 
-          }
+          headers: { 'Content-Type': 'application/json' }
         }
       );
-
-      console.log(' Respuesta del servidor:', response.data);
 
       setSelectedPedido(prev => ({
         ...prev,
@@ -441,18 +355,16 @@ useEffect(() => {
       }));
 
       toast.success(`Pedido ${estado === 'cancelado' ? 'cancelado' : estado} correctamente`);
-
+      
       // Recargar la lista
-      await fetchPedidos();
+      await fetchPedidos(currentPage);
 
-      // Si es aprobado, mostrar mensaje de venta creada
       if (estado === 'aprobado' && response.data.venta) {
-        toast.success(` Venta #${response.data.venta.VentaId.substring(0, 8)} creada`);
+        toast.success(`Venta #${response.data.venta.VentaId.substring(0, 8)} creada`);
       }
 
     } catch (err) {
-      console.error(' Error detallado:', err.response?.data || err);
-
+      console.error('Error detallado:', err.response?.data || err);
       const errorMsg = err.response?.data?.error || err.response?.data?.details || err.message;
       toast.error(`Error: ${errorMsg}`);
     } finally {
@@ -460,8 +372,10 @@ useEffect(() => {
     }
   };
 
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
 
-  const handlePageChange = (page) => setCurrentPage(page);
   const handleItemsPerPageChange = (newItems) => {
     setItemsPerPage(newItems);
     setCurrentPage(1);
@@ -472,7 +386,14 @@ useEffect(() => {
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Pedidos</h1>
 
-        {viewMode === "list" && (
+        {loading && viewMode === "list" && (
+          <div className="bg-white rounded-xl shadow-sm border p-8 mb-6 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-slate-600">Cargando pedidos...</p>
+          </div>
+        )}
+
+        {viewMode === "list" && !loading && (
           <OrderList
             paginatedData={paginatedData}
             filtroText={filtroText}

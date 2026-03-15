@@ -20,29 +20,105 @@ import { v4 as uuidv4 } from "uuid";
 import fs from 'fs';
 import { dbPool } from "../lib/db.js";
 
-// ========================================
-// 📋 OBTENER TODOS LOS PEDIDOS CON PAGINACIÓN
-// ========================================
 export const getPedidosClientes = async (req, res) => {
   try {
+    console.log('🔍 [CONTROLLER] Obteniendo pedidos con paginación');
+    
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const filtroCampo = req.query.filtroCampo || null;
     const filtroValor = req.query.filtroValor || null;
     const tipoPago = req.query.tipoPago || null;
 
-    console.log('🔍 [CONTROLLER] Obteniendo pedidos con paginación:', { page, limit, filtroCampo, filtroValor, tipoPago });
+    console.log('📦 Parámetros:', { page, limit, filtroCampo, filtroValor, tipoPago });
 
-    const result = await getPedidosClientesPaginated({ 
-      page, 
-      limit, 
-      filtroCampo, 
-      filtroValor,
-      tipoPago 
-    });
+    const offset = (page - 1) * limit;
+    let whereClause = '';
+    let params = [];
+
+    // Construir WHERE clause
+    const whereConditions = [];
+
+    if (tipoPago) {
+      whereConditions.push('p.MetodoPago = ?');
+      params.push(tipoPago);
+    }
+
+    if (filtroCampo && filtroValor) {
+      let campoDB;
+      switch(filtroCampo) {
+        case 'PedidoClienteId':
+          campoDB = 'p.PedidoClienteId';
+          break;
+        case 'NombreCliente':
+          campoDB = 'COALESCE(u.NombreCompleto, p.ClienteNombre)';
+          break;
+        case 'FechaRegistro':
+          campoDB = 'p.FechaRegistro';
+          break;
+        case 'MetodoPago':
+          campoDB = 'p.MetodoPago';
+          break;
+        case 'Estado':
+          campoDB = 'p.Estado';
+          break;
+        default:
+          campoDB = filtroCampo;
+      }
+
+      whereConditions.push(`${campoDB} LIKE ?`);
+      params.push(`%${filtroValor}%`);
+    }
+
+    if (whereConditions.length > 0) {
+      whereClause = 'WHERE ' + whereConditions.join(' AND ');
+    }
+
+    // ⚠️ IMPORTANTE: Usar literales para LIMIT y OFFSET
+    const query = `
+      SELECT
+        p.PedidoClienteId,
+        p.ClienteId,
+        COALESCE(u.NombreCompleto, p.ClienteNombre) AS NombreCliente,
+        p.FechaRegistro,
+        p.Total,
+        p.Estado,
+        p.MetodoPago,
+        p.Voucher,
+        p.NombreRecibe,
+        p.TelefonoEntrega,
+        p.DireccionEntrega,
+        p.TipoCliente,
+        p.ClienteNombre,
+        p.ClienteTelefono,
+        p.ClienteCorreo
+      FROM pedidosclientes p
+      LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
+      ${whereClause}
+      ORDER BY p.FechaRegistro DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+
+    console.log('📝 Query:', query);
+    console.log('📝 Params WHERE:', params);
+
+    // Ejecutar consulta principal
+    const [rows] = await dbPool.query(query, params);
+
+    // Consulta para total (usando execute con parámetros)
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM pedidosclientes p
+      LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
+      ${whereClause}
+    `;
+
+    const [countResult] = await dbPool.execute(countQuery, params);
+
+    console.log(`✅ ${rows.length} pedidos encontrados de ${countResult[0].total} total`);
 
     // Obtener detalles para cada pedido
-    for (let p of result.data) {
+    for (let p of rows) {
       try {
         p.detalle = await getDetallePedidoByPedidoIdModel(p.PedidoClienteId);
       } catch (detalleError) {
@@ -51,41 +127,18 @@ export const getPedidosClientes = async (req, res) => {
       }
     }
 
-    if (result.data.length === 0 && page > 1) {
-      const fallback = await getPedidosClientesPaginated({ 
-        page: 1, 
-        limit, 
-        filtroCampo, 
-        filtroValor,
-        tipoPago 
-      });
-      
-      for (let p of fallback.data) {
-        p.detalle = await getDetallePedidoByPedidoIdModel(p.PedidoClienteId);
-      }
-      
-      return res.status(200).json({
-        data: fallback.data,
-        pagination: {
-          totalItems: fallback.totalItems,
-          totalPages: Math.ceil(fallback.totalItems / limit),
-          currentPage: 1,
-          itemsPerPage: limit
-        }
-      });
-    }
-
     res.status(200).json({
-      data: result.data,
+      data: rows,
       pagination: {
-        totalItems: result.totalItems,
-        totalPages: Math.ceil(result.totalItems / limit),
-        currentPage: result.currentPage,
-        itemsPerPage: result.itemsPerPage
+        totalItems: countResult[0].total,
+        totalPages: Math.ceil(countResult[0].total / limit),
+        currentPage: page,
+        itemsPerPage: limit
       }
     });
+
   } catch (error) {
-    console.error("❌ [CONTROLLER] Error al obtener pedidos:", error);
+    console.error('❌ [CONTROLLER] Error al obtener pedidos:', error);
     res.status(500).json({
       error: "Error al obtener pedidos",
       details: error.message
@@ -93,18 +146,17 @@ export const getPedidosClientes = async (req, res) => {
   }
 };
 
-// ========================================
-// 🔍 BUSCAR PEDIDOS (NUEVA FUNCIÓN EXPORTADA)
-// ========================================
 export const buscarPedidos = async (req, res) => {
   const { campo, valor, page = 1, limit = 10, tipoPago } = req.query;
 
+  console.log('🔍 [BUSCAR] Parámetros:', { campo, valor, page, limit, tipoPago });
+
   const columnasPermitidas = {
-    id: 'PedidoClienteId',
-    cliente: 'NombreCliente',
-    fecha: 'FechaRegistro',
-    metodo: 'MetodoPago',
-    estado: 'Estado'
+    id: 'p.PedidoClienteId',
+    cliente: 'COALESCE(u.NombreCompleto, p.ClienteNombre)',
+    fecha: 'p.FechaRegistro',
+    metodo: 'p.MetodoPago',
+    estado: 'p.Estado'
   };
 
   const columna = columnasPermitidas[campo];
@@ -114,31 +166,101 @@ export const buscarPedidos = async (req, res) => {
   }
 
   try {
-    const result = await buscarPedidosClientesPaginated({ 
-      page: parseInt(page), 
-      limit: parseInt(limit), 
-      columna, 
-      valor,
-      tipoPago 
-    });
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
+    
+    let whereClause = '';
+    let params = [];
 
-    // Obtener detalles
-    for (let p of result.data) {
-      p.detalle = await getDetallePedidoByPedidoIdModel(p.PedidoClienteId);
+    // Construir condiciones WHERE
+    const whereConditions = [];
+
+    // Búsqueda por campo específico
+    if (campo && valor) {
+      whereConditions.push(`${columna} LIKE ?`);
+      params.push(`%${valor}%`);
+    }
+
+    // Filtro por tipo de pago
+    if (tipoPago) {
+      whereConditions.push('p.MetodoPago = ?');
+      params.push(tipoPago);
+    }
+
+    if (whereConditions.length > 0) {
+      whereClause = 'WHERE ' + whereConditions.join(' AND ');
+    }
+
+    // ⚠️ IMPORTANTE: Usar literales para LIMIT y OFFSET
+    const query = `
+      SELECT
+        p.PedidoClienteId,
+        p.ClienteId,
+        COALESCE(u.NombreCompleto, p.ClienteNombre) AS NombreCliente,
+        p.FechaRegistro,
+        p.Total,
+        p.Estado,
+        p.MetodoPago,
+        p.Voucher,
+        p.NombreRecibe,
+        p.TelefonoEntrega,
+        p.DireccionEntrega,
+        p.TipoCliente,
+        p.ClienteNombre,
+        p.ClienteTelefono,
+        p.ClienteCorreo
+      FROM pedidosclientes p
+      LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
+      ${whereClause}
+      ORDER BY p.FechaRegistro DESC
+      LIMIT ${limitNum} OFFSET ${offset}
+    `;
+
+    console.log('📝 [BUSCAR] Query:', query);
+    console.log('📝 [BUSCAR] Params:', params);
+
+    // Ejecutar consulta principal con query() para LIMIT literales
+    const [rows] = await dbPool.query(query, params);
+
+    // Consulta para total
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM pedidosclientes p
+      LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
+      ${whereClause}
+    `;
+
+    const [countResult] = await dbPool.execute(countQuery, params);
+
+    console.log(`✅ [BUSCAR] ${rows.length} resultados de ${countResult[0].total} total`);
+
+    // Obtener detalles para cada pedido
+    for (let p of rows) {
+      try {
+        p.detalle = await getDetallePedidoByPedidoIdModel(p.PedidoClienteId);
+      } catch (detalleError) {
+        console.error(`⚠️ Error obteniendo detalles para pedido ${p.PedidoClienteId}:`, detalleError.message);
+        p.detalle = [];
+      }
     }
 
     res.status(200).json({
-      data: result.data,
+      data: rows,
       pagination: {
-        totalItems: result.totalItems,
-        totalPages: Math.ceil(result.totalItems / parseInt(limit)),
-        currentPage: result.currentPage,
-        itemsPerPage: result.itemsPerPage
+        totalItems: countResult[0].total,
+        totalPages: Math.ceil(countResult[0].total / limitNum),
+        currentPage: pageNum,
+        itemsPerPage: limitNum
       }
     });
+
   } catch (error) {
-    console.error('Error al buscar pedidos:', error);
-    res.status(500).json({ message: 'Error interno del servidor' });
+    console.error('❌ [BUSCAR] Error al buscar pedidos:', error);
+    res.status(500).json({ 
+      message: 'Error interno del servidor',
+      error: error.message 
+    });
   }
 };
 

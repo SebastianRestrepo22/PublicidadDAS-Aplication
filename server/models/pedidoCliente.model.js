@@ -203,10 +203,6 @@ export const deletePedidoClienteModel = async (id) => {
   return result;
 };
 
-// ========================================
-// NUEVAS FUNCIONES PARA PAGINACIÓN
-// ========================================
-
 export const getPedidosClientesPaginated = async ({ 
   page = 1, 
   limit = 10, 
@@ -214,97 +210,70 @@ export const getPedidosClientesPaginated = async ({
   filtroValor = null,
   tipoPago = null 
 }) => {
-  const offset = (page - 1) * limit;
-  let whereClause = '';
-  let params = [];
+  try {
+    const offset = (page - 1) * limit;
+    let params = [];
+    let whereClause = '';
 
-  // Construir WHERE clause
-  const whereConditions = [];
-
-  if (tipoPago) {
-    whereConditions.push('MetodoPago = ?');
-    params.push(tipoPago);
-  }
-
-  if (filtroCampo && filtroValor) {
-    let campoDB;
-    // Mapear nombres de campos del frontend a la BD
-    switch(filtroCampo) {
-      case 'PedidoClienteId':
-        campoDB = 'p.PedidoClienteId';
-        break;
-      case 'NombreCliente':
-        campoDB = 'COALESCE(u.NombreCompleto, p.ClienteNombre)';
-        break;
-      case 'FechaRegistro':
-        campoDB = 'p.FechaRegistro';
-        break;
-      case 'MetodoPago':
-        campoDB = 'p.MetodoPago';
-        break;
-      case 'Estado':
-        campoDB = 'p.Estado';
-        break;
-      default:
-        campoDB = filtroCampo;
+    // Construir WHERE clause simple
+    if (tipoPago) {
+      whereClause = 'WHERE p.MetodoPago = ?';
+      params.push(tipoPago);
     }
 
-    if (filtroCampo === 'FechaRegistro') {
-      whereConditions.push(`DATE(${campoDB}) = ?`);
-      params.push(filtroValor);
-    } else {
-      whereConditions.push(`${campoDB} LIKE ?`);
-      params.push(`%${filtroValor}%`);
-    }
+    // Consulta principal con array de parámetros bien formado
+    const query = `
+      SELECT
+        p.PedidoClienteId,
+        p.ClienteId,
+        COALESCE(u.NombreCompleto, p.ClienteNombre) AS NombreCliente,
+        p.FechaRegistro,
+        p.Total,
+        p.Estado,
+        p.MetodoPago,
+        p.Voucher,
+        p.NombreRecibe,
+        p.TelefonoEntrega,
+        p.DireccionEntrega,
+        p.TipoCliente,
+        p.ClienteNombre,
+        p.ClienteTelefono,
+        p.ClienteCorreo
+      FROM pedidosclientes p
+      LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
+      ${whereClause}
+      ORDER BY p.FechaRegistro DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    // Crear array de parámetros correctamente
+    const queryParams = [...params, limit, offset];
+    
+    console.log('📝 [MODEL] Query:', query);
+    console.log('📝 [MODEL] Params:', queryParams);
+
+    const [rows] = await dbPool.execute(query, queryParams);
+
+    // Consulta para total
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM pedidosclientes p
+      LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
+      ${whereClause}
+    `;
+
+    const [countResult] = await dbPool.execute(countQuery, params);
+
+    return {
+      data: rows,
+      totalItems: countResult[0].total,
+      currentPage: Number(page),
+      itemsPerPage: Number(limit)
+    };
+  } catch (error) {
+    console.error('❌ [MODEL] Error:', error);
+    throw error;
   }
-
-  if (whereConditions.length > 0) {
-    whereClause = 'WHERE ' + whereConditions.join(' AND ');
-  }
-
-  // Consulta principal
-  const query = `
-    SELECT
-      p.PedidoClienteId,
-      p.ClienteId,
-      COALESCE(u.NombreCompleto, p.ClienteNombre) AS NombreCliente,
-      p.FechaRegistro,
-      p.Total,
-      p.Estado,
-      p.MetodoPago,
-      p.Voucher,
-      p.NombreRecibe,
-      p.TelefonoEntrega,
-      p.DireccionEntrega,
-      p.TipoCliente,
-      p.ClienteNombre,
-      p.ClienteTelefono,
-      p.ClienteCorreo
-    FROM pedidosclientes p
-    LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
-    ${whereClause}
-    ORDER BY p.FechaRegistro DESC
-    LIMIT ? OFFSET ?
-  `;
-
-  const [rows] = await dbPool.execute(query, [...params, limit, offset]);
-
-  // Consulta para total de registros
-  const countQuery = `
-    SELECT COUNT(*) as total
-    FROM pedidosclientes p
-    LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
-    ${whereClause}
-  `;
-
-  const [countResult] = await dbPool.execute(countQuery, params);
-
-  return {
-    data: rows,
-    totalItems: countResult[0].total,
-    currentPage: Number(page),
-    itemsPerPage: Number(limit)
-  };
 };
 
 export const buscarPedidosClientesPaginated = async ({ 
@@ -314,11 +283,74 @@ export const buscarPedidosClientesPaginated = async ({
   valor,
   tipoPago 
 }) => {
-  return await getPedidosClientesPaginated({ 
-    page, 
-    limit, 
-    filtroCampo: columna, 
-    filtroValor: valor,
-    tipoPago 
-  });
+  try {
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
+    
+    let whereClause = '';
+    let params = [];
+    const whereConditions = [];
+
+    if (columna && valor) {
+      whereConditions.push(`${columna} LIKE ?`);
+      params.push(`%${valor}%`);
+    }
+
+    if (tipoPago) {
+      whereConditions.push('p.MetodoPago = ?');
+      params.push(tipoPago);
+    }
+
+    if (whereConditions.length > 0) {
+      whereClause = 'WHERE ' + whereConditions.join(' AND ');
+    }
+
+    // Query con literales para LIMIT y OFFSET
+    const query = `
+      SELECT
+        p.PedidoClienteId,
+        p.ClienteId,
+        COALESCE(u.NombreCompleto, p.ClienteNombre) AS NombreCliente,
+        p.FechaRegistro,
+        p.Total,
+        p.Estado,
+        p.MetodoPago,
+        p.Voucher,
+        p.NombreRecibe,
+        p.TelefonoEntrega,
+        p.DireccionEntrega,
+        p.TipoCliente,
+        p.ClienteNombre,
+        p.ClienteTelefono,
+        p.ClienteCorreo
+      FROM pedidosclientes p
+      LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
+      ${whereClause}
+      ORDER BY p.FechaRegistro DESC
+      LIMIT ${limitNum} OFFSET ${offset}
+    `;
+
+    const [rows] = await dbPool.query(query, params);
+
+    // Query para contar
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM pedidosclientes p
+      LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
+      ${whereClause}
+    `;
+
+    const [countResult] = await dbPool.execute(countQuery, params);
+
+    return {
+      data: rows,
+      totalItems: countResult[0].total,
+      currentPage: pageNum,
+      itemsPerPage: limitNum
+    };
+  } catch (error) {
+    console.error('❌ Error en buscarPedidosClientesPaginated:', error);
+    throw error;
+  }
 };

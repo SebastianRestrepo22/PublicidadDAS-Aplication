@@ -20,7 +20,7 @@ export const getAllPedidosClientes = async (page = 1, limit = 10, filtroCampo = 
       params.append('tipoPago', tipoPago);
     }
     
-    const response = await axios.get(`${API_BASE}/api/pedidos-clientes?${params.toString()}`);
+    const response = await axios.get(`${'http://localhost:3000'}/api/pedidos-clientes?${params.toString()}`);
     
     // La respuesta ahora tiene estructura { data, pagination }
     return {
@@ -53,7 +53,7 @@ export const buscarPedidos = async (campo, valor, page = 1, limit = 10, tipoPago
       params.append('tipoPago', tipoPago);
     }
     
-    const response = await axios.get(`${API_BASE}/api/pedidos-clientes/buscar?${params.toString()}`);
+    const response = await axios.get(`${'http://localhost:3000'}/api/pedidos-clientes/buscar?${params.toString()}`);
     
     return {
       data: Array.isArray(response.data.data) ? response.data.data : [],
@@ -75,7 +75,7 @@ export const buscarPedidos = async (campo, valor, page = 1, limit = 10, tipoPago
  */
 export const getPedidoById = async (id) => {
   try {
-    const response = await axios.get(`${API_BASE}/api/pedidos-clientes/${id}`);
+    const response = await axios.get(`${'http://localhost:3000'}/api/pedidos-clientes/${id}`);
     return response.data;
   } catch (error) {
     console.error("Error al obtener pedido:", error);
@@ -91,7 +91,7 @@ export const createPedidoCliente = async (pedidoData) => {
     console.log('📤 Enviando pedido al backend...');
     console.log('📦 Datos estructurados:', JSON.stringify(pedidoData, null, 2));
     
-    const response = await axios.post(`${API_BASE}/api/pedidos-clientes`, pedidoData, {
+    const response = await axios.post(`${'http://localhost:3000'}/api/pedidos-clientes`, pedidoData, {
       headers: { 
         'Content-Type': 'multipart/form-data' 
       }
@@ -127,7 +127,7 @@ export const updatePedidoCliente = async (id, pedidoData) => {
     // Determinar si es FormData o JSON
     const isFormData = pedidoData instanceof FormData;
     
-    const response = await axios.put(`${API_BASE}/api/pedidos-clientes/${id}`, pedidoData, {
+    const response = await axios.put(`${'http://localhost:3000'}/api/pedidos-clientes/${id}`, pedidoData, {
       headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {}
     });
     return response.data;
@@ -147,7 +147,7 @@ export const cambiarEstadoPedido = async (id, estado, motivo = '') => {
       payload.motivo = motivo;
     }
     
-    const response = await axios.put(`${API_BASE}/api/pedidos-clientes/${id}`, payload);
+    const response = await axios.put(`${'http://localhost:3000'}/api/pedidos-clientes/${id}`, payload);
     return response.data;
   } catch (error) {
     console.error("Error al cambiar estado:", error);
@@ -160,7 +160,7 @@ export const cambiarEstadoPedido = async (id, estado, motivo = '') => {
  */
 export const deletePedidoCliente = async (id) => {
   try {
-    const response = await axios.delete(`${API_BASE}/api/pedidos-clientes/${id}`);
+    const response = await axios.delete(`${'http://localhost:3000'}/api/pedidos-clientes/${id}`);
     return response.data;
   } catch (error) {
     console.error("Error al eliminar pedido:", error);
@@ -175,7 +175,7 @@ export const getDetallesByPedidoId = async (pedidoId) => {
   try {
     console.log(`🔍 [FRONT-SERVICE] GET detalles para: ${pedidoId}`);
     
-    const response = await axios.get(`${API_BASE}/api/detalle-pedido/${pedidoId}`);
+    const response = await axios.get(`${'http://localhost:3000'}/api/detalle-pedido/${pedidoId}`);
     
     console.log(`📬 [FRONT-SERVICE] Respuesta:`, {
       status: response.status,
@@ -208,7 +208,7 @@ export const getDetallesByPedidoId = async (pedidoId) => {
  */
 export const getAllProductos = async () => {
   try {
-    const response = await axios.get(`${API_BASE}/producto`);
+    const response = await axios.get(`${'http://localhost:3000'}/producto`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("Error al obtener productos:", error);
@@ -221,7 +221,7 @@ export const getAllProductos = async () => {
  */
 export const getAllServicios = async () => {
   try {
-    const response = await axios.get(`${API_BASE}/servicio`);
+    const response = await axios.get(`${'http://localhost:3000'}/servicio`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("Error al obtener servicios:", error);
@@ -234,7 +234,7 @@ export const getAllServicios = async () => {
  */
 export const getAllColores = async () => {
   try {
-    const response = await axios.get(`${API_BASE}/colores`);
+    const response = await axios.get(`${'http://localhost:3000'}/colores`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("Error al obtener colores:", error);
@@ -250,7 +250,7 @@ export const uploadVoucher = async (file) => {
     const formData = new FormData();
     formData.append('voucher', file);
     
-    const response = await axios.post(`${API_BASE}/api/voucher`, formData, {
+    const response = await axios.post(`${'http://localhost:3000'}/api/voucher`, formData, {
       headers: { 
         'Content-Type': 'multipart/form-data' 
       }
@@ -266,16 +266,68 @@ export const uploadVoucher = async (file) => {
 /**
  * Obtiene todos los clientes
  */
-export const getAllClientes = async () => {
+// En services.pedidosClientes.js
+export const getAllClientes = async (page = 1, limit = 10, searchTerm = '') => {
   try {
-    const response = await axios.get(`${API_BASE}/client`);
-    return response.data;
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString()
+    });
+    
+    if (searchTerm) {
+      params.append('filtroCampo', 'nombre');
+      params.append('filtroValor', searchTerm);
+    }
+    
+    const response = await axios.get(`${'http://localhost:3000'}/client?${params.toString()}`);
+    
+    return {
+      data: Array.isArray(response.data.data) ? response.data.data : [],
+      pagination: response.data.pagination || {
+        totalItems: 0,
+        totalPages: 1,
+        currentPage: page,
+        itemsPerPage: limit
+      }
+    };
   } catch (error) {
     console.error('Error fetching clientes:', error);
-    return [];
+    return { 
+      data: [], 
+      pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } 
+    };
   }
 };
 
+// Función para buscar clientes
+export const buscarClientes = async (campo, valor, page = 1, limit = 10) => {
+  try {
+    const params = new URLSearchParams({
+      campo: campo,
+      valor: valor,
+      page: page.toString(),
+      limit: limit.toString()
+    });
+    
+    const response = await axios.get(`${'http://localhost:3000'}/client/buscar?${params.toString()}`);
+    
+    return {
+      data: Array.isArray(response.data.data) ? response.data.data : [],
+      pagination: response.data.pagination || {
+        totalItems: 0,
+        totalPages: 1,
+        currentPage: page,
+        itemsPerPage: limit
+      }
+    };
+  } catch (error) {
+    console.error('Error buscando clientes:', error);
+    return { 
+      data: [], 
+      pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } 
+    };
+  }
+};
 /**
  * Obtener pedidos por método de pago (utilidad)
  */

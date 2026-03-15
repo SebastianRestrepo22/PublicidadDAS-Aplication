@@ -1,15 +1,14 @@
 import { v4 as uuidv4 } from "uuid";
 import { dbPool } from "../lib/db.js";
 
-// ========================================
-// OBTENER DETALLES POR ID DE PEDIDO
-// ========================================
 export const getDetallePedidoByPedidoIdModel = async (PedidoClienteId) => {
   try {
-    console.log(`🔍 [MODEL] Buscando detalles para pedido: ${PedidoClienteId}`);
-    
-    const [rows] = await dbPool.execute(
-      `SELECT 
+    if (!PedidoClienteId) {
+      return [];
+    }
+
+    const query = `
+      SELECT 
         d.DetallePedidoClienteId,
         d.PedidoClienteId,
         d.ProductoId,
@@ -21,27 +20,21 @@ export const getDetallePedidoByPedidoIdModel = async (PedidoClienteId) => {
         d.ColorId,
         c.Nombre AS ColorNombre,
         p.Nombre AS ProductoNombre,
-        s.Nombre AS ServicioNombre
-       FROM detallePedidosClientes d
-       LEFT JOIN colores c ON d.ColorId = c.ColorId
-       LEFT JOIN productos p ON d.ProductoId = p.ProductoId
-       LEFT JOIN servicios s ON d.ServicioId = s.ServicioId
-       WHERE d.PedidoClienteId = ?`,
-      [PedidoClienteId]
-    );
+        s.Nombre AS ServicioNombre,
+        (d.Cantidad * d.Precio) AS Subtotal
+      FROM detallePedidosClientes d
+      LEFT JOIN colores c ON d.ColorId = c.ColorId
+      LEFT JOIN productos p ON d.ProductoId = p.ProductoId
+      LEFT JOIN servicios s ON d.ServicioId = s.ServicioId
+      WHERE d.PedidoClienteId = ?
+    `;
+
+    const [rows] = await dbPool.execute(query, [PedidoClienteId]);
+    return rows;
     
-    // Calcular subtotal
-    const detallesConSubtotal = rows.map(row => ({
-      ...row,
-      Subtotal: (row.Cantidad || 0) * (row.Precio || 0),
-      // 🔴 ELIMINADO: Tamaño y UrlImagenPersonalizada ya no se usan
-    }));
-    
-    console.log(`✅ [MODEL] Detalles cargados: ${detallesConSubtotal.length}`);
-    return detallesConSubtotal;
   } catch (error) {
-    console.error("❌ [MODEL] Error en getDetallePedidoByPedidoIdModel:", error);
-    throw error;
+    console.error('❌ Error en getDetallePedidoByPedidoIdModel:', error);
+    return [];
   }
 };
 

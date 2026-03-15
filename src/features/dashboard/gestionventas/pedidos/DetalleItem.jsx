@@ -1,5 +1,5 @@
-import React from "react";
-import { Package, Trash2, X, Upload, FileText } from "lucide-react";
+import React, { useState } from "react";
+import { Package, Trash2, X, Upload, FileText, Palette } from "lucide-react";
 import { getColorById, formatPrice } from "../pedidos/utils/pedidosHelpers";
 
 export const DetalleItem = ({
@@ -18,18 +18,22 @@ export const DetalleItem = ({
   onAbrirColores,
   onActualizar,
   onEliminar,
-  onUploadArchivo, // Cambiado de onUploadImagen
-  onEliminarArchivo, // Nueva prop
+  onUploadArchivo,
+  onEliminarArchivo,
   puedeEliminar = true
 }) => {
+  const [mostrarOpcionesStock, setMostrarOpcionesStock] = useState(false);
   const subtotal = (detalle.Cantidad || 0) * (detalle.Precio || 0);
+
+  // Tipo de stock: 'general' o 'por_color'
+  const tipoStock = detalle.tipoStock || 'general';
 
   // Función para determinar el ícono según el tipo de archivo
   const getFileIcon = (tipoArchivo, url) => {
     if (!url) return <Upload size={24} className="text-blue-500" />;
     
     if (tipoArchivo?.startsWith('image/')) {
-      return null; // Se maneja con img
+      return null;
     }
     
     if (url.match(/\.pdf$/i) || tipoArchivo === 'application/pdf') {
@@ -54,8 +58,18 @@ export const DetalleItem = ({
     return parts[parts.length - 1] || 'Archivo';
   };
 
+  // Cambiar tipo de stock
+  const cambiarTipoStock = (nuevoTipo) => {
+    onActualizar(index, 'tipoStock', nuevoTipo);
+    if (nuevoTipo === 'general') {
+      onActualizar(index, 'ColorId', null);
+    }
+    setMostrarOpcionesStock(false);
+  };
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4">
+      {/* Fila principal - MANTENIENDO LA MISMA DISTRIBUCIÓN */}
       <div className="grid grid-cols-12 gap-4 items-start">
         {/* Tipo - Select */}
         <div className="col-span-1">
@@ -122,39 +136,39 @@ export const DetalleItem = ({
           )}
         </div>
 
-        {/* Color/Tamaño */}
+        {/* Tipo de Stock (solo productos) */}
         <div className="col-span-2">
-          {esServicio ? (
-            <select
-              value={detalle.Tamaño || "Mediana"}
-              onChange={(e) => onActualizar(index, "Tamaño", e.target.value)}
-              disabled={!itemSeleccionado}
-              className={`w-full px-3 py-2 border rounded-lg text-sm ${
-                !itemSeleccionado ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''
-              }`}
-            >
-              <option value="Pequeña">Pequeña</option>
-              <option value="Mediana">Mediana</option>
-              <option value="Grande">Grande</option>
-            </select>
-          ) : (
-            <button
-              onClick={() => onAbrirColores(index)}
-              disabled={!itemSeleccionado}
-              className={`w-full px-3 py-2 border rounded-lg text-left flex items-center gap-2 text-sm ${
-                !itemSeleccionado ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'
-              }`}
-            >
-              {detalle.ColorId && colorInfo && (
-                <div
-                  className="w-4 h-4 rounded-full border"
-                  style={{ backgroundColor: colorInfo.Hex }}
-                />
+          {!esServicio && itemSeleccionado ? (
+            <div className="relative">
+              <button
+                onClick={() => setMostrarOpcionesStock(!mostrarOpcionesStock)}
+                className="w-full px-3 py-2 border rounded-lg text-left flex items-center justify-between text-sm bg-white hover:bg-slate-50"
+              >
+                <span>
+                  {tipoStock === 'general' ? 'Stock General' : 'Stock x Color'}
+                </span>
+                <span className="text-xs text-slate-400">▼</span>
+              </button>
+              
+              {mostrarOpcionesStock && (
+                <div className="absolute top-full left-0 mt-1 w-full bg-white border rounded-lg shadow-lg z-20">
+                  <button
+                    onClick={() => cambiarTipoStock('general')}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 rounded-t-lg"
+                  >
+                    Stock General
+                  </button>
+                  <button
+                    onClick={() => cambiarTipoStock('por_color')}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-purple-50 rounded-b-lg"
+                  >
+                    Stock por Color
+                  </button>
+                </div>
               )}
-              <span className="truncate text-slate-700">
-                {detalle.ColorId ? colorInfo?.Nombre : "Sin color"}
-              </span>
-            </button>
+            </div>
+          ) : (
+            <span className="text-sm text-slate-400 px-2">—</span>
           )}
         </div>
 
@@ -163,10 +177,12 @@ export const DetalleItem = ({
           <input
             type="number"
             min="1"
-            value={detalle.Cantidad}
+            value={detalle.Cantidad || 1}
             onChange={(e) => onActualizar(index, "Cantidad", parseInt(e.target.value) || 1)}
-            className="w-full px-3 py-2 border rounded-lg text-center text-sm"
-            disabled={!itemSeleccionado}
+            className={`w-full px-3 py-2 border rounded-lg text-center text-sm ${
+              tipoStock === 'por_color' ? 'bg-slate-100 opacity-60' : ''
+            }`}
+            disabled={!itemSeleccionado || tipoStock === 'por_color'}
           />
         </div>
 
@@ -176,7 +192,7 @@ export const DetalleItem = ({
             type="number"
             step="0.01"
             min="0"
-            value={detalle.Precio}
+            value={detalle.Precio || 0}
             onChange={(e) => onActualizar(index, "Precio", parseFloat(e.target.value) || 0)}
             className="w-full px-3 py-2 border rounded-lg text-right text-sm"
             disabled={!itemSeleccionado}
@@ -203,8 +219,53 @@ export const DetalleItem = ({
           )}
         </div>
       </div>
+
+      {/* FILA DE COLOR (solo para productos con stock por color) - Aparece debajo */}
+      {!esServicio && itemSeleccionado && tipoStock === 'por_color' && (
+        <div className="mt-3 pl-[16.66%] grid grid-cols-12 gap-4">
+          <div className="col-span-3">
+            <button
+              onClick={() => onAbrirColores(index)}
+              className={`w-full px-3 py-2 border rounded-lg text-left flex items-center gap-2 text-sm ${
+                !itemSeleccionado ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'
+              }`}
+            >
+              {detalle.ColorId && colorInfo ? (
+                <>
+                  <div
+                    className="w-4 h-4 rounded-full border"
+                    style={{ backgroundColor: colorInfo.Hex || colorInfo.CodigoHex }}
+                  />
+                  <span className="truncate text-slate-700">{colorInfo.Nombre}</span>
+                </>
+              ) : (
+                <>
+                  <Palette size={16} className="text-purple-600" />
+                  <span className="text-slate-500">Seleccionar color</span>
+                </>
+              )}
+            </button>
+          </div>
+          
+          {/* Mensaje de stock por color */}
+          <div className="col-span-8 flex items-center text-xs text-slate-500">
+            {detalle.ColorId ? (
+              <span className="text-green-600">✓ Color seleccionado</span>
+            ) : (
+              <span className="text-amber-600">⚠️ Debe seleccionar un color</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* FILA DE STOCK GENERAL (solo para productos con stock general) */}
+      {!esServicio && itemSeleccionado && tipoStock === 'general' && (
+        <div className="mt-2 pl-[16.66%] text-xs text-slate-500">
+          Stock disponible: <span className="font-medium text-slate-700">{detalle.Stock || 1}</span>
+        </div>
+      )}
       
-      {/* 🔴 SECCIÓN PARA SUBIR ARCHIVOS - SOLO PARA SERVICIOS */}
+      {/* SECCIÓN PARA SUBIR ARCHIVOS - SOLO PARA SERVICIOS */}
       {esServicio && itemSeleccionado && (
         <div className="mt-3 pl-[8.33%]">
           <div className="border border-dashed border-slate-300 rounded-lg p-4 bg-slate-50">
@@ -215,7 +276,6 @@ export const DetalleItem = ({
             
             {detalle.UrlImagenPersonalizada ? (
               <div className="flex items-start gap-4">
-                {/* Vista previa según el tipo de archivo */}
                 <div className="w-16 h-16 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
                   {detalle.tipoArchivo?.startsWith('image/') ? (
                     <img 
@@ -253,18 +313,10 @@ export const DetalleItem = ({
                     if (file) {
                       onUploadArchivo?.(index, file);
                     }
-                    // Limpiar el input para poder subir el mismo archivo nuevamente
                     e.target.value = '';
                   }}
                   className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                 />
-                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-                  <span className="bg-white px-2 py-1 rounded border">📷 Imágenes</span>
-                  <span className="bg-white px-2 py-1 rounded border">📄 PDF</span>
-                  <span className="bg-white px-2 py-1 rounded border">📝 Word</span>
-                  <span className="bg-white px-2 py-1 rounded border">📊 Excel</span>
-                  <span className="bg-white px-2 py-1 rounded border">📃 TXT</span>
-                </div>
                 <p className="text-xs text-slate-400 mt-2">Máximo 10MB por archivo</p>
               </div>
             )}
@@ -272,19 +324,9 @@ export const DetalleItem = ({
         </div>
       )}
       
-      {/* Mensaje de stock si es producto y está seleccionado */}
-      {!esServicio && itemSeleccionado && (
-        <div className="mt-2 text-xs text-slate-500 flex items-center gap-2">
-          <span className="font-medium">Stock: {detalle.Stock || 1}</span>
-          {!detalle.ColorId && (
-            <span className="text-amber-600">• Debe seleccionar un color</span>
-          )}
-        </div>
-      )}
-      
       {/* Mensaje de error si no hay item seleccionado */}
       {!itemSeleccionado && (
-        <div className="mt-2 text-xs text-amber-600">
+        <div className="mt-2 text-xs text-amber-600 pl-[16.66%]">
           • Debe seleccionar un {esServicio ? 'servicio' : 'producto'}
         </div>
       )}
