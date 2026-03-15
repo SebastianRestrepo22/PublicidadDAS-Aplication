@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, ChevronRight, Package, Palette, Trash2 } from "lucide-react";
 import { ProductoColoresModal } from "../../../productos/components/ProductoColoresModal";
+import { ComprasSelectProveedorSimple } from "../components/ComprasSelectProveedorSimple";
+import { toast } from "react-toastify";
 
 const formatPrice = (value) => {
   const num = Number(value);
@@ -24,172 +26,185 @@ export const ComprasCreate = ({
   proveedores,
   errores,
   onBack,
-  onSelectProveedor,
   onSelectProducto,
   onActualizarDetalle,
   onAñadirDetalle,
   onEliminarDetalle,
   onCreate,
-  getProveedorDisplay,
   getProductoDisplay,
   calcularTotal
 }) => {
+
   const [showColorModal, setShowColorModal] = useState(false);
   const [detalleIndexColor, setDetalleIndexColor] = useState(null);
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const [coloresTemp, setColoresTemp] = useState([]);
 
-  // Log para ver qué colores está recibiendo
-  useEffect(() => {
-    console.log("Colores recibidos en ComprasCreate:", colores);
-  }, [colores]);
-
-  // Inicializar FechaRegistro con la fecha actual si no existe
   useEffect(() => {
     if (!formCrear.FechaRegistro) {
       setFormCrear(prev => ({ ...prev, FechaRegistro: getTodayDate() }));
     }
   }, [formCrear.FechaRegistro, setFormCrear]);
 
-  // Función para abrir selector de color
   const abrirSelectorColor = (index, producto) => {
-    console.log("abrirSelectorColor llamado con:", { index, producto });
-    console.log("Colores disponibles en BD:", colores);
-
-    if (producto) {
-      setDetalleIndexColor(index);
-      setProductoSeleccionado(producto);
-
-      // Obtener los colores existentes del detalle
-      const coloresExistentes = detallesCrear[index]?.colores || [];
-      console.log("coloresExistentes en detalle:", coloresExistentes);
-
-      // Convertir los colores existentes a objetos completos
-      const coloresCompletos = coloresExistentes.map(colorExistente => {
-        const colorInfo = colores.find(c => c.ColorId === colorExistente.ColorId);
-        return {
-          ColorId: colorExistente.ColorId,
-          Stock: Number(colorExistente.Stock) || 0,
-          Nombre: colorInfo?.Nombre || colorExistente.Nombre || "Color",
-          Hex: colorInfo?.Hex || colorExistente.Hex || "#CCCCCC"
-        };
-      });
-
-      console.log("coloresCompletos a enviar al modal:", coloresCompletos);
-      setColoresTemp(coloresCompletos);
-      setShowColorModal(true);
+    if (!producto) {
+      toast.warning("Debe seleccionar un producto primero");
+      return;
     }
+
+    const usaColores = producto.UsaColores === 1 || producto.UsaColores === true || producto.UsaColores === "1";
+
+    if (!usaColores) {
+      toast.warning("Este producto no tiene configuración de colores");
+      return;
+    }
+
+    setDetalleIndexColor(index);
+    setProductoSeleccionado(producto);
+
+    const coloresExistentes = detallesCrear[index]?.colores || [];
+
+    if (!colores || colores.length === 0) {
+      toast.warning("No hay colores disponibles");
+      return;
+    }
+
+    const coloresCompletos = coloresExistentes.map(colorExistente => {
+      const colorInfo = colores.find(c => c.ColorId === colorExistente.ColorId);
+      return {
+        ColorId: colorExistente.ColorId,
+        Stock: Number(colorExistente.Stock) || 0,
+        Nombre: colorInfo?.Nombre || colorExistente.Nombre || "Color",
+        Hex: colorInfo?.Hex || colorExistente.Hex || "#CCCCCC"
+      };
+    });
+
+    setColoresTemp(coloresCompletos);
+    setShowColorModal(true);
   };
 
   const manejarSetColoresConStock = (nuevosColores) => {
-  console.log("manejarSetColoresConStock recibió:", nuevosColores);
-  
-  let coloresArray;
-  
-  if (typeof nuevosColores === 'function') {
-    console.log("Es una función, ejecutando con coloresTemp:", coloresTemp);
-    coloresArray = nuevosColores(coloresTemp);
-  } else {
-    coloresArray = nuevosColores;
-  }
-  
-  // Asegurar que sea un array
-  if (!Array.isArray(coloresArray)) {
-    console.error("Error: coloresArray no es un array", coloresArray);
-    coloresArray = [];
-  }
-  
-  // Crear objetos planos
-  const coloresPlanos = coloresArray.map(color => ({
-    ColorId: String(color.ColorId || color.colorId || ''),
-    Stock: Number(color.Stock || color.stock || 0),
-    Nombre: String(color.Nombre || color.nombre || 'Color'),
-    Hex: String(color.Hex || color.hex || '#CCCCCC')
-  }));
-  
-  console.log("Colores planos:", coloresPlanos);
-  
-  // Actualizar el estado local
-  setColoresTemp(coloresPlanos);
-  
-  // Actualizar el detalle inmediatamente
-  if (detalleIndexColor !== null) {
-    const cantidadTotal = coloresPlanos.reduce((sum, c) => {
-      return sum + (Number(c.Stock) || 0);
-    }, 0);
-    
-    onActualizarDetalle(detalleIndexColor, "colores", coloresPlanos);
-    onActualizarDetalle(detalleIndexColor, "Cantidad", cantidadTotal);
-  }
-};
+    let coloresArray;
 
- // En guardarColoresDesdeModal
-const guardarColoresDesdeModal = () => {
-  console.log("guardarColoresDesdeModal llamado, coloresTemp actuales:", coloresTemp);
-  
-  if (detalleIndexColor !== null) {
-    // IMPORTANTE: Crear objetos PLANOS, no objetos con métodos o referencias circulares
-    const coloresParaGuardar = coloresTemp.map(color => {
-      // Crear un objeto nuevo y plano
-      return {
-        ColorId: String(color.ColorId || ''),
-        Stock: Number(color.Stock || 0),
-        Nombre: String(color.Nombre || 'Color'),
-        Hex: String(color.Hex || '#CCCCCC')
-      };
-    });
-    
-    console.log("Colores para guardar (objetos planos):", coloresParaGuardar);
-    
-    const cantidadTotal = coloresParaGuardar.reduce((sum, c) => {
-      return sum + (Number(c.Stock) || 0);
-    }, 0);
-    
-    // Actualizar el detalle
-    onActualizarDetalle(detalleIndexColor, "colores", coloresParaGuardar);
-    onActualizarDetalle(detalleIndexColor, "Cantidad", cantidadTotal);
-    onActualizarDetalle(detalleIndexColor, "tipoStock", "colores");
-    
-    // Cerrar el modal
-    setShowColorModal(false);
-    setDetalleIndexColor(null);
-    setProductoSeleccionado(null);
-    setColoresTemp([]);
-  }
-};
+    if (typeof nuevosColores === 'function') {
+      coloresArray = nuevosColores(coloresTemp);
+    } else {
+      coloresArray = nuevosColores;
+    }
 
-  // Función para cerrar el modal sin guardar
+    if (!Array.isArray(coloresArray)) {
+      coloresArray = [];
+    }
+
+    const coloresPlanos = coloresArray.map(color => ({
+      ColorId: String(color.ColorId || color.colorId || ''),
+      Stock: Number(color.Stock || color.stock || 0),
+      Nombre: String(color.Nombre || color.nombre || 'Color'),
+      Hex: String(color.Hex || color.hex || '#CCCCCC')
+    }));
+
+    setColoresTemp(coloresPlanos);
+
+    if (detalleIndexColor !== null) {
+      const cantidadTotal = coloresPlanos.reduce((sum, c) => {
+        return sum + (Number(c.Stock) || 0);
+      }, 0);
+
+      onActualizarDetalle(detalleIndexColor, "colores", coloresPlanos);
+      onActualizarDetalle(detalleIndexColor, "Cantidad", cantidadTotal);
+    }
+  };
+
+  const guardarColoresDesdeModal = () => {
+    if (detalleIndexColor !== null) {
+      const coloresParaGuardar = coloresTemp.map(color => {
+        return {
+          ColorId: String(color.ColorId || ''),
+          Stock: Number(color.Stock || 0),
+          Nombre: String(color.Nombre || 'Color'),
+          Hex: String(color.Hex || '#CCCCCC')
+        };
+      });
+
+      const cantidadTotal = coloresParaGuardar.reduce((sum, c) => {
+        return sum + (Number(c.Stock) || 0);
+      }, 0);
+
+      onActualizarDetalle(detalleIndexColor, "colores", coloresParaGuardar);
+      onActualizarDetalle(detalleIndexColor, "Cantidad", cantidadTotal);
+      onActualizarDetalle(detalleIndexColor, "tipoStock", "colores");
+
+      setShowColorModal(false);
+      setDetalleIndexColor(null);
+      setProductoSeleccionado(null);
+      setColoresTemp([]);
+    }
+  };
+
   const cerrarModalSinGuardar = () => {
-    console.log("Cerrando modal sin guardar");
     setShowColorModal(false);
     setDetalleIndexColor(null);
     setProductoSeleccionado(null);
     setColoresTemp([]);
   };
 
-  // Función para cambiar tipo de stock
   const handleTipoStockChange = (index, tipo) => {
-    console.log("handleTipoStockChange:", { index, tipo });
-
-    // Actualizar el tipo de stock
     onActualizarDetalle(index, "tipoStock", tipo);
 
     if (tipo === 'general') {
-      // Si cambia a general, limpiar colores
       onActualizarDetalle(index, "colores", []);
       onActualizarDetalle(index, "Cantidad", 1);
     } else if (tipo === 'colores') {
-      // Si cambia a colores, verificar si ya tiene colores seleccionados
       const tieneColores = detallesCrear[index]?.colores?.length > 0;
 
       if (!tieneColores) {
-        // Si no tiene colores, abrir modal automáticamente
-        const producto = productos.find(p => p.ProductoId === detallesCrear[index].ProductoId);
-        console.log("Producto encontrado para modal automático:", producto);
+        const productoId = detallesCrear[index]?.ProductoId;
+
+        if (!productoId) {
+          toast.error("Debe seleccionar un producto primero");
+          onActualizarDetalle(index, "tipoStock", "general");
+          return;
+        }
+
+        const producto = productos?.find(p => p.ProductoId === productoId);
+
         if (producto) {
+          const usaColores = producto.UsaColores === 1 || producto.UsaColores === true || producto.UsaColores === "1";
+
+          if (!usaColores) {
+            toast.warning("Este producto no tiene configuración de colores");
+            onActualizarDetalle(index, "tipoStock", "general");
+            return;
+          }
+
           abrirSelectorColor(index, producto);
+        } else {
+          toast.error("Error: Producto no encontrado en la lista");
+          onActualizarDetalle(index, "tipoStock", "general");
         }
       }
+    }
+  };
+
+  // ✅ Función para manejar cambios en cantidad: permite editar, bloquea negativos y cero
+  const handleCantidadChange = (index, value) => {
+    // Permitir vacío mientras el usuario escribe
+    if (value === '') {
+      onActualizarDetalle(index, "Cantidad", '');
+      return;
+    }
+    // Solo permitir números positivos
+    const num = Number(value);
+    if (num > 0) {
+      onActualizarDetalle(index, "Cantidad", value);
+    }
+  };
+
+  // ✅ Validar al perder el foco: si está vacío o es inválido, restaurar a 1
+  const handleCantidadBlur = (index, value) => {
+    const num = Number(value);
+    if (!value || isNaN(num) || num <= 0) {
+      onActualizarDetalle(index, "Cantidad", 1);
     }
   };
 
@@ -218,17 +233,24 @@ const guardarColoresDesdeModal = () => {
 
         {/* Información General */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* PROVEEDOR CON SELECT SIMPLE - Solo muestra nombre, no ID */}
           <div className="flex flex-col gap-1">
             <label className="font-medium text-sm">Proveedor *</label>
-            <button
-              type="button"
-              onClick={() => onSelectProveedor("create")}
-              className="h-10 px-3 border rounded-lg bg-white hover:bg-gray-50 text-left flex items-center justify-between text-sm w-full"
-            >
-              <span className="truncate">{getProveedorDisplay(formCrear.ProveedorId, formCrear.nombreProveedor)}</span>
-              <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
-            </button>
+            <ComprasSelectProveedorSimple
+              proveedorId={formCrear.ProveedorId}
+              nombreProveedor={formCrear.nombreProveedor}
+              onSelectProveedor={(proveedor) => {
+                setFormCrear(prev => ({
+                  ...prev,
+                  ProveedorId: proveedor?.ProveedorId || "",
+                  nombreProveedor: proveedor?.NombreProveedor || "" // ✅ Solo guardamos el nombre para mostrar
+                }));
+              }}
+              error={errores.some(e => e.toLowerCase().includes('proveedor'))}
+            />
           </div>
+
+          {/* Fecha */}
           <div className="flex flex-col gap-1">
             <label className="font-medium text-sm">Fecha de registro *</label>
             <input
@@ -239,6 +261,8 @@ const guardarColoresDesdeModal = () => {
               disabled
             />
           </div>
+
+          {/* Total */}
           <div className="flex flex-col gap-1">
             <label className="font-medium text-sm">Total (Calculado)</label>
             <input
@@ -286,14 +310,14 @@ const guardarColoresDesdeModal = () => {
                 <div key={index} className="bg-gray-50 border rounded-lg p-4">
                   {/* Fila principal */}
                   <div className="grid grid-cols-12 gap-3 items-start">
-                    {/* Producto */}
+                    {/* Producto - ✅ Muestra solo el nombre, no el ID */}
                     <div className="col-span-4">
                       <button
                         type="button"
                         onClick={() => onSelectProducto("create", index)}
                         className={`w-full text-left flex items-center gap-2 p-2 rounded-lg border h-10 ${tieneProducto
-                            ? 'border-emerald-500 bg-emerald-50 hover:bg-emerald-100'
-                            : 'border-dashed border-gray-300 bg-white hover:border-emerald-400 hover:bg-emerald-50'
+                          ? 'border-emerald-500 bg-emerald-50 hover:bg-emerald-100'
+                          : 'border-dashed border-gray-300 bg-white hover:border-emerald-400 hover:bg-emerald-50'
                           }`}
                       >
                         <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${tieneProducto ? 'bg-emerald-500' : 'bg-gray-400'
@@ -303,7 +327,7 @@ const guardarColoresDesdeModal = () => {
                         <div className="flex-1 min-w-0">
                           <p className={`font-medium text-xs truncate ${tieneProducto ? 'text-emerald-800' : 'text-gray-500'
                             }`}>
-                            {producto?.Nombre || "Seleccionar producto"}
+                            {producto?.Nombre || "Seleccionar producto"} {/* ✅ Solo nombre */}
                           </p>
                           {producto?.SKU && (
                             <p className="text-[10px] text-gray-500 truncate">SKU: {producto.SKU}</p>
@@ -331,17 +355,17 @@ const guardarColoresDesdeModal = () => {
                       )}
                     </div>
 
-                    {/* Cantidad */}
+                    {/* Cantidad - ✅ Permite editar libremente, bloquea negativos y cero */}
                     <div className="col-span-2">
                       {tieneProducto ? (
                         tipoStock === 'general' ? (
                           <input
                             type="number"
-                            value={d.Cantidad || 1}
-                            onChange={(e) => onActualizarDetalle(index, "Cantidad", e.target.value)}
+                            value={d.Cantidad ?? 1}
+                            onChange={(e) => handleCantidadChange(index, e.target.value)}
+                            onBlur={(e) => handleCantidadBlur(index, e.target.value)}
                             className="w-full h-10 px-2 border rounded-lg text-xs text-center"
-                            min="1"
-                            placeholder="0"
+                            placeholder="1"
                           />
                         ) : (
                           <input
@@ -419,12 +443,16 @@ const guardarColoresDesdeModal = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              console.log("Botón Seleccionar colores clickeado");
-                              abrirSelectorColor(index, producto);
+                              if (producto) {
+                                abrirSelectorColor(index, producto);
+                              } else {
+                                toast.error("Debe seleccionar un producto primero");
+                                onActualizarDetalle(index, "tipoStock", "general");
+                              }
                             }}
                             className={`flex items-center gap-2 px-3 py-2 rounded-lg border w-full ${tieneColores
-                                ? 'border-purple-500 bg-purple-50'
-                                : 'border-dashed border-gray-300 bg-white hover:border-purple-400'
+                              ? 'border-purple-500 bg-purple-50'
+                              : 'border-dashed border-gray-300 bg-white hover:border-purple-400'
                               }`}
                           >
                             <Palette size={16} className={tieneColores ? 'text-purple-600' : 'text-gray-400'} />
@@ -514,7 +542,7 @@ const guardarColoresDesdeModal = () => {
         colores={colores}
         coloresConStock={coloresTemp}
         setColoresConStock={manejarSetColoresConStock}
-        onGuardar={guardarColoresDesdeModal} // ¡IMPORTANTE! Esta prop debe existir en tu modal
+        onGuardar={guardarColoresDesdeModal}
       />
     </>
   );

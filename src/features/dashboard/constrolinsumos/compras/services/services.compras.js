@@ -2,15 +2,61 @@ import axios from "axios";
 
 const API_URL = 'http://localhost:3000';
 
-// === Compras ===
+
+export const getComprasPaginated = async (page = 1, limit = 5, filtroCampo = null, filtroValor = null, sortBy = 'FechaRegistro', sortOrder = 'DESC') => {
+  try {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      sortBy,
+      sortOrder
+    });
+    
+    if (filtroCampo && filtroValor && filtroValor.trim() !== '') {
+      params.append('filtroCampo', filtroCampo);
+      params.append('filtroValor', filtroValor.trim());
+    }
+    
+    console.log("📤 getComprasPaginated - URL:", `${'http://localhost:3000'}/api/compras?${params}`);
+
+    const response = await axios.get(`${'http://localhost:3000'}/api/compras?${params}`);
+    
+    console.log("📥 Respuesta:", {
+      dataLength: response.data?.data?.length,
+      pagination: response.data?.pagination
+    });
+
+    // ✅ El backend ya devuelve { data, pagination }, lo retornamos tal cual
+    return response.data;
+    
+  } catch (error) {
+    console.error("❌ Error en getComprasPaginated:", error);
+    return { 
+      data: [], 
+      pagination: { 
+        totalItems: 0, 
+        totalPages: 1, 
+        currentPage: page, 
+        itemsPerPage: limit 
+      } 
+    };
+  }
+};
+
+export const buscarCompras = async (campo, valor, page = 1, limit = 5) => {
+  
+  return await getComprasPaginated(page, limit, campo, valor);
+};
+
+// ========== FUNCIONES PARA COMPATIBILIDAD ==========
 
 export const getAllCompras = async () => {
   try {
-    const response = await axios.get(`${'http://localhost:3000'}/api/compras`);
+    const response = await axios.get(`${'http://localhost:3000'}/api/compras/todas`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("Error en getAllCompras:", error);
-    throw error;
+    return [];
   }
 };
 
@@ -44,22 +90,16 @@ export const updateCompra = async (id, compraData) => {
   }
 };
 
-// Servicio específico para actualizar estado - USANDO PATCH
 export const updateCompraEstado = async (id, nuevoEstado, options = {}) => {
   try {
-    console.log("Llamando a PATCH:", { id, nuevoEstado, options }); // LOG PARA DEBUG
-    
     const response = await axios.patch(`${'http://localhost:3000'}/api/compras/${id}/estado`, {
       estado: nuevoEstado,
       productos: options.productos,
       motivoCancelacion: options.motivoCancelacion
     });
-    
-    console.log("Respuesta del servidor:", response.data); // LOG PARA DEBUG
     return response.data;
   } catch (error) {
     console.error("Error en updateCompraEstado:", error);
-    console.error("Detalles del error:", error.response?.data); // LOG PARA DEBUG
     throw error;
   }
 };
@@ -76,35 +116,16 @@ export const deleteCompra = async (id) => {
 
 export const getDetallesByCompraId = async (compraId) => {
   try {
-    console.log("🔵 [getDetallesByCompraId] Obteniendo detalles para compra:", compraId);
-    
-    // Cambia esta URL a la ruta correcta que definimos
-    const response = await fetch(`http://localhost:3000/api/detalle-compras/compra/${compraId}`);
-    
-    console.log("🟡 [getDetallesByCompraId] Response status:", response.status);
-    
-    if (!response.ok) {
-      console.error("🔴 [getDetallesByCompraId] Error response:", response.status, response.statusText);
-      return []; // Retornar array vacío en caso de error
-    }
-    
-    const data = await response.json();
-    console.log("🟢 [getDetallesByCompraId] Datos recibidos:", data);
-    
-    // Asegurarse de que siempre retorne un array
-    return Array.isArray(data) ? data : [];
-    
+    const response = await axios.get(`${'http://localhost:3000'}/api/detalle-compras/compra/${compraId}`);
+    return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
-    console.error("🔴 [getDetallesByCompraId] Error en getDetallesByCompraId:", error);
-    return []; // Retornar array vacío en caso de error
+    console.error("Error en getDetallesByCompraId:", error);
+    return [];
   }
 };
 
 export const createDetalleCompra = async (detalleData) => {
   try {
-    console.log("🔵 Datos recibidos en createDetalleCompra:", detalleData);
-    
-    // Crear una copia profunda de los datos
     const dataToSend = {
       CompraId: detalleData.CompraId,
       ProductoId: detalleData.ProductoId,
@@ -113,127 +134,89 @@ export const createDetalleCompra = async (detalleData) => {
       Descripcion: detalleData.Descripcion || null
     };
     
-    // Procesar colores CORRECTAMENTE
     if (detalleData.colores && Array.isArray(detalleData.colores) && detalleData.colores.length > 0) {
-      console.log("Procesando colores:", detalleData.colores);
-      
-      // Asegurar que cada color sea un objeto plano con los campos correctos
-      const coloresProcesados = detalleData.colores.map(color => {
-        // Si el color ya es un objeto, extraer sus propiedades
-        if (typeof color === 'object' && color !== null) {
-          return {
-            ColorId: String(color.ColorId || color.colorId || ''),
-            Stock: Number(color.Stock || color.stock || 0),
-            Nombre: String(color.Nombre || color.nombre || 'Color'),
-            Hex: String(color.Hex || color.hex || '#CCCCCC')
-          };
-        }
-        return color;
-      });
-      
-      console.log("Colores procesados:", coloresProcesados);
-      
-      // Enviar el array directamente, el modelo se encargará de stringify
+      const coloresProcesados = detalleData.colores.map(color => ({
+        ColorId: String(color.ColorId || color.colorId || ''),
+        Stock: Number(color.Stock || color.stock || 0),
+        Nombre: String(color.Nombre || color.nombre || 'Color'),
+        Hex: String(color.Hex || color.hex || '#CCCCCC')
+      }));
       dataToSend.colores = coloresProcesados;
     } else {
       dataToSend.colores = [];
     }
     
-    console.log("🔵 Enviando a BD:", dataToSend);
-    
-    const response = await fetch(`http://localhost:3000/api/detalle-compras`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(dataToSend)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("🔴 Respuesta error:", errorText);
-      throw new Error(`Error HTTP: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log("🟢 Respuesta BD:", result);
-    return result;
-    
-  } catch (error) {
-    console.error("🔴 Error en createDetalleCompra:", error);
-    throw error;
-  }
-};
-
-// === Catálogos ===
-export const getAllProductos = async () => {
-  try {
-    const response = await axios.get(`${'http://localhost:3000'}/producto`);
-    return Array.isArray(response.data) ? response.data : [];
-  } catch (error) {
-    console.error("Error en getAllProductos:", error);
-    throw error;
-  }
-};
-
-export const getAllProveedores = async () => {
-  try {
-    const response = await axios.get(`${'http://localhost:3000'}/api/proveedores`);
+    const response = await axios.post(`${'http://localhost:3000'}/api/detalle-compras`, dataToSend);
     return response.data;
   } catch (error) {
-    console.error("Error en getAllProveedores:", error);
+    console.error("Error en createDetalleCompra:", error);
     throw error;
   }
 };
 
-export const getProveedoresPaginados = async (page = 1, limit = 5, search = "") => {
+// ========== PRODUCTOS ==========
+
+export const getAllProductos = async () => {
   try {
-    const params = new URLSearchParams();
-    params.set("page", page);
-    params.set("limit", limit);
-    if (search) params.set("search", search);
-
-    const response = await axios.get(`${'http://localhost:3000'}/api/proveedores?${params.toString()}`);
-
-    if (response.data && Array.isArray(response.data.data)) {
-      return {
-        data: response.data.data,
-        total: response.data.total || response.data.data.length,
-      };
-    } else if (Array.isArray(response.data)) {
-      const total = response.data.length;
-      const start = (page - 1) * limit;
-      const paginated = response.data.slice(start, start + limit);
-      return {
-        data: paginated,
-        total,
-      };
-    } else {
-      return { data: [], total: 0 };
-    }
+    const params = {
+      page: "1",
+      limit: "1000"  // Límite alto para obtener todos
+    };
+    
+    const response = await axios.get(`${'http://localhost:3000'}/producto`, { params });
+    
+    return response.data?.data || [];
   } catch (error) {
-    console.error("Error en getProveedoresPaginados:", error);
-    throw error;
+    console.error("Error en getAllProductos:", error);
+    return [];
   }
 };
 
-export const getProductosPaginados = async (page = 1, limit = 5, search = "") => {
+export const buscarProductosPorCampo = async (campo, valor, page = 1, limit = 5) => {
   try {
-    const params = new URLSearchParams();
-    params.set("page", page);
-    params.set("limit", limit);
-    if (search) params.set("search", search);
+    const params = {
+      page: page.toString(),
+      limit: limit.toString()
+    };
+    
+    if (campo && valor && valor.trim() !== "") {
+      params.filtroCampo = campo;
+      params.filtroValor = valor.trim();
+    }
 
-    const response = await axios.get(`${'http://localhost:3000'}/producto?${params.toString()}`);
+    const response = await axios.get(`${'http://localhost:3000'}/producto`, { params });
     
-    const data = Array.isArray(response.data) ? response.data : [];
-    
-    return { 
-      data, 
-      total: data.length 
+    return {
+      data: response.data?.data || [],
+      total: response.data?.pagination?.totalItems || 0,
+      pages: response.data?.pagination?.totalPages || 1
     };
   } catch (error) {
-    console.error("Error en getProductosPaginados:", error);
-    throw error;
+    console.error("Error en buscarProductosPorCampo:", error);
+    return { data: [], total: 0, pages: 1 };
+  }
+};
+
+// ========== PROVEEDORES ==========
+
+export const getAllProveedoresSimple = async () => {
+  try {
+    const response = await axios.get(`${'http://localhost:3000'}/api/proveedores/todos`);
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error("Error al cargar proveedores:", error);
+    return [];
+  }
+};
+
+// ========== COLORES ==========
+
+export const getAllColores = async () => {
+  try {
+    const response = await axios.get(`${'http://localhost:3000'}/colores`);
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error("Error al cargar colores:", error);
+    return [];
   }
 };

@@ -1,46 +1,78 @@
 import axios from "axios";
 
-const url = "http://localhost:3000/api/";
+const url = 'http://localhost:3000/api/';
 
-// Listar todas las categorías
 export const getAllCategorias = async () => {
   try {
-    const response = await axios.get(url + "categorias");
-    return response;
+    //  Cambiar "all" por "todas" para coincidir con el backend
+    const response = await axios.get('http://localhost:3000/api/categorias/todas');
+    return response.data;  //  Devolver solo los datos, no el response completo
   } catch (error) {
-    return { status: false, message: "No está la API de categorías", error };
+    console.error("Error en getAllCategorias:", error);
+    return [];  //  Devolver array vacío para no romper el frontend
+  }
+};
+
+export const getCategoriasPaginated = async (page = 1, limit = 10, filtroCampo = null, filtroValor = null) => {
+  try {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(filtroCampo && filtroValor && { filtroCampo, filtroValor })
+    });
+    
+    const response = await axios.get(`${'http://localhost:3000/api/'}categorias?${params}`);
+    return response.data; // Devuelve { data: [...], pagination: {...} }
+  } catch (error) {
+    console.error("Error al obtener categorías paginadas:", error);
+    return { data: [], pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } };
+  }
+};
+
+// 🔥 NUEVA FUNCIÓN: Buscar categorías con paginación
+export const buscarCategorias = async (campo, valor, page = 1, limit = 10) => {
+  try {
+    const params = new URLSearchParams({
+      campo,
+      valor,
+      page: page.toString(),
+      limit: limit.toString()
+    });
+    
+    const response = await axios.get(`${'http://localhost:3000/api/'}categorias/buscar?${params}`);
+    return response.data; // Devuelve { data: [...], pagination: {...} }
+  } catch (error) {
+    console.error("Error al buscar categorías:", error);
+    return { data: [], pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } };
   }
 };
 
 // Obtener una categoría por ID
 export const getCategoriaById = async (id) => {
   try {
-    const response = await axios.get(`${url}categorias/${id}`);
+    const response = await axios.get(`${'http://localhost:3000/api/'}categorias/${id}`);
     return response;
   } catch (error) {
     return { status: false, message: "No se puede obtener la categoría", error };
   }
 };
 
-// Crear una nueva categoría
+// ✅ Crear categoría - CORREGIDO
 export const createCategoria = async (data) => {
-  try {
-    const response = await axios.post(url + "categorias", data);
-    return response;
-  } catch (error) {
-    return { status: false, message: "No se puede crear la categoría", error };
-  }
+  const response = await axios.post(`${'http://localhost:3000/api/'}categorias`, data);
+  return response; // Devuelve response de axios (con .status)
+  // Si hay error, axios lo lanza automáticamente → el hook lo captura en catch
 };
 
+
+// ✅ Actualizar categoría - CORREGIDO  
 export const updateCategoria = async (id, data) => {
-    const result = await categoriaModel.updateCategoria(id. data);
-    if (result.affectedRows === 0) throw new Error(" Categoria no encontrada");
-    return result;
+  const response = await axios.put(`${'http://localhost:3000/api/'}categorias/${id}`, data);
+  return response;
 };
 
-export const deleteCategoria = async (data) => {
-    const result = await categoriaModel.deleteCategoria(id);
-    if (result.affectedRows === 0 ) throw new Error("Categoria no encontrada");
-    return result;
-    
+// ✅ Eliminar categoría - CORREGIDO
+export const deleteCategoria = async (id) => {
+  const response = await axios.delete(`${'http://localhost:3000/api/'}categorias/${id}`);
+  return response;
 };

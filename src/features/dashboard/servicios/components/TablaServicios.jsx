@@ -53,7 +53,7 @@ export const TablaServicios = ({
                             return (
                                 <tr key={p.ServicioId} className={`hover:bg-gray-50 ${estado === 'Inactivo' ? 'bg-gray-50 opacity-75' : ''}`}>
                                     <td className="py-3 px-4 text-sm text-gray-700" title={p.ServicioId}>
-                                        {p.ServicioId.slice(0, 3)}...
+                                        {p.ServicioId.slice(0, 3)}
                                     </td>
                                     <td className="py-3 px-4 text-sm font-medium">{p.Nombre}</td>
                                     <td className="py-3 px-4">

@@ -1,94 +1,130 @@
 import axios from "axios";
 const API_BASE = 'http://localhost:3000/api';
 
-// === Proveedores ===
+// ========== FUNCIONES CON PAGINACIÓN (PARA TU MÓDULO) ==========
 
 /**
- * Obtiene todos los proveedores
+ * Obtiene proveedores con paginación
+ * @param {number} page - Página actual
+ * @param {number} limit - Límite por página
+ * @param {string} filtroCampo - Campo para filtrar
+ * @param {string} filtroValor - Valor del filtro
+ * @returns {Object} { data: Array, pagination: {...} }
+ */
+export const getProveedoresPaginated = async (page = 1, limit = 5, filtroCampo = null, filtroValor = null) => {
+  try {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(filtroCampo && filtroValor && { filtroCampo, filtroValor })
+    });
+    
+    const response = await axios.get(`${'http://localhost:3000/api'}/proveedores?${params}`);
+    return response.data; // Devuelve { data: [...], pagination: {...} }
+  } catch (error) {
+    console.error("Error al obtener proveedores paginados:", error);
+    return { data: [], pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } };
+  }
+};
+
+/**
+ * Busca proveedores con paginación
+ * @param {string} campo - Campo a buscar
+ * @param {string} valor - Valor a buscar
+ * @param {number} page - Página actual
+ * @param {number} limit - Límite por página
+ * @returns {Object} { data: Array, pagination: {...} }
+ */
+export const buscarProveedores = async (campo, valor, page = 1, limit = 5) => {
+  try {
+    const params = new URLSearchParams({
+      campo,
+      valor,
+      page: page.toString(),
+      limit: limit.toString()
+    });
+    
+    const response = await axios.get(`${'http://localhost:3000/api'}/proveedores/buscar?${params}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error al buscar proveedores:", error);
+    return { data: [], pagination: { totalItems: 0, totalPages: 1, currentPage: 1, itemsPerPage: limit } };
+  }
+};
+
+// ========== FUNCIONES PARA COMPATIBILIDAD ==========
+
+/**
+ * Obtiene TODOS los proveedores (sin paginación) - para compatibilidad
  * @returns {Array} Lista de proveedores
  */
 export const getAllProveedores = async () => {
-  const response = await axios.get(`${'http://localhost:3000/api'}/proveedores`);
-  return Array.isArray(response.data) ? response.data : [];
+  try {
+    const response = await axios.get(`${'http://localhost:3000/api'}/proveedores/todos`);
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error("Error al obtener todos los proveedores:", error);
+    return [];
+  }
 };
 
 /**
  * Obtiene un proveedor por su ID
- * @param {number|string} id - ID del proveedor
+ * @param {string} id - ID del proveedor
  * @returns {Object} Datos del proveedor
  */
 export const getProveedorById = async (id) => {
-  const response = await axios.get(`${'http://localhost:3000/api'}/proveedores/${id}`);
-  return response.data;
+  try {
+    const response = await axios.get(`${'http://localhost:3000/api'}/proveedores/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error al obtener proveedor por ID:", error);
+    throw error;
+  }
 };
 
 /**
  * Crea un nuevo proveedor
- * @param {Object} proveedorData - Datos del proveedor (nombreProveedor, telefono, correo, direccion, estado)
+ * @param {Object} proveedorData - Datos del proveedor
  * @returns {Object} El proveedor creado
  */
 export const createProveedor = async (proveedorData) => {
-  const response = await axios.post(`${'http://localhost:3000/api'}/proveedores`, proveedorData);
-  return response.data;
+  try {
+    const response = await axios.post(`${'http://localhost:3000/api'}/proveedores`, proveedorData);
+    return response.data;
+  } catch (error) {
+    console.error("Error al crear proveedor:", error);
+    throw error;
+  }
 };
 
 /**
  * Actualiza un proveedor existente
- * @param {number|string} id - ID del proveedor
+ * @param {string} id - ID del proveedor
  * @param {Object} proveedorData - Datos actualizados
  * @returns {Object} Resultado de la actualización
  */
 export const updateProveedor = async (id, proveedorData) => {
-  const response = await axios.put(`${'http://localhost:3000/api'}/proveedores/${id}`, proveedorData);
-  return response.data;
+  try {
+    const response = await axios.put(`${'http://localhost:3000/api'}/proveedores/${id}`, proveedorData);
+    return response.data;
+  } catch (error) {
+    console.error("Error al actualizar proveedor:", error);
+    throw error;
+  }
 };
 
 /**
  * Elimina un proveedor por su ID
- * @param {number|string} id - ID del proveedor
+ * @param {string} id - ID del proveedor
  * @returns {Object} Resultado de la eliminación
  */
 export const deleteProveedor = async (id) => {
-  const response = await axios.delete(`${'http://localhost:3000/api'}/proveedores/${id}`);
-  return response.data;
-};
-
-// === Funciones adicionales (búsqueda y paginación) ===
-
-/**
- * Obtiene proveedores con paginación y búsqueda
- * @param {number} page - Página actual (por defecto: 1)
- * @param {number} limit - Límite por página (por defecto: 5)
- * @param {string} search - Término de búsqueda (opcional)
- * @returns {Object} { data: Array, total: number }
- */
-export const getProveedoresPaginados = async (page = 1, limit = 5, search = "") => {
-  const params = new URLSearchParams();
-  params.set("page", page);
-  params.set("limit", limit);
-  if (search) params.set("search", search);
-
-  const response = await axios.get(`${'http://localhost:3000/api'}/proveedores?${params.toString()}`);
-
-  // Si el backend devuelve estructura paginada: { data: [...], total: N }
-  if (response.data && Array.isArray(response.data.data)) {
-    return {
-      data: response.data.data,
-      total: response.data.total || 0,
-    };
+  try {
+    const response = await axios.delete(`${'http://localhost:3000/api'}/proveedores/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error al eliminar proveedor:", error);
+    throw error;
   }
-
-  // Si el backend devuelve directamente un array (sin paginación real)
-  if (Array.isArray(response.data)) {
-    const total = response.data.length;
-    const start = (page - 1) * limit;
-    const paginated = response.data.slice(start, start + limit);
-    return {
-      data: paginated,
-      total,
-    };
-  }
-
-  // Caso fallback
-  return { data: [], total: 0 };
 };

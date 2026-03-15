@@ -1,87 +1,30 @@
-import { 
-  getComprasPendientesExpiradas, 
-  anularCompraAutomatica 
-} from '../models/compras.model.js';
-import { 
-  getDetalleByCompraIdModel, 
-  actualizarStockMultiple 
-} from '../models/detalleCompras.model.js';
+// services/compraAutoCancel.service.js
+import { dbPool } from "../lib/db.js";
 
 export const anularComprasExpiradas = async () => {
   try {
-    console.log(`🕐 [${new Date().toISOString()}] Buscando compras pendientes expiradas...`);
+    console.log('\n🕒 ===== VERIFICACIÓN DE COMPRAS EXPIRADAS =====');
+    console.log(`🕒 Hora actual del servidor: ${new Date().toLocaleString()}`);
     
-    // Obtener compras pendientes con más de 1 hora
-    const comprasExpiradas = await getComprasPendientesExpiradas();
+    // Anular compras pendientes con más de 2 horas
+    const [result] = await dbPool.query(
+      `UPDATE compras 
+       SET Estado = 'anulada',
+           MotivoCancelacion = CONCAT('Anulación automática por tiempo de espera excedido (2 horas) - ', NOW())
+       WHERE Estado = 'pendiente' 
+       AND FechaRegistro < DATE_SUB(NOW(), INTERVAL 2 HOUR)`
+    );
     
-    if (comprasExpiradas.length === 0) {
-      console.log('✅ No hay compras pendientes expiradas');
-      return { anuladas: 0, compras: [] };
-    }
+    console.log(`📊 RESULTADO: ${result.affectedRows} compras anuladas`);
+    console.log('===========================================\n');
     
-    console.log(`📦 Encontradas ${comprasExpiradas.length} compras para anular`);
-    
-    const resultados = [];
-    
-    for (const compra of comprasExpiradas) {
-      try {
-        // Obtener detalles de la compra
-        const detalles = await getDetalleByCompraIdModel(compra.CompraId);
-        
-        // Si la compra tiene productos, restaurar el stock
-        if (detalles && detalles.length > 0) {
-          const productosARestaurar = detalles.map(d => {
-            // Procesar colores si existen
-            let coloresProcesados = [];
-            if (d.colores && Array.isArray(d.colores) && d.colores.length > 0) {
-              coloresProcesados = d.colores.map(c => ({
-                ColorId: c.ColorId,
-                Stock: -Math.abs(Number(c.Stock) || 0)
-              }));
-            }
-            
-            return {
-              ProductoId: d.ProductoId,
-              Cantidad: -Math.abs(Number(d.Cantidad) || 0),
-              colores: coloresProcesados
-            };
-          });
-          
-          // Actualizar stock (restar)
-          await actualizarStockMultiple(productosARestaurar);
-          console.log(`🔄 Stock restaurado para compra ${compra.CompraId}`);
-        }
-        
-        // Anular la compra
-        const motivo = `Anulación automática por tiempo expirado (${new Date().toLocaleString()})`;
-        await anularCompraAutomatica(compra.CompraId, motivo);
-        
-        resultados.push({
-          compraId: compra.CompraId,
-          anulada: true,
-          motivo
-        });
-        
-        console.log(`✅ Compra ${compra.CompraId} anulada automáticamente`);
-        
-      } catch (error) {
-        console.error(`❌ Error anulando compra ${compra.CompraId}:`, error);
-        resultados.push({
-          compraId: compra.CompraId,
-          anulada: false,
-          error: error.message
-        });
-      }
-    }
-    
-    return {
-      anuladas: resultados.filter(r => r.anulada).length,
-      fallidas: resultados.filter(r => !r.anulada).length,
-      compras: resultados
+    return { 
+      anuladas: result.affectedRows,
+      fallidas: 0
     };
-    
+
   } catch (error) {
-    console.error('❌ Error en anulación automática:', error);
+    console.error('❌ Error en proceso de anulación automática:', error);
     throw error;
   }
 };

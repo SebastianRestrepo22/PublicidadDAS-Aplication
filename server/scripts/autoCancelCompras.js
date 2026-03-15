@@ -1,3 +1,4 @@
+// scripts/autoCancelCompras.js
 import cron from 'node-cron';
 import { anularComprasExpiradas } from '../services/compraAutoCancel.service.js';
 
@@ -13,16 +14,20 @@ export const iniciarAutoCancelacionCompras = () => {
       if (resultado.anuladas > 0) {
         console.log(`✅ ${resultado.anuladas} compras anuladas automáticamente`);
       }
-      if (resultado.fallidas > 0) {
-        console.log(`⚠️ ${resultado.fallidas} compras fallaron al anular`);
-      }
     } catch (error) {
       console.error('❌ Error en CRON de anulación:', error);
     }
   });
 
+  // También ejecutar inmediatamente al iniciar
+  setTimeout(async () => {
+    console.log('🚀 Ejecutando verificación inicial...');
+    try {
+      await anularComprasExpiradas();
+    } catch (error) {
+      console.error('❌ Error en verificación inicial:', error);
+    }
+  }, 5000);
+
   console.log('✅ Servicio de anulación automática de compras iniciado correctamente');
 };
-
-// También exportamos la función para usarla manualmente
-export { anularComprasExpiradas };

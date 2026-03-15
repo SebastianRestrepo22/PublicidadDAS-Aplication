@@ -16,7 +16,7 @@ import {
 import { ClientSelector } from "./ClientSelector";
 import { ProductSelector } from "./ProductSelector";
 import { ServicioSelector } from "./ServicioSelector";
-import { ColorSelector } from "./ColorSelector";
+import { ProductoColoresModal } from "../../productos/components/ProductoColoresModal";
 import { DetalleItem } from "./DetalleItem";
 
 export const OrderForm = ({
@@ -42,27 +42,15 @@ export const OrderForm = ({
   // Estados para modales
   const [modalProductosAbierto, setModalProductosAbierto] = useState(false);
   const [modalServiciosAbierto, setModalServiciosAbierto] = useState(false);
-  const [modalColoresAbierto, setModalColoresAbierto] = useState(false);
+  const [modalColoresProductoAbierto, setModalColoresProductoAbierto] = useState(false);
   const [modalClientesAbierto, setModalClientesAbierto] = useState(false);
   const [currentDetailIndex, setCurrentDetailIndex] = useState(null);
   
   // Estados para cliente seleccionado
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   
-  // Estados para búsqueda y paginación
-  const [searchTermClientes, setSearchTermClientes] = useState("");
-  const [currentPageClientes, setCurrentPageClientes] = useState(1);
-  
-  const [searchTermProductos, setSearchTermProductos] = useState("");
-  const [currentPageProductos, setCurrentPageProductos] = useState(1);
-  
-  const [searchTermServicios, setSearchTermServicios] = useState("");
-  const [currentPageServicios, setCurrentPageServicios] = useState(1);
-  
-  const [searchTermColores, setSearchTermColores] = useState("");
-  const [currentPageColores, setCurrentPageColores] = useState(1);
-
-  const itemsPerPage = 5;
+  // Estado para colores del producto seleccionado
+  const [coloresSeleccionados, setColoresSeleccionados] = useState([]);
 
   // Efecto para fecha automática
   useEffect(() => {
@@ -70,12 +58,10 @@ export const OrderForm = ({
       const hoy = new Date().toISOString().split('T')[0];
       setFormCrear({ ...formCrear, FechaRegistro: hoy });
     }
-  }, []);
+  }, [formCrear, setFormCrear]);
 
   // Handlers para clientes
   const abrirModalClientes = () => {
-    setSearchTermClientes("");
-    setCurrentPageClientes(1);
     setModalClientesAbierto(true);
   };
 
@@ -93,13 +79,15 @@ export const OrderForm = ({
 
   // Handlers para productos
   const abrirModalProductos = (index) => {
+    console.log('📦 Abriendo selector productos para índice:', index);
     setCurrentDetailIndex(index);
-    setSearchTermProductos("");
-    setCurrentPageProductos(1);
     setModalProductosAbierto(true);
   };
 
   const seleccionarProducto = (producto) => {
+    console.log('📦 Producto seleccionado:', producto);
+    console.log('📦 Para índice:', currentDetailIndex);
+    
     if (currentDetailIndex !== null) {
       const nuevos = [...detallesCrear];
       nuevos[currentDetailIndex] = {
@@ -110,25 +98,32 @@ export const OrderForm = ({
         Precio: producto.Precio || 0,
         Descripcion: producto.Descripcion || "",
         UrlImagen: producto.Imagen || "",
-        UrlImagenPersonalizada: null,
-        ColorId: nuevos[currentDetailIndex].ColorId || null,
-        Tamaño: null,
-        Stock: producto.Stock
+        ColorId: null,
+        tipoStock: 'general', // 'general' o 'por_color'
+        Stock: producto.Stock || 0,
+        UsaColores: producto.UsaColores || 0,
+        ProductoNombre: producto.Nombre
       };
+      
+      console.log('📦 Detalle actualizado:', nuevos[currentDetailIndex]);
       setDetallesCrear(nuevos);
+      setModalProductosAbierto(false);
+    } else {
+      console.error('❌ No hay índice seleccionado');
+      toast.error('Error al seleccionar producto');
     }
-    setModalProductosAbierto(false);
   };
 
   // Handlers para servicios
   const abrirModalServicios = (index) => {
+    console.log('🔧 Abriendo selector servicios para índice:', index);
     setCurrentDetailIndex(index);
-    setSearchTermServicios("");
-    setCurrentPageServicios(1);
     setModalServiciosAbierto(true);
   };
 
   const seleccionarServicio = (servicio) => {
+    console.log('🔧 Servicio seleccionado:', servicio);
+    
     if (currentDetailIndex !== null) {
       const nuevos = [...detallesCrear];
       nuevos[currentDetailIndex] = {
@@ -139,9 +134,6 @@ export const OrderForm = ({
         Precio: servicio.Precio || 0,
         Descripcion: servicio.Descripcion || "",
         UrlImagen: servicio.Imagen || "",
-        UrlImagenPersonalizada: null,
-        RequiereImagen: servicio.RequiereImagen === 1 || servicio.RequiereImagen === true,
-        Tamaño: "Mediana",
         ColorId: null
       };
       setDetallesCrear(nuevos);
@@ -149,105 +141,76 @@ export const OrderForm = ({
     setModalServiciosAbierto(false);
   };
 
-  // 🔴 NUEVO HANDLER PARA SUBIR ARCHIVOS (IMÁGENES, PDF, WORD, EXCEL, ETC.)
-  const handleUploadArchivo = (index, file) => {
-    console.log('📎 [UPLOAD] Iniciando subida de archivo:', {
-      index,
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type
-    });
-
-    // Validar tamaño (máx 10MB para cualquier archivo)
-    if (file && file.size > 10 * 1024 * 1024) {
-      toast.error('El archivo debe ser menor a 10MB');
-      return;
-    }
-
-    // Validar tipos permitidos
-    const tiposPermitidos = [
-      'image/', // Todas las imágenes
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-      'text/plain' // .txt
-    ];
-
-    const tipoPermitido = tiposPermitidos.some(tipo => file.type.startsWith(tipo));
-    if (!tipoPermitido) {
-      toast.error('Tipo de archivo no permitido. Solo imágenes, PDF, Word, Excel o TXT');
-      return;
-    }
-
-    const archivoUrl = URL.createObjectURL(file);
-    console.log('📎 [UPLOAD] URL creada:', archivoUrl);
-    
-    const nuevos = [...detallesCrear];
-    nuevos[index] = {
-      ...nuevos[index],
-      UrlImagenPersonalizada: archivoUrl,
-      ArchivoPersonalizadoFile: file,
-      nombreArchivo: file.name,
-      tipoArchivo: file.type,
-      tamañoArchivo: file.size
-    };
-    
-    console.log('📎 [UPLOAD] Estado actualizado:', {
-      index,
-      tieneArchivo: !!nuevos[index].UrlImagenPersonalizada,
-      nombre: file.name,
-      tipo: file.type
-    });
-    
-    setDetallesCrear(nuevos);
-  };
-
-  // 🔴 NUEVO HANDLER PARA ELIMINAR ARCHIVO
-  const handleEliminarArchivo = (index) => {
-    if (detallesCrear[index].UrlImagenPersonalizada?.startsWith('blob:')) {
-      URL.revokeObjectURL(detallesCrear[index].UrlImagenPersonalizada);
-    }
-    
-    const nuevos = [...detallesCrear];
-    nuevos[index] = {
-      ...nuevos[index],
-      UrlImagenPersonalizada: null,
-      ArchivoPersonalizadoFile: null,
-      nombreArchivo: null,
-      tipoArchivo: null,
-      tamañoArchivo: null
-    };
-    setDetallesCrear(nuevos);
-    
-    toast.success('Archivo eliminado');
-  };
-
-  // Handlers para colores
+  // Handlers para colores (solo para productos)
   const abrirModalColores = (index) => {
-    setCurrentDetailIndex(index);
-    setSearchTermColores("");
-    setCurrentPageColores(1);
-    setModalColoresAbierto(true);
+    console.log('🎨 Abriendo modal colores para índice:', index);
+    console.log('🎨 Detalle en índice:', detallesCrear[index]);
+    
+    // Solo abrir si es producto
+    if (detallesCrear[index]?.tipo === 'producto') {
+      const detalleProducto = detallesCrear[index];
+      
+      // Buscar el producto completo en el catálogo
+      const productoCompleto = productos.find(p => p.ProductoId === detalleProducto.ProductoId);
+      
+      console.log('🎨 Producto encontrado:', productoCompleto);
+      
+      if (productoCompleto) {
+        setCurrentDetailIndex(index);
+        
+        // Si ya tiene un color seleccionado, cargarlo
+        if (detalleProducto.ColorId) {
+          const colorSeleccionado = colores.find(c => c.ColorId === detalleProducto.ColorId);
+          if (colorSeleccionado) {
+            setColoresSeleccionados([{
+              ColorId: colorSeleccionado.ColorId,
+              Stock: 1,
+              Nombre: colorSeleccionado.Nombre,
+              Hex: colorSeleccionado.Hex || colorSeleccionado.CodigoHex
+            }]);
+          } else {
+            setColoresSeleccionados([]);
+          }
+        } else {
+          setColoresSeleccionados([]);
+        }
+        
+        setModalColoresProductoAbierto(true);
+      } else {
+        toast.warning("Debes seleccionar un producto primero");
+      }
+    } else {
+      toast.warning("Este ítem no es un producto");
+    }
   };
 
-  const seleccionarColor = (color) => {
-    if (currentDetailIndex !== null) {
+  const handleGuardarColores = (coloresSeleccionados) => {
+    console.log('🎨 Guardando colores:', coloresSeleccionados);
+    
+    if (currentDetailIndex !== null && coloresSeleccionados && coloresSeleccionados.length > 0) {
       const nuevos = [...detallesCrear];
-      nuevos[currentDetailIndex].ColorId = color.ColorId || color.id;
+      // Guardamos el primer color seleccionado
+      const colorSeleccionado = coloresSeleccionados[0];
+      
+      nuevos[currentDetailIndex] = {
+        ...nuevos[currentDetailIndex],
+        ColorId: colorSeleccionado.ColorId,
+        ColorNombre: colorSeleccionado.Nombre,
+        ColorHex: colorSeleccionado.Hex || colorSeleccionado.CodigoHex
+      };
+      
       setDetallesCrear(nuevos);
+      toast.success(`Color ${colorSeleccionado.Nombre} asignado al producto`);
+    } else {
+      toast.warning("No se seleccionó ningún color");
     }
-    setModalColoresAbierto(false);
+    
+    setModalColoresProductoAbierto(false);
   };
 
   // Handlers para detalles
   const cambiarTipoDetalle = (index, nuevoTipo) => {
-    // Limpiar URL del objeto si existe
-    if (detallesCrear[index].UrlImagenPersonalizada?.startsWith('blob:')) {
-      URL.revokeObjectURL(detallesCrear[index].UrlImagenPersonalizada);
-    }
-    
+    console.log('Cambiando tipo de detalle:', index, nuevoTipo);
     const nuevos = [...detallesCrear];
     
     if (nuevoTipo === 'producto') {
@@ -256,16 +219,11 @@ export const OrderForm = ({
         tipo: 'producto',
         ProductoId: null,
         ServicioId: null,
-        Tamaño: null,
         ColorId: null,
+        tipoStock: 'general',
         Precio: 0,
         UrlImagen: "",
-        UrlImagenPersonalizada: null,
-        ArchivoPersonalizadoFile: null,
-        nombreArchivo: null,
-        tipoArchivo: null,
-        tamañoArchivo: null,
-        RequiereImagen: false
+        Descripcion: ""
       };
       setTimeout(() => abrirModalProductos(index), 100);
     } else {
@@ -275,15 +233,9 @@ export const OrderForm = ({
         ServicioId: null,
         ProductoId: null,
         ColorId: null,
-        Tamaño: "Mediana",
         Precio: 0,
         UrlImagen: "",
-        UrlImagenPersonalizada: null,
-        ArchivoPersonalizadoFile: null,
-        nombreArchivo: null,
-        tipoArchivo: null,
-        tamañoArchivo: null,
-        RequiereImagen: false
+        Descripcion: ""
       };
       setTimeout(() => abrirModalServicios(index), 100);
     }
@@ -300,27 +252,16 @@ export const OrderForm = ({
         ProductoId: null,
         ServicioId: null,
         Cantidad: 1,
-        Tamaño: null,
         Descripcion: "",
         UrlImagen: "",
-        UrlImagenPersonalizada: null,
-        ArchivoPersonalizadoFile: null,
-        nombreArchivo: null,
-        tipoArchivo: null,
-        tamañoArchivo: null,
-        RequiereImagen: false,
         Precio: 0,
-        ColorId: null
+        ColorId: null,
+        tipoStock: 'general'
       }
     ]);
   };
 
   const eliminarDetalle = (index) => {
-    // Limpiar URL del objeto si existe
-    if (detallesCrear[index].UrlImagenPersonalizada?.startsWith('blob:')) {
-      URL.revokeObjectURL(detallesCrear[index].UrlImagenPersonalizada);
-    }
-    
     if (detallesCrear.length > 1) {
       setDetallesCrear(prev => prev.filter((_, i) => i !== index));
     } else {
@@ -330,13 +271,9 @@ export const OrderForm = ({
         ProductoId: null,
         ServicioId: null,
         UrlImagen: "",
-        UrlImagenPersonalizada: null,
-        ArchivoPersonalizadoFile: null,
-        nombreArchivo: null,
-        tipoArchivo: null,
-        tamañoArchivo: null,
         Precio: 0,
-        ColorId: null
+        ColorId: null,
+        tipoStock: 'general'
       };
       setDetallesCrear(nuevos);
     }
@@ -360,10 +297,6 @@ export const OrderForm = ({
   };
 
   const getItemImagen = (detalle) => {
-    if (detalle.UrlImagenPersonalizada) {
-      return detalle.UrlImagenPersonalizada;
-    }
-    
     if (detalle.ProductoId) {
       const producto = productos.find(p => p.ProductoId === detalle.ProductoId);
       return producto?.Imagen || "";
@@ -644,7 +577,7 @@ export const OrderForm = ({
             <div className="grid grid-cols-12 gap-4 mb-2 px-4 py-2 bg-slate-100 rounded-lg text-xs font-semibold text-slate-600 uppercase">
               <div className="col-span-1">TIPO</div>
               <div className="col-span-3">PRODUCTO/SERVICIO</div>
-              <div className="col-span-2">COLOR/TAMAÑO</div>
+              <div className="col-span-2">TIPO STOCK</div>
               <div className="col-span-1 text-center">CANT.</div>
               <div className="col-span-2 text-right">PRECIO UNIT.</div>
               <div className="col-span-2 text-right">SUBTOTAL</div>
@@ -678,8 +611,6 @@ export const OrderForm = ({
                     onAbrirColores={abrirModalColores}
                     onActualizar={actualizarDetalle}
                     onEliminar={eliminarDetalle}
-                    onUploadArchivo={handleUploadArchivo}
-                    onEliminarArchivo={handleEliminarArchivo}
                     puedeEliminar={detallesCrear.length > 1}
                   />
                 );
@@ -732,48 +663,27 @@ export const OrderForm = ({
         isOpen={modalClientesAbierto}
         onClose={() => setModalClientesAbierto(false)}
         onSelect={seleccionarCliente}
-        clientes={clientes}
-        searchTerm={searchTermClientes}
-        onSearchChange={setSearchTermClientes}
-        currentPage={currentPageClientes}
-        onPageChange={setCurrentPageClientes}
-        itemsPerPage={itemsPerPage}
       />
 
       <ProductSelector
         isOpen={modalProductosAbierto}
         onClose={() => setModalProductosAbierto(false)}
         onSelect={seleccionarProducto}
-        productos={productos}
-        searchTerm={searchTermProductos}
-        onSearchChange={setSearchTermProductos}
-        currentPage={currentPageProductos}
-        onPageChange={setCurrentPageProductos}
-        itemsPerPage={itemsPerPage}
       />
 
       <ServicioSelector
         isOpen={modalServiciosAbierto}
         onClose={() => setModalServiciosAbierto(false)}
         onSelect={seleccionarServicio}
-        servicios={servicios}
-        searchTerm={searchTermServicios}
-        onSearchChange={setSearchTermServicios}
-        currentPage={currentPageServicios}
-        onPageChange={setCurrentPageServicios}
-        itemsPerPage={itemsPerPage}
       />
 
-      <ColorSelector
-        isOpen={modalColoresAbierto}
-        onClose={() => setModalColoresAbierto(false)}
-        onSelect={seleccionarColor}
+      <ProductoColoresModal
+        open={modalColoresProductoAbierto}
+        onClose={() => setModalColoresProductoAbierto(false)}
         colores={colores}
-        searchTerm={searchTermColores}
-        onSearchChange={setSearchTermColores}
-        currentPage={currentPageColores}
-        onPageChange={setCurrentPageColores}
-        itemsPerPage={itemsPerPage}
+        coloresConStock={coloresSeleccionados}
+        setColoresConStock={setColoresSeleccionados}
+        onGuardar={handleGuardarColores}
       />
     </>
   );

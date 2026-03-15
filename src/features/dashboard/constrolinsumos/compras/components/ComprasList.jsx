@@ -28,24 +28,24 @@ const formatPrice = (value) => {
   return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
 };
 
-// Función para calcular minutos restantes para anulación automática (1 hora)
+// 🔥 MODIFICADO: Calcular minutos restantes para anulación automática (2 horas = 120 min)
 const calcularMinutosRestantes = (fechaRegistro) => {
   if (!fechaRegistro) return null;
-  
+
   const fechaCompra = new Date(fechaRegistro);
   const ahora = new Date();
-  
-  // Calcular la fecha límite (1 hora después de la compra)
+
+  // 🔥 Calcular la fecha límite: 2 horas después de la compra
   const fechaLimite = new Date(fechaCompra);
-  fechaLimite.setHours(fechaLimite.getHours() + 1);
-  
+  fechaLimite.setHours(fechaLimite.getHours() + 2);
+
   // Si ya pasó la fecha límite
   if (ahora > fechaLimite) return 0;
-  
+
   // Calcular minutos restantes
   const diffMs = fechaLimite - ahora;
   const diffMinutos = Math.floor(diffMs / 60000);
-  
+
   return diffMinutos;
 };
 
@@ -54,7 +54,7 @@ const formatearMinutosRestantes = (minutos) => {
   if (minutos === null) return '';
   if (minutos <= 0) return '0 min';
   if (minutos < 60) return `${minutos} min`;
-  
+
   const horas = Math.floor(minutos / 60);
   const mins = minutos % 60;
   return mins > 0 ? `${horas}h ${mins}m` : `${horas}h`;
@@ -96,47 +96,34 @@ export const ComprasList = ({
   totalItems,
   onItemsPerPageChange
 }) => {
-  // Estado para actualizar los minutos cada minuto
   const [tiempoActual, setTiempoActual] = useState(new Date());
-  // Estado para el modal de cancelación
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [compraSeleccionada, setCompraSeleccionada] = useState(null);
-  // Estado para controlar la carga durante la cancelación
   const [cancelando, setCancelando] = useState(false);
 
   useEffect(() => {
-    // Actualizar cada minuto para que los contadores se refresquen
     const intervalo = setInterval(() => {
       setTiempoActual(new Date());
-    }, 60000); // 60000 ms = 1 minuto
+    }, 60000);
 
     return () => clearInterval(intervalo);
   }, []);
 
-  // Función para abrir modal de cancelación
   const handleCancelClick = (compra) => {
     setCompraSeleccionada(compra);
     setShowCancelModal(true);
   };
 
-  // Función para confirmar cancelación
   const handleConfirmCancel = async (motivo) => {
     if (compraSeleccionada && onActualizarEstado) {
       setCancelando(true);
       try {
         await onActualizarEstado(compraSeleccionada.CompraId, ESTADOS_COMPRA.ANULADA, null, motivo);
-        
-        // Refrescar los datos después de la cancelación
-        if (onRefresh) {
-          await onRefresh();
-        }
-        
-        // Cerrar el modal después de 1 segundo
+        if (onRefresh) await onRefresh();
         setTimeout(() => {
           setShowCancelModal(false);
           setCompraSeleccionada(null);
         }, 500);
-        
       } catch (error) {
         console.error("Error al cancelar compra:", error);
       } finally {
@@ -177,10 +164,11 @@ export const ComprasList = ({
               className="border rounded-lg px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <option value="">Filtrar por campo</option>
-              <option value="CompraId">ID Compra</option>
-              <option value="ProveedorId">ID Proveedor</option>
-              <option value="FechaRegistro">Fecha</option>
-              <option value="Estado">Estado</option>
+              <option value="id">ID Compra</option>
+              <option value="proveedor">ID Proveedor</option>
+              <option value="fecha">Fecha</option>
+              <option value="estado">Estado</option>
+              <option value="total">Total</option>
             </select>
           </div>
         </div>
@@ -199,82 +187,77 @@ export const ComprasList = ({
             </tr>
           </thead>
           <tbody className="divide-y">
-            {paginatedData.map((compra) => {
-              const estado = compra.Estado || ESTADOS_COMPRA.PENDIENTE;
-              const config = estadoConfig[estado] || estadoConfig[ESTADOS_COMPRA.PENDIENTE];
-              
-              // Calcular minutos restantes solo para compras pendientes
-              const minutosRestantes = estado === ESTADOS_COMPRA.PENDIENTE 
-                ? calcularMinutosRestantes(compra.FechaRegistro)
-                : null;
-              
-              // Determinar si está por expirar (menos de 10 minutos)
-              const porExpirar = minutosRestantes !== null && minutosRestantes <= 10 && minutosRestantes > 0;
-              
-              return (
-                <tr key={compra.CompraId} className="hover:bg-slate-50">
-                  <td className="py-4 px-6">{getShortId(compra.CompraId)}</td>
-                  <td className="py-4 px-6">{getShortId(compra.ProveedorId)}</td>
-                  <td className="py-4 px-6">{formatearFecha(compra.FechaRegistro)}</td>
-                  <td className="py-4 px-6 text-center font-medium">
-                    {formatPrice(compra.Total)}
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      {/* Solo mostramos el estado actual */}
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${config.color}`}>
-                        <span>{typeof config.icon === 'string' ? config.icon : <config.icon size={14} />}</span>
-                        <span>{config.label}</span>
-                      </span>
-                      
-                      {/* Solo mostramos minutos restantes si está pendiente */}
-                      {estado === ESTADOS_COMPRA.PENDIENTE && minutosRestantes !== null && minutosRestantes > 0 && (
-                        <span className={`text-xs font-medium ${
-                          porExpirar ? 'text-red-600 animate-pulse' : 'text-gray-500'
-                        }`}>
-                          {formatearMinutosRestantes(minutosRestantes)}
+            {paginatedData && paginatedData.length > 0 ? (
+              paginatedData.map((compra) => {
+                const estado = compra.Estado || ESTADOS_COMPRA.PENDIENTE;
+                const config = estadoConfig[estado] || estadoConfig[ESTADOS_COMPRA.PENDIENTE];
+
+                // 🔥 Calcular minutos restantes (2 horas)
+                const minutosRestantes = estado === ESTADOS_COMPRA.PENDIENTE
+                  ? calcularMinutosRestantes(compra.FechaRegistro)
+                  : null;
+
+                // Determinar si está por expirar (menos de 10 minutos)
+                const porExpirar = minutosRestantes !== null && minutosRestantes <= 10 && minutosRestantes > 0;
+
+                return (
+                  <tr key={compra.CompraId} className="hover:bg-slate-50">
+                    <td className="py-4 px-6">{getShortId(compra.CompraId)}</td>
+                    <td className="py-4 px-6">{getShortId(compra.ProveedorId)}</td>
+                    <td className="py-4 px-6">{formatearFecha(compra.FechaRegistro)}</td>
+                    <td className="py-4 px-6 text-center font-medium">
+                      {formatPrice(compra.Total)}
+                    </td>
+                    <td className="py-4 px-6 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${config.color}`}>
+                          <span>{typeof config.icon === 'string' ? config.icon : <config.icon size={14} />}</span>
+                          <span>{config.label}</span>
                         </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex justify-center items-center gap-2">
-                      {/* Botón de ver detalles - siempre visible */}
-                      <button
-                        onClick={() => onView(compra)}
-                        className="p-2 hover:bg-emerald-50 rounded-full transition-colors"
-                        title="Ver detalles"
-                        disabled={cancelando}
-                      >
-                        <Eye size={18} className="text-emerald-600" />
-                      </button>
-                      
-                      {/* Botón de cancelar - solo para compras pendientes */}
-                      {estado === ESTADOS_COMPRA.PENDIENTE && (
+
+                        {estado === ESTADOS_COMPRA.PENDIENTE && minutosRestantes !== null && minutosRestantes > 0 && (
+                          <span className={`text-xs font-medium ${porExpirar ? 'text-red-600 animate-pulse' : 'text-gray-500'}`}>
+                            {formatearMinutosRestantes(minutosRestantes)}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex justify-center items-center gap-2">
                         <button
-                          onClick={() => handleCancelClick(compra)}
-                          className="p-2 hover:bg-red-50 rounded-full transition-colors"
-                          title="Cancelar compra"
+                          onClick={() => onView(compra)}
+                          className="p-2 hover:bg-emerald-50 rounded-full transition-colors"
+                          title="Ver detalles"
                           disabled={cancelando}
                         >
-                          <XCircle size={18} className={`text-red-500 ${cancelando ? 'opacity-50' : ''}`} />
+                          <Eye size={18} className="text-emerald-600" />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {paginatedData.length === 0 && (
+
+                        {estado === ESTADOS_COMPRA.PENDIENTE && (
+                          <button
+                            onClick={() => handleCancelClick(compra)}
+                            className="p-2 hover:bg-red-50 rounded-full transition-colors"
+                            title="Cancelar compra"
+                            disabled={cancelando}
+                          >
+                            <XCircle size={18} className={`text-red-500 ${cancelando ? 'opacity-50' : ''}`} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
               <tr>
                 <td colSpan={6} className="py-8 text-center text-gray-500">
-                  No hay compras a mostrar
+                  {paginatedData === undefined ? "Cargando compras..." : "No hay compras a mostrar"}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-        {paginatedData.length > 0 && (
+        {paginatedData && paginatedData.length > 0 && (
           <div className="px-6 py-4 border-t border-slate-200">
             <Pagination
               currentPage={currentPage}

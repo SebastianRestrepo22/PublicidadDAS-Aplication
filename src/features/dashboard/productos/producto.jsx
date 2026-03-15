@@ -66,56 +66,69 @@ export const ProductosDashboard = () => {
   const [filtroValor, setFiltroValor] = useState('');
 
   const cargarProducto = async () => {
-  if (mode !== "list") return;
+    if (mode !== "list") return;
 
-  try {
-    let resultado;
+    try {
+      let resultado;
 
-    console.log('Cargando productos - Filtros:', {
-      filtroCampo,
-      filtroValor,
-      filtroEstado,
-      currentPage,
-      itemsPerPage
-    });
+      console.log('Cargando productos - Filtros:', {
+        filtroCampo,
+        filtroValor,
+        filtroEstado,
+        currentPage,
+        itemsPerPage
+      });
 
-    if (filtroCampo && filtroValor) {
-      resultado = await buscarProductos(filtroCampo, filtroValor, currentPage, itemsPerPage, filtroEstado || null);
-    } else {
-      resultado = await GetDataproductos(filtroEstado === 'Activo', currentPage, itemsPerPage);
+      if (filtroCampo && filtroValor) {
+        resultado = await buscarProductos(filtroCampo, filtroValor, currentPage, itemsPerPage, filtroEstado || null);
+      } else {
+        resultado = await GetDataproductos(filtroEstado === 'Activo', currentPage, itemsPerPage);
+      }
+
+      console.log('Resultado de la API:', resultado);
+
+      const data = resultado?.data && Array.isArray(resultado.data) ? resultado.data : [];
+      const pagination = resultado?.pagination || {};
+
+      console.log('Datos procesados:', data);
+      console.log('Paginación:', pagination);
+
+      setAllData(data);
+      setPaginatedData(data);
+      setTotalItems(pagination.totalItems || 0);
+      setTotalPages(pagination.totalPages || 1);
+
+      if (currentPage > (pagination.totalPages || 1) && (pagination.totalPages || 0) > 0) {
+        setCurrentPage(pagination.totalPages);
+      }
+    } catch (error) {
+      console.error("Error cargando productos:", error);
+      setAllData([]);
+      setPaginatedData([]);
+      setTotalItems(0);
+      setTotalPages(1);
     }
-
-    console.log('Resultado de la API:', resultado);
-
-    const data = resultado?.data && Array.isArray(resultado.data) ? resultado.data : [];
-    const pagination = resultado?.pagination || {};
-
-    console.log('Datos procesados:', data);
-    console.log('Paginación:', pagination);
-
-    setAllData(data);
-    setPaginatedData(data);
-    setTotalItems(pagination.totalItems || 0);
-    setTotalPages(pagination.totalPages || 1);
-
-    if (currentPage > (pagination.totalPages || 1) && (pagination.totalPages || 0) > 0) {
-      setCurrentPage(pagination.totalPages);
-    }
-  } catch (error) {
-    console.error("Error cargando productos:", error);
-    setAllData([]);
-    setPaginatedData([]);
-    setTotalItems(0);
-    setTotalPages(1);
-  }
-};
+  };
 
   useEffect(() => {
     const fetchCategoria = async () => {
-      const data = await getAllCategorias();
-      if (data?.data) {
-        setCategorias(data.data);
-        setCategoriasFiltradas(data.data);
+      try {
+        const categorias = await getAllCategorias();  // ← Ahora es un array []
+
+        // ✅ Verificar que sea un array con datos
+        if (Array.isArray(categorias) && categorias.length > 0) {
+          setCategorias(categorias);
+          setCategoriasFiltradas(categorias);
+          console.log("✅ Categorías cargadas:", categorias.length);
+        } else {
+          console.warn("⚠️ No se encontraron categorías o respuesta vacía");
+          setCategorias([]);
+          setCategoriasFiltradas([]);
+        }
+      } catch (error) {
+        console.error("❌ Error cargando categorías:", error);
+        setCategorias([]);
+        setCategoriasFiltradas([]);
       }
     };
     fetchCategoria();

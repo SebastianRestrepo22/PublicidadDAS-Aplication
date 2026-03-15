@@ -1,14 +1,14 @@
 import React from "react";
-import { Eye, Plus, Search, Trash2 } from "lucide-react";
+import { Eye, Plus, Search } from "lucide-react";
 import { Pagination } from "../../components/paginacion/pagination";
 import { formatDate, shortenId, formatPrice } from "../../gestionventas/pedidos/utils/pedidosHelpers";
 
 export const OrderList = ({
   paginatedData,
-  busqueda,
-  setBusqueda,
-  campoFiltro,
-  setCampoFiltro,
+  filtroText,
+  setFiltroText,
+  filtroCampo,
+  setFiltroCampo,
   currentPage,
   totalPages,
   itemsPerPage,
@@ -16,7 +16,8 @@ export const OrderList = ({
   handlePageChange,
   handleItemsPerPageChange,
   goToCreate,
-  goToView
+  goToView,
+  tipoPago // Nuevo: para filtrar por tipo de pago
 }) => {
   return (
     <>
@@ -28,19 +29,36 @@ export const OrderList = ({
           >
             <Plus size={18} /> Nuevo pedido
           </button>
+          
+          {/* Selector de tipo de pago */}
+          {tipoPago && (
+            <select
+              value={filtroCampo === 'MetodoPago' ? filtroText : ''}
+              onChange={(e) => {
+                setFiltroCampo('MetodoPago');
+                setFiltroText(e.target.value);
+              }}
+              className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+            >
+              <option value="">Todos los métodos</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="contra_entrega">Contra Entrega</option>
+            </select>
+          )}
+          
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
               type="text"
               placeholder="Buscar pedidos..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
+              value={filtroText}
+              onChange={(e) => setFiltroText(e.target.value)}
               className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700"
             />
           </div>
           <select
-            value={campoFiltro}
-            onChange={(e) => setCampoFiltro(e.target.value)}
+            value={filtroCampo}
+            onChange={(e) => setFiltroCampo(e.target.value)}
             className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]"
           >
             <option value="">Filtrar por Campo</option>
@@ -90,11 +108,19 @@ export const OrderList = ({
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                       pedido.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
                       pedido.Estado === 'aprobado' ? 'bg-blue-100 text-blue-800' :
+                      pedido.Estado === 'finalizado' ? 'bg-green-100 text-green-800' :
+                      pedido.Estado === 'en_proceso' ? 'bg-purple-100 text-purple-800' :
+                      pedido.Estado === 'en_camino' ? 'bg-orange-100 text-orange-800' :
+                      pedido.Estado === 'entregado' ? 'bg-emerald-100 text-emerald-800' :
                       pedido.Estado === 'cancelado' ? 'bg-red-100 text-red-800' :
                       'bg-slate-100 text-slate-800'
                     }`}>
                       {pedido.Estado === 'pendiente' ? 'Pendiente' :
                        pedido.Estado === 'aprobado' ? 'Aprobado' :
+                       pedido.Estado === 'finalizado' ? 'Finalizado' :
+                       pedido.Estado === 'en_proceso' ? 'En Proceso' :
+                       pedido.Estado === 'en_camino' ? 'En Camino' :
+                       pedido.Estado === 'entregado' ? 'Entregado' :
                        pedido.Estado === 'cancelado' ? 'Cancelado' :
                        pedido.Estado}
                     </span>
