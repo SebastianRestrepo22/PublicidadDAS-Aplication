@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Eye, Plus, Search } from "lucide-react";
 import { Pagination } from "../../components/paginacion/pagination";
 import { formatDate, shortenId, formatPrice } from "../../gestionventas/pedidos/utils/pedidosHelpers";
@@ -17,8 +17,46 @@ export const OrderList = ({
   handleItemsPerPageChange,
   goToCreate,
   goToView,
-  tipoPago // Nuevo: para filtrar por tipo de pago
+  tipoPago
 }) => {
+  // Estado local para el input de búsqueda
+  const [localSearchText, setLocalSearchText] = useState(filtroText);
+
+  // Sincronizar el estado local cuando cambia el filtroText desde fuera
+  useEffect(() => {
+    setLocalSearchText(filtroText);
+  }, [filtroText]);
+
+  // Debounce: actualizar el filtroText del padre después de 500ms sin escribir
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearchText !== filtroText) {
+        setFiltroText(localSearchText);
+        // Resetear a página 1 cuando se hace una nueva búsqueda
+        if (currentPage !== 1) {
+          handlePageChange(1);
+        }
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [localSearchText, filtroText, setFiltroText, currentPage, handlePageChange]);
+
+  // Manejar cambio en el input SIN perder foco
+  const handleSearchChange = (e) => {
+    setLocalSearchText(e.target.value);
+  };
+
+  // Manejar búsqueda inmediata con Enter
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      setFiltroText(localSearchText);
+      if (currentPage !== 1) {
+        handlePageChange(1);
+      }
+    }
+  };
+
   return (
     <>
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
@@ -29,7 +67,7 @@ export const OrderList = ({
           >
             <Plus size={18} /> Nuevo pedido
           </button>
-          
+
           {/* Selector de tipo de pago */}
           {tipoPago && (
             <select
@@ -37,6 +75,9 @@ export const OrderList = ({
               onChange={(e) => {
                 setFiltroCampo('MetodoPago');
                 setFiltroText(e.target.value);
+                if (currentPage !== 1) {
+                  handlePageChange(1);
+                }
               }}
               className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
             >
@@ -45,20 +86,29 @@ export const OrderList = ({
               <option value="contra_entrega">Contra Entrega</option>
             </select>
           )}
-          
+
+          {/* Input de búsqueda con estado local */}
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
               type="text"
               placeholder="Buscar pedidos..."
-              value={filtroText}
-              onChange={(e) => setFiltroText(e.target.value)}
+              value={localSearchText}
+              onChange={handleSearchChange}
+              onKeyDown={handleSearchKeyDown}
               className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700"
             />
           </div>
+
+          {/* Selector de campo de filtro */}
           <select
             value={filtroCampo}
-            onChange={(e) => setFiltroCampo(e.target.value)}
+            onChange={(e) => {
+              setFiltroCampo(e.target.value);
+              if (currentPage !== 1) {
+                handlePageChange(1);
+              }
+            }}
             className="border border-slate-300 rounded-lg px-4 py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]"
           >
             <option value="">Filtrar por Campo</option>
@@ -71,6 +121,7 @@ export const OrderList = ({
         </div>
       </div>
 
+      {/* Tabla de pedidos */}
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
         <table className="min-w-full">
           <thead className="bg-slate-800">
@@ -145,6 +196,8 @@ export const OrderList = ({
             )}
           </tbody>
         </table>
+        
+        {/* Paginación */}
         {paginatedData.length > 0 && (
           <div className="px-6 py-4 border-t">
             <Pagination

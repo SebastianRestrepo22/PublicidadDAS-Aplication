@@ -3,7 +3,7 @@ import { Navbar } from '../components/Navbar';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { 
-  ArrowLeft, MapPin, User, CreditCard, Package, Clock, CheckCircle, XCircle, Image as ImageIcon, FileText
+  ArrowLeft, MapPin, User, CreditCard, Package, Clock, CheckCircle, XCircle, Image as ImageIcon
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -13,27 +13,20 @@ const DetallePedido = () => {
   const location = useLocation();
   const [pedido, setPedido] = useState(location.state?.pedido || null);
   const [productos, setProductos] = useState([]);
-  const [servicios, setServicios] = useState([]);
   const [loading, setLoading] = useState(!location.state?.pedido);
   const [error, setError] = useState(null);
 
-  const DEFAULT_SERVICE_IMAGE = "image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect fill='%233b82f6' width='400' height='300'/%3E%3Ctext fill='white' font-family='sans-serif' font-size='24' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EServicio%3C/text%3E%3C/svg%3E";
-  
-  const DEFAULT_PRODUCT_IMAGE = "image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect fill='%23e5e7eb' width='400' height='300'/%3E%3Ctext fill='%236b7280' font-family='sans-serif' font-size='24' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EProducto%3C/text%3E%3C/svg%3E";
+  const DEFAULT_PRODUCT_IMAGE = "https://via.placeholder.com/400x300?text=Producto";
 
-  // 🔥 Cargar productos y servicios al montar - RUTAS CORREGIDAS
+  // Cargar productos al montar
   useEffect(() => {
-    const cargarDatos = async () => {
+    const cargarProductos = async () => {
       try {
-        const [productosRes, serviciosRes] = await Promise.all([
-          axios.get(`${'http://localhost:3000'}/producto?estado=Activo`).catch(() => ({ data: [] })),
-          axios.get(`${'http://localhost:3000'}/servicio?estado=Activo`).catch(() => ({ data: [] }))
-        ]);
+        const productosRes = await axios.get(`${'http://localhost:3000'}/producto?estado=Activo`).catch(() => ({ data: [] }));
         setProductos(productosRes.data || []);
-        setServicios(serviciosRes.data || []);
         setLoading(false);
       } catch (err) {
-        console.error('Error cargando datos:', err);
+        console.error('Error cargando productos:', err);
         setLoading(false);
       }
     };
@@ -42,7 +35,7 @@ const DetallePedido = () => {
       setError('No se encontró información del pedido.');
       setLoading(false);
     } else {
-      cargarDatos();
+      cargarProductos();
     }
   }, [location.state]);
 
@@ -73,75 +66,56 @@ const DetallePedido = () => {
 
   const getUnitPrice = (item) => item.PrecioUnitario ?? item.Precio ?? item.price ?? item.valor ?? 0;
 
+  // 🔥 Función mejorada para normalizar URLs
   const normalizeImageUrl = (url) => {
     if (!url) return null;
+    
+    // Si ya es una URL completa, devolverla
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return url;
     }
-    const cleanPath = url.startsWith('/') ? url : `/${url}`;
-    return `${'http://localhost:3000'}${cleanPath}`;
-  };
-
-  // 🔥 Función para determinar si es un archivo (no imagen)
-  const esArchivo = (url) => {
-    if (!url) return false;
-    return url.match(/\.(pdf|doc|docx|xls|xlsx|txt)$/i) !== null;
-  };
-
-  // 🔥 Función para obtener el ícono según el tipo de archivo
-  const getFileIcon = (url) => {
-    if (!url) return <Package className="w-8 h-8 text-gray-300" />;
     
-    if (url.match(/\.pdf$/i)) {
-      return <FileText className="w-8 h-8 text-red-500" />;
+    // Si es una URL de data:image (base64)
+    if (url.startsWith('data:image')) {
+      return url;
     }
-    if (url.match(/\.(doc|docx)$/i)) {
-      return <FileText className="w-8 h-8 text-blue-600" />;
-    }
-    if (url.match(/\.(xls|xlsx)$/i)) {
-      return <FileText className="w-8 h-8 text-green-600" />;
-    }
-    return <FileText className="w-8 h-8 text-gray-600" />;
+    
+    // Limpiar la URL
+    let cleanPath = url.replace(/^\/+/, ''); // Quitar slashes al inicio
+    
+    // Construir URL completa
+    return `${'http://localhost:3000'}/${cleanPath}`;
   };
 
-  // ✅ Busca imagen en productos/servicios cargados o imagen personalizada
+  // 🔥 Función mejorada para obtener la imagen del producto
   const getItemImage = (item) => {
-    // 🔥 PRIORIDAD 1: Imagen personalizada del cliente (UrlImagenPersonalizada)
-    if (item.UrlImagenPersonalizada) {
-      return normalizeImageUrl(item.UrlImagenPersonalizada);
+    console.log('🔍 Buscando imagen para item:', item);
+    
+    // 1. Si el item tiene imagen directa
+    if (item.UrlImagen) {
+      const url = normalizeImageUrl(item.UrlImagen);
+      console.log('📸 Usando UrlImagen del item:', url);
+      return url;
     }
     
-    // Imagen del cliente en otros formatos
-    if (item.ImagenCliente) return normalizeImageUrl(item.ImagenCliente);
-    
-    // 🔥 PRIORIDAD 2: Imagen por defecto del servicio/producto
-    if (item.Imagen) return normalizeImageUrl(item.Imagen);
-    
-    // Buscar en productos cargados
+    // 2. Buscar en productos cargados
     if (productos.length > 0 && item.ProductoId) {
       const producto = productos.find(p => p.ProductoId === item.ProductoId);
       if (producto?.Imagen) {
-        return normalizeImageUrl(producto.Imagen);
+        const url = normalizeImageUrl(producto.Imagen);
+        console.log('📸 Imagen encontrada en catálogo:', url);
+        return url;
       }
     }
     
-    // Buscar en servicios cargados
-    if (servicios.length > 0 && item.ServicioId) {
-      const servicio = servicios.find(s => s.ServicioId === item.ServicioId);
-      if (servicio?.Imagen) {
-        return normalizeImageUrl(servicio.Imagen);
-      }
-    }
-    
-    return esServicio(item) ? DEFAULT_SERVICE_IMAGE : DEFAULT_PRODUCT_IMAGE;
+    console.log('❌ No se encontró imagen, usando default');
+    return DEFAULT_PRODUCT_IMAGE;
   };
 
-  const esServicio = (item) => {
-    return item.Tipo === 'servicio' || 
-           item.tipo === 'servicio' || 
-           item.EsServicio === true ||
-           (item.ServicioId !== null && item.ServicioId !== undefined);
-  };
+  // Filtrar solo productos (excluir servicios)
+  const soloProductos = pedido?.detalle?.filter(item => {
+    return item.ProductoId && !item.ServicioId;
+  }) || [];
 
   if (loading) {
     return (
@@ -222,7 +196,7 @@ const DetallePedido = () => {
               <div className="flex-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Dirección de entrega</p>
                 <p className="font-semibold text-gray-900 mt-0.5">
-                  {pedido.DireccionEntrega || pedido.Direccion || pedido.direccion || 'No especificada'}
+                  {pedido.DireccionEntrega || pedido.Direccion || 'No especificada'}
                 </p>
               </div>
             </div>
@@ -233,84 +207,51 @@ const DetallePedido = () => {
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Método de pago</p>
                 <p className="font-semibold text-gray-900 mt-0.5">
-                  {pedido.MetodoPago || pedido.metodoPago || 'No especificado'}
+                  {pedido.MetodoPago || 'No especificado'}
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Productos y Servicios */}
+        {/* Solo Productos */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
               <Package className="w-4 h-4 text-blue-600" />
             </div>
-            Productos y Servicios ({pedido.detalle?.length || 0})
+            Productos ({soloProductos.length})
           </h2>
           
           <div className="space-y-4">
-            {pedido.detalle && pedido.detalle.length > 0 ? (
-              pedido.detalle.map((item, index) => {
+            {soloProductos.length > 0 ? (
+              soloProductos.map((item, index) => {
                 const unitPrice = getUnitPrice(item);
                 const quantity = item.Cantidad || item.cantidad || 1;
                 const itemTotal = unitPrice * quantity;
                 const imageUrl = getItemImage(item);
-                const isService = esServicio(item);
-                const itemName = item.Descripcion || item.descripcion || item.Nombre || `Ítem ${index + 1}`;
-                const tieneImagenPersonalizada = !!item.UrlImagenPersonalizada;
-                const esArchivoPersonalizado = esArchivo(item.UrlImagenPersonalizada);
+                const itemName = item.Descripcion || item.descripcion || item.Nombre || `Producto ${index + 1}`;
+                
+                console.log('🖼️ Renderizando producto:', { itemName, imageUrl });
                 
                 return (
                   <div key={item.DetallePedidoId || item.id || index} className="flex flex-col sm:flex-row gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                     <div className="w-full sm:w-32 h-32 flex-shrink-0">
                       <div className="w-full h-full bg-white rounded-lg border border-gray-200 overflow-hidden relative">
-                        {/* 🔥 Si es imagen personalizada o tiene URL */}
-                        {imageUrl && !esArchivoPersonalizado ? (
+                        {imageUrl ? (
                           <img
                             src={imageUrl}
                             alt={itemName}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              if (e.target.dataset.fallback) return;
-                              e.target.dataset.fallback = 'true';
-                              e.target.src = isService ? DEFAULT_SERVICE_IMAGE : DEFAULT_PRODUCT_IMAGE;
+                              console.log('⚠️ Error cargando imagen:', imageUrl);
+                              e.target.onerror = null;
+                              e.target.src = DEFAULT_PRODUCT_IMAGE;
                             }}
                           />
-                        ) : esArchivoPersonalizado ? (
-                          // 🔥 Si es un archivo (PDF, Word, Excel)
-                          <a
-                            href={imageUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full h-full flex flex-col items-center justify-center bg-blue-50 hover:bg-blue-100 transition-colors"
-                          >
-                            {getFileIcon(imageUrl)}
-                            <span className="text-[10px] font-medium text-blue-700 mt-1">
-                              {imageUrl.match(/\.pdf$/i) ? 'PDF' :
-                               imageUrl.match(/\.docx?$/i) ? 'WORD' :
-                               imageUrl.match(/\.xlsx?$/i) ? 'EXCEL' : 'ARCHIVO'}
-                            </span>
-                          </a>
                         ) : (
-                          // Fallback a ícono
                           <div className="w-full h-full flex items-center justify-center bg-gray-100">
                             <Package className="w-8 h-8 text-gray-300" />
-                          </div>
-                        )}
-                        
-                        {/* 🔥 Indicador de servicio o producto */}
-                        {isService && (
-                          <div className="absolute top-2 right-2 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
-                            Servicio
-                          </div>
-                        )}
-                        
-                        {/* 🔥 Indicador de imagen personalizada */}
-                        {tieneImagenPersonalizada && (
-                          <div className="absolute bottom-2 left-2 bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                            <ImageIcon className="w-3 h-3" />
-                            Cliente
                           </div>
                         )}
                       </div>
@@ -320,27 +261,13 @@ const DetallePedido = () => {
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-gray-900 text-base leading-tight">{itemName}</h3>
-                          {item.CodigoProducto && <p className="text-sm text-gray-500 mt-1">Código: {item.CodigoProducto}</p>}
                           
-                          {/* 🔥 Mostrar información del archivo personalizado */}
-                          {tieneImagenPersonalizada && (
-                            <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                              <ImageIcon className="w-3 h-3" />
-                              {esArchivoPersonalizado ? 'Archivo adjunto' : 'Imagen personalizada'}
-                            </p>
-                          )}
-                          
-                          {/* 🔥 Mostrar color si existe */}
+                          {/* Mostrar color si existe */}
                           {item.ColorId && item.ColorNombre && (
                             <div className="flex items-center gap-1 mt-1">
                               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.ColorHex || '#ccc' }}></div>
                               <span className="text-xs text-gray-600">{item.ColorNombre}</span>
                             </div>
-                          )}
-                          
-                          {/* 🔥 Mostrar tamaño si existe */}
-                          {item.Tamaño && (
-                            <p className="text-xs text-gray-600 mt-1">Tamaño: {item.Tamaño}</p>
                           )}
                         </div>
                         <div className="text-right flex-shrink-0">
@@ -379,18 +306,6 @@ const DetallePedido = () => {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-5">Resumen</h2>
           <div className="space-y-3">
-            {pedido.Descuento > 0 && (
-              <div className="flex justify-between text-gray-600">
-                <span>Descuento</span>
-                <span className="font-medium text-red-600">-${Number(pedido.Descuento).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</span>
-              </div>
-            )}
-            {pedido.Impuesto > 0 && (
-              <div className="flex justify-between text-gray-600">
-                <span>Impuestos</span>
-                <span className="font-medium">${Number(pedido.Impuesto).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</span>
-              </div>
-            )}
             <div className="flex justify-between items-center pt-4 border-t border-gray-200">
               <span className="font-semibold text-gray-900">Total a pagar</span>
               <span className="text-2xl font-bold text-blue-600">
@@ -405,11 +320,6 @@ const DetallePedido = () => {
           <button onClick={() => navigate('/cliente/MisPedidos')} className="flex-1 bg-white text-gray-700 border border-gray-300 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors">
             Volver a Mis Pedidos
           </button>
-          {pedido.Estado === 'entregado' && (
-            <button className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-medium hover:bg-purple-700 transition-colors shadow-sm">
-              Dejar Reseña
-            </button>
-          )}
         </div>
       </div>
     </div>

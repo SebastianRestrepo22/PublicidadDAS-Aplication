@@ -260,117 +260,132 @@ export const PedidosClientes = () => {
     setErrores([]);
   };
 
+
   const handleCreate = async () => {
-    // Validaciones básicas
-    const errs = [];
-    if (!formCrear.FechaRegistro) errs.push("La fecha es obligatoria.");
-    if (tipoClienteCrear === 'walkin' && !clienteWalkinCrear.Nombre) {
-      errs.push("El nombre del cliente es obligatorio");
-    }
-    if (!detallesCrear?.length) errs.push("Agregue al menos un producto/servicio.");
+  // Validaciones básicas
+  const errs = [];
+  if (!formCrear.FechaRegistro) errs.push("La fecha es obligatoria.");
+  if (tipoClienteCrear === 'walkin' && !clienteWalkinCrear.Nombre) {
+    errs.push("El nombre del cliente es obligatorio");
+  }
+  if (!detallesCrear?.length) errs.push("Agregue al menos un producto/servicio.");
 
-    if (errs.length) {
-      setErrores(errs);
-      toast.error("Corrija los errores");
-      return;
-    }
+  if (errs.length) {
+    setErrores(errs);
+    toast.error("Corrija los errores");
+    return;
+  }
 
-    try {
-      setUploading(true);
+  try {
+    setUploading(true);
 
-      // Construir detalles
-      const detallesLimpios = detallesCrear.map(d => {
-        const detalle = {
-          ProductoId: d.ProductoId?.trim() || null,
-          ServicioId: d.ServicioId?.trim() || null,
-          Cantidad: Number(d.Cantidad) || 1,
-          Descripcion: d.Descripcion || "",
-          UrlImagen: d.UrlImagen || "",
-          Precio: Number(d.Precio) || 0,
-          ColorId: d.ColorId || null
-        };
-        return detalle;
-      });
-
-      // Construir el pedido completo
-      const pedidoCompleto = {
-        ClienteId: tipoClienteCrear === 'registrado' ? formCrear.ClienteId?.trim() || null : null,
-        FechaRegistro: formCrear.FechaRegistro,
-        Total: Number(formCrear.Total) || 0,
-        Estado: formCrear.Estado,
-        MetodoPago: formCrear.MetodoPago,
-        NombreRecibe: formCrear.MetodoPago === "contra_entrega" ? formCrear.NombreRecibe || null : null,
-        TelefonoEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.TelefonoEntrega || null : null,
-        DireccionEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.DireccionEntrega || null : null,
-        TipoCliente: tipoClienteCrear,
-        ClienteNombre: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Nombre || null : null,
-        ClienteTelefono: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Telefono || null : null,
-        ClienteCorreo: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Correo || null : null,
-        detalle: detallesLimpios
-      };
-
-      const formData = new FormData();
-      formData.append('pedido', JSON.stringify(pedidoCompleto));
-
-      if (formCrear.MetodoPago === "transferencia" && voucherFileCrear) {
-        formData.append('voucher', voucherFileCrear);
+    // Construir detalles LIMPIANDO EL PRECIO
+    const detallesLimpios = detallesCrear.map(d => {
+      // 🔥 Limpiar el precio: eliminar puntos y convertir a número
+      let precioLimpio = 0;
+      if (d.Precio) {
+        // Si es string, eliminar puntos y comas, luego convertir a número
+        const precioStr = String(d.Precio).replace(/[.,]/g, '');
+        precioLimpio = parseFloat(precioStr) || 0;
       }
+      
+      const detalle = {
+        ProductoId: d.ProductoId?.trim() || null,
+        ServicioId: d.ServicioId?.trim() || null,
+        Cantidad: Number(d.Cantidad) || 1,
+        Descripcion: d.Descripcion || "",
+        UrlImagen: d.UrlImagen || "",
+        Precio: precioLimpio,  // ← AHORA USA EL PRECIO LIMPIO
+        ColorId: d.ColorId || null
+      };
+      return detalle;
+    });
 
-      const response = await axios.post('http://localhost:3000/api/pedidos-clientes', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+    console.log('💰 Precios limpios:', detallesLimpios.map(d => d.Precio));
 
-      toast.success("Pedido creado correctamente");
-      goToList();
+    // Construir el pedido completo
+    const pedidoCompleto = {
+      ClienteId: tipoClienteCrear === 'registrado' ? formCrear.ClienteId?.trim() || null : null,
+      FechaRegistro: formCrear.FechaRegistro,
+      Total: Number(formCrear.Total) || 0,
+      Estado: formCrear.Estado,
+      MetodoPago: formCrear.MetodoPago,
+      NombreRecibe: formCrear.MetodoPago === "contra_entrega" ? formCrear.NombreRecibe || null : null,
+      TelefonoEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.TelefonoEntrega || null : null,
+      DireccionEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.DireccionEntrega || null : null,
+      TipoCliente: tipoClienteCrear,
+      ClienteNombre: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Nombre || null : null,
+      ClienteTelefono: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Telefono || null : null,
+      ClienteCorreo: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Correo || null : null,
+      detalle: detallesLimpios
+    };
 
-    } catch (err) {
-      console.error('❌ Error:', err);
-      toast.error(`Error: ${err.response?.data?.error || err.message}`);
-    } finally {
-      setUploading(false);
+    console.log('📦 Pedido completo a enviar:', pedidoCompleto);
+
+    const formData = new FormData();
+    formData.append('pedido', JSON.stringify(pedidoCompleto));
+
+    if (formCrear.MetodoPago === "transferencia" && voucherFileCrear) {
+      formData.append('voucher', voucherFileCrear);
     }
-  };
+
+    const response = await axios.post('http://localhost:3000/api/pedidos-clientes', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+
+    toast.success("Pedido creado correctamente");
+    goToList();
+
+  } catch (err) {
+    console.error('❌ Error:', err);
+    toast.error(`Error: ${err.response?.data?.error || err.message}`);
+  } finally {
+    setUploading(false);
+  }
+};
+
+ 
 
   const handleUpdateEstado = async (estado, motivo = "") => {
-    if (!selectedPedido) return;
+  if (!selectedPedido) return;
 
-    try {
-      setUpdating(true);
+  try {
+    setUpdating(true);
 
-      const payload = { Estado: estado };
-      if (estado === 'cancelado' && motivo) payload.motivo = motivo;
-
-      const response = await axios.put(
-        `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
-        payload,
-        {
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
-
-      setSelectedPedido(prev => ({
-        ...prev,
-        Estado: estado,
-        MotivoCancelacion: estado === 'cancelado' ? motivo : prev.MotivoCancelacion
-      }));
-
-      toast.success(`Pedido ${estado === 'cancelado' ? 'cancelado' : estado} correctamente`);
-      
-      // Recargar la lista
-      await fetchPedidos(currentPage);
-
-      if (estado === 'aprobado' && response.data.venta) {
-        toast.success(`Venta #${response.data.venta.VentaId.substring(0, 8)} creada`);
-      }
-
-    } catch (err) {
-      console.error('Error detallado:', err.response?.data || err);
-      const errorMsg = err.response?.data?.error || err.response?.data?.details || err.message;
-      toast.error(`Error: ${errorMsg}`);
-    } finally {
-      setUpdating(false);
+    const payload = { Estado: estado };
+    if (estado === 'cancelado' && motivo) {
+      payload.motivo = motivo;
     }
-  };
+
+    console.log('Enviando actualización:', payload);
+
+    const response = await axios.put(
+      `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
+      payload,
+      {
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+
+    setSelectedPedido(prev => ({
+      ...prev,
+      Estado: estado,
+      MotivoCancelacion: estado === 'cancelado' ? motivo : prev.MotivoCancelacion
+    }));
+
+    toast.success(`Pedido ${estado === 'cancelado' ? 'cancelado' : 'actualizado'} correctamente`);
+    
+    // Recargar la lista
+    await fetchPedidos(currentPage);
+
+  } catch (err) {
+    console.error('Error detallado:', err.response?.data || err);
+    const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message;
+    toast.error(`Error: ${errorMsg}`);
+  } finally {
+    setUpdating(false);
+  }
+};
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
