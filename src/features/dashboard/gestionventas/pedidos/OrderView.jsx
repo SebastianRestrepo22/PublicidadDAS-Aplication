@@ -22,8 +22,9 @@ export const OrderView = ({
   const [cancelReason, setCancelReason] = useState("");
   const [updating, setUpdating] = useState(false);
 
-  // Determinar si es contra entrega
+  // Determinar el tipo de pago
   const esContraEntrega = selectedPedido?.MetodoPago === 'contra_entrega';
+  const esPagoInmediato = selectedPedido?.MetodoPago === 'transferencia' || selectedPedido?.MetodoPago === 'efectivo';
 
   // Estados permitidos según el método de pago
   const estadosPermitidos = esContraEntrega 
@@ -78,11 +79,20 @@ export const OrderView = ({
     try {
       setUpdating(true);
       await onUpdateEstado(nuevoEstado);
-      toast.success(`Estado actualizado a ${getEstadoLabel(nuevoEstado)}`);
-      // ✅ Redirigir a la tabla después de 1 segundo
+      
+      let mensaje = `Estado actualizado a ${getEstadoLabel(nuevoEstado)}`;
+      
+      // Mensaje especial para cuando se entrega un pedido de contra entrega
+      if (esContraEntrega && nuevoEstado === 'entregado') {
+        mensaje = '✅ Pedido entregado - Se generó la venta automáticamente';
+      }
+      
+      toast.success(mensaje);
+      
+      // Redirigir a la tabla después de 1.5 segundos
       setTimeout(() => {
         onBack();
-      }, 1000);
+      }, 1500);
     } catch (error) {
       toast.error('Error al actualizar estado');
     } finally {
@@ -102,10 +112,11 @@ export const OrderView = ({
       setShowCancelModal(false);
       setCancelReason("");
       toast.success('Pedido cancelado correctamente');
-      // ✅ Redirigir a la tabla después de 1 segundo
+      
+      // Redirigir a la tabla después de 1.5 segundos
       setTimeout(() => {
         onBack();
-      }, 1000);
+      }, 1500);
     } catch (error) {
       toast.error('Error al cancelar el pedido');
     } finally {
@@ -166,6 +177,21 @@ export const OrderView = ({
               <span className="text-sm text-slate-500">
                 Última actualización: {formatDate(selectedPedido.FechaRegistro)}
               </span>
+            </div>
+
+            {/* Indicador del tipo de pago */}
+            <div className="mb-3 text-sm">
+              {esContraEntrega ? (
+                <span className="text-purple-600 bg-purple-50 px-3 py-1 rounded-full inline-flex items-center gap-1">
+                  <Truck size={14} />
+                  Contra Entrega - Flujo de envío
+                </span>
+              ) : (
+                <span className="text-green-600 bg-green-50 px-3 py-1 rounded-full inline-flex items-center gap-1">
+                  <CheckCircle size={14} />
+                  Pago {selectedPedido.MetodoPago === 'efectivo' ? 'en Efectivo' : 'por Transferencia'} - Venta generada
+                </span>
+              )}
             </div>
 
             {userRole === 'admin' && (
@@ -271,7 +297,9 @@ export const OrderView = ({
               <div>
                 <p className="text-sm text-slate-500">Método</p>
                 <p className="font-medium capitalize">
-                  {selectedPedido.MetodoPago?.replace('_', ' ')}
+                  {selectedPedido.MetodoPago === 'transferencia' ? 'Transferencia Bancaria' :
+                   selectedPedido.MetodoPago === 'efectivo' ? 'Efectivo' :
+                   selectedPedido.MetodoPago?.replace('_', ' ')}
                 </p>
               </div>
               
@@ -330,6 +358,25 @@ export const OrderView = ({
               </div>
             </div>
           </div>
+
+          {/* Mensaje informativo según el tipo de pago */}
+          {esContraEntrega && selectedPedido.Estado === 'entregado' && (
+            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+              <p className="text-sm text-green-700 flex items-center gap-2">
+                <CheckCircle size={16} />
+                ✅ Pedido entregado - Venta generada automáticamente
+              </p>
+            </div>
+          )}
+
+          {esPagoInmediato && (
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <p className="text-sm text-blue-700 flex items-center gap-2">
+                <CheckCircle size={16} />
+                💰 Pago recibido - Venta generada
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

@@ -327,7 +327,9 @@ export const createPedidoCliente = async (req, res) => {
       ? FechaRegistro.split("T")[0]
       : new Date().toISOString().split("T")[0];
 
-    // Crear pedido
+    // Crear pedido - Si es transferencia o efectivo, estado aprobado desde el inicio
+    const estadoInicial = (MetodoPago === "transferencia" || MetodoPago === "efectivo") ? "aprobado" : "pendiente";
+
     nuevoPedido = await createPedidoClienteModel({
       ClienteId: ClienteId || null,
       FechaRegistro: fechaProcesada,
@@ -337,7 +339,7 @@ export const createPedidoCliente = async (req, res) => {
       NombreRecibe: NombreRecibe || null,
       TelefonoEntrega: TelefonoEntrega || null,
       DireccionEntrega: DireccionEntrega || null,
-      Estado: MetodoPago === "transferencia" ? "pendiente" : Estado,
+      Estado: estadoInicial,
       TipoCliente,
       ClienteNombre: ClienteNombre || null,
       ClienteTelefono: ClienteTelefono || null,
@@ -393,19 +395,22 @@ export const createPedidoCliente = async (req, res) => {
     const pedidoCompleto = await getPedidoClienteByIdModel(nuevoPedido.PedidoClienteId);
     pedidoCompleto.detalle = await getDetallePedidoByPedidoIdModel(nuevoPedido.PedidoClienteId);
 
-    // Si es transferencia, crear venta automáticamente
-    if (MetodoPago === "transferencia") {
+    // ✅ Si es transferencia o efectivo, crear venta automáticamente
+    if (MetodoPago === "transferencia" || MetodoPago === "efectivo") {
       try {
-        await updatePedidoClienteModel(pedidoCompleto.PedidoClienteId, { Estado: "aprobado" });
+        console.log(`💰 Creando venta automática para pedido pagado con ${MetodoPago}`);
         
         const resultadoVenta = await crearVentaDesdePedidoId(pedidoCompleto.PedidoClienteId, null);
         pedidoCompleto.Estado = "aprobado";
         pedidoCompleto.ventaCreada = {
           id: resultadoVenta.VentaId,
-          estado: 'pagado'
+          estado: 'pagado',
+          metodo: MetodoPago
         };
+        
+        console.log(`✅ Venta creada automáticamente: ${resultadoVenta.VentaId}`);
       } catch (ventaError) {
-        console.error('❌ Error creando venta automática:', ventaError);
+        console.error(`❌ Error creando venta automática para ${MetodoPago}:`, ventaError);
       }
     }
 
@@ -469,11 +474,11 @@ export const updatePedidoCliente = async (req, res) => {
 
     // Validar estados según método de pago
     if (updates.Estado) {
-      if (pedidoActual.MetodoPago === "transferencia") {
-        const estadosPermitidosTransferencia = ['pendiente', 'aprobado', 'finalizado', 'cancelado'];
-        if (!estadosPermitidosTransferencia.includes(updates.Estado)) {
+      if (pedidoActual.MetodoPago === "transferencia" || pedidoActual.MetodoPago === "efectivo") {
+        const estadosPermitidos = ['pendiente', 'aprobado', 'finalizado', 'cancelado'];
+        if (!estadosPermitidos.includes(updates.Estado)) {
           return res.status(400).json({
-            message: `Para transferencia, estado debe ser: ${estadosPermitidosTransferencia.join(', ')}`
+            message: `Para ${pedidoActual.MetodoPago}, estado debe ser: ${estadosPermitidos.join(', ')}`
           });
         }
       } else if (pedidoActual.MetodoPago === "contra_entrega") {
@@ -504,8 +509,9 @@ export const updatePedidoCliente = async (req, res) => {
     const updated = await getPedidoClienteByIdModel(id);
     updated.detalle = await getDetallePedidoByPedidoIdModel(id);
 
-    // Si es transferencia y se aprueba, crear venta
-    if (pedidoActual.MetodoPago === "transferencia" && nuevoEstado === 'aprobado' && estadoAnterior !== 'aprobado') {
+    // ✅ Si es transferencia/efectivo y se aprueba, crear venta
+    if ((pedidoActual.MetodoPago === "transferencia" || pedidoActual.MetodoPago === "efectivo") && 
+        nuevoEstado === 'aprobado' && estadoAnterior !== 'aprobado') {
       try {
         const [ventaExistente] = await dbPool.execute(
           "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
@@ -526,6 +532,34 @@ export const updatePedidoCliente = async (req, res) => {
         }
       } catch (ventaError) {
         console.error('❌ Error al crear venta:', ventaError);
+        updated.errorVenta = ventaError.message;
+      }
+    }
+
+    // ✅ Si es contra entrega y llega a 'entregado', crear venta
+    if (pedidoActual.MetodoPago === "contra_entrega" && nuevoEstado === 'entregado' && estadoAnterior !== 'entregado') {
+      try {
+        const [ventaExistente] = await dbPool.execute(
+          "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
+          [id]
+        );
+
+        if (ventaExistente.length === 0) {
+          const resultadoVenta = await crearVentaDesdePedidoId(id, null);
+          updated.ventaCreada = {
+            id: resultadoVenta.VentaId,
+            estado: 'pagado',
+            mensaje: 'Venta generada al entregar el pedido'
+          };
+          console.log(`✅ Venta creada para pedido contra entrega entregado: ${resultadoVenta.VentaId}`);
+        } else {
+          updated.ventaCreada = {
+            id: ventaExistente[0].VentaId,
+            yaExiste: true
+          };
+        }
+      } catch (ventaError) {
+        console.error('❌ Error al crear venta para pedido entregado:', ventaError);
         updated.errorVenta = ventaError.message;
       }
     }
