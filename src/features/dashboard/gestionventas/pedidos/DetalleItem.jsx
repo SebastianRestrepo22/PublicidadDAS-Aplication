@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Package, Trash2, X, Upload, FileText, Palette } from "lucide-react";
-import { getColorById, formatPrice } from "../pedidos/utils/pedidosHelpers";
+import { Package, Trash2, X, Palette, ChevronDown } from "lucide-react";
+import { formatPrice } from "../pedidos/utils/pedidosHelpers";
 
 export const DetalleItem = ({
   detalle,
@@ -18,8 +18,6 @@ export const DetalleItem = ({
   onAbrirColores,
   onActualizar,
   onEliminar,
-  onUploadArchivo,
-  onEliminarArchivo,
   puedeEliminar = true
 }) => {
   const [mostrarOpcionesStock, setMostrarOpcionesStock] = useState(false);
@@ -27,36 +25,6 @@ export const DetalleItem = ({
 
   // Tipo de stock: 'general' o 'por_color'
   const tipoStock = detalle.tipoStock || 'general';
-
-  // Función para determinar el ícono según el tipo de archivo
-  const getFileIcon = (tipoArchivo, url) => {
-    if (!url) return <Upload size={24} className="text-blue-500" />;
-    
-    if (tipoArchivo?.startsWith('image/')) {
-      return null;
-    }
-    
-    if (url.match(/\.pdf$/i) || tipoArchivo === 'application/pdf') {
-      return <FileText size={32} className="text-red-500" />;
-    }
-    
-    if (url.match(/\.(doc|docx)$/i) || tipoArchivo?.includes('word')) {
-      return <FileText size={32} className="text-blue-600" />;
-    }
-    
-    if (url.match(/\.(xls|xlsx)$/i) || tipoArchivo?.includes('excel')) {
-      return <FileText size={32} className="text-green-600" />;
-    }
-    
-    return <FileText size={32} className="text-gray-600" />;
-  };
-
-  // Función para obtener el nombre del archivo de la URL
-  const getFileNameFromUrl = (url) => {
-    if (!url) return '';
-    const parts = url.split('/');
-    return parts[parts.length - 1] || 'Archivo';
-  };
 
   // Cambiar tipo de stock
   const cambiarTipoStock = (nuevoTipo) => {
@@ -67,16 +35,59 @@ export const DetalleItem = ({
     setMostrarOpcionesStock(false);
   };
 
+  // Determinar la imagen a mostrar
+  const imagenAMostrar = detalle.UrlImagen || detalle.ProductoImagen || imagenUrl;
+
+  // 🔥 Manejar cambio de precio - permitir números y puntos
+  const handlePrecioChange = (e) => {
+    const value = e.target.value;
+    // Permitir vacío, números, puntos y comas
+    if (value === '' || /^[\d.,]*$/.test(value)) {
+      onActualizar(index, "Precio", value);
+    }
+  };
+
+  // 🔥 Manejar blur del precio - limpiar y convertir a número
+  const handlePrecioBlur = () => {
+    let precio = detalle.Precio;
+    if (!precio || precio === '') {
+      onActualizar(index, "Precio", 0);
+      return;
+    }
+
+    // Limpiar el string: eliminar puntos y comas, luego convertir a número
+    const precioLimpio = String(precio).replace(/[.,]/g, '');
+    const precioNumero = parseFloat(precioLimpio) || 0;
+    
+    console.log('💰 Precio original:', precio, 'Limpio:', precioLimpio, 'Número:', precioNumero);
+    onActualizar(index, "Precio", precioNumero);
+  };
+
+  // Manejar cambio de cantidad
+  const handleCantidadChange = (e) => {
+    const value = e.target.value;
+    if (value === '' || /^\d+$/.test(value)) {
+      onActualizar(index, "Cantidad", value === '' ? '' : parseInt(value, 10));
+    }
+  };
+
+  const handleCantidadBlur = () => {
+    const cantidad = detalle.Cantidad;
+    if (cantidad === '' || cantidad === null || isNaN(parseInt(cantidad, 10)) || parseInt(cantidad, 10) < 1) {
+      onActualizar(index, "Cantidad", 1);
+    }
+  };
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4">
-      {/* Fila principal - MANTENIENDO LA MISMA DISTRIBUCIÓN */}
-      <div className="grid grid-cols-12 gap-4 items-start">
+      {/* Fila principal */}
+      <div className="grid grid-cols-12 gap-4 items-center">
         {/* Tipo - Select */}
         <div className="col-span-1">
           <select
             value={esServicio ? 'servicio' : 'producto'}
             onChange={(e) => onTipoChange(index, e.target.value)}
-            className="w-full px-2 py-1 border border-slate-300 rounded-lg text-xs font-medium bg-white focus:ring-2 focus:ring-blue-500"
+            className="w-full px-2 py-2 border border-slate-300 rounded-lg text-xs font-medium bg-white focus:ring-2 focus:ring-blue-500"
           >
             <option value="producto">Prod</option>
             <option value="servicio">Serv</option>
@@ -85,14 +96,11 @@ export const DetalleItem = ({
 
         {/* Producto/Servicio - Selector */}
         <div className="col-span-3">
-          {esServicio ? (
-            <button
-              onClick={() => onAbrirServicios(index)}
-              className="w-full px-3 py-2 border rounded-lg hover:bg-slate-50 text-left flex items-center gap-2 text-sm"
-            >
-              {imagenUrl ? (
+          {itemSeleccionado ? (
+            <div className="flex items-center gap-2 px-3 py-2 border border-slate-300 rounded-lg bg-slate-50">
+              {imagenAMostrar ? (
                 <img 
-                  src={imagenUrl} 
+                  src={imagenAMostrar} 
                   alt="" 
                   className="w-6 h-6 object-cover rounded"
                   onError={(e) => {
@@ -101,37 +109,20 @@ export const DetalleItem = ({
                   }}
                 />
               ) : (
-                <div className="w-6 h-6 bg-purple-100 rounded flex items-center justify-center">
-                  <Package size={12} className="text-purple-600" />
+                <div className={`w-6 h-6 ${esServicio ? 'bg-purple-100' : 'bg-blue-100'} rounded flex items-center justify-center`}>
+                  <Package size={12} className={esServicio ? 'text-purple-600' : 'text-blue-600'} />
                 </div>
               )}
-              <span className="flex-1 truncate text-slate-700">
-                {itemSeleccionado ? itemNombre : "Seleccionar servicio..."}
+              <span className="flex-1 truncate text-slate-700 text-sm font-medium">
+                {detalle.ProductoNombre || itemNombre || (esServicio ? 'Servicio' : 'Producto')}
               </span>
-            </button>
+            </div>
           ) : (
             <button
-              onClick={() => onAbrirProductos(index)}
-              className="w-full px-3 py-2 border rounded-lg hover:bg-slate-50 text-left flex items-center gap-2 text-sm"
+              onClick={() => esServicio ? onAbrirServicios(index) : onAbrirProductos(index)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-left text-sm text-slate-500"
             >
-              {imagenUrl ? (
-                <img 
-                  src={imagenUrl} 
-                  alt="" 
-                  className="w-6 h-6 object-cover rounded"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.style.display = 'none';
-                  }}
-                />
-              ) : (
-                <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
-                  <Package size={12} className="text-blue-600" />
-                </div>
-              )}
-              <span className="flex-1 truncate text-slate-700">
-                {itemSeleccionado ? itemNombre : "Seleccionar producto..."}
-              </span>
+              + Seleccionar {esServicio ? 'servicio' : 'producto'}
             </button>
           )}
         </div>
@@ -142,12 +133,12 @@ export const DetalleItem = ({
             <div className="relative">
               <button
                 onClick={() => setMostrarOpcionesStock(!mostrarOpcionesStock)}
-                className="w-full px-3 py-2 border rounded-lg text-left flex items-center justify-between text-sm bg-white hover:bg-slate-50"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-left flex items-center justify-between text-sm bg-white hover:bg-slate-50"
               >
                 <span>
                   {tipoStock === 'general' ? 'Stock General' : 'Stock x Color'}
                 </span>
-                <span className="text-xs text-slate-400">▼</span>
+                <ChevronDown size={14} className="text-slate-400" />
               </button>
               
               {mostrarOpcionesStock && (
@@ -167,6 +158,8 @@ export const DetalleItem = ({
                 </div>
               )}
             </div>
+          ) : !esServicio ? (
+            <span className="text-sm text-slate-400 px-2">—</span>
           ) : (
             <span className="text-sm text-slate-400 px-2">—</span>
           )}
@@ -175,34 +168,40 @@ export const DetalleItem = ({
         {/* Cantidad */}
         <div className="col-span-1">
           <input
-            type="number"
-            min="1"
-            value={detalle.Cantidad || 1}
-            onChange={(e) => onActualizar(index, "Cantidad", parseInt(e.target.value) || 1)}
-            className={`w-full px-3 py-2 border rounded-lg text-center text-sm ${
-              tipoStock === 'por_color' ? 'bg-slate-100 opacity-60' : ''
+            type="text"
+            inputMode="numeric"
+            value={detalle.Cantidad || ''}
+            onChange={handleCantidadChange}
+            onBlur={handleCantidadBlur}
+            placeholder="0"
+            className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-center text-sm ${
+              tipoStock === 'por_color' ? 'bg-slate-100 opacity-60' : 'bg-white'
             }`}
             disabled={!itemSeleccionado || tipoStock === 'por_color'}
           />
         </div>
 
-        {/* Precio Unitario */}
+        {/* 🔥 Precio Unitario con signo $ y limpieza */}
         <div className="col-span-2">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={detalle.Precio || 0}
-            onChange={(e) => onActualizar(index, "Precio", parseFloat(e.target.value) || 0)}
-            className="w-full px-3 py-2 border rounded-lg text-right text-sm"
-            disabled={!itemSeleccionado}
-          />
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 font-medium">$</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={detalle.Precio || ''}
+              onChange={handlePrecioChange}
+              onBlur={handlePrecioBlur}
+              placeholder="0"
+              className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-right text-sm bg-white"
+              disabled={!itemSeleccionado}
+            />
+          </div>
         </div>
 
-        {/* Subtotal */}
+        {/* Subtotal con signo $ */}
         <div className="col-span-2">
           <div className="px-3 py-2 bg-blue-50 rounded-lg text-right font-semibold text-blue-700 text-sm">
-            {formatPrice(subtotal)}
+            ${subtotal.toLocaleString('es-CO')}
           </div>
         </div>
 
@@ -220,39 +219,48 @@ export const DetalleItem = ({
         </div>
       </div>
 
-      {/* FILA DE COLOR (solo para productos con stock por color) - Aparece debajo */}
+      {/* FILA DE COLOR (solo para productos con stock por color) */}
       {!esServicio && itemSeleccionado && tipoStock === 'por_color' && (
-        <div className="mt-3 pl-[16.66%] grid grid-cols-12 gap-4">
-          <div className="col-span-3">
-            <button
-              onClick={() => onAbrirColores(index)}
-              className={`w-full px-3 py-2 border rounded-lg text-left flex items-center gap-2 text-sm ${
-                !itemSeleccionado ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'
-              }`}
-            >
-              {detalle.ColorId && colorInfo ? (
-                <>
-                  <div
-                    className="w-4 h-4 rounded-full border"
-                    style={{ backgroundColor: colorInfo.Hex || colorInfo.CodigoHex }}
-                  />
-                  <span className="truncate text-slate-700">{colorInfo.Nombre}</span>
-                </>
-              ) : (
-                <>
-                  <Palette size={16} className="text-purple-600" />
-                  <span className="text-slate-500">Seleccionar color</span>
-                </>
+        <div className="mt-3 grid grid-cols-12 gap-4">
+          <div className="col-span-4 col-start-2">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onAbrirColores(index)}
+                className={`flex-1 px-3 py-2 border rounded-lg text-left flex items-center gap-2 text-sm ${
+                  detalle.ColorId ? 'bg-blue-50 border-blue-300' : 'border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                {detalle.ColorId ? (
+                  <>
+                    <div
+                      className="w-4 h-4 rounded-full border"
+                      style={{ backgroundColor: detalle.ColorHex || (colorInfo?.Hex || colorInfo?.CodigoHex) || '#ccc' }}
+                    />
+                    <span className="truncate text-slate-700">
+                      {detalle.ColorNombre || (colorInfo?.Nombre) || 'Color'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Palette size={16} className="text-purple-600" />
+                    <span className="text-slate-500">Seleccionar color</span>
+                  </>
+                )}
+              </button>
+              {detalle.ColorId && (
+                <button
+                  onClick={() => onActualizar(index, 'ColorId', null)}
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                  title="Quitar color"
+                >
+                  <X size={14} />
+                </button>
               )}
-            </button>
+            </div>
           </div>
-          
-          {/* Mensaje de stock por color */}
-          <div className="col-span-8 flex items-center text-xs text-slate-500">
-            {detalle.ColorId ? (
-              <span className="text-green-600">✓ Color seleccionado</span>
-            ) : (
-              <span className="text-amber-600">⚠️ Debe seleccionar un color</span>
+          <div className="col-span-6 flex items-center">
+            {!detalle.ColorId && (
+              <span className="text-xs text-amber-600">⚠️ Debe seleccionar un color</span>
             )}
           </div>
         </div>
@@ -260,74 +268,23 @@ export const DetalleItem = ({
 
       {/* FILA DE STOCK GENERAL (solo para productos con stock general) */}
       {!esServicio && itemSeleccionado && tipoStock === 'general' && (
-        <div className="mt-2 pl-[16.66%] text-xs text-slate-500">
-          Stock disponible: <span className="font-medium text-slate-700">{detalle.Stock || 1}</span>
-        </div>
-      )}
-      
-      {/* SECCIÓN PARA SUBIR ARCHIVOS - SOLO PARA SERVICIOS */}
-      {esServicio && itemSeleccionado && (
-        <div className="mt-3 pl-[8.33%]">
-          <div className="border border-dashed border-slate-300 rounded-lg p-4 bg-slate-50">
-            <label className="block text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
-              <Upload size={16} className="text-blue-600" />
-              Adjuntar archivo (opcional)
-            </label>
-            
-            {detalle.UrlImagenPersonalizada ? (
-              <div className="flex items-start gap-4">
-                <div className="w-16 h-16 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
-                  {detalle.tipoArchivo?.startsWith('image/') ? (
-                    <img 
-                      src={detalle.UrlImagenPersonalizada} 
-                      alt="Vista previa" 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    getFileIcon(detalle.tipoArchivo, detalle.UrlImagenPersonalizada)
-                  )}
-                </div>
-                
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-slate-700">
-                    {detalle.nombreArchivo || getFileNameFromUrl(detalle.UrlImagenPersonalizada)}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {detalle.tipoArchivo || 'Archivo'} • {(detalle.tamañoArchivo / 1024).toFixed(2)} KB
-                  </p>
-                  <button
-                    onClick={() => onEliminarArchivo?.(index)}
-                    className="mt-2 text-xs text-red-600 hover:text-red-800 flex items-center gap-1 bg-red-50 px-2 py-1 rounded-lg"
-                  >
-                    <X size={12} /> Eliminar archivo
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <input
-                  type="file"
-                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      onUploadArchivo?.(index, file);
-                    }
-                    e.target.value = '';
-                  }}
-                  className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                />
-                <p className="text-xs text-slate-400 mt-2">Máximo 10MB por archivo</p>
-              </div>
-            )}
+        <div className="mt-2 grid grid-cols-12 gap-4">
+          <div className="col-span-4 col-start-2">
+            <span className="text-xs text-slate-500">
+              Stock disponible: <span className="font-medium text-slate-700">{detalle.Stock || 1}</span>
+            </span>
           </div>
         </div>
       )}
       
       {/* Mensaje de error si no hay item seleccionado */}
       {!itemSeleccionado && (
-        <div className="mt-2 text-xs text-amber-600 pl-[16.66%]">
-          • Debe seleccionar un {esServicio ? 'servicio' : 'producto'}
+        <div className="mt-2 grid grid-cols-12 gap-4">
+          <div className="col-span-4 col-start-2">
+            <span className="text-xs text-amber-600">
+              • Debe seleccionar un {esServicio ? 'servicio' : 'producto'}
+            </span>
+          </div>
         </div>
       )}
     </div>

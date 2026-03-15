@@ -60,6 +60,39 @@ export const OrderForm = ({
     }
   }, [formCrear, setFormCrear]);
 
+  // Efecto para detectar cuando el modal de colores se cierra
+  useEffect(() => {
+    if (!modalColoresProductoAbierto && currentDetailIndex !== null) {
+      // El modal se acaba de cerrar
+      console.log('🎨 Modal cerrado, colores seleccionados:', coloresSeleccionados);
+      
+      if (coloresSeleccionados && coloresSeleccionados.length > 0) {
+        const nuevos = [...detallesCrear];
+        const colorSeleccionado = coloresSeleccionados[0];
+        
+        nuevos[currentDetailIndex] = {
+          ...nuevos[currentDetailIndex],
+          ColorId: colorSeleccionado.ColorId,
+          ColorNombre: colorSeleccionado.Nombre,
+          ColorHex: colorSeleccionado.Hex
+        };
+        
+        setDetallesCrear(nuevos);
+        toast.success(`Color ${colorSeleccionado.Nombre} asignado al producto`);
+      } else if (coloresSeleccionados.length === 0 && detallesCrear[currentDetailIndex]?.ColorId) {
+        // Si no hay colores seleccionados pero antes había uno, lo quitamos
+        const nuevos = [...detallesCrear];
+        nuevos[currentDetailIndex] = {
+          ...nuevos[currentDetailIndex],
+          ColorId: null,
+          ColorNombre: null,
+          ColorHex: null
+        };
+        setDetallesCrear(nuevos);
+      }
+    }
+  }, [modalColoresProductoAbierto, coloresSeleccionados, currentDetailIndex]);
+
   // Handlers para clientes
   const abrirModalClientes = () => {
     setModalClientesAbierto(true);
@@ -99,10 +132,11 @@ export const OrderForm = ({
         Descripcion: producto.Descripcion || "",
         UrlImagen: producto.Imagen || "",
         ColorId: null,
-        tipoStock: 'general', // 'general' o 'por_color'
+        tipoStock: 'general',
         Stock: producto.Stock || 0,
         UsaColores: producto.UsaColores || 0,
-        ProductoNombre: producto.Nombre
+        ProductoNombre: producto.Nombre,
+        ProductoImagen: producto.Imagen || ""
       };
       
       console.log('📦 Detalle actualizado:', nuevos[currentDetailIndex]);
@@ -150,62 +184,44 @@ export const OrderForm = ({
     if (detallesCrear[index]?.tipo === 'producto') {
       const detalleProducto = detallesCrear[index];
       
-      // Buscar el producto completo en el catálogo
-      const productoCompleto = productos.find(p => p.ProductoId === detalleProducto.ProductoId);
-      
-      console.log('🎨 Producto encontrado:', productoCompleto);
-      
-      if (productoCompleto) {
-        setCurrentDetailIndex(index);
-        
-        // Si ya tiene un color seleccionado, cargarlo
-        if (detalleProducto.ColorId) {
-          const colorSeleccionado = colores.find(c => c.ColorId === detalleProducto.ColorId);
-          if (colorSeleccionado) {
-            setColoresSeleccionados([{
-              ColorId: colorSeleccionado.ColorId,
-              Stock: 1,
-              Nombre: colorSeleccionado.Nombre,
-              Hex: colorSeleccionado.Hex || colorSeleccionado.CodigoHex
-            }]);
-          } else {
-            setColoresSeleccionados([]);
-          }
-        } else {
-          setColoresSeleccionados([]);
-        }
-        
-        setModalColoresProductoAbierto(true);
-      } else {
-        toast.warning("Debes seleccionar un producto primero");
+      // Verificar que tenga un ProductoId
+      if (!detalleProducto.ProductoId) {
+        toast.warning("El producto no tiene un ID válido");
+        return;
       }
+      
+      setCurrentDetailIndex(index);
+      
+      // Cargar el color actual si existe en el formato que espera el modal
+      if (detalleProducto.ColorId) {
+        // Buscar el color completo en la lista de colores
+        const colorCompleto = colores.find(c => c.ColorId === detalleProducto.ColorId);
+        
+        if (colorCompleto) {
+          // El modal espera un array de objetos con ColorId, Stock, Nombre, Hex
+          setColoresSeleccionados([{
+            ColorId: colorCompleto.ColorId,
+            Stock: 1,
+            Nombre: colorCompleto.Nombre,
+            Hex: colorCompleto.Hex || colorCompleto.CodigoHex
+          }]);
+        } else {
+          // Si no encontramos el color completo, usamos la info del detalle
+          setColoresSeleccionados([{
+            ColorId: detalleProducto.ColorId,
+            Stock: 1,
+            Nombre: detalleProducto.ColorNombre || 'Color',
+            Hex: detalleProducto.ColorHex || '#ccc'
+          }]);
+        }
+      } else {
+        setColoresSeleccionados([]);
+      }
+      
+      setModalColoresProductoAbierto(true);
     } else {
       toast.warning("Este ítem no es un producto");
     }
-  };
-
-  const handleGuardarColores = (coloresSeleccionados) => {
-    console.log('🎨 Guardando colores:', coloresSeleccionados);
-    
-    if (currentDetailIndex !== null && coloresSeleccionados && coloresSeleccionados.length > 0) {
-      const nuevos = [...detallesCrear];
-      // Guardamos el primer color seleccionado
-      const colorSeleccionado = coloresSeleccionados[0];
-      
-      nuevos[currentDetailIndex] = {
-        ...nuevos[currentDetailIndex],
-        ColorId: colorSeleccionado.ColorId,
-        ColorNombre: colorSeleccionado.Nombre,
-        ColorHex: colorSeleccionado.Hex || colorSeleccionado.CodigoHex
-      };
-      
-      setDetallesCrear(nuevos);
-      toast.success(`Color ${colorSeleccionado.Nombre} asignado al producto`);
-    } else {
-      toast.warning("No se seleccionó ningún color");
-    }
-    
-    setModalColoresProductoAbierto(false);
   };
 
   // Handlers para detalles
@@ -287,16 +303,24 @@ export const OrderForm = ({
 
   // Funciones helper
   const getItemNombre = (detalle) => {
+    // Si ya tenemos el nombre guardado en el detalle, usarlo
+    if (detalle.ProductoNombre) return detalle.ProductoNombre;
+    
     if (detalle.ProductoId) {
-      return getProductoNombre(detalle.ProductoId, productos, servicios);
+      const producto = productos.find(p => p.ProductoId === detalle.ProductoId);
+      return producto?.Nombre || "Producto";
     } else if (detalle.ServicioId) {
       const servicio = servicios.find(s => s.ServicioId === detalle.ServicioId);
-      return servicio?.Nombre || "Servicio no encontrado";
+      return servicio?.Nombre || "Servicio";
     }
     return "";
   };
 
   const getItemImagen = (detalle) => {
+    // Si ya tenemos la imagen en el detalle, usarla
+    if (detalle.UrlImagen) return detalle.UrlImagen;
+    if (detalle.ProductoImagen) return detalle.ProductoImagen;
+    
     if (detalle.ProductoId) {
       const producto = productos.find(p => p.ProductoId === detalle.ProductoId);
       return producto?.Imagen || "";
@@ -683,7 +707,6 @@ export const OrderForm = ({
         colores={colores}
         coloresConStock={coloresSeleccionados}
         setColoresConStock={setColoresSeleccionados}
-        onGuardar={handleGuardarColores}
       />
     </>
   );

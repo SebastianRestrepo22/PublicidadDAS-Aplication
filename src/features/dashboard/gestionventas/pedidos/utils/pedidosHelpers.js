@@ -36,18 +36,22 @@ export const shortenId = (id) => {
   return strId.length > 3 ? strId.slice(-3) : strId.padStart(3, '0');
 };
 
-// Formatear precio
-export const formatPrice = (value, currency = '$') => {
-  if (value === null || value === undefined || value === '') return `${currency}0.00`;
+export const formatPrice = (price) => {
+  if (price === undefined || price === null) return '$0';
   
-  // Convertir a número si es string
-  const num = typeof value === 'string' ? parseFloat(value) : value;
+  // Convertir a número
+  const numPrice = typeof price === 'string' ? parseFloat(price) : price;
   
-  // Verificar si es un número válido
-  if (isNaN(num)) return `${currency}0.00`;
+  // Formatear con separadores de miles
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(numPrice);
   
-  // Formatear con separador de miles y 2 decimales
-  return `${currency}${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+  // O si prefieres un formato más simple:
+  // return `$${Math.round(numPrice).toLocaleString('es-CO')}`;
 };
 
 /**

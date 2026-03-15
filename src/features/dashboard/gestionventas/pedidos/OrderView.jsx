@@ -1,18 +1,12 @@
 import React, { useState } from "react";
 import {
-  ArrowLeft, Edit, Package, FileText,
-  ExternalLink, User, Image as ImageIcon,
-  ChevronDown, ChevronUp, AlertTriangle, Shield, Store, X
+  ArrowLeft, Package, User, CreditCard,
+  Calendar, Phone, MapPin, FileText,
+  CheckCircle, XCircle, Clock, Truck,
+  AlertCircle, Edit, Download, Printer
 } from "lucide-react";
 import { toast } from "react-toastify";
-import { CancelacionModal } from "../../components/modals/CancelacionModal";
-import {
-  formatDate,
-  shortenId,
-  formatPrice,
-  getProductoNombre,
-  getColorById
-} from "../pedidos/utils/pedidosHelpers";
+import { formatDate, formatPrice, shortenId } from "../pedidos/utils/pedidosHelpers";
 
 export const OrderView = ({
   selectedPedido,
@@ -22,509 +16,359 @@ export const OrderView = ({
   onBack,
   onEdit,
   onUpdateEstado,
-  userRole = 'admin'
+  userRole = "admin"
 }) => {
-  const [showVoucher, setShowVoucher] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [estadoSeleccionado, setEstadoSeleccionado] = useState(selectedPedido?.Estado || 'pendiente');
-  const [filtroTipo, setFiltroTipo] = useState('todos');
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelando, setCancelando] = useState(false);
-  const [imagenAmpliada, setImagenAmpliada] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [updating, setUpdating] = useState(false);
 
-  if (!selectedPedido) return null;
+  // Determinar si es contra entrega
+  const esContraEntrega = selectedPedido?.MetodoPago === 'contra_entrega';
 
-  const getDetallesFiltrados = () => {
-    if (!Array.isArray(selectedPedido.detalle)) return [];
-    return selectedPedido.detalle.filter(d => {
-      if (filtroTipo === 'todos') return true;
-      if (filtroTipo === 'productos') return d.ProductoId && !d.ServicioId;
-      if (filtroTipo === 'servicios') return d.ServicioId && !d.ProductoId;
-      return true;
-    });
-  };
+  // Estados permitidos según el método de pago
+  const estadosPermitidos = esContraEntrega 
+    ? ['pendiente', 'en_proceso', 'en_camino', 'entregado', 'cancelado']
+    : ['pendiente', 'aprobado', 'finalizado', 'cancelado'];
 
-  const getConteoTipos = () => {
-    if (!Array.isArray(selectedPedido.detalle)) {
-      return { productos: 0, servicios: 0, total: 0 };
-    }
-    const productos = selectedPedido.detalle.filter(d => d.ProductoId && !d.ServicioId).length;
-    const servicios = selectedPedido.detalle.filter(d => d.ServicioId && !d.ProductoId).length;
-    return { productos, servicios, total: selectedPedido.detalle.length };
-  };
-
-  const getItemNombre = (detalle) => {
-    if (detalle.ProductoId) {
-      return getProductoNombre(detalle.ProductoId, productos, servicios);
-    } else if (detalle.ServicioId) {
-      const servicio = servicios.find(s => s.ServicioId === detalle.ServicioId);
-      return servicio?.Nombre || "Servicio no encontrado";
-    }
-    return "";
-  };
-
-  const getItemDescripcion = (detalle) => {
-    // Priorizar la descripción personalizada del detalle
-    if (detalle.Descripcion) return detalle.Descripcion;
-
-    // Si no, buscar la descripción del producto/servicio
-    if (detalle.ProductoId) {
-      const producto = productos.find(p => p.ProductoId === detalle.ProductoId);
-      return producto?.Descripcion || "";
-    } else if (detalle.ServicioId) {
-      const servicio = servicios.find(s => s.ServicioId === detalle.ServicioId);
-      return servicio?.Descripcion || "";
-    }
-    return "";
-  };
-
-  const getServicioInfo = (servicioId) => {
-    return servicios.find(s => s.ServicioId === servicioId);
-  };
-
-  // Verificar si la imagen es personalizada
-  const esImagenPersonalizada = (detalle) => {
-    return !!detalle.UrlImagenPersonalizada;
-  };
-
-  const abrirComprobante = (voucherUrl) => {
-    if (!voucherUrl) {
-      toast.error("No hay comprobante disponible");
-      return;
-    }
-    try {
-      const urlLimpia = voucherUrl.trim();
-      let urlCompleta = urlLimpia.startsWith('http') ? urlLimpia : `http://localhost:3000${urlLimpia.startsWith('/') ? urlLimpia : '/' + urlLimpia}`;
-      window.open(urlCompleta, '_blank', 'noopener,noreferrer');
-    } catch (error) {
-      toast.error("La URL del comprobante no es válida");
+  const getEstadoColor = (estado) => {
+    switch (estado) {
+      case 'pendiente': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'aprobado': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'en_proceso': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'en_camino': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'entregado': return 'bg-green-100 text-green-800 border-green-200';
+      case 'finalizado': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'cancelado': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  const puedeCancelar = () => selectedPedido.Estado !== 'cancelado' && userRole === 'admin';
-  const puedeAprobar = () => userRole === 'admin' && selectedPedido.Estado !== 'aprobado';
-
-  const getOpcionesEstado = () => {
-    const opciones = [
-      { value: "pendiente", label: "Pendiente", disabled: selectedPedido.Estado === 'aprobado' }
-    ];
-    if (puedeAprobar()) {
-      opciones.push({ value: "aprobado", label: "Aprobado (Generará Venta)", disabled: false });
-    }
-    if (puedeCancelar()) {
-      opciones.push({ value: "cancelado", label: "Cancelar Pedido", disabled: false, className: "text-red-600 font-medium" });
-    }
-    return opciones;
-  };
-
-  // 🔴 FUNCIÓN MODIFICADA - Ahora llama a onBack() después de actualizar
-  const ejecutarCambioEstado = async (nuevoEstado, motivo = "") => {
-    setUpdating(true);
-    try {
-      await onUpdateEstado(nuevoEstado, motivo);
-      
-      // Mostrar mensaje de éxito específico según el estado
-      if (nuevoEstado === 'aprobado') {
-        toast.success("✅ Pedido aprobado y venta generada correctamente");
-      } else if (nuevoEstado === 'cancelado') {
-        toast.success("✅ Pedido cancelado correctamente");
-      } else {
-        toast.success(`✅ Pedido actualizado a ${nuevoEstado}`);
-      }
-      
-      // 🔴 IMPORTANTE: Redirigir a la tabla principal después de 1 segundo
-      setTimeout(() => {
-        onBack(); // Esto vuelve a la lista de pedidos
-      }, 1000);
-      
-    } catch (error) {
-      console.error("Error al actualizar estado:", error);
-      setEstadoSeleccionado(selectedPedido.Estado);
-      toast.error("Error al actualizar el estado");
-    } finally {
-      setUpdating(false);
-      setCancelando(false);
+  const getEstadoIcon = (estado) => {
+    switch (estado) {
+      case 'pendiente': return <Clock className="w-4 h-4" />;
+      case 'aprobado': return <CheckCircle className="w-4 h-4" />;
+      case 'en_proceso': return <Package className="w-4 h-4" />;
+      case 'en_camino': return <Truck className="w-4 h-4" />;
+      case 'entregado': return <CheckCircle className="w-4 h-4" />;
+      case 'finalizado': return <CheckCircle className="w-4 h-4" />;
+      case 'cancelado': return <XCircle className="w-4 h-4" />;
+      default: return <Package className="w-4 h-4" />;
     }
   };
 
-  const handleEstadoChange = async (e) => {
-    const nuevoEstado = e.target.value;
-    if (nuevoEstado === selectedPedido.Estado) return;
-    if (selectedPedido.Estado === 'aprobado' && nuevoEstado === 'pendiente') {
-      toast.error("No se puede revertir un pedido aprobado a pendiente");
-      setEstadoSeleccionado(selectedPedido.Estado);
-      return;
-    }
-    if (nuevoEstado === 'cancelado' && puedeCancelar()) {
+  const getEstadoLabel = (estado) => {
+    const labels = {
+      pendiente: 'Pendiente',
+      aprobado: 'Aprobado',
+      en_proceso: 'En Proceso',
+      en_camino: 'En Camino',
+      entregado: 'Entregado',
+      finalizado: 'Finalizado',
+      cancelado: 'Cancelado'
+    };
+    return labels[estado] || estado;
+  };
+
+  const handleEstadoChange = async (nuevoEstado) => {
+    if (nuevoEstado === 'cancelado') {
       setShowCancelModal(true);
       return;
     }
-    await ejecutarCambioEstado(nuevoEstado);
+
+    try {
+      setUpdating(true);
+      await onUpdateEstado(nuevoEstado);
+      toast.success(`Estado actualizado a ${getEstadoLabel(nuevoEstado)}`);
+      // ✅ Redirigir a la tabla después de 1 segundo
+      setTimeout(() => {
+        onBack();
+      }, 1000);
+    } catch (error) {
+      toast.error('Error al actualizar estado');
+    } finally {
+      setUpdating(false);
+    }
   };
 
-  const handleConfirmCancel = async (motivo) => {
-    setCancelando(true);
-    setShowCancelModal(false);
-    await ejecutarCambioEstado('cancelado', motivo);
+  const handleCancelConfirm = async () => {
+    if (!cancelReason.trim()) {
+      toast.warning('Debes proporcionar un motivo de cancelación');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await onUpdateEstado('cancelado', cancelReason);
+      setShowCancelModal(false);
+      setCancelReason("");
+      toast.success('Pedido cancelado correctamente');
+      // ✅ Redirigir a la tabla después de 1 segundo
+      setTimeout(() => {
+        onBack();
+      }, 1000);
+    } catch (error) {
+      toast.error('Error al cancelar el pedido');
+    } finally {
+      setUpdating(false);
+    }
   };
 
-  const conteo = getConteoTipos();
-  const detallesFiltrados = getDetallesFiltrados();
-  const opcionesEstado = getOpcionesEstado();
+  // Obtener nombre del producto/servicio
+  const getItemNombre = (item) => {
+    if (item.ProductoId) {
+      const producto = productos.find(p => p.ProductoId === item.ProductoId);
+      return producto?.Nombre || item.ProductoNombre || 'Producto';
+    }
+    if (item.ServicioId) {
+      const servicio = servicios.find(s => s.ServicioId === item.ServicioId);
+      return servicio?.Nombre || item.ServicioNombre || 'Servicio';
+    }
+    return item.Nombre || 'Item';
+  };
+
+  // Obtener color del item
+  const getItemColor = (item) => {
+    if (!item.ColorId) return null;
+    const color = colores.find(c => c.ColorId === item.ColorId);
+    return color || (item.ColorNombre ? { Nombre: item.ColorNombre, Hex: item.ColorHex } : null);
+  };
 
   return (
-    <>
-      <div className="bg-white rounded-xl shadow-sm border p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <button onClick={onBack} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300">
-              <ArrowLeft size={18} />
-            </button>
-            <div>
-              <h3 className="text-lg font-bold">Pedido #{shortenId(selectedPedido.PedidoClienteId)}</h3>
-              <p className="text-slate-600 text-sm">{formatDate(selectedPedido.FechaRegistro)}</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${selectedPedido.TipoCliente === 'walkin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-              }`}>
-              {selectedPedido.TipoCliente === 'walkin' ? <><Store size={14} /> Walk-in</> : <><User size={14} /> Registrado</>}
-            </div>
-            {selectedPedido.TipoCliente === 'walkin' && userRole === 'admin' && (
-              <button onClick={() => onEdit(selectedPedido)} className="bg-blue-500 text-white px-5 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2">
-                <Edit size={18} /> Editar Pedido
-              </button>
-            )}
-          </div>
-        </div>
+    <div className="bg-white rounded-xl shadow-sm border p-6">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <button
+          onClick={onBack}
+          className="p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition-colors"
+        >
+          <ArrowLeft size={18} />
+        </button>
+        <h3 className="text-lg font-bold text-slate-800">Detalle del Pedido</h3>
+        <span className="ml-auto text-sm text-slate-500 font-mono">
+          ID: {shortenId(selectedPedido.PedidoClienteId)}
+        </span>
+      </div>
 
-        <div className="space-y-8">
-          {/* Información General */}
-          <div className="bg-slate-50 p-6 rounded-xl">
-            <h4 className="text-lg font-semibold mb-4">Información General</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white p-4 rounded-lg border">
-                <div className="text-sm text-slate-600 mb-1">Cliente</div>
-                <div className="font-medium">{selectedPedido.NombreCliente || selectedPedido.ClienteNombre || "Cliente Walk-in"}</div>
-                {selectedPedido.ClienteTelefono && (
-                  <div className="text-xs text-slate-500 mt-1">{selectedPedido.ClienteTelefono}</div>
-                )}
-              </div>
-              <div className="bg-white p-4 rounded-lg border">
-                <div className="text-sm text-slate-600 mb-1">Estado</div>
-                <div className={`font-medium flex items-center gap-1 ${selectedPedido.Estado === 'pendiente' ? 'text-yellow-600' :
-                  selectedPedido.Estado === 'aprobado' ? 'text-green-600' :
-                    selectedPedido.Estado === 'cancelado' ? 'text-red-600' : 'text-slate-600'
-                  }`}>
-                  {selectedPedido.Estado} {userRole === 'admin' && <Shield size={14} className="ml-1 text-blue-500" />}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Columna izquierda - Información del pedido */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Estado del pedido */}
+          <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+            <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
+              <Package size={20} /> Estado del Pedido
+            </h4>
+            
+            <div className="flex items-center gap-4 mb-4">
+              <span className={`px-4 py-2 rounded-full text-sm font-medium inline-flex items-center gap-2 ${getEstadoColor(selectedPedido.Estado)}`}>
+                {getEstadoIcon(selectedPedido.Estado)}
+                {getEstadoLabel(selectedPedido.Estado)}
+              </span>
+              <span className="text-sm text-slate-500">
+                Última actualización: {formatDate(selectedPedido.FechaRegistro)}
+              </span>
+            </div>
+
+            {userRole === 'admin' && (
+              <div className="mt-4">
+                <p className="text-sm font-medium text-slate-700 mb-2">Cambiar estado:</p>
+                <div className="flex flex-wrap gap-2">
+                  {estadosPermitidos.map((estado) => (
+                    <button
+                      key={estado}
+                      onClick={() => handleEstadoChange(estado)}
+                      disabled={updating || estado === selectedPedido.Estado}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        estado === selectedPedido.Estado
+                          ? getEstadoColor(estado)
+                          : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      {getEstadoLabel(estado)}
+                    </button>
+                  ))}
                 </div>
-                {selectedPedido.MotivoCancelacion && (
-                  <div className="text-xs text-red-600 mt-1">
-                    Motivo: {selectedPedido.MotivoCancelacion}
-                  </div>
-                )}
-              </div>
-              <div className="bg-white p-4 rounded-lg border">
-                <div className="text-sm text-slate-600 mb-1">Método de Pago</div>
-                <div className="font-medium capitalize">{selectedPedido.MetodoPago?.replace('_', ' ') || '—'}</div>
-              </div>
-              <div className="bg-white p-4 rounded-lg border">
-                <div className="text-sm text-slate-600 mb-1">Total</div>
-                <div className="text-lg font-bold text-blue-700">{formatPrice(selectedPedido.Total)}</div>
-              </div>
-            </div>
-
-            {/* Información de contacto para walk-in o contra entrega */}
-            {(selectedPedido.MetodoPago === "contra_entrega" || selectedPedido.TipoCliente === 'walkin') && (
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                {selectedPedido.NombreRecibe && (
-                  <div className="bg-white p-3 rounded-lg border">
-                    <div className="text-xs text-slate-600">Nombre quien recibe</div>
-                    <div className="font-medium">{selectedPedido.NombreRecibe}</div>
-                  </div>
-                )}
-                {selectedPedido.TelefonoEntrega && (
-                  <div className="bg-white p-3 rounded-lg border">
-                    <div className="text-xs text-slate-600">Teléfono</div>
-                    <div className="font-medium">{selectedPedido.TelefonoEntrega}</div>
-                  </div>
-                )}
-                {selectedPedido.DireccionEntrega && (
-                  <div className="bg-white p-3 rounded-lg border">
-                    <div className="text-xs text-slate-600">Dirección</div>
-                    <div className="font-medium text-sm">{selectedPedido.DireccionEntrega}</div>
-                  </div>
-                )}
               </div>
             )}
           </div>
 
-          {/* Voucher */}
-          {selectedPedido.MetodoPago === "transferencia" && selectedPedido.Voucher && (
-            <div className="bg-slate-50 p-6 rounded-xl">
-              <button onClick={() => setShowVoucher(!showVoucher)} className="w-full flex items-center justify-between">
-                <h4 className="text-lg font-semibold flex items-center gap-2">
-                  <FileText size={20} /> Comprobante de Pago
-                </h4>
-                {showVoucher ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-              </button>
-              {showVoucher && (
-                <div className="mt-4 bg-white p-4 rounded-lg border">
-                  <button
-                    onClick={() => abrirComprobante(selectedPedido.Voucher)}
-                    className="text-blue-600 hover:text-blue-800 flex items-center gap-2"
-                  >
-                    <ExternalLink size={16} /> Ver comprobante
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Detalles */}
-          <div className="bg-slate-50 p-6 rounded-xl">
-            <div className="flex flex-col sm:flex-row justify-between mb-6">
-              <h4 className="text-lg font-semibold flex items-center gap-2">
-                <Package size={20} /> Productos y Servicios ({conteo.total} items)
-              </h4>
-              <div className="flex gap-2 mt-2 sm:mt-0">
-                {['todos', 'productos', 'servicios'].map(tipo => (
-                  <button
-                    key={tipo}
-                    onClick={() => setFiltroTipo(tipo)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium ${filtroTipo === tipo ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 hover:bg-slate-100'
-                      }`}
-                  >
-                    {tipo.charAt(0).toUpperCase() + tipo.slice(1)} ({tipo === 'todos' ? conteo.total : tipo === 'productos' ? conteo.productos : conteo.servicios})
-                  </button>
-                ))}
-              </div>
-            </div>
+          {/* Productos y Servicios */}
+          <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+            <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
+              <Package size={20} /> Productos y Servicios
+            </h4>
 
             <div className="space-y-4">
-              {detallesFiltrados.map((d, index) => {
-
-                console.log('👁️ [VIEW] Renderizando detalle:', {
-                  id: d.DetallePedidoClienteId,
-                  UrlImagenPersonalizada: d.UrlImagenPersonalizada,
-                  UrlImagen: d.UrlImagen,
-                  tienePersonalizada: !!d.UrlImagenPersonalizada
-                });
-
-                const esServicio = !!d.ServicioId;
-                const itemNombre = getItemNombre(d);
-                const itemDescripcion = getItemDescripcion(d);
-                const colorInfo = d.ColorId ? getColorById(d.ColorId, colores) : null;
-                const servicioInfo = d.ServicioId ? getServicioInfo(d.ServicioId) : null;
-                const imagenPersonalizada = esImagenPersonalizada(d);
+              {selectedPedido.detalle?.map((item, index) => {
+                const color = getItemColor(item);
+                const itemNombre = getItemNombre(item);
+                const subtotal = (item.Cantidad || 0) * (item.Precio || 0);
 
                 return (
-                  <div key={d.DetallePedidoClienteId || index} className="bg-white border rounded-xl p-6">
-                    <div className="flex flex-col md:flex-row gap-4">
-                      {/* Imagen del item - Verificar si hay imagen personalizada en la BD */}
-                      {d.UrlImagenPersonalizada ? (
-                        <div className="flex-shrink-0">
-                          <div className="relative">
-                            {d.UrlImagenPersonalizada.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i) ? (
-                              // Es una imagen
-                              <img
-                                src={d.UrlImagenPersonalizada}
-                                alt={itemNombre}
-                                className="w-24 h-24 object-cover rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={() => setImagenAmpliada(d.UrlImagenPersonalizada)}
-                                onError={(e) => {
-                                  console.error("Error cargando imagen:", d.UrlImagenPersonalizada);
-                                  e.target.onerror = null;
-                                  e.target.src = d.UrlImagen || 'https://via.placeholder.com/96?text=Error';
-                                }}
+                  <div key={item.DetallePedidoClienteId || index} className="bg-white p-4 rounded-lg border border-slate-200">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium text-slate-800">{itemNombre}</p>
+                        <div className="flex items-center gap-4 mt-2 text-sm">
+                          <span className="text-slate-600">Cantidad: {item.Cantidad || 1}</span>
+                          <span className="text-slate-600">Precio: {formatPrice(item.Precio || 0)}</span>
+                          {color && (
+                            <div className="flex items-center gap-1">
+                              <div 
+                                className="w-4 h-4 rounded-full border"
+                                style={{ backgroundColor: color.Hex || color.CodigoHex }}
                               />
-                            ) : (
-                              // Es otro tipo de archivo (PDF, Word, etc.)
-                              <a
-                                href={d.UrlImagenPersonalizada}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block w-24 h-24 bg-blue-50 rounded-lg border-2 border-blue-200 hover:bg-blue-100 transition-colors"
-                              >
-                                <div className="flex flex-col items-center justify-center h-full p-2">
-                                  {d.UrlImagenPersonalizada.match(/\.pdf$/i) ? (
-                                    <>
-                                      <FileText size={32} className="text-red-500" />
-                                      <span className="text-xs text-center mt-1 font-medium text-blue-700">PDF</span>
-                                    </>
-                                  ) : d.UrlImagenPersonalizada.match(/\.(doc|docx)$/i) ? (
-                                    <>
-                                      <FileText size={32} className="text-blue-600" />
-                                      <span className="text-xs text-center mt-1 font-medium text-blue-700">Word</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <FileText size={32} className="text-gray-600" />
-                                      <span className="text-xs text-center mt-1 font-medium text-blue-700">Archivo</span>
-                                    </>
-                                  )}
-                                </div>
-                              </a>
-                            )}
-                            <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full shadow-lg">
-                              Cliente
-                            </span>
-                          </div>
-                        </div>
-                      ) : d.UrlImagen ? (
-                        <div className="flex-shrink-0">
-                          <img
-                            src={d.UrlImagen}
-                            alt={itemNombre}
-                            className="w-24 h-24 object-cover rounded-lg border"
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src = 'https://via.placeholder.com/96?text=Sin+imagen';
-                            }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Package size={32} className="text-slate-400" />
-                        </div>
-                      )}
-
-                      {/* Información del item */}
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className={`px-2 py-1 rounded-lg text-xs font-medium ${esServicio ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-                                }`}>
-                                {esServicio ? 'Servicio' : 'Producto'}
-                              </span>
-
-                              {d.Tamaño && (
-                                <span className="px-2 py-1 bg-slate-100 rounded-lg text-xs font-medium text-slate-600">
-                                  Tamaño: {d.Tamaño}
-                                </span>
-                              )}
-
-                              {colorInfo && (
-                                <span className="px-2 py-1 bg-slate-100 rounded-lg text-xs font-medium text-slate-600 flex items-center gap-1">
-                                  <span
-                                    className="w-3 h-3 rounded-full border"
-                                    style={{ backgroundColor: colorInfo.Hex }}
-                                  />
-                                  {colorInfo.Nombre}
-                                </span>
-                              )}
+                              <span className="text-slate-600">{color.Nombre}</span>
                             </div>
-
-                            <div>
-                              <h5 className="font-semibold text-lg">{itemNombre}</h5>
-                              {/* Mostrar descripción personalizada si existe */}
-                              {d.Descripcion && (
-                                <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                  <p className="text-sm text-blue-800">
-                                    <span className="font-medium">Instrucciones del cliente:</span> {d.Descripcion}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Indicador de imagen personalizada */}
-                            {imagenPersonalizada && (
-                              <div className="flex items-center gap-2 mt-2 text-xs text-green-600 bg-green-50 p-2 rounded-lg">
-                                <ImageIcon size={14} />
-                                <span>El cliente adjuntó un archivo de referencia</span>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="text-right">
-                            <div className="text-xl font-bold text-blue-700">
-                              {formatPrice(d.Precio * d.Cantidad)}
-                            </div>
-                            <div className="text-sm text-slate-500">
-                              {d.Cantidad} x {formatPrice(d.Precio)}
-                            </div>
-                          </div>
+                          )}
                         </div>
                       </div>
+                      <span className="font-semibold text-blue-600">
+                        {formatPrice(subtotal)}
+                      </span>
                     </div>
                   </div>
                 );
               })}
             </div>
-
-            <div className="mt-6 pt-6 border-t">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-semibold">Total del Pedido</span>
-                <span className="text-2xl font-bold text-blue-700">{formatPrice(selectedPedido.Total)}</span>
-              </div>
-            </div>
           </div>
+        </div>
 
-          {/* Estado */}
-          {userRole === 'admin' && (
-            <div className="bg-slate-50 p-6 rounded-xl">
-              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <AlertTriangle size={20} /> Actualizar Estado
-              </h4>
-              {opcionesEstado.length > 0 && (
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <select
-                    value={estadoSeleccionado}
-                    onChange={handleEstadoChange}
-                    disabled={updating || cancelando || selectedPedido.Estado === 'cancelado'}
-                    className="flex-1 px-4 py-3 border rounded-lg"
-                  >
-                    {opcionesEstado.map(op => (
-                      <option key={op.value} value={op.value} disabled={op.disabled} className={op.className}>
-                        {op.label}
-                      </option>
-                    ))}
-                  </select>
-                  
-                  {/* Indicador de carga */}
-                  {updating && (
-                    <div className="flex items-center justify-center gap-2 text-blue-600">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                      <span>Actualizando...</span>
-                    </div>
-                  )}
+        {/* Columna derecha - Información adicional */}
+        <div className="space-y-6">
+          {/* Información del cliente */}
+          <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+            <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
+              <User size={20} /> Cliente
+            </h4>
+            
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-slate-500">Nombre</p>
+                <p className="font-medium">{selectedPedido.NombreCliente || selectedPedido.ClienteNombre}</p>
+              </div>
+              {selectedPedido.ClienteTelefono && (
+                <div>
+                  <p className="text-sm text-slate-500">Teléfono</p>
+                  <p className="font-medium">{selectedPedido.ClienteTelefono}</p>
+                </div>
+              )}
+              {selectedPedido.ClienteCorreo && (
+                <div>
+                  <p className="text-sm text-slate-500">Correo</p>
+                  <p className="font-medium">{selectedPedido.ClienteCorreo}</p>
                 </div>
               )}
             </div>
-          )}
+          </div>
+
+          {/* Método de pago */}
+          <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+            <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
+              <CreditCard size={20} /> Pago
+            </h4>
+            
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-slate-500">Método</p>
+                <p className="font-medium capitalize">
+                  {selectedPedido.MetodoPago?.replace('_', ' ')}
+                </p>
+              </div>
+              
+              {selectedPedido.MetodoPago === 'contra_entrega' && (
+                <>
+                  {selectedPedido.NombreRecibe && (
+                    <div>
+                      <p className="text-sm text-slate-500">Recibe</p>
+                      <p className="font-medium">{selectedPedido.NombreRecibe}</p>
+                    </div>
+                  )}
+                  {selectedPedido.TelefonoEntrega && (
+                    <div>
+                      <p className="text-sm text-slate-500">Teléfono</p>
+                      <p className="font-medium">{selectedPedido.TelefonoEntrega}</p>
+                    </div>
+                  )}
+                  {selectedPedido.DireccionEntrega && (
+                    <div>
+                      <p className="text-sm text-slate-500">Dirección</p>
+                      <p className="font-medium">{selectedPedido.DireccionEntrega}</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {selectedPedido.Voucher && (
+                <div>
+                  <p className="text-sm text-slate-500 mb-1">Comprobante</p>
+                  <a
+                    href={selectedPedido.Voucher}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800"
+                  >
+                    <FileText size={16} />
+                    Ver voucher
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Totales */}
+          <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
+            <h4 className="text-lg font-semibold mb-4 text-blue-700">Resumen</h4>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-blue-600">Subtotal</span>
+                <span className="font-medium">{formatPrice(selectedPedido.Total)}</span>
+              </div>
+              <div className="flex justify-between text-lg font-bold pt-2 border-t border-blue-200">
+                <span>Total</span>
+                <span className="text-blue-700">{formatPrice(selectedPedido.Total)}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Modal para imagen ampliada */}
-      {imagenAmpliada && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-          onClick={() => setImagenAmpliada(null)}
-        >
-          <div className="relative max-w-4xl max-h-[90vh]">
-            <img
-              src={imagenAmpliada}
-              alt="Imagen ampliada"
-              className="max-w-full max-h-[90vh] object-contain"
+      {/* Modal de cancelación */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <h3 className="text-lg font-bold mb-4">Cancelar Pedido</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              ¿Estás seguro de cancelar este pedido? Esta acción no se puede deshacer.
+            </p>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Motivo de cancelación (obligatorio)"
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg mb-4 focus:ring-2 focus:ring-red-500"
+              rows="3"
             />
-            <button
-              onClick={() => setImagenAmpliada(null)}
-              className="absolute top-2 right-2 bg-white rounded-full p-2 hover:bg-gray-100 shadow-lg"
-            >
-              <X size={20} />
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={handleCancelConfirm}
+                disabled={updating}
+                className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {updating ? 'Cancelando...' : 'Confirmar cancelación'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setCancelReason("");
+                }}
+                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+              >
+                Volver
+              </button>
+            </div>
           </div>
         </div>
       )}
-
-      <CancelacionModal
-        isOpen={showCancelModal}
-        onClose={() => setShowCancelModal(false)}
-        onConfirm={handleConfirmCancel}
-        pedidoId={selectedPedido.PedidoClienteId}
-      />
-    </>
+    </div>
   );
 };
