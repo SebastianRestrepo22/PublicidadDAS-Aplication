@@ -276,7 +276,7 @@ const ModalVerVenta = ({ open, onClose, venta, onEstadoActualizado }) => {
     try {
       const response = await actualizarEstadoVenta(ventaLocal.VentaId, 'pagado');
       if (response.success) {
-        toast.success("Venta marcada como pagada ✅");
+        toast.success("Venta marcada como pagada");
         setVentaLocal(response.venta);
         if (onEstadoActualizado) {
           onEstadoActualizado(response.venta);

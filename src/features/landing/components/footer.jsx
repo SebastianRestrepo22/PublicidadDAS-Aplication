@@ -1,81 +1,69 @@
 import React from "react";
 
 export const Footer = () => {
-    return (
-        <>
-            <footer className="bg-gray-900 text-gray-400 mt-10">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 sm:px-12 px-6 py-1">
+  return (
+    <footer className="bg-gray-900 text-gray-400">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 px-6 sm:px-12 pt-10 pb-4 items-start">
 
-                    {/* Columna 1 */}
-                    <div>
-                        <div className="p-3">
-                            <h3 className="text-lg font-semibold text-white mb-4">Empresa</h3>
-                            <ul className="space-y-2">
-                                <li><a href="#">Acerca de Design and Style</a></li>
-                                <li><a href="#">Contáctanos</a></li>
-                            </ul>
-                        </div>
-                        <div className="p-3">
-                            <h3 className="text-lg font-semibold text-white mb-4">Atención al cliente</h3>
-                            <ul className="space-y-2">
-                                <li><a href="#">Política de envíos</a></li>
-                                <li><a href="#">Soporte</a></li>
-                            </ul>
-                        </div>
-                    </div>
+        {/* Columna 1 - Info */}
+        <div>
+          <h3 className="text-xl font-semibold text-white mb-3">PublicidadDAS</h3>
+          <p className="text-base text-gray-400 leading-relaxed">
+            Sistema de gestión para administrar productos, servicios y pedidos
+            en papelerías o negocios de impresión.
+          </p>
+        </div>
 
-                    {/* Columna 2 */}
+        {/* Columna 2 - Redes */}
+        <div>
+          <p className="text-sm font-medium text-gray-300 uppercase tracking-widest mb-3">
+            Síguenos
+          </p>
+          <p className="text-base text-gray-400 leading-relaxed mb-4">
+            Conéctate con nosotros a través de nuestras redes sociales y mantente
+            al tanto de nuestras novedades.
+          </p>
+          <div className="flex space-x-3">
+            <a href="https://www.whatsapp.com/?lang=es_LA" target="_blank" rel="noreferrer"
+              className="flex items-center justify-center w-11 h-11 rounded-lg border border-gray-700 bg-gray-800 hover:bg-gray-700 transition">
+              <img src="/multimedia/whatsapp.png" alt="WhatsApp" className="w-6 h-6" />
+            </a>
+            <a href="https://www.facebook.com/?locale=es_LA" target="_blank" rel="noreferrer"
+              className="flex items-center justify-center w-11 h-11 rounded-lg border border-gray-700 bg-gray-800 hover:bg-gray-700 transition">
+              <img src="/multimedia/facebook.png" alt="Facebook" className="w-6 h-6" />
+            </a>
+            <a href="https://www.instagram.com/" target="_blank" rel="noreferrer"
+              className="flex items-center justify-center w-11 h-11 rounded-lg border border-gray-700 bg-gray-800 hover:bg-gray-700 transition">
+              <img src="/multimedia/social.png" alt="Instagram" className="w-6 h-6" />
+            </a>
+          </div>
+        </div>
 
-                    <div>
-                        <div className="p-5">
-                            <h3 className="text-lg font-semibold text-white mb-4">Síguenos</h3>
-                            <div className="flex space-x-4">
-                                <a href="https://www.whatsapp.com/?lang=es_LA" target="_blank" className="hover:opacity-80 transition">
-                                    <img className="w-8 h-8" src="/multimedia/whatsapp.png" alt="WhatsApp" />
-                                </a>
-                                <a href="https://www.facebook.com/?locale=es_LA" target="_blank" className="hover:opacity-80 transition">
-                                    <img className="w-8 h-8" src="/multimedia/facebook.png" alt="Facebook" />
-                                </a>
-                                <a href="https://www.instagram.com/" target="_blank" className="hover:opacity-80 transition">
-                                    <img className="w-8 h-8" src="/multimedia/social.png" alt="Instagram" />
-                                </a>
-                            </div>
-                        </div>
-                    </div>
+        {/* Columna 3 - Ubicación */}
+        <div>
+          <p className="text-sm font-medium text-gray-300 uppercase tracking-widest mb-3">
+            Ubicación
+          </p>
+          <div className="flex items-center gap-1 text-sm text-gray-500 mb-2">
+            <span className="material-symbols-outlined text-red-500 text-lg">location_on</span>
+            <span>Solo referencia visual</span>
+          </div>
+          <div className="w-full h-36 rounded-xl overflow-hidden border border-gray-700">
+            <iframe
+              src="https://www.google.com/maps?q=medellin&output=embed"
+              className="w-full h-full border-0"
+              loading="lazy"
+            />
+          </div>
+        </div>
 
-                    {/*Column 3*/}
-                    <div className="p-5">
-                        <h3 className="text-lg font-semibold text-white mb-4">Dirección</h3>
+      </div>
 
-                        <div className="flex items-start mb-2">
-                            <span className="material-symbols-outlined text-red-500 mr-2">
-                                location_on
-                            </span>
-                            <p>
-                                Carrera 10 #55 366 int(150). <br />
-                            </p>
-                        </div>
-                        <div className="w-full h-50 md:h-50 rounded-xl overflow-hidden shadow-lg">
-                            <iframe
-                                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3093.8159235080193!2d-75.61079942635264!3d6.171504527156471!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e4682321a79aea7%3A0x1bf85f1b567ce732!2sCra.%2049%20%2351-28%2C%20Los%20Naranjos%2C%20Itag%C3%BCi%2C%20Antioquia!5e1!3m2!1ses-419!2sco!4v1756600255780!5m2!1ses-419!2sco"
-                                className="w-full h-50 border-0"
-                                allowFullScreen=""
-                                loading="lazy"
-                                referrerPolicy="no-referrer-when-downgrade"
-                            ></iframe>
-                        </div>
-                    </div>
-
-                </div>
-
-                {/* Copyright */}
-                <div className="border-t border-gray-700 text-center py-4">
-                    <p className="text-sm text-gray-500">
-                        © {new Date().getFullYear()} PublicidadDAS. Todos los derechos reservados.
-                    </p>
-                </div>
-            </footer>
-        </>
-
-    );
+      <div className="border-t border-gray-800 text-center py-4">
+        <p className="text-sm text-gray-600">
+          © {new Date().getFullYear()} PublicidadDAS. Todos los derechos reservados.
+        </p>
+      </div>
+    </footer>
+  );
 };
