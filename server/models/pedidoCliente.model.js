@@ -89,6 +89,9 @@ export const createPedidoClienteModel = async ({
 }) => {
   const PedidoClienteId = uuidv4();
 
+  console.log('📝 [MODEL] Creando pedido con estado:', Estado);
+  console.log('📝 [MODEL] Método de pago:', MetodoPago);
+
   await dbPool.execute(
     `
     INSERT INTO pedidosclientes 
@@ -115,7 +118,7 @@ export const createPedidoClienteModel = async ({
       ClienteId ?? null,
       FechaRegistro,
       Total,
-      Estado,
+      Estado,          // ✅ Este es el estado que se guarda en BD
       MetodoPago,
       Voucher ?? null,
       NombreRecibe ?? null,
@@ -152,6 +155,8 @@ export const createPedidoClienteModel = async ({
     `,
     [PedidoClienteId]
   );
+
+  console.log('✅ [MODEL] Pedido guardado con estado:', rows[0]?.Estado);
 
   return rows[0];
 };
