@@ -82,19 +82,22 @@ export const getVentaByIdModel = async (ventaId) => {
   }
 };
 
-export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) => {
-  const connection = await dbPool.getConnection();
+export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId, metodoPago = null, connection = null) => {
+  // Manejo de conexión: si no se pasa una externa, crear y liberar propia
+  const useConnection = connection || await dbPool.getConnection();
+  const shouldRelease = !connection;
 
   try {
-    await connection.beginTransaction();
+    // Solo iniciar transacción si es conexión propia
+    if (!connection) await useConnection.beginTransaction();
 
-    const [ventaExistente] = await connection.query(
+    const [ventaExistente] = await useConnection.query(
       "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
       [pedidoData.PedidoClienteId]
     );
 
     if (ventaExistente.length > 0) {
-      await connection.rollback();
+      if (!connection) await useConnection.rollback();
       return {
         success: false,
         alreadyExists: true,
@@ -117,7 +120,7 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
 
     if (pedidoData.TipoCliente === 'registrado' && pedidoData.ClienteId) {
       clienteId = pedidoData.ClienteId;
-      const [clienteRows] = await connection.query(
+      const [clienteRows] = await useConnection.query(
         "SELECT NombreCompleto, Telefono, CorreoElectronico FROM usuarios WHERE CedulaId = ?",
         [pedidoData.ClienteId]
       );
@@ -132,12 +135,22 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
       clienteCorreo = pedidoData.ClienteCorreo || null;
     }
 
-    await connection.query(
+    // 🔥 NUEVO: Determinar estado de la venta según método de pago
+    // Transferencia y QR → pendiente (requieren verificación manual del voucher)
+    // Otros (efectivo, contra_entrega, o null como fallback) → pagado
+    const estadoVenta = (metodoPago === 'transferencia' || metodoPago === 'QR') 
+      ? 'pendiente' 
+      : 'pagado';
+
+    console.log(`🔍 Venta creada - Pedido: ${pedidoData.PedidoClienteId}, Pago: ${metodoPago}, Estado: ${estadoVenta}`);
+
+    // 🔥 MODIFICADO: Último parámetro ahora es variable (estadoVenta) en lugar de 'pagado' hardcodeado
+    await useConnection.query(
       `INSERT INTO ventas (
         VentaId, Origen, PedidoClienteId, ClienteId, ClienteNombre, 
         ClienteTelefono, ClienteCorreo, UsuarioVendedorId, FechaVenta, 
         Subtotal, IVA, Total, Estado
-      ) VALUES (?, 'pedido', ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, 'pagado')`,
+      ) VALUES (?, 'pedido', ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)`,
       [
         VentaId,
         pedidoData.PedidoClienteId,
@@ -148,11 +161,67 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
         usuarioVendedorId || null,
         subtotal,
         IVA,
-        total
+        total,
+        estadoVenta  // ← NUEVO: se pasa el estado calculado dinámicamente
       ]
     );
 
-    await connection.commit();
+    // 🔥 Obtener los detalles del pedido con toda la información
+    const [detallesPedido] = await useConnection.query(
+      `SELECT 
+        dp.*,
+        p.Nombre AS ProductoNombre,
+        s.Nombre AS ServicioNombre,
+        c.Nombre AS ColorNombre,
+        c.Hex AS ColorHex
+       FROM detallepedidosclientes dp
+       LEFT JOIN productos p ON dp.ProductoId = p.ProductoId
+       LEFT JOIN servicios s ON dp.ServicioId = s.ServicioId
+       LEFT JOIN colores c ON dp.ColorId = c.ColorId
+       WHERE dp.PedidoClienteId = ?`,
+      [pedidoData.PedidoClienteId]
+    );
+
+    // 🔥 Crear los detalles de la venta con TODA la información
+    for (const detalle of detallesPedido) {
+      const DetalleVentaId = uuidv4();
+      
+      // Determinar el tipo de item y nombre snapshot
+      let tipoItem = detalle.ProductoId ? 'producto' : 'servicio';
+      let nombreSnapshot = '';
+      
+      if (detalle.ProductoId) {
+        nombreSnapshot = detalle.ProductoNombre || 'Producto';
+      } else if (detalle.ServicioId) {
+        nombreSnapshot = detalle.ServicioNombre || 'Servicio';
+      }
+
+      // Calcular subtotal
+      const subtotalDetalle = (detalle.Cantidad || 0) * (detalle.Precio || 0);
+
+      await useConnection.query(
+        `INSERT INTO detalleventas (
+          DetalleVentaId, VentaId, TipoItem, ProductoId, ServicioId,
+          NombreSnapshot, Cantidad, PrecioUnitario, Subtotal, ColorId, DescripcionPersonalizada
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          DetalleVentaId,
+          VentaId,
+          tipoItem,
+          detalle.ProductoId || null,
+          detalle.ServicioId || null,
+          nombreSnapshot,
+          detalle.Cantidad || 1,
+          detalle.Precio || 0,
+          subtotalDetalle,
+          detalle.ColorId || null,
+          detalle.Descripcion || null
+        ]
+      );
+    }
+
+    // Solo hacer commit si es conexión propia
+    if (!connection) await useConnection.commit();
 
     return {
       success: true,
@@ -161,11 +230,15 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
     };
 
   } catch (error) {
-    await connection.rollback();
+    // Solo hacer rollback si es conexión propia
+    if (!connection) await useConnection.rollback();
     console.error("Error en createVentaFromPedidoModel:", error);
     throw error;
   } finally {
-    connection.release();
+    // Solo liberar si es conexión propia
+    if (shouldRelease && useConnection) {
+      useConnection.release();
+    }
   }
 };
 
