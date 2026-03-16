@@ -90,19 +90,7 @@ export const updateCompra = async (id, compraData) => {
   }
 };
 
-export const updateCompraEstado = async (id, nuevoEstado, options = {}) => {
-  try {
-    const response = await axios.patch(`${'http://localhost:3000'}/api/compras/${id}/estado`, {
-      estado: nuevoEstado,
-      productos: options.productos,
-      motivoCancelacion: options.motivoCancelacion
-    });
-    return response.data;
-  } catch (error) {
-    console.error("Error en updateCompraEstado:", error);
-    throw error;
-  }
-};
+
 
 export const deleteCompra = async (id) => {
   try {

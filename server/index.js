@@ -30,13 +30,11 @@ import tipoDocumentoRoutes from './routes/tipoDocumento.js';
 // Scripts
 import { initRolesAndAdmin } from './scripts/initRolesAndAdmin.js';
 import { dbPool } from './lib/db.js';
-import { iniciarAutoCancelacionCompras } from './scripts/autoCancelCompras.js';
 
 dotenv.config();
 
 const app = express();
 
-iniciarAutoCancelacionCompras();
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -95,4 +93,3 @@ const startServer = async () => {
 
 startServer();
 
-//mi server //

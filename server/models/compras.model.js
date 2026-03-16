@@ -3,7 +3,6 @@ import { dbPool } from '../lib/db.js';
 
 const sanitize = (v) => (v === undefined ? null : v);
 
-
 // Obtener todas las compras (sin paginación)
 export const getAllCompras = async () => {
   const [rows] = await dbPool.execute('SELECT * FROM Compras ORDER BY FechaRegistro DESC'); 
@@ -18,17 +17,17 @@ export const getCompraById = async (id) => {
   return rows[0];
 };
 
-// Crear compra
-export const createCompra = async ({ ProveedorId, Total, FechaRegistro, Estado }) => {
+// Crear compra - SIEMPRE APROBADO
+export const createCompra = async ({ ProveedorId, Total, FechaRegistro }) => {
   const CompraId = uuidv4();
 
   await dbPool.execute(
     `INSERT INTO Compras 
     (CompraId, ProveedorId, Total, FechaRegistro, Estado) 
     VALUES (?, ?, ?, ?, ?)`,
-    [CompraId, sanitize(ProveedorId), sanitize(Total), sanitize(FechaRegistro), Estado || 'pendiente']
+    [CompraId, sanitize(ProveedorId), sanitize(Total), sanitize(FechaRegistro), 'aprobado']
   );
-  return { CompraId, ProveedorId, Total, FechaRegistro, Estado };
+  return { CompraId, ProveedorId, Total, FechaRegistro, Estado: 'aprobado' };
 };
 
 // Eliminar compra
@@ -41,32 +40,18 @@ export const deleteCompra = async (id) => {
 
 // Actualizar compra completa
 export const updateCompra = async (id, data) => {
-  const { ProveedorId, Total, FechaRegistro, Estado, MotivoCancelacion } = data;
+  const { ProveedorId, Total, FechaRegistro } = data;
 
   const [result] = await dbPool.execute(
     `UPDATE Compras
-    SET ProveedorId = ?, Total = ?, FechaRegistro = ?, Estado = ?, MotivoCancelacion = ?
+    SET ProveedorId = ?, Total = ?, FechaRegistro = ?
     WHERE CompraId = ?`,
     [
         sanitize(ProveedorId), 
         sanitize(Total), 
         sanitize(FechaRegistro), 
-        Estado,
-        sanitize(MotivoCancelacion),
         id
     ]
-  );
-
-  return result;
-};
-
-// Actualizar solo el estado de la compra
-export const updateCompraEstado = async (id, estado, motivoCancelacion = null) => {
-  const [result] = await dbPool.execute(
-    `UPDATE Compras
-    SET Estado = ?, MotivoCancelacion = ?
-    WHERE CompraId = ?`,
-    [estado, sanitize(motivoCancelacion), id]
   );
 
   return result;
@@ -108,60 +93,6 @@ export const actualizarStockProducto = async (productoId, cantidad) => {
   return { productoId, stockAnterior: stockActual, stockNuevo: nuevoStock };
 };
 
-export const getComprasPendientesExpiradas = async () => {
-  try {
-    const [rows] = await dbPool.query(`
-      SELECT 
-        CompraId,
-        ProveedorId,
-        FechaRegistro,
-        Estado,
-        Total
-      FROM compras 
-      WHERE Estado = 'pendiente' 
-      AND FechaRegistro < DATE_SUB(NOW(), INTERVAL 2 HOUR)
-      AND (FechaRegistro IS NOT NULL)
-      ORDER BY FechaRegistro ASC
-    `);
-    
-    return rows;
-  } catch (error) {
-    console.error('Error al obtener compras expiradas:', error);
-    throw error;
-  }
-};
-
-// Anular compra automáticamente
-export const anularCompraAutomatica = async (compraId, motivo) => {
-  try {
-    const [result] = await dbPool.query(
-      `UPDATE compras 
-       SET Estado = 'anulada',
-           MotivoCancelacion = ?,
-           FechaAnulacion = NOW()
-       WHERE CompraId = ? 
-       AND Estado = 'pendiente'`,
-      [motivo, compraId]
-    );
-    
-    return result;
-  } catch (error) {
-    console.error('Error al anular compra:', error);
-    throw error;
-  }
-};
-
-export const puedeAnularseAutomaticamente = async (id) => {
-  const [rows] = await dbPool.execute(`
-    SELECT * FROM Compras 
-    WHERE CompraId = ? 
-    AND Estado = 'pendiente' 
-    AND FechaRegistro <= DATE_SUB(NOW(), INTERVAL 2 HOUR)
-    AND TIMESTAMPDIFF(MINUTE, FechaRegistro, NOW()) >= 120
-  `, [id]);
-  return rows.length > 0;
-};
-
 // Obtener compras con paginación y filtros
 export const getComprasPaginated = async ({ 
   page = 1, 
@@ -184,7 +115,6 @@ export const getComprasPaginated = async ({
       id: 'CompraId',
       proveedor: 'ProveedorId',
       fecha: 'FechaRegistro',
-      estado: 'Estado',
       total: 'Total'
     };
 
@@ -194,10 +124,6 @@ export const getComprasPaginated = async ({
     if (columna === 'CompraId' || columna === 'ProveedorId') {
       whereClause = `WHERE ${columna} LIKE ?`;
       params.push(`%${valorLimpio}%`);
-      countParams.push(valorLimpio);
-    } else if (columna === 'Estado') {
-      whereClause = `WHERE ${columna} = ?`;
-      params.push(valorLimpio);
       countParams.push(valorLimpio);
     } else if (columna === 'FechaRegistro') {
       whereClause = `WHERE DATE(${columna}) = ?`;
@@ -218,7 +144,7 @@ export const getComprasPaginated = async ({
   }
 
   const order = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-  const columnasPermitidas = ['CompraId', 'ProveedorId', 'FechaRegistro', 'Total', 'Estado'];
+  const columnasPermitidas = ['CompraId', 'ProveedorId', 'FechaRegistro', 'Total'];
   const sortColumn = columnasPermitidas.includes(sortBy) ? sortBy : 'FechaRegistro';
 
   try {
