@@ -152,60 +152,6 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId) 
       ]
     );
 
-    // 🔥 Obtener los detalles del pedido con toda la información
-    const [detallesPedido] = await connection.query(
-      `SELECT 
-        dp.*,
-        p.Nombre AS ProductoNombre,
-        s.Nombre AS ServicioNombre,
-        c.Nombre AS ColorNombre,
-        c.Hex AS ColorHex
-       FROM detallepedidosclientes dp
-       LEFT JOIN productos p ON dp.ProductoId = p.ProductoId
-       LEFT JOIN servicios s ON dp.ServicioId = s.ServicioId
-       LEFT JOIN colores c ON dp.ColorId = c.ColorId
-       WHERE dp.PedidoClienteId = ?`,
-      [pedidoData.PedidoClienteId]
-    );
-
-    // 🔥 Crear los detalles de la venta con TODA la información
-    for (const detalle of detallesPedido) {
-      const DetalleVentaId = uuidv4();
-      
-      // Determinar el tipo de item y nombre snapshot
-      let tipoItem = detalle.ProductoId ? 'producto' : 'servicio';
-      let nombreSnapshot = '';
-      
-      if (detalle.ProductoId) {
-        nombreSnapshot = detalle.ProductoNombre || 'Producto';
-      } else if (detalle.ServicioId) {
-        nombreSnapshot = detalle.ServicioNombre || 'Servicio';
-      }
-
-      // Calcular subtotal
-      const subtotalDetalle = (detalle.Cantidad || 0) * (detalle.Precio || 0);
-
-      await connection.query(
-        `INSERT INTO detalleventas (
-          DetalleVentaId, VentaId, TipoItem, ProductoId, ServicioId,
-          NombreSnapshot, Cantidad, PrecioUnitario, Subtotal, ColorId, DescripcionPersonalizada
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          DetalleVentaId,
-          VentaId,
-          tipoItem,
-          detalle.ProductoId || null,
-          detalle.ServicioId || null,
-          nombreSnapshot,
-          detalle.Cantidad || 1,
-          detalle.Precio || 0,
-          subtotalDetalle,
-          detalle.ColorId || null,  // ✅ Aquí se guarda el ColorId
-          detalle.Descripcion || null
-        ]
-      );
-    }
-
     await connection.commit();
 
     return {

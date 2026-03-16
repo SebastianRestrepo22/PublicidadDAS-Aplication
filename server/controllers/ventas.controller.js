@@ -444,6 +444,8 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
       throw new Error("El pedido no tiene detalles");
     }
 
+    console.log(`📦 Creando venta desde pedido ${PedidoClienteId} con ${detallesRows.length} detalles`);
+
     const result = await createVentaFromPedidoModel(pedido, UsuarioVendedorId);
 
     if (!result.success) {
@@ -453,6 +455,7 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
 
     const VentaId = result.VentaId;
 
+    // 🔥 IMPORTANTE: Crear detalles de la venta a partir de los detalles del pedido
     await createDetallesVentaFromPedidoModel(connection, VentaId, detallesRows);
 
     await connection.commit();
@@ -461,22 +464,7 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
     const detallesCompletos = await getDetalleVentaByVentaIdModel(VentaId);
     ventaCreada.detalle = detallesCompletos;
 
-    const correoCliente = pedido.ClienteCorreo || ventaCreada.ClienteCorreo;
-    const nombreCliente = pedido.ClienteNombre || ventaCreada.ClienteNombre || 'Cliente';
-
-    if (correoCliente) {
-      try {
-        await sendVentaFacturaEmail(
-          correoCliente,
-          nombreCliente,
-          VentaId,
-          ventaCreada.Total,
-          detallesCompletos
-        );
-      } catch (emailError) {
-        console.error("Error enviando correo de factura:", emailError);
-      }
-    }
+    console.log(`✅ Venta ${VentaId} creada con ${detallesCompletos.length} detalles`);
 
     return {
       success: true,
