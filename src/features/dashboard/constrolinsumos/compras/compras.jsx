@@ -426,7 +426,6 @@ export const Compras = () => {
       const compraData = {
         ProveedorId: formCrear.ProveedorId,
         Total: total,
-        FechaRegistro: formCrear.FechaRegistro,
         Estado: ESTADOS_COMPRA.PENDIENTE,
       };
 

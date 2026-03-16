@@ -70,6 +70,16 @@ export const getPedidosClientes = async (req, res) => {
       params.push(`%${filtroValor}%`);
     }
 
+    // 🔥 NUEVA LÓGICA: Solo mostrar pedidos que deben estar en el módulo de pedidos
+    // 1. Todos los pedidos de contra entrega (sin importar su estado)
+    // 2. Pedidos de otros métodos (transferencia, efectivo, QR) que NO estén aprobados
+    //    (es decir, pendientes, cancelados, etc.)
+    whereConditions.push(`(
+      p.MetodoPago = 'contra_entrega' 
+      OR 
+      (p.MetodoPago IN ('transferencia', 'efectivo', 'QR') AND p.Estado != 'aprobado')
+    )`);
+
     if (whereConditions.length > 0) {
       whereClause = 'WHERE ' + whereConditions.join(' AND ');
     }
@@ -105,7 +115,7 @@ export const getPedidosClientes = async (req, res) => {
     // Ejecutar consulta principal
     const [rows] = await dbPool.query(query, params);
 
-    // Consulta para total (usando execute con parámetros)
+    // Consulta para total
     const countQuery = `
       SELECT COUNT(*) as total
       FROM pedidosclientes p
@@ -188,6 +198,13 @@ export const buscarPedidos = async (req, res) => {
       params.push(tipoPago);
     }
 
+    // 🔥 MISMA LÓGICA: Solo mostrar pedidos que deben estar en el módulo de pedidos
+    whereConditions.push(`(
+      p.MetodoPago = 'contra_entrega' 
+      OR 
+      (p.MetodoPago IN ('transferencia', 'efectivo', 'QR') AND p.Estado != 'aprobado')
+    )`);
+
     if (whereConditions.length > 0) {
       whereClause = 'WHERE ' + whereConditions.join(' AND ');
     }
@@ -220,7 +237,6 @@ export const buscarPedidos = async (req, res) => {
     console.log('📝 [BUSCAR] Query:', query);
     console.log('📝 [BUSCAR] Params:', params);
 
-    // Ejecutar consulta principal con query() para LIMIT literales
     const [rows] = await dbPool.query(query, params);
 
     // Consulta para total
@@ -305,6 +321,12 @@ export const createPedidoCliente = async (req, res) => {
       detalle = []
     } = pedidoData;
 
+    // 🔥 NORMALIZAR: Convertir a mayúsculas para comparar
+    const metodoPagoNormalizado = MetodoPago ? MetodoPago.toUpperCase() : MetodoPago;
+    
+    console.log('💰 Método de pago recibido (original):', MetodoPago);
+    console.log('💰 Método de pago normalizado:', metodoPagoNormalizado);
+
     // Validar Total
     const totalLimpio = parseFloat(Total);
     if (isNaN(totalLimpio) || totalLimpio <= 0) {
@@ -327,14 +349,20 @@ export const createPedidoCliente = async (req, res) => {
       ? FechaRegistro.split("T")[0]
       : new Date().toISOString().split("T")[0];
 
-    // Crear pedido - Si es transferencia o efectivo, estado aprobado desde el inicio
-    const estadoInicial = (MetodoPago === "transferencia" || MetodoPago === "efectivo") ? "aprobado" : "pendiente";
+    // 🔥 NUEVA LÓGICA: Pagos inmediatos: transferencia, efectivo, QR → todos van a ventas (aprobado)
+    const pagosInmediatos = ["TRANSFERENCIA", "EFECTIVO", "QR"];
+    const estadoInicial = pagosInmediatos.includes(metodoPagoNormalizado) ? "aprobado" : "pendiente";
 
+    console.log(`💰 Método de pago normalizado: ${metodoPagoNormalizado}`);
+    console.log(`📊 Es pago inmediato: ${pagosInmediatos.includes(metodoPagoNormalizado)}`);
+    console.log(`📊 Estado inicial calculado: ${estadoInicial}`);
+
+    // Crear pedido (guardar con el valor original, no normalizado)
     nuevoPedido = await createPedidoClienteModel({
       ClienteId: ClienteId || null,
       FechaRegistro: fechaProcesada,
       Total: totalLimpio,
-      MetodoPago,
+      MetodoPago,  // Guardamos el valor original (qr, QR, transferencia, etc)
       Voucher: voucherUrl || null,
       NombreRecibe: NombreRecibe || null,
       TelefonoEntrega: TelefonoEntrega || null,
@@ -346,7 +374,8 @@ export const createPedidoCliente = async (req, res) => {
       ClienteCorreo: ClienteCorreo || null
     });
 
-    console.log("✅ Pedido creado:", nuevoPedido.PedidoClienteId);
+    console.log("✅ Pedido creado en BD:", nuevoPedido);
+    console.log("📊 Estado guardado en BD:", nuevoPedido.Estado);
 
     // Crear detalles del pedido (SIN TAMAÑO PARA SERVICIOS)
     for (let i = 0; i < detalle.length; i++) {
@@ -395,8 +424,14 @@ export const createPedidoCliente = async (req, res) => {
     const pedidoCompleto = await getPedidoClienteByIdModel(nuevoPedido.PedidoClienteId);
     pedidoCompleto.detalle = await getDetallePedidoByPedidoIdModel(nuevoPedido.PedidoClienteId);
 
-    // ✅ Si es transferencia o efectivo, crear venta automáticamente
-    if (MetodoPago === "transferencia" || MetodoPago === "efectivo") {
+    console.log("📦 Pedido completo después de crear detalles:", {
+      id: pedidoCompleto.PedidoClienteId,
+      estado: pedidoCompleto.Estado,
+      metodo: pedidoCompleto.MetodoPago
+    });
+
+    // 🔥 Si es pago inmediato (transferencia, efectivo, QR), crear venta automáticamente
+    if (pagosInmediatos.includes(metodoPagoNormalizado)) {
       try {
         console.log(`💰 Creando venta automática para pedido pagado con ${MetodoPago}`);
         
@@ -409,6 +444,7 @@ export const createPedidoCliente = async (req, res) => {
         };
         
         console.log(`✅ Venta creada automáticamente: ${resultadoVenta.VentaId}`);
+        console.log(`📊 Estado final del pedido: ${pedidoCompleto.Estado}`);
       } catch (ventaError) {
         console.error(`❌ Error creando venta automática para ${MetodoPago}:`, ventaError);
       }
@@ -425,6 +461,19 @@ export const createPedidoCliente = async (req, res) => {
           pedidoCompleto.Estado,
           "Tu pedido ha sido recibido"
         );
+      }
+    }
+
+    // Enviar email con voucher si existe
+    if (pedidoCompleto.Voucher && pedidoCompleto.ClienteId) {
+      const cliente = await getClienteByIdModel(pedidoCompleto.ClienteId);
+      if (cliente?.CorreoElectronico) {
+        await sendVoucherEmail(
+          cliente.CorreoElectronico,
+          cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
+          nuevoPedido.PedidoClienteId,
+          pedidoCompleto.Voucher
+        ).catch(err => console.error('Error enviando email de voucher:', err));
       }
     }
 
@@ -474,14 +523,19 @@ export const updatePedidoCliente = async (req, res) => {
 
     // Validar estados según método de pago
     if (updates.Estado) {
-      if (pedidoActual.MetodoPago === "transferencia" || pedidoActual.MetodoPago === "efectivo") {
+      // 🔥 PAGO INMEDIATO: transferencia, efectivo o QR
+      if (pedidoActual.MetodoPago === "transferencia" ||
+        pedidoActual.MetodoPago === "efectivo" ||
+        pedidoActual.MetodoPago === "QR") {
         const estadosPermitidos = ['pendiente', 'aprobado', 'finalizado', 'cancelado'];
         if (!estadosPermitidos.includes(updates.Estado)) {
           return res.status(400).json({
             message: `Para ${pedidoActual.MetodoPago}, estado debe ser: ${estadosPermitidos.join(', ')}`
           });
         }
-      } else if (pedidoActual.MetodoPago === "contra_entrega") {
+      }
+      // 🔥 CONTRA ENTREGA
+      else if (pedidoActual.MetodoPago === "contra_entrega") {
         const estadosPermitidosContraEntrega = ['pendiente', 'en_proceso', 'en_camino', 'entregado', 'cancelado'];
         if (!estadosPermitidosContraEntrega.includes(updates.Estado)) {
           return res.status(400).json({
@@ -509,9 +563,9 @@ export const updatePedidoCliente = async (req, res) => {
     const updated = await getPedidoClienteByIdModel(id);
     updated.detalle = await getDetallePedidoByPedidoIdModel(id);
 
-    // ✅ Si es transferencia/efectivo y se aprueba, crear venta
-    if ((pedidoActual.MetodoPago === "transferencia" || pedidoActual.MetodoPago === "efectivo") && 
-        nuevoEstado === 'aprobado' && estadoAnterior !== 'aprobado') {
+    // 🔥 Si es transferencia/efectivo y se aprueba, crear venta
+    if ((pedidoActual.MetodoPago === "transferencia" || pedidoActual.MetodoPago === "efectivo") &&
+      nuevoEstado === 'aprobado' && estadoAnterior !== 'aprobado') {
       try {
         const [ventaExistente] = await dbPool.execute(
           "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
@@ -536,7 +590,7 @@ export const updatePedidoCliente = async (req, res) => {
       }
     }
 
-    // ✅ Si es contra entrega y llega a 'entregado', crear venta
+    // 🔥 Si es contra entrega y llega a 'entregado', crear venta
     if (pedidoActual.MetodoPago === "contra_entrega" && nuevoEstado === 'entregado' && estadoAnterior !== 'entregado') {
       try {
         const [ventaExistente] = await dbPool.execute(
@@ -648,13 +702,13 @@ export const getMisPedidos = async (req, res) => {
     if (!clienteId) {
       return res.status(401).json({ error: "Usuario no autenticado" });
     }
-    
+
     const pedidos = await getAllPedidosClientesModel(clienteId);
-    
+
     for (let p of pedidos) {
       p.detalle = await getDetallePedidoByPedidoIdModel(p.PedidoClienteId);
     }
-    
+
     res.status(200).json(pedidos);
   } catch (error) {
     console.error("Error al obtener mis pedidos:", error);

@@ -250,17 +250,6 @@ export const ComprasCreate = ({
             />
           </div>
 
-          {/* Fecha */}
-          <div className="flex flex-col gap-1">
-            <label className="font-medium text-sm">Fecha de registro *</label>
-            <input
-              type="date"
-              value={formCrear.FechaRegistro || getTodayDate()}
-              className="h-10 px-3 border rounded-lg bg-gray-100 text-sm w-full cursor-not-allowed"
-              readOnly
-              disabled
-            />
-          </div>
 
           {/* Total */}
           <div className="flex flex-col gap-1">

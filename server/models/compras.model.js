@@ -151,13 +151,13 @@ export const anularCompraAutomatica = async (compraId, motivo) => {
   }
 };
 
-// ✅ Función: puedeAnularseAutomaticamente
 export const puedeAnularseAutomaticamente = async (id) => {
   const [rows] = await dbPool.execute(`
     SELECT * FROM Compras 
     WHERE CompraId = ? 
     AND Estado = 'pendiente' 
-    AND FechaRegistro <= DATE_SUB(NOW(), INTERVAL 2 HOUR)  /* 🔥 CAMBIO: 1 HOUR → 2 HOUR */
+    AND FechaRegistro <= DATE_SUB(NOW(), INTERVAL 2 HOUR)
+    AND TIMESTAMPDIFF(MINUTE, FechaRegistro, NOW()) >= 120
   `, [id]);
   return rows.length > 0;
 };
