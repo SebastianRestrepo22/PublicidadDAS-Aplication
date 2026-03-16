@@ -913,7 +913,7 @@ export const Proveedores = () => {
                     </div>
 
                     <div className="flex flex-col">
-                      <label className="mb-1 text-sm font-medium text-gray-600">Teléfono</label>
+                      <label className="mb-1 text-sm font-medium text-gray-700">Teléfono</label>
                       <div className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-gray-100 flex items-center text-gray-700">
                         {selectedProveedor.Telefono}
                       </div>
