@@ -3,15 +3,12 @@ import {
   getComprasPaginated,
   buscarCompras,
   getAllProductos,
-  getAllProveedoresSimple,
-  updateCompraEstado
+  getAllProveedoresSimple
 } from "../services/services.compras";
 import { toast } from "react-toastify";
 
 export const ESTADOS_COMPRA = {
-  PENDIENTE: 'pendiente',
-  RECIBIDO: 'recibido',
-  ANULADA: 'anulada'
+  APROBADO: 'aprobado' // 🔥 Solo un estado
 };
 
 export const useCompras = () => {
@@ -103,7 +100,6 @@ export const useCompras = () => {
 
       console.log("✅ fetchCompras - DATOS EXTRAÍDOS:", {
         cantidad: data.length,
-        data: data,
         pagination
       });
 
@@ -134,7 +130,7 @@ export const useCompras = () => {
   useEffect(() => {
     console.log("🔄 Cargando compras iniciales...");
     fetchCompras();
-  }, []); // ← Esto asegura que se carguen al inicio
+  }, []);
 
   // 🔥 Resetear a página 1 cuando cambian los filtros
   useEffect(() => {
@@ -146,50 +142,6 @@ export const useCompras = () => {
     console.log("🔄 EJECUTANDO fetchCompras POR CAMBIO EN DEPENDENCIAS");
     fetchCompras();
   }, [currentPage, itemsPerPage, filtroCampo, filtroValor]);
-
-  // 🔥 Log para monitorear cambios en paginatedData
-  useEffect(() => {
-    console.log("🔄 ESTADO ACTUALIZADO - paginatedData:", {
-      length: paginatedData?.length,
-      data: paginatedData
-    });
-  }, [paginatedData]);
-
-  const actualizarEstado = async (idCompra, nuevoEstado, productosAActualizar = null, motivo = "") => {
-    try {
-      const result = await updateCompraEstado(idCompra, nuevoEstado, {
-        productos: productosAActualizar,
-        motivoCancelacion: motivo
-      });
-
-      setCompras((prev) =>
-        prev.map((c) =>
-          c.CompraId === idCompra ? { ...c, Estado: nuevoEstado, MotivoCancelacion: motivo } : c
-        )
-      );
-
-      setPaginatedData((prev) =>
-        prev.map((c) =>
-          c.CompraId === idCompra ? { ...c, Estado: nuevoEstado, MotivoCancelacion: motivo } : c
-        )
-      );
-
-      if (nuevoEstado === ESTADOS_COMPRA.RECIBIDO) {
-        await fetchProductos();
-      }
-
-      toast.success(result.message || 'Estado actualizado correctamente');
-      return result;
-    } catch (err) {
-      console.error("Error al actualizar estado:", err);
-      toast.error(err.response?.data?.error || "Error al actualizar estado");
-      throw err;
-    }
-  };
-
-  const puedeCambiarEstado = (estadoActual, nuevoEstado) => {
-    return estadoActual === ESTADOS_COMPRA.PENDIENTE && nuevoEstado === ESTADOS_COMPRA.RECIBIDO;
-  };
 
   return {
     compras,
@@ -212,8 +164,6 @@ export const useCompras = () => {
     fetchCompras,
     fetchProductos,
     fetchCatalogos,
-    actualizarEstado,
-    puedeCambiarEstado,
     setCompras
   };
 };

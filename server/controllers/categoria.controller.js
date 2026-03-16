@@ -5,13 +5,13 @@ import {
   deleteCategoria as deleteCategoriaModel,
   updateCategoria as updateCategoriaModel,
   getCategoriaByNombre as getCategoriaByNombreModel,
-  // 🔥 Nuevas funciones importadas
+  //  Nuevas funciones importadas
   getCategoriasPaginated as getCategoriasPaginatedModel,
   buscarCategoriasPaginated
 } from '../models/categoria.models.js';
 import { v4 as uuidv4 } from 'uuid';
 
-// ========== FUNCIÓN EXISTENTE (la mantenemos para compatibilidad) ==========
+// ========== la mantenemos para compatibilidad) ==========
 export const getAllCategorias = async (req, res) => {
   try {
     const categorias = await getAllCategoriasModel();
@@ -22,7 +22,7 @@ export const getAllCategorias = async (req, res) => {
   }
 };
 
-// ========== NUEVA FUNCIÓN: Obtener categorías con paginación ==========
+// ==========  Obtener categorías con paginación ==========
 export const getCategoriasPaginated = async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page) || 1, 1);
@@ -146,6 +146,7 @@ export const getCategoriaById = async (req, res) => {
   }
 };
 
+// 1 Inicio 
 export const createCategoria = async (req, res) => {
   const { nombreCategoria, descripcion } = req.body;
 

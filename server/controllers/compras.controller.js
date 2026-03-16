@@ -26,19 +26,17 @@ export const getCompraById = async (req, res) => {
   }
 };
 
-// ➕ Crear nueva compra - CON UUID
+// ➕ Crear nueva compra - SIEMPRE CON ESTADO APROBADO
 export const createCompra = async (req, res) => {
   try {
     const { 
       ProveedorId, 
-      Total, 
-      Estado,
-      FechaRegistro 
+      Total 
     } = req.body;
     
     console.log('📝 Creando compra con datos:', req.body);
     
-    // 🔥 USAR SIEMPRE LA FECHA ACTUAL para evitar anulación inmediata
+    // 🔥 USAR SIEMPRE LA FECHA ACTUAL
     const fechaActual = new Date();
     
     // 1. Generar UUID primero
@@ -47,7 +45,7 @@ export const createCompra = async (req, res) => {
     
     console.log('🔑 UUID generado:', compraId);
     
-    // 2. Insertar la compra con el UUID generado y FECHA ACTUAL
+    // 2. Insertar la compra con el UUID generado y ESTADO APROBADO
     await dbPool.query(
       `INSERT INTO compras 
        (CompraId, ProveedorId, Total, Estado, FechaRegistro) 
@@ -56,8 +54,8 @@ export const createCompra = async (req, res) => {
         compraId,
         ProveedorId, 
         Total || 0, 
-        Estado || 'pendiente', 
-        fechaActual // 🔥 Usar fecha actual, no la que viene del frontend
+        'aprobado', // 🔥 SIEMPRE APROBADO
+        fechaActual
       ]
     );
     
@@ -70,7 +68,7 @@ export const createCompra = async (req, res) => {
         CompraId: compraId,
         ProveedorId,
         Total: Total || 0,
-        Estado: Estado || 'pendiente',
+        Estado: 'aprobado', // 🔥 SIEMPRE APROBADO
         FechaRegistro: fechaActual
       },
       CompraId: compraId
@@ -86,13 +84,13 @@ export const createCompra = async (req, res) => {
 export const updateCompra = async (req, res) => {
   try {
     const { id } = req.params;
-    const { ProveedorId, Total, Estado } = req.body;
+    const { ProveedorId, Total } = req.body;
     
     const [result] = await dbPool.query(
       `UPDATE compras 
-       SET ProveedorId = ?, Total = ?, Estado = ? 
+       SET ProveedorId = ?, Total = ? 
        WHERE CompraId = ?`,
-      [ProveedorId, Total, Estado, id]
+      [ProveedorId, Total, id]
     );
     
     if (result.affectedRows === 0) {
@@ -129,46 +127,6 @@ export const deleteCompra = async (req, res) => {
     res.json({ message: 'Compra eliminada exitosamente', CompraId: id });
   } catch (error) {
     console.error('Error al eliminar compra:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  }
-};
-
-// 🔄 Actualizar solo el estado (incluyendo motivo de cancelación)
-export const updateCompraEstado = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { estado, motivoCancelacion } = req.body;
-    
-    if (!estado) {
-      return res.status(400).json({ error: 'El campo "estado" es requerido' });
-    }
-    
-    let query = 'UPDATE compras SET Estado = ?';
-    let params = [estado];
-    
-    // Si es anulada y hay motivo, actualizar también MotivoCancelacion
-    if (estado === 'anulada' && motivoCancelacion) {
-      query += ', MotivoCancelacion = ?';
-      params.push(motivoCancelacion);
-    }
-    
-    query += ' WHERE CompraId = ?';
-    params.push(id);
-    
-    const [result] = await dbPool.query(query, params);
-    
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Compra no encontrada' });
-    }
-    
-    const [updatedCompra] = await dbPool.query('SELECT * FROM compras WHERE CompraId = ?', [id]);
-    
-    res.json({ 
-      message: 'Estado actualizado exitosamente', 
-      data: updatedCompra[0] 
-    });
-  } catch (error) {
-    console.error('Error al actualizar estado:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
@@ -211,16 +169,16 @@ export const buscarCompras = async (req, res) => {
 
     const [rows] = await dbPool.query(
       `SELECT * FROM compras 
-       WHERE ProveedorId LIKE ? OR Estado LIKE ? OR CompraId LIKE ? OR MotivoCancelacion LIKE ?
+       WHERE ProveedorId LIKE ? OR CompraId LIKE ?
        ORDER BY FechaRegistro DESC 
        LIMIT ? OFFSET ?`,
-      [searchTerm, searchTerm, searchTerm, searchTerm, parseInt(limit), parseInt(offset)]
+      [searchTerm, searchTerm, parseInt(limit), parseInt(offset)]
     );
 
     const [total] = await dbPool.query(
       `SELECT COUNT(*) as total FROM compras 
-       WHERE ProveedorId LIKE ? OR Estado LIKE ? OR CompraId LIKE ? OR MotivoCancelacion LIKE ?`,
-      [searchTerm, searchTerm, searchTerm, searchTerm]
+       WHERE ProveedorId LIKE ? OR CompraId LIKE ?`,
+      [searchTerm, searchTerm]
     );
 
     res.json({
@@ -235,49 +193,5 @@ export const buscarCompras = async (req, res) => {
   } catch (error) {
     console.error('Error en búsqueda de compras:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
-  }
-};
-
-// 🔥 FUNCIÓN CLAVE: Anular compras expiradas (basado en FechaRegistro + 2 horas)
-export const anularComprasExpiradas = async () => {
-  try {
-    console.log('🕒 Ejecutando anulación automática de compras...');
-    console.log(`🕒 Hora actual: ${new Date().toLocaleString()}`);
-    
-    // 🔥 SOLO anular compras que tengan más de 2 horas EXACTAS
-    const [result] = await dbPool.query(
-      `UPDATE compras 
-       SET Estado = 'anulada', 
-           MotivoCancelacion = CONCAT('Anulación automática por tiempo de espera excedido (2 horas) - ', NOW())
-       WHERE Estado = 'pendiente' 
-       AND FechaRegistro <= DATE_SUB(NOW(), INTERVAL 2 HOUR)
-       AND TIMESTAMPDIFF(MINUTE, FechaRegistro, NOW()) >= 120` // 🔥 Asegurar que sean 2 horas completas
-    );
-    
-    if (result.affectedRows > 0) {
-      console.log(`✅ ${result.affectedRows} compras anuladas automáticamente`);
-      
-      // Obtener las compras anuladas para más detalle
-      const [anuladas] = await dbPool.query(
-        `SELECT CompraId, ProveedorId, FechaRegistro 
-         FROM compras 
-         WHERE Estado = 'anulada' 
-         AND MotivoCancelacion LIKE 'Anulación automática%'
-         AND FechaRegistro <= DATE_SUB(NOW(), INTERVAL 2 HOUR)
-         ORDER BY FechaRegistro DESC`
-      );
-      
-      console.log('📋 Compras anuladas:', anuladas);
-    } else {
-      console.log('✅ No hay compras con más de 2 horas para anular');
-    }
-    
-    return {
-      anuladas: result.affectedRows,
-      timestamp: new Date().toISOString()
-    };
-  } catch (error) {
-    console.error('Error al anular compras expiradas:', error);
-    throw error;
   }
 };

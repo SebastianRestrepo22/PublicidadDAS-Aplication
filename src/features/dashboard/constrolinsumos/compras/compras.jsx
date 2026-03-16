@@ -86,8 +86,6 @@ export const Compras = () => {
     ESTADOS_COMPRA,
     fetchCompras,
     fetchProductos,
-    actualizarEstado,
-    puedeCambiarEstado,
     setCompras
   } = useCompras();
 
@@ -101,8 +99,7 @@ export const Compras = () => {
     ProveedorId: "",
     nombreProveedor: "",
     Total: 0,
-    FechaRegistro: getTodayDate(),
-    Estado: ESTADOS_COMPRA.PENDIENTE,
+    FechaRegistro: getTodayDate()
   });
   const [detallesCrear, setDetallesCrear] = useState([
     { ProductoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }
@@ -220,8 +217,7 @@ export const Compras = () => {
       ProveedorId: "",
       nombreProveedor: "",
       Total: 0,
-      FechaRegistro: getTodayDate(),
-      Estado: ESTADOS_COMPRA.PENDIENTE
+      FechaRegistro: getTodayDate()
     });
     setDetallesCrear([{ ProductoId: "", Cantidad: 1, Descripcion: "", PrecioUnitario: 0, Subtotal: 0 }]);
     setErrores([]);
@@ -231,8 +227,6 @@ export const Compras = () => {
   const goToView = async (compra) => {
     try {
       console.log("📦 [goToView] Compra recibida:", compra);
-      console.log("📦 [goToView] Productos disponibles:", productos?.length);
-      console.log("📦 [goToView] Colores disponibles:", colores?.length);
 
       const detalles = await getDetallesByCompraId(compra.CompraId);
       console.log("📦 [goToView] Detalles recuperados de la BD:", detalles);
@@ -294,39 +288,11 @@ export const Compras = () => {
         nombreProveedor
       });
 
-      console.log("📦 [goToView] selectedCompra actualizado:", {
-        compraId: compra.CompraId,
-        total: compra.Total,
-        detallesCount: detallesConProducto.length
-      });
-
       setViewMode("view");
     } catch (err) {
       console.error("❌ Error al cargar datos para vista detallada:", err);
       toast.error("No se pudieron cargar los detalles de la compra.");
       goToBackToList();
-    }
-  };
-
-  const handleActualizarEstado = async (idCompra, nuevoEstado, productosAActualizar, motivo = "") => {
-    try {
-      await actualizarEstado(idCompra, nuevoEstado, productosAActualizar, motivo);
-
-      setCompras(prevCompras =>
-        prevCompras.map(compra =>
-          compra.CompraId === idCompra
-            ? { ...compra, Estado: nuevoEstado, MotivoCancelacion: motivo }
-            : compra
-        )
-      );
-
-      setViewMode("list");
-      setSelectedCompra(null);
-
-      toast.success(`Estado actualizado correctamente`);
-    } catch (error) {
-      console.error("Error al actualizar estado:", error);
-      toast.error("Error al actualizar el estado");
     }
   };
 
@@ -425,8 +391,8 @@ export const Compras = () => {
 
       const compraData = {
         ProveedorId: formCrear.ProveedorId,
-        Total: total,
-        Estado: ESTADOS_COMPRA.PENDIENTE,
+        Total: total
+        // 🔥 Ya no enviamos Estado porque el backend lo pone como 'aprobado'
       };
 
       const compraCreada = await createCompra(compraData);
@@ -499,7 +465,6 @@ export const Compras = () => {
             setFiltroCampo={setFiltroCampo}
             onView={goToView}
             onCreate={goToCreate}
-            onActualizarEstado={handleActualizarEstado}
             onRefresh={fetchCompras}
             currentPage={currentPage}
             totalPages={totalPages}
@@ -534,13 +499,10 @@ export const Compras = () => {
           <ComprasView
             selectedCompra={selectedCompra}
             productos={productos || []}
-            colores={colores || []}  // ✅ IMPORTANTE: Pasar colores
+            colores={colores || []}
             proveedores={proveedores || []}
             onBack={goToBackToList}
             getProveedorDisplay={getProveedorDisplay}
-            onActualizarEstado={handleActualizarEstado}
-            puedeCambiarEstado={puedeCambiarEstado}
-            userRole="admin"
           />
         )}
 
