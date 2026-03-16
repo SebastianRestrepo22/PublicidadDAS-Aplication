@@ -26,9 +26,14 @@ export const getAllPedidosClientesModel = async (clienteId = null) => {
       p.TipoCliente,
       p.ClienteNombre,
       p.ClienteTelefono,
-      p.ClienteCorreo
+      p.ClienteCorreo,
+      -- 🔥 Información de la venta si existe
+      v.VentaId,
+      v.Estado AS EstadoVenta,
+      CASE WHEN v.VentaId IS NOT NULL THEN true ELSE false END AS EsVenta
     FROM pedidosclientes p
     LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
+    LEFT JOIN ventas v ON p.PedidoClienteId = v.PedidoClienteId
   `;
 
   const params = [];
