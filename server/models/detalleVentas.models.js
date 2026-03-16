@@ -26,67 +26,53 @@ export const getDetalleVentaByVentaIdModel = async (ventaId) => {
 
 export const createDetallesVentaFromPedidoModel = async (connection, VentaId, detallesPedido) => {
   try {
-    const detallesCreados = [];
-    
     for (const detalle of detallesPedido) {
       const DetalleVentaId = uuidv4();
       
-      let tipoItem = null;
-      let productoId = null;
-      let servicioId = null;
-      let nombreSnapshot = "";
-      let descripcionPersonalizada = detalle.Descripcion || null;
-      
+      // Determinar el tipo de item y nombre snapshot
+      let tipoItem = detalle.ProductoId ? 'producto' : 'servicio';
+      let nombreSnapshot = '';
+
+      // Obtener nombres si es necesario
       if (detalle.ProductoId) {
-        tipoItem = 'producto';
-        productoId = detalle.ProductoId;
-        
-        const [productoRows] = await connection.query(
+        const [producto] = await connection.query(
           "SELECT Nombre FROM productos WHERE ProductoId = ?",
           [detalle.ProductoId]
         );
-        nombreSnapshot = productoRows.length > 0 ? productoRows[0].Nombre : "Producto";
-        
+        nombreSnapshot = producto[0]?.Nombre || 'Producto';
       } else if (detalle.ServicioId) {
-        tipoItem = 'servicio';
-        servicioId = detalle.ServicioId;
-        
-        const [servicioRows] = await connection.query(
+        const [servicio] = await connection.query(
           "SELECT Nombre FROM servicios WHERE ServicioId = ?",
           [detalle.ServicioId]
         );
-        nombreSnapshot = servicioRows.length > 0 ? servicioRows[0].Nombre : "Servicio";
+        nombreSnapshot = servicio[0]?.Nombre || 'Servicio';
       }
-      
-      const subtotal = detalle.Cantidad * detalle.Precio;
-      
+
+      // Calcular subtotal
+      const subtotalDetalle = (detalle.Cantidad || 0) * (detalle.Precio || 0);
+
       await connection.query(
         `INSERT INTO detalleventas (
           DetalleVentaId, VentaId, TipoItem, ProductoId, ServicioId,
-          NombreSnapshot, Cantidad, PrecioUnitario,
-          Descuento, Subtotal, ColorId, DescripcionPersonalizada
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          NombreSnapshot, Cantidad, PrecioUnitario, Subtotal, ColorId, DescripcionPersonalizada
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           DetalleVentaId,
           VentaId,
           tipoItem,
-          productoId,
-          servicioId,
+          detalle.ProductoId || null,
+          detalle.ServicioId || null,
           nombreSnapshot,
-          detalle.Cantidad,
-          detalle.Precio,
-          detalle.Descuento || 0,
-          subtotal,
-          detalle.ColorId || null,
-          descripcionPersonalizada
+          detalle.Cantidad || 1,
+          detalle.Precio || 0,
+          subtotalDetalle,
+          detalle.ColorId || null,  // ✅ Aquí se guarda el ColorId
+          detalle.Descripcion || null
         ]
       );
-      
-      detallesCreados.push(DetalleVentaId);
     }
     
-    return detallesCreados;
-    
+    return true;
   } catch (error) {
     console.error("Error en createDetallesVentaFromPedidoModel:", error);
     throw error;
