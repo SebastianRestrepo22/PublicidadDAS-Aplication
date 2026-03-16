@@ -425,15 +425,25 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
       return { success: false, alreadyExists: true, VentaId: ventaExistente[0].VentaId };
     }
 
+    // MODIFICADO: Consultar explícitamente MetodoPago del pedido para pasarlo al model
     const [pedidoRows] = await connection.query(
-      `SELECT * FROM pedidosclientes WHERE PedidoClienteId = ?`,
+      `SELECT 
+        PedidoClienteId, MetodoPago, ClienteId, ClienteNombre, ClienteTelefono, 
+        ClienteCorreo, Total, TipoCliente, Estado, FechaRegistro, Voucher,
+        NombreRecibe, TelefonoEntrega, DireccionEntrega
+      FROM pedidosclientes 
+      WHERE PedidoClienteId = ?`,
       [PedidoClienteId]
     );
+    
     if (pedidoRows.length === 0) {
       await connection.rollback();
       throw new Error("Pedido no encontrado");
     }
     const pedido = pedidoRows[0];
+    
+    // NUEVO: Extraer MetodoPago para pasarlo al model y calcular el estado correcto
+    const metodoPago = pedido.MetodoPago;
 
     const [detallesRows] = await connection.query(
       `SELECT * FROM detallepedidosclientes WHERE PedidoClienteId = ?`,
@@ -444,7 +454,8 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
       throw new Error("El pedido no tiene detalles");
     }
 
-    const result = await createVentaFromPedidoModel(pedido, UsuarioVendedorId);
+    // MODIFICADO: Pasar metodoPago como tercer parámetro al model
+    const result = await createVentaFromPedidoModel(pedido, UsuarioVendedorId, metodoPago, connection);
 
     if (!result.success) {
       await connection.rollback();
@@ -489,6 +500,116 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
     await connection.rollback();
     console.error("Error en crearVentaDesdePedidoId:", error);
     throw error;
+  } finally {
+    connection.release();
+  }
+};
+
+// ========================================
+// ACTUALIZAR ESTADO DE VENTA 
+// ========================================
+export const actualizarEstadoVenta = async (req, res) => {
+  const { id } = req.params;
+  const { Estado, motivo } = req.body;
+  const connection = await dbPool.getConnection();
+
+  try {
+    // Validar que el nuevo estado sea permitido
+    const estadosPermitidos = ['pagado', 'anulado', 'pendiente'];
+    if (!Estado || !estadosPermitidos.includes(Estado)) {
+      return res.status(400).json({ 
+        error: "Estado no válido", 
+        permitidos: estadosPermitidos 
+      });
+    }
+
+    const venta = await getVentaByIdModel(id);
+    if (!venta) {
+      return res.status(404).json({ error: "Venta no encontrada" });
+    }
+
+    // Validaciones de negocio
+    if (venta.Estado === 'anulado' && Estado !== 'anulado') {
+      return res.status(400).json({ error: "No se puede modificar una venta anulada" });
+    }
+
+    if (venta.Estado === 'pagado' && Estado === 'pendiente') {
+      return res.status(400).json({ error: "No se puede revertir de 'pagado' a 'pendiente'" });
+    }
+
+    await connection.beginTransaction();
+
+    // Si se anula, ejecutar lógica de devolución de stock (el trigger ya lo hace)
+    if (Estado === 'anulado' && venta.Estado !== 'anulado') {
+      // El trigger trg_venta_devolver_stock se ejecuta automáticamente
+      // Solo guardamos el motivo
+      const [result] = await connection.query(
+        "UPDATE ventas SET Estado = ?, MotivoAnulacion = ? WHERE VentaId = ?",
+        [Estado, motivo || null, id]
+      );
+      
+      if (result.affectedRows === 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: "No se pudo actualizar el estado" });
+      }
+    } else {
+      // Actualización normal de estado
+      const [result] = await connection.query(
+        "UPDATE ventas SET Estado = ? WHERE VentaId = ?",
+        [Estado, id]
+      );
+      
+      if (result.affectedRows === 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: "No se pudo actualizar el estado" });
+      }
+    }
+
+    await connection.commit();
+
+    // Obtener venta actualizada
+    const ventaActualizada = await getVentaByIdModel(id);
+    ventaActualizada.detalle = await getDetalleVentaByVentaIdModel(id);
+
+    // 🔥 Si se marca como 'pagado' y viene de transferencia/QR, enviar factura
+    if (Estado === 'pagado' && venta.Origen === 'pedido') {
+      try {
+        const [pedido] = await connection.query(
+          "SELECT MetodoPago FROM pedidosclientes WHERE PedidoClienteId = ?",
+          [venta.PedidoClienteId]
+        );
+        
+        if (pedido[0]?.MetodoPago === 'transferencia' || pedido[0]?.MetodoPago === 'QR') {
+          if (ventaActualizada.ClienteCorreo) {
+            await sendVentaFacturaEmail(
+              ventaActualizada.ClienteCorreo,
+              ventaActualizada.ClienteNombre || 'Cliente',
+              ventaActualizada.VentaId,
+              ventaActualizada.Total,
+              ventaActualizada.detalle
+            );
+            console.log(`📧 Factura enviada al marcar como pagado: ${ventaActualizada.VentaId}`);
+          }
+        }
+      } catch (emailError) {
+        console.error("⚠️ Error enviando factura al actualizar estado:", emailError);
+        // No fallamos la operación por un error de email
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Estado actualizado correctamente",
+      venta: ventaActualizada
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error("❌ Error en actualizarEstadoVenta:", error);
+    res.status(500).json({ 
+      error: "Error al actualizar el estado de la venta",
+      details: error.message 
+    });
   } finally {
     connection.release();
   }

@@ -6,6 +6,7 @@ import {
   createVentaDesdePedido,
   createVentaManual,
   anularVenta,
+  actualizarEstadoVenta,
   getDetallesByVenta
 } from "../controllers/ventas.controller.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
@@ -34,6 +35,8 @@ router.post("/desde-pedido", createVentaDesdePedido);
 
 // Anular venta (NO eliminar)
 router.put("/:id/anular", anularVenta);
+
+router.put('/:id/estado', actualizarEstadoVenta);
 
 console.log("Rutas de ventas registradas correctamente");
 export default router;

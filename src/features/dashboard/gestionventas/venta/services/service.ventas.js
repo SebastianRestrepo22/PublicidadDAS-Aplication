@@ -101,3 +101,25 @@ export const anularVenta = async (id, motivo) => {
     throw error;
   }
 };
+
+export const actualizarEstadoVenta = async (id, nuevoEstado, motivo = null) => {
+  try {
+    const response = await axios.put(
+      `${API_URL}/ventas/${id}/estado`, 
+      { 
+        Estado: nuevoEstado,
+        motivo: motivo || null 
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error en actualizarEstadoVenta:", error);
+    throw error.response?.data || error;
+  }
+};

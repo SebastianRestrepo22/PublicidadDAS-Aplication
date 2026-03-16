@@ -5,7 +5,7 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Pagination } from "../../components/paginacion/pagination.jsx";
 import { TiempoRestanteAnulacion } from '../venta/components/TiempoRestanteAnulacion.jsx';
-import { getVentas, getVentaById, anularVenta } from "../venta/services/service.ventas.js";
+import { getVentas, getVentaById, anularVenta, actualizarEstadoVenta } from "../venta/services/service.ventas.js";
 import Modal from "../../components/modals/modal.jsx";
 import { generarFacturaPDF } from "../../../../utils/generarFacturaPDF.js";
 
@@ -32,10 +32,16 @@ const formatPrice = (value, currency = '$') => {
 const EstadoBadge = ({ estado }) => {
   const config = {
     'pagado': { bg: 'bg-green-100', text: 'text-green-800', label: 'Pagado' },
-    'anulado': { bg: 'bg-red-100', text: 'text-red-800', label: 'Anulado' }
+    'anulado': { bg: 'bg-red-100', text: 'text-red-800', label: 'Anulado' },
+    'pendiente': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pendiente' }
   };
   const { bg, text, label } = config[estado] || config['pagado'];
-  return <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${bg} ${text}`}>{label}</span>;
+  return (
+    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${bg} ${text}`}>
+      {estado === 'pendiente' && <AlertCircle size={12} />}
+      {label}
+    </span>
+  );
 };
 
 const OrigenBadge = ({ origen }) => {
@@ -65,7 +71,7 @@ const DetallesProductosAcordeon = ({ detalles }) => {
 
   // Filtrar elementos nulos del array
   const detallesValidos = detalles.filter(d => d !== null && d !== undefined);
-  
+
   if (detallesValidos.length === 0) {
     return <p className="text-gray-500 text-center py-4">No hay productos en esta venta</p>;
   }
@@ -231,8 +237,8 @@ const ModalAnular = ({ open, onClose, onConfirm, venta, motivo, setMotivo }) => 
         <div className="flex gap-3">
           <button
             className={`flex-1 py-3 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors ${!motivo?.trim()
-                ? 'bg-red-300 cursor-not-allowed'
-                : 'bg-red-600 hover:bg-red-700 text-white'
+              ? 'bg-red-300 cursor-not-allowed'
+              : 'bg-red-600 hover:bg-red-700 text-white'
               }`}
             onClick={() => onConfirm(venta.VentaId, motivo)}
             disabled={!motivo?.trim()}
@@ -245,9 +251,43 @@ const ModalAnular = ({ open, onClose, onConfirm, venta, motivo, setMotivo }) => 
   );
 };
 
-const ModalVerVenta = ({ open, onClose, venta }) => {
-  if (!venta) return null;
-  const handleDescargarPDF = () => { generarFacturaPDF(venta); };
+const ModalVerVenta = ({ open, onClose, venta, onEstadoActualizado }) => {
+  // Estado local para manejar la venta actualizada
+  const [ventaLocal, setVentaLocal] = useState(venta);
+
+  // Sincronizar cuando cambia la venta externa
+  useEffect(() => {
+    setVentaLocal(venta);
+  }, [venta]);
+
+  if (!ventaLocal) return null;
+
+  const handleDescargarPDF = () => {
+    // Solo permitir PDF si está pagado
+    if (ventaLocal.Estado !== 'pagado') {
+      toast.warning("La factura solo se puede generar cuando la venta está pagada");
+      return;
+    }
+    generarFacturaPDF(ventaLocal);
+  };
+
+  // Función para marcar como pagado
+  const handleMarcarComoPagado = async () => {
+    try {
+      const response = await actualizarEstadoVenta(ventaLocal.VentaId, 'pagado');
+      if (response.success) {
+        toast.success("Venta marcada como pagada ✅");
+        setVentaLocal(response.venta);
+        // Notificar al componente padre si existe el callback
+        if (onEstadoActualizado) {
+          onEstadoActualizado(response.venta);
+        }
+      }
+    } catch (error) {
+      console.error("Error al actualizar estado:", error);
+      toast.error(error.error || error.message || "Error al actualizar el estado");
+    }
+  };
   const vendedorNombre = venta.UsuarioVendedorNombre || venta.UsuarioVendedor?.NombreCompleto || 'No especificado';
   return (
     <Modal open={open} onClose={onClose}>
@@ -265,6 +305,29 @@ const ModalVerVenta = ({ open, onClose, venta }) => {
               <div><p className="text-xs text-slate-500">Fecha</p><p className="text-sm">{formatDate(venta.FechaVenta)}</p></div>
               <div><p className="text-xs text-slate-500">Estado</p><EstadoBadge estado={venta.Estado} /></div>
             </div>
+
+            {ventaLocal.Estado === 'pendiente' && ventaLocal.Origen === 'pedido' && (
+              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertCircle size={20} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-800 mb-2">
+                      Esta venta está pendiente de verificación de pago
+                    </p>
+                    <p className="text-xs text-yellow-700 mb-3">
+                      Confirma que el pago por transferencia/QR fue recibido para generar la factura.
+                    </p>
+                    <button
+                      onClick={handleMarcarComoPagado}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
+                    >
+                      <DollarSign size={16} /> Marcar como Pagado y Generar Factura
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {venta.Estado === 'anulado' && venta.MotivoAnulacion && (
               <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-xs font-medium text-red-800 mb-1">Motivo de anulación:</p>
@@ -305,8 +368,23 @@ const ModalVerVenta = ({ open, onClose, venta }) => {
             </div>
           )}        </div>
         <div className="mt-6 pt-4 border-t flex justify-between items-center">
-          <button onClick={handleDescargarPDF} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"><Download size={18} />Descargar Factura PDF</button>
-          <button className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors" onClick={onClose}>Cerrar</button>
+          {/* Botón PDF deshabilitado si no está pagado */}
+          <button
+            onClick={handleDescargarPDF}
+            disabled={ventaLocal.Estado !== 'pagado'}
+            className={`px-6 py-2 rounded-lg transition-colors flex items-center gap-2 ${ventaLocal.Estado === 'pagado'
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            title={ventaLocal.Estado !== 'pagado' ? "La factura se habilita cuando la venta está pagada" : ""}
+          >
+            <Download size={18} />
+            {ventaLocal.Estado === 'pagado' ? 'Descargar Factura PDF' : 'Factura no disponible'}
+          </button>
+
+          <button className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors" onClick={onClose}>
+            Cerrar
+          </button>
         </div>
       </div>
     </Modal>
@@ -353,40 +431,40 @@ export const Ventas = () => {
   useEffect(() => { cargarVentas(); }, [currentPage, itemsPerPage, campoFiltro, filtroValor]);
 
   const handleVerClick = async (venta) => {
-  try {
-    console.log('🔍 Venta seleccionada:', venta);
-    console.log('🔍 Detalles en venta:', venta.detalle);
+    try {
+      console.log('🔍 Venta seleccionada:', venta);
+      console.log('🔍 Detalles en venta:', venta.detalle);
 
-    if (venta.detalle && venta.detalle.length > 0) {
-      console.log('✅ Usando detalles existentes:', venta.detalle.length);
-      setVentaSeleccionada(venta);
-    } else {
-      console.log('🔄 Obteniendo detalles del backend para:', venta.VentaId);
-      const ventaCompleta = await getVentaById(venta.VentaId);
-      console.log('📦 Venta completa recibida:', ventaCompleta);
-      console.log('📦 Detalles en venta completa:', ventaCompleta?.detalle);
-      
-      // Verificar si ventaCompleta tiene la estructura correcta
-      if (!ventaCompleta) {
-        console.error('❌ No se recibió data del backend');
-        toast.error('No se pudo obtener la información de la venta');
-        return;
+      if (venta.detalle && venta.detalle.length > 0) {
+        console.log('✅ Usando detalles existentes:', venta.detalle.length);
+        setVentaSeleccionada(venta);
+      } else {
+        console.log('🔄 Obteniendo detalles del backend para:', venta.VentaId);
+        const ventaCompleta = await getVentaById(venta.VentaId);
+        console.log('📦 Venta completa recibida:', ventaCompleta);
+        console.log('📦 Detalles en venta completa:', ventaCompleta?.detalle);
+
+        // Verificar si ventaCompleta tiene la estructura correcta
+        if (!ventaCompleta) {
+          console.error('❌ No se recibió data del backend');
+          toast.error('No se pudo obtener la información de la venta');
+          return;
+        }
+
+        // Asegurar que detalle sea un array
+        if (ventaCompleta.detalle && !Array.isArray(ventaCompleta.detalle)) {
+          console.warn('⚠️ detalle no es un array, convirtiendo...');
+          ventaCompleta.detalle = [ventaCompleta.detalle];
+        }
+
+        setVentaSeleccionada(ventaCompleta);
       }
-      
-      // Asegurar que detalle sea un array
-      if (ventaCompleta.detalle && !Array.isArray(ventaCompleta.detalle)) {
-        console.warn('⚠️ detalle no es un array, convirtiendo...');
-        ventaCompleta.detalle = [ventaCompleta.detalle];
-      }
-      
-      setVentaSeleccionada(ventaCompleta);
+      setOpenVer(true);
+    } catch (error) {
+      console.error("❌ Error al cargar venta:", error);
+      toast.error("Error al cargar los detalles de la venta");
     }
-    setOpenVer(true);
-  } catch (error) {
-    console.error("❌ Error al cargar venta:", error);
-    toast.error("Error al cargar los detalles de la venta");
-  }
-};
+  };
 
   const handleAnularClick = (venta) => {
     setVentaSeleccionada(venta);
@@ -426,8 +504,15 @@ export const Ventas = () => {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                 {campoFiltro === "Estado" ? (
-                  <select value={filtroValor} onChange={(e) => { setFiltroValor(e.target.value); setCurrentPage(1); }} className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700">
-                    <option value="">Todos los estados</option><option value="pagado">Pagado</option><option value="anulado">Anulado</option>
+                  <select
+                    value={filtroValor}
+                    onChange={(e) => { setFiltroValor(e.target.value); setCurrentPage(1); }}
+                    className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700"
+                  >
+                    <option value="">Todos los estados</option>
+                    <option value="pagado">Pagado</option>
+                    <option value="anulado">Anulado</option>
+                    <option value="pendiente">Pendiente</option>
                   </select>
                 ) : campoFiltro === "Origen" ? (
                   <select value={filtroValor} onChange={(e) => { setFiltroValor(e.target.value); setCurrentPage(1); }} className="border border-slate-300 rounded-lg pl-10 pr-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700">
@@ -443,8 +528,20 @@ export const Ventas = () => {
               {(campoFiltro || filtroValor) && <button onClick={handleLimpiarFiltros} className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1 whitespace-nowrap"><X size={16} />Limpiar filtros</button>}
             </div>
           </div>
-          <ModalVerVenta open={openVer} onClose={() => setOpenVer(false)} venta={ventaSeleccionada} />
-          <ModalAnular open={openAnular} onClose={() => setOpenAnular(false)} onConfirm={handleConfirmarAnular} venta={ventaSeleccionada} motivo={motivoAnulacion} setMotivo={setMotivoAnulacion} />
+          <ModalVerVenta
+            open={openVer}
+            onClose={() => setOpenVer(false)}
+            venta={ventaSeleccionada}
+            // Callback para refrescar la lista cuando se actualiza el estado
+            onEstadoActualizado={(ventaActualizada) => {
+              // Actualizar la venta en el estado local si está abierta
+              if (ventaSeleccionada?.VentaId === ventaActualizada.VentaId) {
+                setVentaSeleccionada(ventaActualizada);
+              }
+              // Recargar la lista para reflejar el cambio en la tabla
+              cargarVentas();
+            }}
+          />          <ModalAnular open={openAnular} onClose={() => setOpenAnular(false)} onConfirm={handleConfirmarAnular} venta={ventaSeleccionada} motivo={motivoAnulacion} setMotivo={setMotivoAnulacion} />
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <table className="min-w-full">
               <thead className="bg-slate-800">
