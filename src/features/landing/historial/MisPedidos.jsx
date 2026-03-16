@@ -3,7 +3,7 @@ import { useMisPedidos } from '../hooks/useMisPedidos';
 import { Navbar } from '../components/Navbar';
 import axios from 'axios';
 import { 
-  Search, Package, Clock, CheckCircle, XCircle, ChevronRight 
+  Search, Package, Clock, CheckCircle, XCircle, ChevronRight, Truck, DollarSign 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
@@ -15,59 +15,107 @@ const MisPedidos = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [clienteId, setClienteId] = useState(null);
-    const { user, loading: authLoading } = useAuth(); 
+  const { user, loading: authLoading } = useAuth(); 
 
- useEffect(() => {
-  // Usar user del contexto (ya tiene CedulaId del token decodificado)
-  if (user?.CedulaId) {
-    const loadUser = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get(
-          `http://localhost:3000/user/${user.CedulaId}`, //user.CedulaId sí existe
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setClienteId(String(response.data.CedulaId));
-      } catch (err) {
-        console.error("Error al cargar usuario:", err);
-      }
-    };
-    loadUser();
-  }
-}, [user]); // agregar 'user' como dependencia para el caso
+  useEffect(() => {
+    // Usar user del contexto (ya tiene CedulaId del token decodificado)
+    if (user?.CedulaId) {
+      const loadUser = async () => {
+        try {
+          const token = localStorage.getItem("token");
+          const response = await axios.get(
+            `http://localhost:3000/user/${user.CedulaId}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          setClienteId(String(response.data.CedulaId));
+        } catch (err) {
+          console.error("Error al cargar usuario:", err);
+        }
+      };
+      loadUser();
+    }
+  }, [user]);
 
   const { pedidos, loading, refetch } = useMisPedidos(clienteId);
 
-  const allStatuses = ['Todos', 'pendiente', 'aprobado', 'entregado', 'cancelado'];
+  // 🔥 Función para determinar si un pedido es de venta (transferencia/QR/efectivo)
+  const esVenta = (pedido) => {
+    const metodo = pedido.MetodoPago?.toLowerCase() || '';
+    return metodo !== 'contra_entrega';
+  };
 
+  // 🔥 Función para determinar si es contra entrega
+  const esContraEntrega = (pedido) => {
+    const metodo = pedido.MetodoPago?.toLowerCase() || '';
+    return metodo === 'contra_entrega';
+  };
+
+  // 🔥 Obtener el estado a mostrar (usa EstadoParaMostrar si existe)
+  const getEstadoActual = (pedido) => {
+    return pedido.EstadoParaMostrar || pedido.Estado;
+  };
+
+  // 🔥 Obtener todos los estados únicos de los pedidos
+  const getUniqueStatuses = () => {
+    const estados = new Set(['Todos']);
+    pedidos.forEach(pedido => {
+      const estado = getEstadoActual(pedido);
+      estados.add(estado);
+    });
+    return Array.from(estados);
+  };
+
+  // 🔥 Función para obtener la etiqueta del estado
   const getEstadoLabel = (estado) => {
     const labels = {
       pendiente: 'Pendiente',
+      pagado: 'Pagado',
       aprobado: 'Aprobado',
+      en_proceso: 'En Proceso',
+      en_camino: 'En Camino',
       entregado: 'Entregado',
+      finalizado: 'Finalizado',
       cancelado: 'Cancelado'
     };
     return labels[estado] || estado;
   };
 
+  // 🔥 Función para obtener el color del estado
   const getEstadoColor = (estado) => {
     switch (estado?.toLowerCase()) {
       case 'pendiente': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'pagado': return 'bg-green-50 text-green-700 border-green-200';
       case 'aprobado': return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'en_proceso': return 'bg-purple-50 text-purple-700 border-purple-200';
+      case 'en_camino': return 'bg-orange-50 text-orange-700 border-orange-200';
       case 'entregado': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'finalizado': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'cancelado': return 'bg-red-50 text-red-700 border-red-200';
       default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
+  // 🔥 Función para obtener el ícono del estado
   const getEstadoIcon = (estado) => {
     switch (estado?.toLowerCase()) {
       case 'pendiente': return <Clock className="w-4 h-4" />;
+      case 'pagado': return <CheckCircle className="w-4 h-4" />;
       case 'aprobado': return <Package className="w-4 h-4" />;
+      case 'en_proceso': return <Package className="w-4 h-4" />;
+      case 'en_camino': return <Truck className="w-4 h-4" />;
       case 'entregado': return <CheckCircle className="w-4 h-4" />;
+      case 'finalizado': return <CheckCircle className="w-4 h-4" />;
       case 'cancelado': return <XCircle className="w-4 h-4" />;
       default: return <Package className="w-4 h-4" />;
     }
+  };
+
+  // 🔥 Función para obtener el ícono del tipo de pedido
+  const getTipoIcon = (pedido) => {
+    if (esContraEntrega(pedido)) {
+      return <Truck className="w-5 h-5 text-purple-600" />;
+    }
+    return <DollarSign className="w-5 h-5 text-green-600" />;
   };
 
   const handleOrderClick = (order) => {
@@ -77,7 +125,7 @@ const MisPedidos = () => {
   };
 
   const handleCancelarPedido = async (pedidoId, e) => {
-    e?.stopPropagation(); // Evita la propagación del evento
+    e?.stopPropagation();
     
     if (!window.confirm("¿Estás seguro de que deseas cancelar este pedido?")) {
       return;
@@ -95,11 +143,9 @@ const MisPedidos = () => {
 
       if (response.status === 200) {
         toast.success("Pedido cancelado exitosamente");
-        // Recargar los pedidos
         if (refetch) {
           refetch();
         } else {
-          // Si no hay refetch, recargar la página
           setTimeout(() => {
             window.location.reload();
           }, 1500);
@@ -111,7 +157,17 @@ const MisPedidos = () => {
     }
   };
 
+  // 🔥 Verificar si se puede cancelar un pedido
+  const puedeCancelar = (pedido) => {
+    const estado = getEstadoActual(pedido);
+    // Se puede cancelar si está pendiente (para ambos tipos)
+    return estado === 'pendiente';
+  };
+
+  const allStatuses = getUniqueStatuses();
   const filteredOrders = pedidos.filter((order) => {
+    const estadoActual = getEstadoActual(order);
+    
     const matchesSearch = !searchTerm ||
       (order.PedidoClienteId && order.PedidoClienteId.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
       (order.detalle && order.detalle.some(d =>
@@ -119,13 +175,14 @@ const MisPedidos = () => {
         (d.ProductoServicioId && d.ProductoServicioId.toString().includes(searchTerm))
       ));
 
-    const matchesStatus = filterStatus === 'Todos' || order.Estado === filterStatus;
+    const matchesStatus = filterStatus === 'Todos' || estadoActual === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
-  const activeOrders = filteredOrders.filter(o =>
-    o.Estado !== 'entregado' && o.Estado !== 'cancelado'
-  );
+  const activeOrders = filteredOrders.filter(o => {
+    const estado = getEstadoActual(o);
+    return estado !== 'entregado' && estado !== 'finalizado' && estado !== 'cancelado' && estado !== 'pagado';
+  });
 
   if (authLoading) {
     return (
@@ -200,7 +257,7 @@ const MisPedidos = () => {
           {allStatuses.map((status) => {
             const count = status === 'Todos'
               ? pedidos.length
-              : pedidos.filter(o => o.Estado === status).length;
+              : pedidos.filter(o => getEstadoActual(o) === status).length;
 
             return (
               <button
@@ -232,128 +289,141 @@ const MisPedidos = () => {
             </div>
 
             <div className="space-y-4">
-              {activeOrders.map((order) => (
-                <div
-                  key={order.PedidoClienteId}
-                  onClick={() => handleOrderClick(order)}
-                  className="bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200 overflow-hidden group cursor-pointer"
-                >
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <Package className="w-6 h-6 text-gray-600" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            Pedido #{String(order.PedidoClienteId).substring(0, 4)}
-                          </h3>
-                          <p className="text-sm text-gray-500">
-                            {new Date(order.FechaRegistro).toLocaleDateString('es-ES', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex flex-col items-end gap-3">
-                        <div className="flex items-center gap-3">
-                          <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border ${getEstadoColor(order.Estado)}`}>
-                            {getEstadoIcon(order.Estado)}
-                            {getEstadoLabel(order.Estado)}
-                          </span>
-                          <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" />
-                        </div>
-                        
-                        {/* Botón de Cancelar - Solo aparece cuando el pedido NO está aprobado */}
-                        {order.Estado === 'pendiente' && (
-                          <button
-                            onClick={(e) => handleCancelarPedido(order.PedidoClienteId, e)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-lg transition-colors text-xs font-medium whitespace-nowrap"
-                          >
-                            <XCircle className="w-3 h-3" />
-                            Cancelar Pedido
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {order.detalle?.length > 0 && (
-                      <div className="space-y-2 mb-4 pl-15">
-                        {order.detalle.slice(0, 2).map((d, i) => (
-                          <div key={i} className="text-sm text-gray-600 flex items-start gap-2">
-                            <span className="text-gray-400 mt-0.5">•</span>
-                            <span>{d.Descripcion || `Producto ${d.ProductoServicioId}`}</span>
-                          </div>
-                        ))}
-                        {order.detalle.length > 2 && (
-                          <div className="text-sm text-gray-500 pl-4">
-                            +{order.detalle.length - 2} producto{order.detalle.length - 2 !== 1 ? 's' : ''} más
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <span className="text-sm text-gray-500">Total</span>
-                      <span className="text-xl font-bold text-gray-900">
-                        ${Number(order.Total).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {filterStatus !== 'Todos' && filteredOrders.length > activeOrders.length && (
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-5">Historial</h2>
-            <div className="space-y-4">
-              {filteredOrders
-                .filter(order => !activeOrders.includes(order))
-                .map((order) => (
+              {activeOrders.map((order) => {
+                const estadoActual = getEstadoActual(order);
+                
+                return (
                   <div
                     key={order.PedidoClienteId}
                     onClick={() => handleOrderClick(order)}
-                    className="bg-white rounded-xl border border-gray-200 hover:shadow-sm transition-all duration-200 overflow-hidden opacity-75 hover:opacity-100 cursor-pointer"
+                    className="bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200 overflow-hidden group cursor-pointer"
                   >
                     <div className="p-6">
-                      <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center">
-                            <Package className="w-5 h-5 text-gray-400" />
+                          <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                            esContraEntrega(order) ? 'bg-purple-100' : 'bg-green-100'
+                          }`}>
+                            {getTipoIcon(order)}
                           </div>
                           <div>
-                            <h3 className="font-semibold text-gray-900">
-                              Pedido #{String(order.PedidoClienteId).substring(0, 4)}
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {esContraEntrega(order) ? 'Pedido' : 'Venta'} #{String(order.PedidoClienteId).substring(0, 4)}
                             </h3>
                             <p className="text-sm text-gray-500">
-                              {new Date(order.FechaRegistro).toLocaleDateString('es-ES')}
+                              {new Date(order.FechaRegistro).toLocaleDateString('es-ES', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
                             </p>
                           </div>
                         </div>
                         
-                        <div className="flex items-center gap-3">
-                          <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border ${getEstadoColor(order.Estado)}`}>
-                            {getEstadoIcon(order.Estado)}
-                            {getEstadoLabel(order.Estado)}
-                          </span>
+                        <div className="flex flex-col items-end gap-3">
+                          <div className="flex items-center gap-3">
+                            <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border ${getEstadoColor(estadoActual)}`}>
+                              {getEstadoIcon(estadoActual)}
+                              {getEstadoLabel(estadoActual)}
+                            </span>
+                            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" />
+                          </div>
+                          
+                          {/* Botón de Cancelar - Solo si está pendiente */}
+                          {puedeCancelar(order) && (
+                            <button
+                              onClick={(e) => handleCancelarPedido(order.PedidoClienteId, e)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-lg transition-colors text-xs font-medium whitespace-nowrap"
+                            >
+                              <XCircle className="w-3 h-3" />
+                              Cancelar Pedido
+                            </button>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                      {order.detalle?.length > 0 && (
+                        <div className="space-y-2 mb-4 pl-15">
+                          {order.detalle.slice(0, 2).map((d, i) => (
+                            <div key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                              <span className="text-gray-400 mt-0.5">•</span>
+                              <span>{d.Descripcion || d.ProductoNombre || `Producto ${d.ProductoId}`}</span>
+                            </div>
+                          ))}
+                          {order.detalle.length > 2 && (
+                            <div className="text-sm text-gray-500 pl-4">
+                              +{order.detalle.length - 2} producto{order.detalle.length - 2 !== 1 ? 's' : ''} más
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                         <span className="text-sm text-gray-500">Total</span>
-                        <span className="text-lg font-semibold text-gray-900">
+                        <span className="text-xl font-bold text-gray-900">
                           ${Number(order.Total).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Historial Section */}
+        {filteredOrders.length > activeOrders.length && (
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-5">Historial</h2>
+            <div className="space-y-4">
+              {filteredOrders
+                .filter(order => !activeOrders.includes(order))
+                .map((order) => {
+                  const estadoActual = getEstadoActual(order);
+                  
+                  return (
+                    <div
+                      key={order.PedidoClienteId}
+                      onClick={() => handleOrderClick(order)}
+                      className="bg-white rounded-xl border border-gray-200 hover:shadow-sm transition-all duration-200 overflow-hidden opacity-75 hover:opacity-100 cursor-pointer"
+                    >
+                      <div className="p-6">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                              esContraEntrega(order) ? 'bg-purple-50' : 'bg-green-50'
+                            }`}>
+                              {getTipoIcon(order)}
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-900">
+                                {esContraEntrega(order) ? 'Pedido' : 'Venta'} #{String(order.PedidoClienteId).substring(0, 4)}
+                              </h3>
+                              <p className="text-sm text-gray-500">
+                                {new Date(order.FechaRegistro).toLocaleDateString('es-ES')}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border ${getEstadoColor(estadoActual)}`}>
+                              {getEstadoIcon(estadoActual)}
+                              {getEstadoLabel(estadoActual)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                          <span className="text-sm text-gray-500">Total</span>
+                          <span className="text-lg font-semibold text-gray-900">
+                            ${Number(order.Total).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}

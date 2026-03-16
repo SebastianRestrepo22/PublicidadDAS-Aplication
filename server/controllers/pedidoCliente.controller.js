@@ -705,8 +705,23 @@ export const getMisPedidos = async (req, res) => {
 
     const pedidos = await getAllPedidosClientesModel(clienteId);
 
+    // Agregar detalles a cada pedido
     for (let p of pedidos) {
       p.detalle = await getDetallePedidoByPedidoIdModel(p.PedidoClienteId);
+      
+      // 🔥 Determinar qué estado mostrar
+      if (p.EsVenta) {
+        // Si tiene venta y NO es contra entrega, mostrar estado de la venta
+        if (p.MetodoPago?.toLowerCase() !== 'contra_entrega') {
+          p.EstadoParaMostrar = p.EstadoVenta; // 'pagado' o 'pendiente'
+        } else {
+          // Si es contra entrega pero ya tiene venta (porque se entregó), mostrar estado de la venta
+          p.EstadoParaMostrar = p.EstadoVenta;
+        }
+      } else {
+        // Si no tiene venta, mostrar estado del pedido
+        p.EstadoParaMostrar = p.Estado;
+      }
     }
 
     res.status(200).json(pedidos);
