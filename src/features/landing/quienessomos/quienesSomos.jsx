@@ -1,4 +1,4 @@
-import { Briefcase, Users, Award, MapPin, DollarSign } from "lucide-react";
+import { Briefcase, Users, Award, MapPin, DollarSign, Box } from "lucide-react";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer"
 import { History, Target, Eye } from "lucide-react";
@@ -16,13 +16,15 @@ export const QuienesSomos = () => {
                         </h1>
                         <div className="w-20 h-1 bg-blue-900 mb-6"></div>
                         <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                            Somos una empresa experta en ofrecer soluciones publicitarias de alta calidad. 
-                            Nuestro compromiso es superar tus expectativas y brindarte una experiencia 
-                            excepcional en cada proyecto.
+                            Somos un espacio dedicado a ofrecer productos y servicios de papelería que facilitan el estudio, 
+                            el trabajo y la organización diaria. Nuestro objetivo es brindar soluciones prácticas para estudiantes, 
+                            profesionales y empresas que necesitan materiales confiables para sus actividades.
                         </p>
                         <p className="text-lg text-gray-600 leading-relaxed">
-                            La calidad es nuestra prioridad. Estamos disponibles para transformar tus ideas 
-                            en realidades tangibles, siempre con la excelencia que mereces.
+                          En nuestra papelería encontrarás una variedad de útiles escolares, 
+                          material de oficina y servicios como impresiones, copias y encuadernación. 
+                          Trabajamos para ofrecer atención cercana, productos de calidad y precios accesibles que se adapten 
+                          a las necesidades de cada cliente.
                         </p>
                     </div>
 
@@ -50,11 +52,11 @@ export const QuienesSomos = () => {
                     <div className="bg-white p-8 rounded-2xl border-2 border-gray-200 hover:border-blue-900 hover:shadow-xl transition-all duration-300 hover:-translate-y-2 text-center group">
                         <div className="flex justify-center mb-4">
                             <div className="p-4 bg-blue-50 rounded-full text-blue-900 group-hover:bg-blue-900 group-hover:text-white transition-colors duration-300">
-                                <Users className="w-8 h-8" />
+                                <Box className="w-8 h-8" />
                             </div>
                         </div>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">+300</h3>
-                        <p className="text-gray-600 font-medium">Clientes Satisfechos</p>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">Variedad</h3>
+                        <p className="text-gray-600 font-medium">Amplia variedad de productos</p>
                     </div>
 
                     <div className="bg-white p-8 rounded-2xl border-2 border-gray-200 hover:border-blue-900 hover:shadow-xl transition-all duration-300 hover:-translate-y-2 text-center group">
@@ -63,8 +65,8 @@ export const QuienesSomos = () => {
                                 <Award className="w-8 h-8" />
                             </div>
                         </div>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">100%</h3>
-                        <p className="text-gray-600 font-medium">Calidad Garantizada</p>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">Calidad en cada servicio</h3>
+                        <p className="text-gray-600 font-medium">Calidad en cada servicio</p>
                     </div>
 
                     <div className="bg-white p-8 rounded-2xl border-2 border-gray-200 hover:border-blue-900 hover:shadow-xl transition-all duration-300 hover:-translate-y-2 text-center group">
@@ -73,8 +75,8 @@ export const QuienesSomos = () => {
                                 <MapPin className="w-8 h-8" />
                             </div>
                         </div>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">Itagüí</h3>
-                        <p className="text-gray-600 font-medium">Tienda Física</p>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">Atención</h3>
+                        <p className="text-gray-600 font-medium">Atención cercana</p>
                     </div>
 
                     <div className="bg-white p-8 rounded-2xl border-2 border-gray-200 hover:border-blue-900 hover:shadow-xl transition-all duration-300 hover:-translate-y-2 text-center group">
@@ -95,7 +97,7 @@ export const QuienesSomos = () => {
                     Nuestra Experiencia
                 </h2>
                 <p className="text-center text-gray-600 mb-12 max-w-2xl mx-auto">
-                    Más de 4 años transformando ideas en realidad
+                    Comprometidos con brindar soluciones prácticas para el estudio, el trabajo y la organización diaria.
                 </p>
 
                 <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -132,11 +134,10 @@ export const QuienesSomos = () => {
                         </div>
                         <h3 className="text-xl font-semibold text-gray-900 mb-2">HISTORIA</h3>
                         <p className="text-gray-600">
-                            Design and Style es una microempresa de litografía ubicada en Itagüí, con más de 4 años en
-                            el mercado. Ofrece servicios de impresión en papel, gran formato y personalización de productos
-                            para clientes individuales y empresas. Se apoya en canales digitales y
-                            una empresa asociada para gestionar sus pedidos de forma eficiente.
-                            <span className="font-semibold">TENDENCIA</span> de tu mejor negocio
+                            Nuestra historia nace con la idea de ofrecer un espacio donde las personas puedan encontrar
+                            todo lo necesario para el estudio, el trabajo y la organización diaria. Con el tiempo, las
+                            papelerías se han convertido en un apoyo importante para estudiantes, profesionales y empresas
+                            que buscan materiales y servicios confiables para sus actividades.
                         </p>
                     </div>
 
@@ -147,11 +148,9 @@ export const QuienesSomos = () => {
                         </div>
                         <h3 className="text-xl font-semibold text-gray-900 mb-2">MISIÓN</h3>
                         <p className="text-gray-600">
-                            En Design and Style nos dedicamos a ofrecer soluciones de impresión y personalización de alta calidad,
-                            adaptadas a las necesidades tanto de clientes individuales como corporativos. Nuestro compromiso es brindar
-                            una experiencia ágil, moderna y cercana, utilizando herramientas digitales para facilitar y garantizar resultados visuales
-                            que superen las expectativas.
-                            <span className="font-semibold">Confianza</span>
+                            Ofrecer productos de papelería y servicios de impresión que ayuden a estudiantes,
+                            profesionales y empresas a desarrollar sus actividades con mayor facilidad,
+                            garantizando calidad, buena atención y precios accesibles.
                         </p>
                     </div>
 
@@ -162,10 +161,9 @@ export const QuienesSomos = () => {
                         </div>
                         <h3 className="text-xl font-semibold text-gray-900 mb-2">VISIÓN</h3>
                         <p className="text-gray-600">
-                            Aspiramos a consolidarnos como una empresa líder en servicios de impresión personalizada
-                            de Medellín, reconocida por su innovación, eficiencia y enfoque centrado en el cliente. Buscamos evolucionar continuamente, integrando nuevas tecnologías,
-                            nuestros canales de atención y métodos de pago, para ofrecer soluciones
-                            efectivas que fortalezcan la identidad visual de nuestros clientes.
+                            Ser un referente confiable en productos y servicios de papelería, destacándonos por
+                            nuestra variedad, atención al cliente y compromiso con brindar soluciones útiles
+                            para el estudio, el trabajo y los proyectos personales.
                         </p>
                     </div>
                 </div>

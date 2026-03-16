@@ -24,25 +24,25 @@ export const Inicio = () => {
         {
             icon: "payments",
             title: "Calidad al cliente",
-            description: "Eres nuestro mayor objetivo.",
+            description: "Brindamos atención cercana y personalizada para ayudarte a encontrar exactamente lo que necesitas.",
             image: "/multimedia/pape1.jpg",
         },
         {
             icon: "public",
             title: "Confianza estandar",
-            description: "Queremos lo mejor para ti por eso trabajamos duro en ello.",
+            description: "Contamos con una amplia selección de útiles escolares, papelería y material de oficina para todas tus necesidades.",
             image: "/multimedia/pape2.jpg",
         },
         {
             icon: "group",
             title: "Encuentra lo que buscas",
-            description: "Somos escogidos por la gran variedad de productos que ofrecemos.",
+            description: "Desde materiales escolares hasta servicios de impresión y copias para tus trabajos o proyectos.",
             image: "/multimedia/pape3.jpg",
         },
         {
             icon: "group",
             title: "Pedidos seguros",
-            description: "Tus pedidos con nostos estan seguros.",
+            description: "Gestionamos tus pedidos de forma organizada para garantizar que recibas exactamente lo que solicitaste.",
             image: "/multimedia/pape4.jpg",
         }
     ];
@@ -264,19 +264,19 @@ export const Inicio = () => {
                             
                             <h1 className="mb-6">
                                 <span className="block text-4xl md:text-6xl lg:text-7xl font-light text-white/90 mb-2 tracking-tight">
-                                    Haz que
+                                    Todo para 
                                 </span>
                                 <span className="block text-5xl md:text-7xl lg:text-8xl font-bold text-white mb-2 tracking-tight italic">
-                                    tu marca
+                                    tu estudio,
                                 </span>
                                 <span className="block text-4xl md:text-6xl lg:text-7xl font-light text-white/90 tracking-tight">
-                                    hable por ti
+                                    oficina y proyectos
                                 </span>
                             </h1>
 
                             <p className="text-lg md:text-xl text-white/80 font-light tracking-wide leading-relaxed max-w-3xl mx-auto">
-                                Impresiones con calidad real para que tu negocio<br className="hidden md:block" />
-                                se vea profesional, moderno y confiable
+                                Encuentra útiles escolares, material de oficina,<br className="hidden md:block" />
+                                impresiones y servicios de papelería en un solo lugar, con calidad y precios accesibles.
                             </p>
                         </motion.div>
                     </div>
@@ -313,17 +313,17 @@ export const Inicio = () => {
                             {
                                 icon: "verified",
                                 title: "Calidad Premium",
-                                desc: "Cada impresión se realiza con máxima precisión para que tus ideas se vean claras, vibrantes y duraderas."
+                                desc: "Trabajamos con productos de buena calidad para que tus trabajos, tareas y documentos tengan el mejor resultado."
                             },
                             {
                                 icon: "local_offer",
                                 title: "Precios Justos",
-                                desc: "Soluciones para todos los presupuestos sin sacrificar calidad. Queremos que tu marca crezca, no tus gastos."
+                                desc: "Ofrecemos precios competitivos en útiles escolares, papelería y servicios para apoyar tu estudio y trabajo."
                             },
                             {
                                 icon: "design_services",
                                 title: "Diseño Creativo",
-                                desc: "Te ayudamos a transformar tus ideas en diseños frescos, modernos y atractivos que conectan con tu público."
+                                desc: "Encuentra cuadernos, lapiceros, impresiones, copias, encuadernación y mucho más sin tener que ir a diferentes lugares."
                             }
                         ].map((item, index) => (
                             <motion.div
