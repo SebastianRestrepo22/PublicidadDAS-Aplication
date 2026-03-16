@@ -34,7 +34,7 @@ const MisPedidos = () => {
     };
     loadUser();
   }
-}, [user]); // agregar 'user' como dependencia
+}, [user]); // agregar 'user' como dependencia para el caso
 
   const { pedidos, loading, refetch } = useMisPedidos(clienteId);
 
@@ -309,7 +309,6 @@ const MisPedidos = () => {
           </div>
         )}
 
-        {/* History Section */}
         {filterStatus !== 'Todos' && filteredOrders.length > activeOrders.length && (
           <div>
             <h2 className="text-xl font-semibold text-gray-900 mb-5">Historial</h2>
@@ -359,7 +358,6 @@ const MisPedidos = () => {
           </div>
         )}
 
-        {/* Empty State */}
         {filteredOrders.length === 0 && (
           <div className="text-center bg-white rounded-xl shadow-sm border border-gray-200 p-12">
             <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -369,7 +367,6 @@ const MisPedidos = () => {
         )}
       </div>
 
-      {/* Toast Container para notificaciones */}
       <ToastContainer
         position="top-right"
         autoClose={3000}

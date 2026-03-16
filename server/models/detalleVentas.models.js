@@ -26,6 +26,8 @@ export const getDetalleVentaByVentaIdModel = async (ventaId) => {
 
 export const createDetallesVentaFromPedidoModel = async (connection, VentaId, detallesPedido) => {
   try {
+    console.log(`📝 Creando ${detallesPedido.length} detalles para venta ${VentaId}`);
+
     for (const detalle of detallesPedido) {
       const DetalleVentaId = uuidv4();
       
@@ -51,6 +53,8 @@ export const createDetallesVentaFromPedidoModel = async (connection, VentaId, de
       // Calcular subtotal
       const subtotalDetalle = (detalle.Cantidad || 0) * (detalle.Precio || 0);
 
+      console.log(`   - Detalle: ${nombreSnapshot}, Cantidad: ${detalle.Cantidad}, Precio: ${detalle.Precio}`);
+
       await connection.query(
         `INSERT INTO detalleventas (
           DetalleVentaId, VentaId, TipoItem, ProductoId, ServicioId,
@@ -66,12 +70,13 @@ export const createDetallesVentaFromPedidoModel = async (connection, VentaId, de
           detalle.Cantidad || 1,
           detalle.Precio || 0,
           subtotalDetalle,
-          detalle.ColorId || null,  // ✅ Aquí se guarda el ColorId
+          detalle.ColorId || null,
           detalle.Descripcion || null
         ]
       );
     }
     
+    console.log(`✅ ${detallesPedido.length} detalles creados para venta ${VentaId}`);
     return true;
   } catch (error) {
     console.error("Error en createDetallesVentaFromPedidoModel:", error);
