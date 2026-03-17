@@ -8,23 +8,24 @@ import {
   existeVentaParaPedidoModel,
   getVentasPaginated,
   anularVentaModel,
+  rechazarVentaModel,
 } from "../models/venta.models.js";
 import {
   getDetalleVentaByVentaIdModel,
   createDetallesVentaFromPedidoModel,
   createDetalleVentaManualModel
 } from "../models/detalleVentas.models.js";
-import { sendVentaFacturaEmail, sendVentaAnuladaEmail } from "../utils/email.js";
+import { sendVentaFacturaEmail, sendVentaAnuladaEmail, sendVentaRechazadaEmail  } from "../utils/email.js";
 
 export const getVentas = async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 10, 
-      filtroCampo, 
+    const {
+      page = 1,
+      limit = 10,
+      filtroCampo,
       filtroValor,
       fechaInicio,
-      fechaFin 
+      fechaFin
     } = req.query;
 
     const result = await getVentasPaginated({
@@ -52,7 +53,7 @@ export const getVentas = async (req, res) => {
       });
       const fallbackData = fallback && fallback.data && Array.isArray(fallback.data) ? fallback.data : [];
       const fallbackTotal = typeof fallback?.totalItems === 'number' ? fallback.totalItems : 0;
-      
+
       return res.status(200).json({
         data: fallbackData,
         pagination: {
@@ -129,13 +130,13 @@ export const createVentaDesdePedido = async (req, res) => {
       WHERE PedidoClienteId = ?`,
       [PedidoClienteId]
     );
-    
+
     if (pedidoRows.length === 0) {
       await connection.rollback();
       return res.status(404).json({ error: "Pedido no encontrado" });
     }
     const pedido = pedidoRows[0];
-    
+
     // 🔥 NUEVO: Extraer MetodoPago para pasarlo al model
     const metodoPago = pedido.MetodoPago;
 
@@ -199,30 +200,30 @@ export const createVentaDesdePedido = async (req, res) => {
 
 export const createVentaManual = async (req, res) => {
   const connection = await dbPool.getConnection();
-  
+
   try {
     const ventaData = req.body;
 
     if (!ventaData) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: "No se recibieron datos de la venta" 
+        error: "No se recibieron datos de la venta"
       });
     }
 
     const { detalles, UsuarioVendedorId, ClienteCorreo, ClienteNombre } = ventaData;
 
     if (!UsuarioVendedorId) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: "UsuarioVendedorId es obligatorio" 
+        error: "UsuarioVendedorId es obligatorio"
       });
     }
-    
+
     if (!detalles || !Array.isArray(detalles) || detalles.length === 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: "Debe incluir al menos un detalle" 
+        error: "Debe incluir al menos un detalle"
       });
     }
 
@@ -272,7 +273,7 @@ export const createVentaManual = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error("Error en createVentaManual:", error);
-    
+
     let mensajeError = error.message;
     if (error.message.includes('Stock insuficiente')) {
       mensajeError = error.message;
@@ -281,12 +282,12 @@ export const createVentaManual = async (req, res) => {
     } else {
       mensajeError = "Error al crear la venta";
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       success: false,
       error: mensajeError
     });
-    
+
   } finally {
     connection.release();
   }
@@ -296,13 +297,13 @@ export const anularVenta = async (req, res) => {
   const { id } = req.params;
   const { motivo } = req.body;
   const connection = await dbPool.getConnection();
-  
+
   try {
     const venta = await getVentaByIdModel(id);
     if (!venta) {
       return res.status(404).json({ error: "Venta no encontrada" });
     }
-    
+
     if (venta.Estado === 'anulado') {
       return res.status(400).json({ error: "La venta ya está anulada" });
     }
@@ -312,11 +313,11 @@ export const anularVenta = async (req, res) => {
       const ahora = new Date();
       const diferenciaMs = ahora - fechaVenta;
       const diferenciaHoras = diferenciaMs / (1000 * 60 * 60);
-      
+
       const TIEMPO_LIMITE_HORAS = 1;
-      
+
       if (diferenciaHoras > TIEMPO_LIMITE_HORAS) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
           error: `Ya no es posible anular esta venta manual. Han pasado más de ${TIEMPO_LIMITE_HORAS} hora desde su creación.`,
           codigo: 'TIEMPO_EXCEDIDO',
@@ -358,7 +359,7 @@ export const anularVenta = async (req, res) => {
       success: true,
       message: "Venta anulada correctamente",
       venta: ventaAnulada,
-      tiempoTranscurrido: venta.Origen === 'manual' 
+      tiempoTranscurrido: venta.Origen === 'manual'
         ? Math.round(((new Date() - new Date(venta.FechaVenta)) / (1000 * 60 * 60)) * 10) / 10 + " horas"
         : "Sin límite de tiempo"
     });
@@ -366,9 +367,9 @@ export const anularVenta = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error("Error al anular venta:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: error.message || "Error al anular venta" 
+      error: error.message || "Error al anular venta"
     });
   } finally {
     connection.release();
@@ -378,12 +379,12 @@ export const anularVenta = async (req, res) => {
 export const getDetallesByVenta = async (req, res) => {
   try {
     const { ventaId } = req.params;
-    
+
     const venta = await getVentaByIdModel(ventaId);
     if (!venta) {
       return res.status(404).json({ error: "Venta no encontrada" });
     }
-    
+
     const detalles = await getDetalleVentaByVentaIdModel(ventaId);
     res.status(200).json(detalles);
   } catch (error) {
@@ -396,21 +397,21 @@ export const createDetalle = async (req, res) => {
   try {
     const { ventaId } = req.params;
     const detalleData = req.body;
-    
+
     const venta = await getVentaByIdModel(ventaId);
     if (!venta) {
       return res.status(404).json({ error: "Venta no encontrada" });
     }
-    
+
     if (venta.Estado === 'anulado') {
       return res.status(400).json({ error: "No se pueden agregar detalles a una venta anulada" });
     }
-    
+
     detalleData.VentaId = ventaId;
     const detalleId = await createDetalleVentaManualModel(dbPool, detalleData);
-    
+
     const detalles = await getDetalleVentaByVentaIdModel(ventaId);
-    
+
     res.status(201).json({
       success: true,
       message: "Detalle creado exitosamente",
@@ -448,13 +449,13 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
       WHERE PedidoClienteId = ?`,
       [PedidoClienteId]
     );
-    
+
     if (pedidoRows.length === 0) {
       await connection.rollback();
       throw new Error("Pedido no encontrado");
     }
     const pedido = pedidoRows[0];
-    
+
     // 🔥 NUEVO: Extraer MetodoPago para pasarlo al model
     const metodoPago = pedido.MetodoPago;
 
@@ -529,12 +530,12 @@ export const actualizarEstadoVenta = async (req, res) => {
   const connection = await dbPool.getConnection();
 
   try {
-    // Validar que el nuevo estado sea permitido
-    const estadosPermitidos = ['pagado', 'anulado', 'pendiente'];
+    // Validar que el nuevo estado sea permitido (AGREGAR 'rechazado')
+    const estadosPermitidos = ['pagado', 'anulado', 'pendiente', 'rechazado'];
     if (!Estado || !estadosPermitidos.includes(Estado)) {
-      return res.status(400).json({ 
-        error: "Estado no válido", 
-        permitidos: estadosPermitidos 
+      return res.status(400).json({
+        error: "Estado no válido",
+        permitidos: estadosPermitidos
       });
     }
 
@@ -548,21 +549,35 @@ export const actualizarEstadoVenta = async (req, res) => {
       return res.status(400).json({ error: "No se puede modificar una venta anulada" });
     }
 
-    if (venta.Estado === 'pagado' && Estado === 'pendiente') {
-      return res.status(400).json({ error: "No se puede revertir de 'pagado' a 'pendiente'" });
+    if (venta.Estado === 'rechazado' && Estado !== 'rechazado') {
+      return res.status(400).json({ error: "No se puede modificar una venta rechazada" });
+    }
+
+    if (venta.Estado === 'pagado' && (Estado === 'pendiente' || Estado === 'rechazado')) {
+      return res.status(400).json({ error: "No se puede revertir una venta pagada" });
     }
 
     await connection.beginTransaction();
 
+    // Si se rechaza, actualizar con motivo
+    if (Estado === 'rechazado') {
+      const [result] = await connection.query(
+        "UPDATE ventas SET Estado = ?, MotivoRechazo = ? WHERE VentaId = ?",
+        [Estado, motivo || null, id]
+      );
+
+      if (result.affectedRows === 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: "No se pudo actualizar el estado" });
+      }
+    }
     // Si se anula, ejecutar lógica de devolución de stock (el trigger ya lo hace)
-    if (Estado === 'anulado' && venta.Estado !== 'anulado') {
-      // El trigger trg_venta_devolver_stock se ejecuta automáticamente
-      // Solo guardamos el motivo
+    else if (Estado === 'anulado' && venta.Estado !== 'anulado') {
       const [result] = await connection.query(
         "UPDATE ventas SET Estado = ?, MotivoAnulacion = ? WHERE VentaId = ?",
         [Estado, motivo || null, id]
       );
-      
+
       if (result.affectedRows === 0) {
         await connection.rollback();
         return res.status(400).json({ error: "No se pudo actualizar el estado" });
@@ -573,7 +588,7 @@ export const actualizarEstadoVenta = async (req, res) => {
         "UPDATE ventas SET Estado = ? WHERE VentaId = ?",
         [Estado, id]
       );
-      
+
       if (result.affectedRows === 0) {
         await connection.rollback();
         return res.status(400).json({ error: "No se pudo actualizar el estado" });
@@ -586,14 +601,29 @@ export const actualizarEstadoVenta = async (req, res) => {
     const ventaActualizada = await getVentaByIdModel(id);
     ventaActualizada.detalle = await getDetalleVentaByVentaIdModel(id);
 
-    // 🔥 Si se marca como 'pagado' y viene de transferencia/QR, enviar factura
+    // Enviar correos según el nuevo estado
+    if (Estado === 'rechazado' && ventaActualizada.ClienteCorreo) {
+      try {
+        await sendVentaRechazadaEmail(
+          ventaActualizada.ClienteCorreo,
+          ventaActualizada.ClienteNombre || 'Cliente',
+          ventaActualizada.VentaId,
+          ventaActualizada.Total,
+          motivo || 'Voucher inválido o falta de pago'
+        );
+      } catch (emailError) {
+        console.error("⚠️ Error enviando correo de rechazo:", emailError);
+      }
+    }
+
+    // Si se marca como 'pagado' y viene de transferencia/QR, enviar factura
     if (Estado === 'pagado' && venta.Origen === 'pedido') {
       try {
         const [pedido] = await connection.query(
           "SELECT MetodoPago FROM pedidosclientes WHERE PedidoClienteId = ?",
           [venta.PedidoClienteId]
         );
-        
+
         if (pedido[0]?.MetodoPago === 'transferencia' || pedido[0]?.MetodoPago === 'QR') {
           if (ventaActualizada.ClienteCorreo) {
             await sendVentaFacturaEmail(
@@ -608,7 +638,6 @@ export const actualizarEstadoVenta = async (req, res) => {
         }
       } catch (emailError) {
         console.error("⚠️ Error enviando factura al actualizar estado:", emailError);
-        // No fallamos la operación por un error de email
       }
     }
 
@@ -621,9 +650,79 @@ export const actualizarEstadoVenta = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error("❌ Error en actualizarEstadoVenta:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Error al actualizar el estado de la venta",
-      details: error.message 
+      details: error.message
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+export const rechazarVenta = async (req, res) => {
+  const { id } = req.params;
+  const { motivo } = req.body;
+  const connection = await dbPool.getConnection();
+
+  try {
+    const venta = await getVentaByIdModel(id);
+    if (!venta) {
+      return res.status(404).json({ error: "Venta no encontrada" });
+    }
+
+    if (venta.Estado === 'rechazado') {
+      return res.status(400).json({ error: "La venta ya está rechazada" });
+    }
+
+    if (venta.Estado === 'anulado') {
+      return res.status(400).json({ error: "No se puede rechazar una venta anulada" });
+    }
+
+    if (venta.Estado === 'pagado') {
+      return res.status(400).json({ error: "No se puede rechazar una venta ya pagada" });
+    }
+
+    await connection.beginTransaction();
+
+    const result = await rechazarVentaModel(id, motivo);
+
+    if (!result.success) {
+      await connection.rollback();
+      return res.status(400).json({ error: result.message || "No se pudo rechazar la venta" });
+    }
+
+    await connection.commit();
+
+    const ventaRechazada = await getVentaByIdModel(id);
+    ventaRechazada.detalle = await getDetalleVentaByVentaIdModel(id);
+
+    // Enviar correo de notificación al cliente
+    if (ventaRechazada.ClienteCorreo) {
+      try {
+        await sendVentaRechazadaEmail(
+          ventaRechazada.ClienteCorreo,
+          ventaRechazada.ClienteNombre || 'Cliente',
+          ventaRechazada.VentaId,
+          ventaRechazada.Total,
+          motivo || 'Voucher inválido o falta de pago'
+        );
+      } catch (emailError) {
+        console.error("Error enviando correo de rechazo:", emailError);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Venta rechazada correctamente",
+      venta: ventaRechazada
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error("Error al rechazar venta:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Error al rechazar venta"
     });
   } finally {
     connection.release();

@@ -415,3 +415,42 @@ export const getVentasPaginated = async ({
     itemsPerPage: Number(limit)
   };
 };
+
+export const rechazarVentaModel = async (ventaId, motivoRechazo) => {
+  try {
+    const [venta] = await dbPool.query(
+      "SELECT Estado FROM ventas WHERE VentaId = ?",
+      [ventaId]
+    );
+
+    if (venta.length === 0) {
+      return { success: false, message: "Venta no encontrada" };
+    }
+
+    if (venta[0].Estado === 'rechazado') {
+      return { success: false, message: "La venta ya está rechazada" };
+    }
+
+    if (venta[0].Estado === 'anulado') {
+      return { success: false, message: "No se puede rechazar una venta anulada" };
+    }
+
+    if (venta[0].Estado === 'pagado') {
+      return { success: false, message: "No se puede rechazar una venta ya pagada" };
+    }
+
+    const [result] = await dbPool.query(
+      "UPDATE ventas SET Estado = 'rechazado', MotivoRechazo = ? WHERE VentaId = ?",
+      [motivoRechazo || null, ventaId]
+    );
+
+    return {
+      success: true,
+      affectedRows: result.affectedRows
+    };
+
+  } catch (error) {
+    console.error("Error en rechazarVentaModel:", error);
+    throw error;
+  }
+};

@@ -7,7 +7,8 @@ import {
   createVentaManual,
   anularVenta,
   actualizarEstadoVenta,
-  getDetallesByVenta
+  getDetallesByVenta,
+  rechazarVenta
 } from "../controllers/ventas.controller.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { upload } from '../middleware/upload.js';
@@ -35,6 +36,8 @@ router.post("/desde-pedido", createVentaDesdePedido);
 
 // Anular venta (NO eliminar)
 router.put("/:id/anular", anularVenta);
+
+router.put('/:id/rechazar', rechazarVenta);
 
 router.put('/:id/estado', actualizarEstadoVenta);
 
