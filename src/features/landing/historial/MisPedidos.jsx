@@ -18,7 +18,6 @@ const MisPedidos = () => {
   const { user, loading: authLoading } = useAuth(); 
 
   useEffect(() => {
-    // Usar user del contexto (ya tiene CedulaId del token decodificado)
     if (user?.CedulaId) {
       const loadUser = async () => {
         try {
@@ -37,12 +36,6 @@ const MisPedidos = () => {
   }, [user]);
 
   const { pedidos, loading, refetch } = useMisPedidos(clienteId);
-
-  // 🔥 Función para determinar si un pedido es de venta (transferencia/QR/efectivo)
-  const esVenta = (pedido) => {
-    const metodo = pedido.MetodoPago?.toLowerCase() || '';
-    return metodo !== 'contra_entrega';
-  };
 
   // 🔥 Función para determinar si es contra entrega
   const esContraEntrega = (pedido) => {
@@ -157,11 +150,11 @@ const MisPedidos = () => {
     }
   };
 
-  // 🔥 Verificar si se puede cancelar un pedido
+  // 🔥 Verificar si se puede cancelar un pedido (solo contra entrega y pendiente)
   const puedeCancelar = (pedido) => {
     const estado = getEstadoActual(pedido);
-    // Se puede cancelar si está pendiente (para ambos tipos)
-    return estado === 'pendiente';
+    // Solo contra entrega Y estado pendiente
+    return esContraEntrega(pedido) && estado === 'pendiente';
   };
 
   const allStatuses = getUniqueStatuses();
@@ -329,7 +322,7 @@ const MisPedidos = () => {
                             <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" />
                           </div>
                           
-                          {/* Botón de Cancelar - Solo si está pendiente */}
+                          {/* 🔥 Botón de Cancelar - SOLO para contra entrega Y pendiente */}
                           {puedeCancelar(order) && (
                             <button
                               onClick={(e) => handleCancelarPedido(order.PedidoClienteId, e)}
@@ -453,4 +446,4 @@ const MisPedidos = () => {
   );
 };
 
-export default MisPedidos;
+export default MisPedidos;   

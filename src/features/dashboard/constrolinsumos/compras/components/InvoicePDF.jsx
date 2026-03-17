@@ -12,90 +12,85 @@ export const generarFacturaCompraPDF = (compra, detalles, proveedor) => {
     
     const doc = new jsPDF();
     
-    // Colores
-    const colorPrimario = [30, 58, 138]; // Azul oscuro
-    const colorSecundario = [243, 244, 246]; // Gris claro
-    const colorTexto = [75, 85, 99]; // Gris oscuro
+    // Colores profesionales y sobrios
+    const colorPrimario = [0, 0, 0]; // Negro para títulos
+    const colorSecundario = [245, 245, 245]; // Gris muy claro para fondos
+    const colorTexto = [80, 80, 80]; // Gris oscuro para texto
     
     // ==========================================
-    // HEADER
+    // HEADER SIMPLE
     // ==========================================
-    doc.setFillColor(...colorPrimario);
-    doc.rect(0, 0, 210, 40, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(...colorPrimario);
+    doc.text('PUBLICIDADDAS', 20, 20);
     
-    doc.setFont('helvetica');
-    doc.setFontSize(22);
-    doc.setTextColor(255, 255, 255);
-    doc.text('PublicidadDAS', 20, 25);
-    
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text('NIT: 901.234.567-8', 150, 20);
-    doc.text('Regimen Comun', 150, 26);
+    doc.setTextColor(...colorTexto);
+    doc.text('NIT: 901.234.567-8', 20, 27);
+    doc.text('Régimen Común', 20, 32);
+    
+    // Línea separadora
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, 37, 190, 37);
     
     // ==========================================
     // TÍTULO Y NÚMERO DE FACTURA
     // ==========================================
-    doc.setFontSize(16);
-    doc.setTextColor(...colorPrimario);
-    doc.text('FACTURA DE COMPRA', 20, 55);
-    
-    doc.setFontSize(8);
-    doc.setTextColor(...colorTexto);
-    doc.text('Documento equivalente a factura', 20, 61);
-    
-    // Número de factura
-    doc.setFillColor(...colorSecundario);
-    doc.roundedRect(140, 45, 50, 20, 2, 2, 'F');
-    
-    doc.setFontSize(8);
-    doc.setTextColor(...colorTexto);
-    doc.text('FACTURA No.', 150, 52);
-    
-    doc.setFontSize(12);
-    doc.setTextColor(...colorPrimario);
     doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(...colorPrimario);
+    doc.text('FACTURA DE COMPRA', 20, 50);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...colorTexto);
+    doc.text('Documento equivalente a factura electrónica', 20, 56);
+    
+    // Número de factura (simple, sin fondo)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...colorPrimario);
+    doc.text('No.', 150, 50);
+    
+    doc.setFont('helvetica', 'normal');
     const facturaNum = compra.CompraId ? compra.CompraId.substring(0, 8).toUpperCase() : 'N/A';
-    doc.text(facturaNum, 150, 60);
+    doc.text(facturaNum, 165, 50);
     
     // ==========================================
     // SECCIÓN PROVEEDOR
     // ==========================================
-    doc.setFillColor(...colorSecundario);
-    doc.roundedRect(20, 75, 85, 40, 2, 2, 'F');
-    
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(...colorPrimario);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PROVEEDOR', 25, 83);
+    doc.text('PROVEEDOR', 20, 70);
     
-    doc.setFontSize(8);
-    doc.setTextColor(...colorTexto);
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...colorTexto);
     
     const nombreProveedor = proveedor?.NombreProveedor || compra.nombreProveedor || 'Proveedor General';
     const nitProveedor = proveedor?.NIT || 'N/A';
     const telefono = proveedor?.Telefono || 'N/A';
     const direccion = proveedor?.Direccion || 'N/A';
     
-    doc.text(`Nombre: ${nombreProveedor}`, 25, 92);
-    doc.text(`NIT: ${nitProveedor}`, 25, 98);
-    doc.text(`Teléfono: ${telefono}`, 25, 104);
-    doc.text(`Dirección: ${direccion}`, 25, 110);
+    doc.text(`Nombre: ${nombreProveedor}`, 20, 78);
+    doc.text(`NIT: ${nitProveedor}`, 20, 85);
+    doc.text(`Teléfono: ${telefono}`, 20, 92);
+    doc.text(`Dirección: ${direccion}`, 20, 99);
     
     // ==========================================
-    // SECCIÓN DETALLES
+    // SECCIÓN DETALLES DE COMPRA
     // ==========================================
-    doc.setFillColor(...colorSecundario);
-    doc.roundedRect(115, 75, 75, 40, 2, 2, 'F');
-    
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(...colorPrimario);
-    doc.setFont('helvetica', 'bold');
-    doc.text('DETALLES', 120, 83);
+    doc.text('DETALLES DE COMPRA', 120, 70);
     
-    doc.setFontSize(8);
-    doc.setTextColor(...colorTexto);
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...colorTexto);
     
     // Fecha
     let fechaTexto = 'Fecha no disponible';
@@ -105,33 +100,31 @@ export const generarFacturaCompraPDF = (compra, detalles, proveedor) => {
         fechaTexto = fecha.toLocaleDateString('es-ES', {
           year: 'numeric',
           month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
+          day: '2-digit'
         });
       } catch (e) {}
     }
-    doc.text(`Fecha: ${fechaTexto}`, 120, 92);
+    doc.text(`Fecha: ${fechaTexto}`, 120, 78);
     
     // Estado
     const estado = compra.Estado || 'PENDIENTE';
-    doc.text(`Estado: ${estado}`, 120, 98);
+    doc.text(`Estado: ${estado}`, 120, 85);
     
     // Total
     const totalCompra = Number(compra.Total) || 0;
-    doc.text(`Total: $${totalCompra.toFixed(0)}`, 120, 104);
+    doc.text(`Total: $${totalCompra.toFixed(0)}`, 120, 92);
     
     // ==========================================
-    // TABLA DE PRODUCTOS (CON COLUMNA DE COLOR)
+    // TABLA DE PRODUCTOS
     // ==========================================
-    let startY = 130;
+    let startY = 115;
     
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(...colorPrimario);
-    doc.setFont('helvetica', 'bold');
     doc.text('ARTÍCULOS', 20, startY - 5);
     
-    // Preparar filas para la tabla con 5 columnas
+    // Preparar filas
     const tableRows = [];
     let subtotal = 0;
     
@@ -144,67 +137,66 @@ export const generarFacturaCompraPDF = (compra, detalles, proveedor) => {
         
         // VERIFICAR SI TIENE COLORES
         if (detalle.colores && Array.isArray(detalle.colores) && detalle.colores.length > 0) {
-          // Crear una fila para CADA color
           detalle.colores.forEach((color) => {
             const cantidadColor = Number(color.Stock) || 0;
             const subtotalColor = cantidadColor * precioUnit;
             subtotal += subtotalColor;
             
             tableRows.push([
-              productoNombre,                    // Producto
-              color.Nombre || 'Color',           // Color
-              cantidadColor.toString(),          // Cantidad
-              `$${precioUnit.toFixed(0)}`,       // Precio Unitario
-              `$${subtotalColor.toFixed(0)}`     // Subtotal
+              productoNombre,
+              color.Nombre || 'Color',
+              cantidadColor.toString(),
+              `$${precioUnit.toFixed(0)}`,
+              `$${subtotalColor.toFixed(0)}`
             ]);
           });
         } else {
-          // Producto sin colores
           const cantidad = Number(detalle.Cantidad) || 0;
           const subtotalItem = cantidad * precioUnit;
           subtotal += subtotalItem;
           
           tableRows.push([
-            productoNombre,                    // Producto
-            'N/A',                              // Color (N/A)
-            cantidad.toString(),                // Cantidad
-            `$${precioUnit.toFixed(0)}`,        // Precio Unitario
-            `$${subtotalItem.toFixed(0)}`       // Subtotal
+            productoNombre,
+            '-',
+            cantidad.toString(),
+            `$${precioUnit.toFixed(0)}`,
+            `$${subtotalItem.toFixed(0)}`
           ]);
         }
       });
     }
     
-    // Si no hay filas, mostrar mensaje
     if (tableRows.length === 0) {
-      tableRows.push(['No hay productos', '', '0', '$0', '$0']);
+      tableRows.push(['No hay productos', '-', '0', '$0', '$0']);
     }
     
-    // Generar tabla con 5 columnas
+    // Tabla simple sin colores de fondo
     autoTable(doc, {
       startY: startY,
       head: [['Producto', 'Color', 'Cant.', 'P.Unit', 'Subtotal']],
       body: tableRows,
-      theme: 'grid',
-      headStyles: {
-        fillColor: colorPrimario,
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 9,
-        halign: 'center'
-      },
-      bodyStyles: {
+      theme: 'plain',
+      styles: {
         fontSize: 8,
-        textColor: colorTexto
+        textColor: colorTexto,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.1
+      },
+      headStyles: {
+        fillColor: [255, 255, 255],
+        textColor: colorPrimario,
+        fontStyle: 'bold',
+        lineColor: [200, 200, 200],
+        lineWidth: 0.1
       },
       columnStyles: {
-        0: { cellWidth: 55 }, // Producto
-        1: { cellWidth: 35, halign: 'center' }, // Color
-        2: { cellWidth: 20, halign: 'center' }, // Cantidad
-        3: { cellWidth: 30, halign: 'right' }, // Precio Unitario
-        4: { cellWidth: 35, halign: 'right' } // Subtotal
+        0: { cellWidth: 50 },
+        1: { cellWidth: 30, halign: 'center' },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 35, halign: 'right' },
+        4: { cellWidth: 35, halign: 'right' }
       },
-      margin: { left: 15, right: 15 }
+      margin: { left: 20, right: 20 }
     });
     
     // ==========================================
@@ -216,47 +208,41 @@ export const generarFacturaCompraPDF = (compra, detalles, proveedor) => {
     const iva = subtotal * 0.19;
     const total = subtotal + iva;
     
-    // Caja de totales
-    doc.setFillColor(...colorSecundario);
-    doc.roundedRect(120, finalY, 70, 35, 2, 2, 'F');
+    // Línea separadora
+    doc.line(120, finalY, 190, finalY);
     
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(...colorTexto);
-    doc.setFont('helvetica', 'normal');
     
-    doc.text('Subtotal:', 125, finalY + 8);
+    doc.text('Subtotal:', 130, finalY + 8);
     doc.text(`$${subtotal.toFixed(0)}`, 185, finalY + 8, { align: 'right' });
     
-    doc.text('IVA (19%):', 125, finalY + 16);
+    doc.text('IVA (19%):', 130, finalY + 16);
     doc.text(`$${iva.toFixed(0)}`, 185, finalY + 16, { align: 'right' });
     
-    doc.setDrawColor(200, 200, 200);
-    doc.line(125, finalY + 19, 185, finalY + 19);
-    
-    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
     doc.setTextColor(...colorPrimario);
-    doc.text('TOTAL:', 125, finalY + 28);
+    doc.text('TOTAL:', 130, finalY + 28);
     doc.text(`$${total.toFixed(0)}`, 185, finalY + 28, { align: 'right' });
     
     // ==========================================
     // FOOTER
     // ==========================================
+    doc.setFont('helvetica', 'italic');
     doc.setFontSize(8);
     doc.setTextColor(...colorTexto);
-    doc.setFont('helvetica', 'italic');
     doc.text('Documento generado electrónicamente', 105, 280, { align: 'center' });
     
     // ==========================================
-    // GUARDAR PDF - VERSIÓN MEJORADA
+    // GUARDAR PDF
     // ==========================================
-    // Crear nombre de archivo con fecha y hora para evitar duplicados
     const now = new Date();
     const fechaHora = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}`;
     
     const fileName = `Factura_Compra_${facturaNum}_${fechaHora}.pdf`;
     
-    // Guardar el PDF
     doc.save(fileName);
     
     console.log(" FACTURA GENERADA Y DESCARGADA:", fileName);
@@ -269,7 +255,7 @@ export const generarFacturaCompraPDF = (compra, detalles, proveedor) => {
       proveedor: nombreProveedor
     });
     
-    return fileName; // Devolver el nombre del archivo generado
+    return fileName;
     
   } catch (error) {
     console.error(" Error en generarFacturaCompraPDF:", error);
