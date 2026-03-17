@@ -677,3 +677,66 @@ export const sendVentaAnuladaEmail = async (to, nombreCliente, ventaId, total) =
     return false;
   }
 };
+
+// ENVÍA NOTIFICACIÓN DE RECHAZO DE VENTA (VOUCHER INVÁLIDO / FALTA DE PAGO)
+export const sendVentaRechazadaEmail = async (to, nombreCliente, ventaId, total, motivo) => {
+  const totalFormateado = new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 0
+  }).format(total);
+
+  const subject = `❌ Venta rechazada #${ventaId} - Problema con el pago`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
+      <div style="text-align: center; padding: 20px 0; border-bottom: 2px solid #e67e22;">
+        <h1 style="color: #2d3748; margin: 0;">Tu Empresa</h1>
+        <p style="color: #666; margin-top: 5px;">Notificación de rechazo de venta</p>
+      </div>
+      
+      <div style="padding: 30px; background: white; border-radius: 10px; margin-top: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 25px;">
+          <h2 style="color: #d35400;">Venta rechazada</h2>
+          <p style="color: #666;">Hola, ${nombreCliente}</p>
+        </div>
+
+        <div style="background-color: #fef5e7; padding: 20px; border-radius: 10px; margin-bottom: 25px; border-left: 4px solid #e67e22;">
+          <h3 style="margin-top: 0; color: #b85e00;">Información importante</h3>
+          <p><strong>Factura No.:</strong> ${ventaId}</p>
+          <p><strong>Monto:</strong> ${totalFormateado}</p>
+          <p><strong>Fecha de rechazo:</strong> ${new Date().toLocaleDateString("es-CO")}</p>
+          ${motivo ? `<p><strong>Motivo del rechazo:</strong> ${motivo}</p>` : ''}
+        </div>
+
+        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 8px;">
+          <p style="margin: 0; color: #333;">
+            <strong>⚠️ La venta No. ${ventaId} ha sido rechazada debido a problemas con el comprobante de pago.</strong>
+          </p>
+          <p style="margin-top: 10px; color: #666;">
+            El voucher proporcionado no pudo ser validado o no se recibió el pago correspondiente.
+            Si crees que esto es un error, por favor contáctanos para resolver la situación.
+          </p>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 30px; color: #718096; font-size: 14px;">
+        <p>Este es un mensaje automático.</p>
+        <p>© ${new Date().getFullYear()} Tu Empresa.</p>
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"Tu Empresa" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    });
+    console.log(`✅ Notificación de rechazo enviada a ${to} para venta ${ventaId}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error al enviar notificación de rechazo:", error.message);
+    return false;
+  }
+};

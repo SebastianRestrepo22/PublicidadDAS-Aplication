@@ -123,3 +123,21 @@ export const actualizarEstadoVenta = async (id, nuevoEstado, motivo = null) => {
     throw error.response?.data || error;
   }
 };
+
+export const rechazarVenta = async (id, motivo) => {
+  try {
+    const response = await axios.put(
+      `${API_URL}/ventas/${id}/rechazar`, 
+      { motivo: motivo || null },
+      {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error en rechazarVenta:", error);
+    throw error;
+  }
+};
