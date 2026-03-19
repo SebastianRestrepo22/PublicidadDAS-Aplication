@@ -521,14 +521,52 @@ export const updatePedidoCliente = async (req, res) => {
       return res.status(404).json({ message: 'Pedido no encontrado.' });
     }
 
-    // Validar estados según método de pago
+    // Si se está actualizando el estado
     if (updates.Estado) {
-      // 🔥 PAGO INMEDIATO: transferencia, efectivo o QR
+      const estadoAnterior = pedidoActual.Estado;
+      const nuevoEstado = updates.Estado;
+
+      // 🔥 NUEVA VALIDACIÓN: No permitir cambio a estado anterior
+      const ordenEstados = {
+        'pendiente': 1,
+        'aprobado': 2,
+        'en_proceso': 2,
+        'en_camino': 3,
+        'entregado': 4,
+        'finalizado': 3,
+        'cancelado': 999 // El cancelado puede ocurrir en cualquier momento
+      };
+
+      // Si el nuevo estado es cancelado, siempre permitir
+      if (nuevoEstado !== 'cancelado') {
+        const nivelAnterior = ordenEstados[estadoAnterior];
+        const nivelNuevo = ordenEstados[nuevoEstado];
+
+        console.log('📊 Validación de estados:', {
+          estadoAnterior,
+          nuevoEstado,
+          nivelAnterior,
+          nivelNuevo
+        });
+
+        // Si el estado anterior tiene nivel y el nuevo estado tiene nivel
+        if (nivelAnterior && nivelNuevo) {
+          // No permitir retroceder
+          if (nivelNuevo < nivelAnterior) {
+            return res.status(400).json({
+              message: `No se puede cambiar de "${estadoAnterior}" a "${nuevoEstado}". Solo se puede avanzar a estados posteriores.`,
+              error: 'transicion_invalida'
+            });
+          }
+        }
+      }
+
+      // Validar estados según método de pago
       if (pedidoActual.MetodoPago === "transferencia" ||
         pedidoActual.MetodoPago === "efectivo" ||
         pedidoActual.MetodoPago === "QR") {
         const estadosPermitidos = ['pendiente', 'aprobado', 'finalizado', 'cancelado'];
-        if (!estadosPermitidos.includes(updates.Estado)) {
+        if (!estadosPermitidos.includes(nuevoEstado)) {
           return res.status(400).json({
             message: `Para ${pedidoActual.MetodoPago}, estado debe ser: ${estadosPermitidos.join(', ')}`
           });
@@ -537,16 +575,13 @@ export const updatePedidoCliente = async (req, res) => {
       // 🔥 CONTRA ENTREGA
       else if (pedidoActual.MetodoPago === "contra_entrega") {
         const estadosPermitidosContraEntrega = ['pendiente', 'en_proceso', 'en_camino', 'entregado', 'cancelado'];
-        if (!estadosPermitidosContraEntrega.includes(updates.Estado)) {
+        if (!estadosPermitidosContraEntrega.includes(nuevoEstado)) {
           return res.status(400).json({
             message: `Para contra entrega, estado debe ser: ${estadosPermitidosContraEntrega.join(', ')}`
           });
         }
       }
     }
-
-    const estadoAnterior = pedidoActual.Estado;
-    const nuevoEstado = updates.Estado;
 
     // Sanitizar Total si viene
     if (updates.Total !== undefined) {
@@ -565,7 +600,7 @@ export const updatePedidoCliente = async (req, res) => {
 
     // 🔥 Si es transferencia/efectivo y se aprueba, crear venta
     if ((pedidoActual.MetodoPago === "transferencia" || pedidoActual.MetodoPago === "efectivo") &&
-      nuevoEstado === 'aprobado' && estadoAnterior !== 'aprobado') {
+      updates.Estado === 'aprobado' && pedidoActual.Estado !== 'aprobado') {
       try {
         const [ventaExistente] = await dbPool.execute(
           "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
@@ -591,7 +626,7 @@ export const updatePedidoCliente = async (req, res) => {
     }
 
     // 🔥 Si es contra entrega y llega a 'entregado', crear venta
-    if (pedidoActual.MetodoPago === "contra_entrega" && nuevoEstado === 'entregado' && estadoAnterior !== 'entregado') {
+    if (pedidoActual.MetodoPago === "contra_entrega" && updates.Estado === 'entregado' && pedidoActual.Estado !== 'entregado') {
       try {
         const [ventaExistente] = await dbPool.execute(
           "SELECT VentaId FROM ventas WHERE PedidoClienteId = ?",
@@ -619,7 +654,7 @@ export const updatePedidoCliente = async (req, res) => {
     }
 
     // Enviar correo si cambió el estado
-    if (nuevoEstado && estadoAnterior !== nuevoEstado) {
+    if (updates.Estado && pedidoActual.Estado !== updates.Estado) {
       let destinatario = null;
       let nombreCliente = 'Cliente';
 
@@ -639,7 +674,7 @@ export const updatePedidoCliente = async (req, res) => {
           destinatario,
           nombreCliente,
           id,
-          nuevoEstado,
+          updates.Estado,
           updates.motivo || ''
         ).catch(err => console.error('Error enviando correo:', err));
       }

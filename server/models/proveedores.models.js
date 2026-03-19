@@ -4,14 +4,11 @@ import { dbPool } from '../lib/db.js';
 const sanitize = (v) => (v === undefined ? null : v);
 
 // ========== FUNCIONES EXISTENTES ==========
-
-// Obtener todos los proveedores (sin paginación)
 export const getAllProveedores = async () => {
   const [rows] = await dbPool.query('SELECT * FROM Proveedores ORDER BY NombreProveedor');
   return rows;
 };
 
-// Obtener proveedor por ID
 export const getProveedorById = async (id) => {
   const [rows] = await dbPool.query(
     'SELECT * FROM Proveedores WHERE ProveedorId = ?',
@@ -22,15 +19,14 @@ export const getProveedorById = async (id) => {
 
 export const createProveedor = async ({ ProveedorId, nombreProveedor, nit, telefono, correo, direccion, estado }) => {
   await dbPool.query(
-    `INSERT INTO Proveedores 
-    (ProveedorId, NombreProveedor, Nit, Telefono, Correo, Direccion, Estado) 
+    `INSERT INTO Proveedores
+    (ProveedorId, NombreProveedor, Nit, Telefono, Correo, Direccion, Estado)
     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [ProveedorId, nombreProveedor, nit, telefono, correo, direccion, estado]
   );
   return { ProveedorId, nombreProveedor, nit, telefono, correo, direccion, estado };
 };
 
-// Eliminar un proveedor
 export const deleteProveedor = async (id) => {
   const [result] = await dbPool.query(
     'DELETE FROM Proveedores WHERE ProveedorId = ?',
@@ -41,7 +37,6 @@ export const deleteProveedor = async (id) => {
 
 export const updateProveedor = async (id, data) => {
   const { nombreProveedor, nit, telefono, correo, direccion, estado } = data;
-
   const [result] = await dbPool.query(
     `UPDATE Proveedores
     SET NombreProveedor = ?, Nit = ?, Telefono = ?, Correo = ?, Direccion = ?, Estado = ?
@@ -56,17 +51,50 @@ export const updateProveedor = async (id, data) => {
       id
     ]
   );
-
   return result;
 };
 
+// ========== NUEVAS FUNCIONES PARA VALIDACIÓN ==========
 
-// Obtener proveedores con paginación y filtros
-export const getProveedoresPaginated = async ({ 
-  page = 1, 
-  limit = 10, 
-  filtroCampo = null, 
-  filtroValor = null 
+/**
+ * Verifica si un campo ya existe en la base de datos
+ * @param {string} campo - Nombre del campo a validar
+ * @param {string} valor - Valor a verificar
+ * @param {string} excludeId - ID a excluir (para edición)
+ * @returns {Promise<boolean>} - true si existe, false si no
+ */
+// ========== NUEVA FUNCIÓN PARA VALIDACIÓN ==========
+export const verificarCampoUnico = async (campo, valor, excludeId = null) => {
+  const campoMap = {
+    nombreProveedor: 'NombreProveedor',
+    correo: 'Correo',
+    nit: 'Nit'
+  };
+
+  const columna = campoMap[campo];
+  if (!columna) {
+    throw new Error(`Campo no válido: ${campo}`);
+  }
+
+  let query = `SELECT COUNT(*) as count FROM Proveedores WHERE ${columna} = ?`;
+  let params = [valor];
+
+  // Si estamos editando, excluimos el registro actual
+  if (excludeId) {
+    query += ' AND ProveedorId != ?';
+    params.push(excludeId);
+  }
+
+  const [rows] = await dbPool.query(query, params);
+  return rows[0].count > 0;
+};
+
+// ========== FUNCIONES DE PAGINACIÓN ==========
+export const getProveedoresPaginated = async ({
+  page = 1,
+  limit = 10,
+  filtroCampo = null,
+  filtroValor = null
 }) => {
   const offset = (page - 1) * limit;
   let whereClause = '';
@@ -76,21 +104,20 @@ export const getProveedoresPaginated = async ({
     const campoMap = {
       id: 'ProveedorId',
       nombre: 'NombreProveedor',
-      nit: 'Nit', // Agregar NIT
+      nit: 'Nit',
       telefono: 'Telefono',
       correo: 'Correo',
       direccion: 'Direccion',
       estado: 'Estado'
     };
-
     const columna = campoMap[filtroCampo] || filtroCampo;
 
     if (columna === 'ProveedorId') {
       whereClause = 'WHERE ProveedorId = ?';
       params.push(filtroValor);
     } else if (columna === 'Estado') {
-      const valorNormalizado = filtroValor.toLowerCase() === 'activo' ? 1 : 
-                               filtroValor.toLowerCase() === 'inactivo' ? 0 : filtroValor;
+      const valorNormalizado = filtroValor.toLowerCase() === 'activo' ? 1 :
+        filtroValor.toLowerCase() === 'inactivo' ? 0 : filtroValor;
       whereClause = 'WHERE Estado = ?';
       params.push(valorNormalizado);
     } else {
@@ -117,12 +144,11 @@ export const getProveedoresPaginated = async ({
   };
 };
 
-// Buscar proveedores con paginación
 export const buscarProveedoresPaginated = async ({ page, limit, columna, valor }) => {
-  return await getProveedoresPaginated({ 
-    page, 
-    limit, 
-    filtroCampo: columna, 
-    filtroValor: valor 
+  return await getProveedoresPaginated({
+    page,
+    limit,
+    filtroCampo: columna,
+    filtroValor: valor
   });
 };

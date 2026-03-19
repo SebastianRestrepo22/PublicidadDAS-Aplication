@@ -22,6 +22,17 @@ export const OrderView = ({
   const [cancelReason, setCancelReason] = useState("");
   const [updating, setUpdating] = useState(false);
 
+  // 🔥 ORDEN DE ESTADOS PARA VALIDACIÓN VISUAL
+  const ordenEstados = {
+    'pendiente': 1,
+    'aprobado': 2,
+    'en_proceso': 2,
+    'en_camino': 3,
+    'entregado': 4,
+    'finalizado': 3,
+    'cancelado': 999
+  };
+
   // Determinar el tipo de pago
   const esContraEntrega = selectedPedido?.MetodoPago === 'contra_entrega';
   const esPagoInmediato = selectedPedido?.MetodoPago === 'transferencia' || selectedPedido?.MetodoPago === 'efectivo';
@@ -70,9 +81,40 @@ export const OrderView = ({
     return labels[estado] || estado;
   };
 
+  // 🔥 Función para verificar si un estado es accesible (no anterior)
+  const isEstadoAccesible = (estado) => {
+    if (estado === 'cancelado') return true; // Cancelar siempre permitido
+    
+    const estadoActual = selectedPedido?.Estado;
+    if (!estadoActual) return true;
+    
+    const nivelActual = ordenEstados[estadoActual];
+    const nivelEstado = ordenEstados[estado];
+    
+    // Si no tenemos niveles definidos, permitir
+    if (!nivelActual || !nivelEstado) return true;
+    
+    // Solo permitir si el nivel es mayor o igual (no retroceder)
+    return nivelEstado >= nivelActual;
+  };
+
+  // 🔥 Función para obtener el mensaje de tooltip
+  const getEstadoTooltip = (estado) => {
+    if (!isEstadoAccesible(estado)) {
+      return `No puedes cambiar de "${getEstadoLabel(selectedPedido.Estado)}" a "${getEstadoLabel(estado)}". Solo puedes avanzar a estados posteriores.`;
+    }
+    return `Cambiar estado a ${getEstadoLabel(estado)}`;
+  };
+
   const handleEstadoChange = async (nuevoEstado) => {
     if (nuevoEstado === 'cancelado') {
       setShowCancelModal(true);
+      return;
+    }
+
+    // 🔥 Validación adicional en el frontend
+    if (!isEstadoAccesible(nuevoEstado)) {
+      toast.warning(`No puedes cambiar de "${getEstadoLabel(selectedPedido.Estado)}" a "${getEstadoLabel(nuevoEstado)}"`);
       return;
     }
 
@@ -94,7 +136,8 @@ export const OrderView = ({
         onBack();
       }, 1500);
     } catch (error) {
-      toast.error('Error al actualizar estado');
+      const errorMsg = error.response?.data?.message || error.message;
+      toast.error(errorMsg);
     } finally {
       setUpdating(false);
     }
@@ -198,21 +241,40 @@ export const OrderView = ({
               <div className="mt-4">
                 <p className="text-sm font-medium text-slate-700 mb-2">Cambiar estado:</p>
                 <div className="flex flex-wrap gap-2">
-                  {estadosPermitidos.map((estado) => (
-                    <button
-                      key={estado}
-                      onClick={() => handleEstadoChange(estado)}
-                      disabled={updating || estado === selectedPedido.Estado}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        estado === selectedPedido.Estado
-                          ? getEstadoColor(estado)
-                          : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      {getEstadoLabel(estado)}
-                    </button>
-                  ))}
+                  {estadosPermitidos.map((estado) => {
+                    const accesible = isEstadoAccesible(estado);
+                    const esActual = estado === selectedPedido.Estado;
+                    
+                    return (
+                      <button
+                        key={estado}
+                        onClick={() => accesible && handleEstadoChange(estado)}
+                        disabled={updating || esActual || !accesible}
+                        title={getEstadoTooltip(estado)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative ${
+                          esActual
+                            ? getEstadoColor(estado)
+                            : accesible
+                              ? 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer'
+                              : 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed opacity-50'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {getEstadoLabel(estado)}
+                        {!accesible && !esActual && (
+                          <span className="absolute -top-1 -right-1 w-2 h-2 bg-gray-400 rounded-full"></span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
+                
+                {/* Mensaje informativo sobre estados no disponibles */}
+                {estadosPermitidos.some(e => !isEstadoAccesible(e) && e !== selectedPedido.Estado) && (
+                  <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    Los estados atenuados no están disponibles porque son anteriores al estado actual.
+                  </p>
+                )}
               </div>
             )}
           </div>

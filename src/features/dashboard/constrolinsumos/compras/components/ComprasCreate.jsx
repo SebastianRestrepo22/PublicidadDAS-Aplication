@@ -299,7 +299,7 @@ export const ComprasCreate = ({
                 <div key={index} className="bg-gray-50 border rounded-lg p-4">
                   {/* Fila principal */}
                   <div className="grid grid-cols-12 gap-3 items-start">
-                    {/* Producto - ✅ Muestra solo el nombre, no el ID */}
+                    {/* Producto -  Muestra solo el nombre, no el ID */}
                     <div className="col-span-4">
                       <button
                         type="button"
@@ -316,7 +316,7 @@ export const ComprasCreate = ({
                         <div className="flex-1 min-w-0">
                           <p className={`font-medium text-xs truncate ${tieneProducto ? 'text-emerald-800' : 'text-gray-500'
                             }`}>
-                            {producto?.Nombre || "Seleccionar producto"} {/* ✅ Solo nombre */}
+                            {producto?.Nombre || "Seleccionar producto"} {/*  Solo nombre */}
                           </p>
                           {producto?.SKU && (
                             <p className="text-[10px] text-gray-500 truncate">SKU: {producto.SKU}</p>
@@ -344,7 +344,7 @@ export const ComprasCreate = ({
                       )}
                     </div>
 
-                    {/* Cantidad - ✅ Permite editar libremente, bloquea negativos y cero */}
+                    {/* Cantidad -  Permite editar libremente, bloquea negativos y cero */}
                     <div className="col-span-2">
                       {tieneProducto ? (
                         tipoStock === 'general' ? (
@@ -512,7 +512,7 @@ export const ComprasCreate = ({
             onClick={onCreate}
             className="flex-1 h-11 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-lg hover:from-emerald-600 hover:to-green-600 transition-all font-medium text-sm shadow-lg shadow-emerald-500/30"
           >
-            Crear Compra (Pendiente)
+            Crear Compra
           </button>
           <button
             type="button"
