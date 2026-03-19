@@ -118,7 +118,8 @@ export const CartProvider = ({ children }) => {
               colorData = {
                 ColorId: foundColor.ColorId,
                 Nombre: foundColor.Nombre,
-                Hex: foundColor.Hex
+                Hex: foundColor.Hex,
+                Stock: foundColor.Stock || 0
               };
             } else {
               colorData = {
@@ -140,7 +141,8 @@ export const CartProvider = ({ children }) => {
         colorData = {
           ColorId: customization.color.ColorId || null,
           Nombre: customization.color.Nombre || "Color no definido",
-          Hex: customization.color.Hex || "#ccc"
+          Hex: customization.color.Hex || "#ccc",
+          Stock: customization.color.Stock || 0
         };
         colorIdSeleccionado = colorData.ColorId;
       }
@@ -225,7 +227,7 @@ export const CartProvider = ({ children }) => {
           nombre: f.nombre || f.name,
           tipo: f.tipo || f.type,
           tamaño: f.tamaño || f.size,
-          url: f.url,                          
+          url: f.url,
           esImagen: (f.tipo || f.type)?.startsWith("image/")
         });
 
@@ -243,8 +245,9 @@ export const CartProvider = ({ children }) => {
       Descuento: discount,
       UrlImagen: product.UrlImagen || product.Imagen || product.Url || "",
       Imagen: product.Imagen || product.UrlImagen || "",
-      Stock: !isServicio ? (product.Stock || 0) : null,
-      UsaColores: !isServicio && usaColores ? 1 : 0,
+      Stock: !isServicio
+        ? (usaColores && colorData ? (colorData.Stock || 0) : (product.Stock || 0))
+        : null, UsaColores: !isServicio && usaColores ? 1 : 0,
       quantity: quantity,
       Tipo: itemType,
       EsPersonalizado: product.EsPersonalizado || false,

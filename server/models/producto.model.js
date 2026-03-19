@@ -10,13 +10,12 @@ export const createProducto = async ({
   Descuento,
   CategoriaId,
   UsaColores = 0,
-  Stock = null,
   Estado = 'Activo'  
 }) => {
   await dbPool.query(
     `INSERT INTO Productos 
      (ProductoId, Nombre, Descripcion, Imagen, Precio, Descuento, CategoriaId, UsaColores, Stock, Estado)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,  // 🔥 Stock siempre 0
     [
       ProductoId,
       Nombre,
@@ -26,12 +25,10 @@ export const createProducto = async ({
       Descuento,
       CategoriaId,
       UsaColores,
-      Stock,
       Estado
     ]
   );
 };
-
 // Obtener producto por ID
 export const getDataProductoById = async (ProductoId) => {
   const [rows] = await dbPool.query(
@@ -81,18 +78,11 @@ export const updateDataProducto = async ({
   Descuento,
   CategoriaId,
   UsaColores = 0,
-  Stock = null,
   Estado  
 }) => {
-
-    console.log('💾 MODELO - updateDataProducto:');
-  console.log('ProductoId:', ProductoId);
-  console.log('UsaColores:', UsaColores, 'Tipo:', typeof UsaColores);
-  console.log('Stock:', Stock, 'Tipo:', typeof Stock);
   const campos = [];
   const valores = [];
 
-  // Agregar solo los campos que se proporcionen
   if (Nombre !== undefined) {
     campos.push('Nombre = ?');
     valores.push(Nombre);
@@ -121,10 +111,7 @@ export const updateDataProducto = async ({
     campos.push('UsaColores = ?');
     valores.push(UsaColores);
   }
-  if (Stock !== undefined) {
-    campos.push('Stock = ?');
-    valores.push(Stock);
-  }
+  // ❌ NO incluir Stock
   if (Estado !== undefined) {
     campos.push('Estado = ?');
     valores.push(Estado);
@@ -138,18 +125,10 @@ export const updateDataProducto = async ({
 
   const query = `UPDATE Productos SET ${campos.join(', ')} WHERE ProductoId = ?`;
   
-  console.log('📝 Query:', query);
-  console.log('📊 Valores:', valores);
-
-
   const [rows] = await dbPool.query(query, valores);
-
-   console.log('✅ Filas afectadas:', rows.affectedRows);
-  console.log('========================================');
   
   return rows.affectedRows;
 };
-
 export const findDuplicateName = async ({ ProductoId, Nombre }) => {
   const [rows] = await dbPool.query(
     'SELECT ProductoId FROM Productos WHERE Nombre = ? AND ProductoId != ?',
@@ -317,7 +296,7 @@ export const getProductosPaginated = async ({
     ? `WHERE ${whereConditions.join(' AND ')}` 
     : '';
 
-  // 🔥 PRIMERO: Obtener productos con paginación (SIN JOIN de colores)
+  // Obtener productos con paginación
   const [productos] = await dbPool.query(`
     SELECT 
       ProductoId,
@@ -336,14 +315,12 @@ export const getProductosPaginated = async ({
     LIMIT ? OFFSET ?
   `, [...params, limit, offset]);
 
-  // 🔥 SEGUNDO: Obtener total de productos para paginación
   const [countResult] = await dbPool.query(`
     SELECT COUNT(*) as total 
     FROM Productos
     ${whereClause}
   `, params);
 
-  // Si no hay productos, retornar vacío
   if (productos.length === 0) {
     return {
       data: [],
@@ -354,26 +331,50 @@ export const getProductosPaginated = async ({
     };
   }
 
-  // 🔥 TERCERO: Obtener colores SOLO para los productos de esta página
+  // 🔥 Obtener colores desde COMPRAS (no desde productocolores)
   const productoIds = productos.map(p => p.ProductoId);
   
-  const [colores] = await dbPool.query(`
-    SELECT 
-      pc.ProductoId,
+  const [coloresDesdeCompras] = await dbPool.query(`
+    SELECT DISTINCT
+      dc.ProductoId,
       c.ColorId,
       c.Nombre AS ColorNombre,
       c.Hex,
       COALESCE(pcs.Stock, 0) AS StockColor
-    FROM ProductoColores pc
-    INNER JOIN Colores c ON c.ColorId = pc.ColorId
-    LEFT JOIN ProductoColores_Stock pcs ON pcs.ProductoId = pc.ProductoId AND pcs.ColorId = pc.ColorId
-    WHERE pc.ProductoId IN (?)
+    FROM detallecompras dc
+    INNER JOIN Colores c ON c.ColorId = dc.ColorId
+    LEFT JOIN productocolores_stock pcs ON pcs.ProductoId = dc.ProductoId AND pcs.ColorId = dc.ColorId
+    WHERE dc.ProductoId IN (?) AND dc.ColorId IS NOT NULL
   `, [productoIds]);
 
-  // 🔥 CUARTO: Construir objeto de productos con sus colores
+  // 🔥 También obtener colores que puedan tener stock inicial (de compras anteriores)
+  const [coloresConStock] = await dbPool.query(`
+    SELECT 
+      pcs.ProductoId,
+      c.ColorId,
+      c.Nombre AS ColorNombre,
+      c.Hex,
+      pcs.Stock AS StockColor
+    FROM productocolores_stock pcs
+    INNER JOIN Colores c ON c.ColorId = pcs.ColorId
+    WHERE pcs.ProductoId IN (?) AND pcs.Stock > 0
+  `, [productoIds]);
+
+  // Combinar resultados únicos
+  const coloresMap = new Map();
+  
+  [...coloresDesdeCompras, ...coloresConStock].forEach(color => {
+    const key = `${color.ProductoId}-${color.ColorId}`;
+    if (!coloresMap.has(key) || coloresMap.get(key).StockColor < color.StockColor) {
+      coloresMap.set(key, color);
+    }
+  });
+
+  const coloresUnicos = Array.from(coloresMap.values());
+
+  // Construir objeto de productos
   const productosMap = {};
   
-  // Inicializar productos
   productos.forEach(producto => {
     productosMap[producto.ProductoId] = {
       ProductoId: producto.ProductoId,
@@ -385,13 +386,13 @@ export const getProductosPaginated = async ({
       CategoriaId: producto.CategoriaId,
       UsaColores: parseInt(producto.UsaColores),
       Estado: producto.Estado || 'Activo',
-      Stock: producto.UsaColores === 0 ? producto.StockGeneral : null,
-      Colores: []
+      Stock: producto.StockGeneral,
+      Colores: []  // Se llenará con los colores que vienen de compras
     };
   });
 
-  // Agregar colores a los productos correspondientes
-  colores.forEach(color => {
+  // Agregar colores a los productos
+  coloresUnicos.forEach(color => {
     if (productosMap[color.ProductoId]) {
       productosMap[color.ProductoId].Colores.push({
         ColorId: color.ColorId,

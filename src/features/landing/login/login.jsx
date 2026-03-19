@@ -417,9 +417,9 @@ export const Login = () => {
                 >
                   <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl p-5 border border-white/20">
                     <div className="text-center mb-6">
-                      <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-                        Iniciar Sesión
-                      </h1>
+                     <h1 className="text-2xl font-bold text-blue-600 mb-2">
+  Iniciar Sesión
+</h1>
                       <p className="text-gray-600 text-sm">
                         Ingresa tus credenciales para acceder
                       </p>
@@ -499,15 +499,15 @@ export const Login = () => {
                         )}
                       </div>
 
-                      <button
-                        type="submit"
-                        className="relative w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2.5 rounded-xl font-semibold overflow-hidden group/btn hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]"
-                      >
-                        <span className="relative z-10 flex items-center justify-center gap-2">
-                          Iniciar Sesión
-                          <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
-                        </span>
-                      </button>
+                     <button
+  type="submit"
+  className="group w-full bg-blue-600 text-white py-2.5 rounded-xl font-semibold hover:bg-blue-700 hover:shadow-lg transition-all duration-300"
+>
+  <span className="flex items-center justify-center gap-2">
+    Iniciar Sesión
+    <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+  </span>
+</button>
                     </form>
 
                     <div className="mt-4 pt-3 border-t border-gray-200 text-center">
@@ -520,11 +520,11 @@ export const Login = () => {
                       <p className="text-gray-600 text-sm">
                         ¿No tienes cuenta?{" "}
                         <button
-                          onClick={() => toggleForm(false)}
-                          className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 font-bold hover:from-purple-600 hover:to-pink-600 transition-all"
-                        >
-                          Regístrate aquí
-                        </button>
+  onClick={() => toggleForm(false)}
+  className="text-blue-600 font-semibold hover:text-blue-700 transition-colors"
+>
+  Regístrate aquí
+</button>
                       </p>
                     </div>
                   </div>
@@ -539,7 +539,7 @@ export const Login = () => {
                   <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
                     <div className="p-4 md:p-6 text-center">
                       <div className="flex items-center justify-between">
-                        <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 bg-clip-text text-transparent">
+                        <h1 className="text-2xl font-bold text-blue-600">
                           Crear Cuenta
                         </h1>
                         <div className="md:hidden flex items-center space-x-2">
@@ -837,7 +837,7 @@ export const Login = () => {
                               </button>
                               <button
                                 type="submit"
-                                className="bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 text-white py-3 rounded-xl font-semibold hover:shadow-2xl transition-all duration-300"
+                                className="bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 hover:shadow-lg transition-all duration-300"
                               >
                                 Crear Cuenta
                               </button>
@@ -846,27 +846,27 @@ export const Login = () => {
                         </div>
 
                         <div className="hidden md:block mt-6">
-                          <button
-                            type="submit"
-                            className="relative w-full bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 text-white py-3 rounded-xl font-semibold overflow-hidden group/btn hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]"
-                          >
-                            <span className="relative z-10 flex items-center justify-center gap-2">
-                              Crear Cuenta
-                              <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
-                            </span>
-                          </button>
+                        <button
+  type="submit"
+  className="relative w-full bg-blue-600 text-white py-3 rounded-xl font-semibold overflow-hidden hover:bg-blue-700 hover:shadow-lg transition-all duration-300"
+>
+  <span className="flex items-center justify-center gap-2">
+    Crear Cuenta
+    <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+  </span>
+</button>
                         </div>
                       </form>
 
                       <div className="mt-6 pt-4 border-t border-gray-200 text-center">
                         <p className="text-gray-600 text-sm">
                           ¿Ya tienes cuenta?{" "}
-                          <button
-                            onClick={() => toggleForm(true)}
-                            className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 font-bold hover:from-pink-600 hover:to-orange-600 transition-all"
-                          >
-                            Inicia sesión aquí
-                          </button>
+                         <button
+  onClick={() => toggleForm(true)}
+  className="text-blue-600 font-semibold hover:text-blue-700 transition-colors"
+>
+  Inicia sesión aquí
+</button>
                         </p>
                       </div>
                     </div>

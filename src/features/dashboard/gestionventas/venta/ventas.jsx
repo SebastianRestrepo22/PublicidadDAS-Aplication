@@ -312,6 +312,8 @@ const ModalRechazar = ({ open, onClose, onConfirm, venta, motivo, setMotivo }) =
 const ModalVerVenta = ({ open, onClose, venta, onEstadoActualizado }) => {
   // Estado local para manejar la venta actualizada
   const [ventaLocal, setVentaLocal] = useState(venta);
+  // 🔥 NUEVO: Estado para el modal del voucher
+  const [openVoucher, setOpenVoucher] = useState(false);
 
   // Sincronizar cuando cambia la venta externa
   useEffect(() => {
@@ -358,184 +360,273 @@ const ModalVerVenta = ({ open, onClose, venta, onEstadoActualizado }) => {
   };
 
   return (
-    <Modal open={open} onClose={onClose}>
-      <div className="w-[800px] max-h-[90vh] overflow-y-auto p-6 mx-auto bg-white rounded-xl shadow-lg">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4 border-b pb-3">
-          <h3 className="text-xl font-bold text-gray-800">Detalles de Venta #{shortenId(ventaLocal.VentaId)}</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><X size={20} /></button>
-        </div>
+    <>
+      <Modal open={open} onClose={onClose}>
+        <div className="w-[800px] max-h-[90vh] overflow-y-auto p-6 mx-auto bg-white rounded-xl shadow-lg">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-4 border-b pb-3">
+            <h3 className="text-xl font-bold text-gray-800">Detalles de Venta #{shortenId(ventaLocal.VentaId)}</h3>
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><X size={20} /></button>
+          </div>
 
-        <div className="space-y-6">
-          {/* Información General */}
-          <div className="bg-slate-50 p-5 rounded-xl">
-            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><FileText size={16} /> Información General</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div><p className="text-xs text-slate-500">ID Venta</p><p className="font-mono text-sm font-medium">{ventaLocal.VentaId}</p></div>
-              <div><p className="text-xs text-slate-500">Origen</p><OrigenBadge origen={ventaLocal.Origen} /></div>
-              <div><p className="text-xs text-slate-500">Fecha</p><p className="text-sm">{formatDate(ventaLocal.FechaVenta)}</p></div>
-              <div><p className="text-xs text-slate-500">Estado</p><EstadoBadge estado={ventaLocal.Estado} /></div>
-            </div>
+          <div className="space-y-6">
+            {/* Información General */}
+            <div className="bg-slate-50 p-5 rounded-xl">
+              <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><FileText size={16} /> Información General</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div><p className="text-xs text-slate-500">ID Venta</p><p className="font-mono text-sm font-medium">{ventaLocal.VentaId}</p></div>
+                <div><p className="text-xs text-slate-500">Origen</p><OrigenBadge origen={ventaLocal.Origen} /></div>
+                <div><p className="text-xs text-slate-500">Fecha</p><p className="text-sm">{formatDate(ventaLocal.FechaVenta)}</p></div>
+                <div><p className="text-xs text-slate-500">Estado</p><EstadoBadge estado={ventaLocal.Estado} /></div>
+              </div>
 
-            {/* Botón para marcar como pagado (solo si está pendiente y viene de pedido) */}
-            {ventaLocal.Estado === 'pendiente' && ventaLocal.Origen === 'pedido' && (
-              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <AlertCircle size={20} className="text-yellow-600 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-yellow-800 mb-2">
-                      Esta venta está pendiente de verificación de pago
-                    </p>
-                    <p className="text-xs text-yellow-700 mb-3">
-                      Confirma que el pago por transferencia/QR fue recibido para generar la factura.
-                    </p>
-                    <button
-                      onClick={handleMarcarComoPagado}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
-                    >
-                      <DollarSign size={16} /> Marcar como Pagado y Generar Factura
-                    </button>
+              {/* Botón para marcar como pagado (solo si está pendiente y viene de pedido) */}
+              {ventaLocal.Estado === 'pendiente' && ventaLocal.Origen === 'pedido' && (
+                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle size={20} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-yellow-800 mb-2">
+                        Esta venta está pendiente de verificación de pago
+                      </p>
+                      <p className="text-xs text-yellow-700 mb-3">
+                        Confirma que el pago por transferencia/QR fue recibido para generar la factura.
+                      </p>
+                      <button
+                        onClick={handleMarcarComoPagado}
+                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
+                      >
+                        <DollarSign size={16} /> Marcar como Pagado y Generar Factura
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {ventaLocal.Estado === 'rechazado' && ventaLocal.MotivoRechazo && (
-              <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                <p className="text-xs font-medium text-orange-800 mb-1">Motivo de rechazo:</p>
-                <p className="text-sm text-orange-700">{ventaLocal.MotivoRechazo}</p>
-              </div>
-            )}
-
-            {/* 🔥 NUEVA: Sección de Comprobante/Voucher */}
-            {ventaLocal.Voucher && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h5 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
-                  <FileText size={16} /> Comprobante de Pago
-                </h5>
-                <div className="flex items-center gap-4">
-                  {getVoucherType(ventaLocal.Voucher) === 'image' ? (
-                    // Preview para imágenes
-                    <div className="flex-1">
-                      <img
-                        src={ventaLocal.Voucher}
-                        alt="Comprobante de pago"
-                        className="max-h-48 rounded-lg border border-blue-200 cursor-pointer hover:shadow-md transition-shadow"
-                        onClick={() => window.open(ventaLocal.Voucher, '_blank')}
-                      />
-                      <p className="text-xs text-blue-600 mt-2">
-                        👆 Haz clic para ampliar
-                      </p>
-                    </div>
-                  ) : getVoucherType(ventaLocal.Voucher) === 'pdf' ? (
-                    // Enlace para PDF
-                    <div className="flex-1 flex items-center gap-3">
-                      <div className="p-3 bg-red-100 rounded-lg">
-                        <FileText size={24} className="text-red-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">Documento PDF</p>
-                        <a
-                          href={ventaLocal.Voucher}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 text-sm underline"
-                        >
-                          Ver comprobante →
-                        </a>
-                      </div>
-                    </div>
-                  ) : (
-                    // Enlace genérico para otros tipos
-                    <div className="flex-1">
-                      <a
-                        href={ventaLocal.Voucher}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-2"
-                      >
-                        <FileText size={16} />
-                        Ver comprobante en nueva pestaña
-                      </a>
-                    </div>
-                  )}
-                  {/* Botón para descargar */}
-                  <a
-                    href={ventaLocal.Voucher}
-                    download
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
-                  >
-                    <Download size={16} /> Descargar
-                  </a>
+              {ventaLocal.Estado === 'rechazado' && ventaLocal.MotivoRechazo && (
+                <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <p className="text-xs font-medium text-orange-800 mb-1">Motivo de rechazo:</p>
+                  <p className="text-sm text-orange-700">{ventaLocal.MotivoRechazo}</p>
                 </div>
-              </div>
-            )}
+              )}
 
-            {ventaLocal.Estado === 'anulado' && ventaLocal.MotivoAnulacion && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-xs font-medium text-red-800 mb-1">Motivo de anulación:</p>
-                <p className="text-sm text-red-700">{ventaLocal.MotivoAnulacion}</p>
-              </div>
-            )}
-          </div>
+              {/* 🔥 MODIFICADO: Sección de Comprobante/Voucher con apertura en modal */}
+              {ventaLocal.Voucher && (
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h5 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                    <FileText size={16} /> Comprobante de Pago
+                  </h5>
+                  <div className="flex items-center gap-4">
+                    {getVoucherType(ventaLocal.Voucher) === 'image' ? (
+                      // Preview para imágenes - AHORA ABRE MODAL
+                      <div className="flex-1">
+                        <img
+                          src={ventaLocal.Voucher}
+                          alt="Comprobante de pago"
+                          className="max-h-48 rounded-lg border border-blue-200 cursor-pointer hover:shadow-md transition-shadow"
+                          onClick={() => setOpenVoucher(true)}
+                        />
+                        <p className="text-xs text-blue-600 mt-2">
+                          👆 Haz clic en la imagen para ver más grande
+                        </p>
+                      </div>
+                    ) : getVoucherType(ventaLocal.Voucher) === 'pdf' ? (
+                      // Enlace para PDF - AHORA ABRE MODAL
+                      <div 
+                        className="flex-1 flex items-center gap-3 cursor-pointer hover:bg-blue-100 p-2 rounded-lg transition-colors"
+                        onClick={() => setOpenVoucher(true)}
+                      >
+                        <div className="p-3 bg-red-100 rounded-lg">
+                          <FileText size={24} className="text-red-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Documento PDF</p>
+                          <p className="text-blue-600 hover:text-blue-800 text-sm">
+                            👆 Haz clic para ver el PDF
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      // Enlace genérico para otros tipos - TAMBIÉN ABRE MODAL
+                      <div 
+                        className="flex-1 cursor-pointer hover:bg-blue-100 p-3 rounded-lg transition-colors"
+                        onClick={() => setOpenVoucher(true)}
+                      >
+                        <p className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-2">
+                          <FileText size={16} />
+                          👆 Haz clic para ver el comprobante
+                        </p>
+                      </div>
+                    )}
+                    {/* Botón para descargar (sigue funcionando igual) */}
+                    <a
+                      href={ventaLocal.Voucher}
+                      download
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+                      onClick={(e) => e.stopPropagation()} // Evita que el click en descargar abra el modal
+                    >
+                      <Download size={16} /> Descargar
+                    </a>
+                  </div>
+                </div>
+              )}
 
-          {/* Cliente */}
-          <div className="bg-slate-50 p-5 rounded-xl">
-            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><User size={16} /> Cliente</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-1"><p className="text-xs text-slate-500">Nombre</p><p className="font-medium">{ventaLocal.ClienteNombre || 'No especificado'}</p></div>
-              <div><p className="text-xs text-slate-500">Teléfono</p><p>{ventaLocal.ClienteTelefono || '-'}</p></div>
-              <div><p className="text-xs text-slate-500">Correo</p><p className="truncate">{ventaLocal.ClienteCorreo || '-'}</p></div>
+              {ventaLocal.Estado === 'anulado' && ventaLocal.MotivoAnulacion && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-xs font-medium text-red-800 mb-1">Motivo de anulación:</p>
+                  <p className="text-sm text-red-700">{ventaLocal.MotivoAnulacion}</p>
+                </div>
+              )}
             </div>
-          </div>
 
-          {/* Vendedor */}
-          <div className="bg-slate-50 p-5 rounded-xl">
-            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><User size={16} /> Vendedor</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><p className="text-xs text-slate-500">Nombre</p><p className="font-medium">{vendedorNombre}</p></div>
-              <div><p className="text-xs text-slate-500">ID Vendedor</p><p className="font-mono text-sm">{ventaLocal.UsuarioVendedorId || '-'}</p></div>
-            </div>
-          </div>
-
-          {/* Totales */}
-          <div className="bg-slate-50 p-5 rounded-xl">
-            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><DollarSign size={16} /> Totales</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white p-3 rounded-lg border"><p className="text-xs text-slate-500">Subtotal</p><p className="text-lg font-semibold">{formatPrice(ventaLocal.Subtotal)}</p></div>
-              <div className="bg-white p-3 rounded-lg border"><p className="text-xs text-slate-500">IVA (19%)</p><p className="text-lg font-semibold">{formatPrice(ventaLocal.IVA)}</p></div>
-              <div className="bg-white p-3 rounded-lg border border-blue-200"><p className="text-xs text-blue-600">Total</p><p className="text-xl font-bold text-blue-600">{formatPrice(ventaLocal.Total)}</p></div>
-            </div>
-          </div>
-
-          {/* Detalles de productos */}
-          {ventaLocal.detalle && Array.isArray(ventaLocal.detalle) && ventaLocal.detalle.length > 0 ? (
+            {/* Cliente */}
             <div className="bg-slate-50 p-5 rounded-xl">
-              <DetallesProductosAcordeon detalles={ventaLocal.detalle} />
+              <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><User size={16} /> Cliente</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-1"><p className="text-xs text-slate-500">Nombre</p><p className="font-medium">{ventaLocal.ClienteNombre || 'No especificado'}</p></div>
+                <div><p className="text-xs text-slate-500">Teléfono</p><p>{ventaLocal.ClienteTelefono || '-'}</p></div>
+                <div><p className="text-xs text-slate-500">Correo</p><p className="truncate">{ventaLocal.ClienteCorreo || '-'}</p></div>
+              </div>
             </div>
+
+            {/* Vendedor */}
+            <div className="bg-slate-50 p-5 rounded-xl">
+              <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><User size={16} /> Vendedor</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><p className="text-xs text-slate-500">Nombre</p><p className="font-medium">{vendedorNombre}</p></div>
+                <div><p className="text-xs text-slate-500">ID Vendedor</p><p className="font-mono text-sm">{ventaLocal.UsuarioVendedorId || '-'}</p></div>
+              </div>
+            </div>
+
+            {/* Totales */}
+            <div className="bg-slate-50 p-5 rounded-xl">
+              <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><DollarSign size={16} /> Totales</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-3 rounded-lg border"><p className="text-xs text-slate-500">Subtotal</p><p className="text-lg font-semibold">{formatPrice(ventaLocal.Subtotal)}</p></div>
+                <div className="bg-white p-3 rounded-lg border"><p className="text-xs text-slate-500">IVA (19%)</p><p className="text-lg font-semibold">{formatPrice(ventaLocal.IVA)}</p></div>
+                <div className="bg-white p-3 rounded-lg border border-blue-200"><p className="text-xs text-blue-600">Total</p><p className="text-xl font-bold text-blue-600">{formatPrice(ventaLocal.Total)}</p></div>
+              </div>
+            </div>
+
+            {/* Detalles de productos */}
+            {ventaLocal.detalle && Array.isArray(ventaLocal.detalle) && ventaLocal.detalle.length > 0 ? (
+              <div className="bg-slate-50 p-5 rounded-xl">
+                <DetallesProductosAcordeon detalles={ventaLocal.detalle} />
+              </div>
+            ) : (
+              <div className="bg-slate-50 p-5 rounded-xl text-center py-4 text-slate-500">
+                No hay detalles disponibles para esta venta
+              </div>
+            )}
+          </div>
+
+          {/* Footer con acciones */}
+          <div className="mt-6 pt-4 border-t flex justify-between items-center">
+            <button
+              onClick={handleDescargarPDF}
+              disabled={ventaLocal.Estado !== 'pagado'}
+              className={`px-6 py-2 rounded-lg transition-colors flex items-center gap-2 ${ventaLocal.Estado === 'pagado'
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              title={ventaLocal.Estado !== 'pagado' ? "La factura se habilita cuando la venta está pagada" : ""}
+            >
+              <Download size={18} />
+              {ventaLocal.Estado === 'pagado' ? 'Descargar Factura PDF' : 'Factura no disponible'}
+            </button>
+
+            <button className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors" onClick={onClose}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 🔥 NUEVO: Modal para ver el voucher */}
+      <ModalVoucher 
+        open={openVoucher}
+        onClose={() => setOpenVoucher(false)}
+        voucherUrl={ventaLocal?.Voucher}
+      />
+    </>
+  );
+};
+
+// Puedes agregar esto al final del archivo o en un archivo separado
+const ModalVoucher = ({ open, onClose, voucherUrl }) => {
+  if (!open || !voucherUrl) return null;
+
+  const getVoucherType = (url) => {
+    const extension = url.split('.').pop()?.toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) return 'image';
+    if (['pdf'].includes(extension)) return 'pdf';
+    return 'other';
+  };
+
+  const voucherType = getVoucherType(voucherUrl);
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <div className="w-[900px] max-h-[90vh] overflow-hidden p-4 mx-auto bg-white rounded-xl shadow-lg">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-4 border-b pb-3">
+          <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <FileText size={20} /> Comprobante de Pago
+          </h3>
+          <button 
+            onClick={onClose} 
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Contenido del voucher */}
+        <div className="overflow-auto max-h-[calc(90vh-120px)]">
+          {voucherType === 'image' ? (
+            <div className="flex flex-col items-center">
+              <img
+                src={voucherUrl}
+                alt="Comprobante de pago"
+                className="max-w-full rounded-lg shadow-lg"
+              />
+            </div>
+          ) : voucherType === 'pdf' ? (
+            <iframe
+              src={`${voucherUrl}#toolbar=0&navpanes=0`}
+              className="w-full h-[70vh] rounded-lg border border-gray-200"
+              title="Comprobante PDF"
+            />
           ) : (
-            <div className="bg-slate-50 p-5 rounded-xl text-center py-4 text-slate-500">
-              No hay detalles disponibles para esta venta
+            <div className="text-center py-12">
+              <FileText size={64} className="mx-auto mb-4 text-gray-400" />
+              <p className="text-gray-600 mb-4">No se puede previsualizar este tipo de archivo</p>
+              <a
+                href={voucherUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Download size={18} />
+                Descargar archivo
+              </a>
             </div>
           )}
         </div>
 
-        {/* Footer con acciones */}
-        <div className="mt-6 pt-4 border-t flex justify-between items-center">
-          <button
-            onClick={handleDescargarPDF}
-            disabled={ventaLocal.Estado !== 'pagado'}
-            className={`px-6 py-2 rounded-lg transition-colors flex items-center gap-2 ${ventaLocal.Estado === 'pagado'
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            title={ventaLocal.Estado !== 'pagado' ? "La factura se habilita cuando la venta está pagada" : ""}
+        {/* Footer */}
+        <div className="mt-4 pt-3 border-t flex justify-end gap-3">
+          <a
+            href={voucherUrl}
+            download
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
           >
-            <Download size={18} />
-            {ventaLocal.Estado === 'pagado' ? 'Descargar Factura PDF' : 'Factura no disponible'}
-          </button>
-
-          <button className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors" onClick={onClose}>
+            <Download size={16} /> Descargar
+          </a>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
+          >
             Cerrar
           </button>
         </div>

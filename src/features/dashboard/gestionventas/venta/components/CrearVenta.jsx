@@ -8,7 +8,7 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Store, UserCheck } from "lucide-react";
 
-import { GetDataproductos, getColoresByProductoId } from "../../../productos/services/services.products.js";
+import { GetDataproductos } from "../../../productos/services/services.products.js";
 import { getAllColores } from "../../../gestionventas/pedidos/services/services.pedidosClientes.js";
 import { GetDataservicios } from "../../../servicios/services/services.servicios.js";
 import Modal from "../../../components/modals/modal.jsx";
@@ -108,30 +108,52 @@ export const CrearVenta = () => {
                 const clientesData = clientesResponse?.data || [];
                 setClientes(Array.isArray(clientesData) ? clientesData : []);
 
+                // ✅ CORREGIDO: Construir coloresPorProducto directamente desde productosData
                 const coloresMap = {};
                 const stockMap = {};
-                for (const producto of productosData) {
-                    if (producto.UsaColores === 1) {
-                        try {
-                            const coloresProducto = await getColoresByProductoId(producto.ProductoId);
-                            const coloresCompletos = (Array.isArray(coloresProducto) ? coloresProducto : []).map(cp => {
-                                const cg = Array.isArray(coloresData) ? coloresData.find(c => c.ColorId === cp.ColorId) : null;
-                                return { ...cp, Hex: cp.Hex || cg?.Hex || '#e5e7eb' };
-                            });
-                            coloresMap[producto.ProductoId] = coloresCompletos;
-                            coloresCompletos.forEach(c => {
-                                stockMap[`${producto.ProductoId}_${c.ColorId}`] = c.Stock || 0;
-                            });
-                        } catch (error) {
-                            console.error(`Error cargando colores para producto ${producto.ProductoId}:`, error);
-                            coloresMap[producto.ProductoId] = [];
-                        }
+
+                // Primero, crear un mapa de colores global para referencia
+                const coloresGlobalMap = {};
+                if (Array.isArray(coloresData)) {
+                    coloresData.forEach(c => {
+                        coloresGlobalMap[c.ColorId] = c;
+                    });
+                }
+
+                productosData.forEach(producto => {
+                    // Si el producto tiene colores en su propiedad Colores
+                    if (producto.UsaColores === 1 && producto.Colores && producto.Colores.length > 0) {
+                        // Mapear los colores que ya vienen del backend
+                        const coloresCompletos = producto.Colores.map(cp => {
+                            // Si el color tiene toda la información, usarla
+                            if (cp.Nombre && cp.Hex) {
+                                return cp;
+                            }
+                            // Si no, buscar en colores globales
+                            const cg = coloresGlobalMap[cp.ColorId];
+                            return {
+                                ...cp,
+                                Nombre: cp.Nombre || cg?.Nombre || 'Color',
+                                Hex: cp.Hex || cg?.Hex || '#e5e7eb'
+                            };
+                        });
+
+                        coloresMap[producto.ProductoId] = coloresCompletos;
+
+                        // Guardar stock de cada color
+                        coloresCompletos.forEach(c => {
+                            stockMap[`${producto.ProductoId}_${c.ColorId}`] = c.Stock || 0;
+                        });
+
+                        console.log(`✅ Producto ${producto.Nombre} tiene ${coloresCompletos.length} colores:`, coloresCompletos);
                     } else {
                         coloresMap[producto.ProductoId] = [];
                     }
-                }
+                });
+
                 setColoresPorProducto(coloresMap);
                 setStockColores(stockMap);
+
             } catch (error) {
                 console.error("Error cargando datos:", error);
                 toast.error("Error al cargar productos y servicios");
@@ -891,32 +913,53 @@ export const CrearVenta = () => {
                                 const itemsPaginados = itemsFiltrados.slice(inicio, inicio + itemsPorPagina);
                                 if (itemsFiltrados.length === 0) return <div className="text-center py-12"><p className="text-gray-600">{esProducto ? "No hay productos disponibles" : "No hay servicios disponibles"}</p></div>;
                                 return (<>
-                                    <div className="space-y-2">{itemsPaginados.map(item => {
-                                        if (esProducto) {
-                                            const p = item;
-                                            const tieneColores = coloresPorProducto[p.ProductoId]?.length > 0;
-                                            return <button key={p.ProductoId} onClick={() => seleccionarProducto({ ...p, tipo: 'producto' })} className="w-full p-4 border border-slate-200 rounded-lg hover:bg-slate-50 text-left flex justify-between items-center">
-                                                <div className="flex-1"><span className="font-medium">{p.Nombre}</span>{tieneColores ? <span className="ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">{coloresPorProducto[p.ProductoId].length} colores</span> : p.Stock > 0 ? <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Stock: {p.Stock}</span> : <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">Sin stock</span>}</div>
-                                                <span className="text-blue-600 font-medium">{formatPrice(p.Precio)}</span>
-                                            </button>;
-                                        } else {
-                                            const s = item;
-                                            return <button key={s.ServicioId} onClick={() => seleccionarProducto({ ...s, tipo: 'servicio' })} className="w-full p-4 border border-slate-200 rounded-lg hover:bg-slate-50 text-left">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <span className="font-medium">{s.Nombre}</span>
-                                                        <span className="ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">
-                                                            Servicio
+                                    <div className="space-y-2">
+                                        {itemsPaginados.map(item => {
+                                            if (esProducto) {
+                                                const p = item;
+                                                // ✅ CAMBIA ESTO:
+                                                // const tieneColores = coloresPorProducto[p.ProductoId]?.length > 0;
+                                                // POR ESTO:
+                                                const tieneColores = p.UsaColores === 1 && p.Colores && p.Colores.length > 0;
+
+                                                return <button key={p.ProductoId} onClick={() => seleccionarProducto({ ...p, tipo: 'producto' })}
+                                                    className="w-full p-4 border border-slate-200 rounded-lg hover:bg-slate-50 text-left flex justify-between items-center">
+                                                    <div className="flex-1">
+                                                        <span className="font-medium">{p.Nombre}</span>
+                                                        {tieneColores ? (
+                                                            <span className="ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
+                                                                {p.Colores.length} colores
+                                                            </span>
+                                                        ) : p.Stock > 0 ? (
+                                                            <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
+                                                                Stock: {p.Stock}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">
+                                                                Sin stock
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-blue-600 font-medium">{formatPrice(p.Precio)}</span>
+                                                </button>;
+                                            } else {
+                                                const s = item;
+                                                return <button key={s.ServicioId} onClick={() => seleccionarProducto({ ...s, tipo: 'servicio' })} className="w-full p-4 border border-slate-200 rounded-lg hover:bg-slate-50 text-left">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <span className="font-medium">{s.Nombre}</span>
+                                                            <span className="ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">
+                                                                Servicio
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                                            Precio a definir
                                                         </span>
                                                     </div>
-                                                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                                                        Precio a definir
-                                                    </span>
-                                                </div>
-                                                {s.Descripcion && <p className="text-xs text-slate-500 mt-2 line-clamp-2">{s.Descripcion}</p>}
-                                            </button>;
-                                        }
-                                    })}</div>
+                                                    {s.Descripcion && <p className="text-xs text-slate-500 mt-2 line-clamp-2">{s.Descripcion}</p>}
+                                                </button>;
+                                            }
+                                        })}</div>
                                     {totalPaginas > 1 && <div className="mt-4 flex items-center justify-between border-t pt-3">
                                         <div className="text-xs text-slate-500">Mostrando {inicio + 1} - {Math.min(inicio + itemsPorPagina, itemsFiltrados.length)} de {itemsFiltrados.length}</div>
                                         <div className="flex gap-1">

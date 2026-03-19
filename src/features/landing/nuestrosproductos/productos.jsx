@@ -216,13 +216,14 @@ export const Productos = () => {
     );
   }, [featuredProducts.length]);
 
-  const formatPrice = useCallback((precio) => {
-    return new Intl.NumberFormat("es-CO", {
-      style: "currency",
-      currency: "COP",
-      minimumFractionDigits: 0,
-    }).format(precio);
-  }, []);
+const formatPrice = useCallback((precio) => {
+  const formateado = new Intl.NumberFormat("es-CO", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(precio);
+  
+  return `COP ${formateado}`;
+}, []);
 
   const calcularPrecioConDescuento = useCallback((precio, descuento) => {
     return precio - (precio * descuento) / 100;

@@ -32,6 +32,37 @@ export const ProductosTable = ({
         return 'bg-red-100 text-red-800';
     };
 
+    const getStockDisplay = (producto) => {
+        if (parseInt(producto.UsaColores) === 0) {
+            const stock = producto.Stock || 0;
+            const stockClass = stock > 10 ? 'bg-green-100 text-green-800' :
+                stock > 0 ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800';
+            return (
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${stockClass}`}>
+                    {stock} unidades
+                </span>
+            );
+        } else {
+            const coloresConStock = producto.Colores?.filter(c => c.Stock > 0) || [];
+            const totalStock = coloresConStock.reduce((sum, c) => sum + (c.Stock || 0), 0);
+
+            return (
+                <div className="space-y-1">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${totalStock > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                        {totalStock} uds totales
+                    </span>
+                    {coloresConStock.length > 0 && (
+                        <div className="text-xs text-gray-500">
+                            {coloresConStock.length} color(es) con stock
+                        </div>
+                    )}
+                </div>
+            );
+        }
+    };
+
     return (
         <div className="overflow-x-auto">
             <table className="w-full min-w-[1000px] table-auto">
@@ -55,11 +86,10 @@ export const ProductosTable = ({
                             const nombreCategoria = categorias.find(c => c.CategoriaId === p.CategoriaId)?.Nombre || "—";
 
                             return (
-                                <tr 
-                                    key={p.ProductoId} 
-                                    className={`hover:bg-slate-50 transition-colors duration-150 ${
-                                        estado === 'Inactivo' ? 'bg-gray-50 opacity-75' : ''
-                                    }`}
+                                <tr
+                                    key={p.ProductoId}
+                                    className={`hover:bg-slate-50 transition-colors duration-150 ${estado === 'Inactivo' ? 'bg-gray-50 opacity-75' : ''
+                                        }`}
                                 >
                                     {/* Producto (Nombre + Imagen) */}
                                     <td className="py-3 px-4">
@@ -91,19 +121,16 @@ export const ProductosTable = ({
                                             <button
                                                 type="button"
                                                 onClick={() => onToggleEstado(p.ProductoId, estado === 'Activo' ? 'Inactivo' : 'Activo')}
-                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${
-                                                    estado === 'Activo' ? 'bg-green-500' : 'bg-gray-300'
-                                                }`}
+                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${estado === 'Activo' ? 'bg-green-500' : 'bg-gray-300'
+                                                    }`}
                                             >
                                                 <span
-                                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${
-                                                        estado === 'Activo' ? 'translate-x-5' : 'translate-x-1'
-                                                    }`}
+                                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${estado === 'Activo' ? 'translate-x-5' : 'translate-x-1'
+                                                        }`}
                                                 />
                                             </button>
-                                            <span className={`text-xs font-medium ${
-                                                estado === 'Activo' ? 'text-green-600' : 'text-gray-500'
-                                            }`}>
+                                            <span className={`text-xs font-medium ${estado === 'Activo' ? 'text-green-600' : 'text-gray-500'
+                                                }`}>
                                                 {estado}
                                             </span>
                                         </div>
@@ -123,9 +150,7 @@ export const ProductosTable = ({
 
                                     {/* Stock */}
                                     <td className="py-3 px-4">
-                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStockColorClass(stockTotal)}`}>
-                                            {stockTotal} unidades
-                                        </span>
+                                        {getStockDisplay(p)}
                                     </td>
 
                                     {/* Categoría */}
@@ -139,7 +164,7 @@ export const ProductosTable = ({
                                     <td className="py-3 px-4">
                                         {parseInt(p.UsaColores) === 1 && p.Colores?.length > 0 ? (
                                             <div className="flex flex-wrap gap-1">
-                                                {p.Colores.slice(0, 3).map(c => (
+                                                {p.Colores.filter(c => c.Stock > 0).slice(0, 3).map(c => (
                                                     <div
                                                         key={c.ColorId}
                                                         className="flex items-center gap-1 bg-gray-100 rounded-full px-2 py-0.5"
@@ -154,18 +179,19 @@ export const ProductosTable = ({
                                                         </span>
                                                     </div>
                                                 ))}
-                                                {p.Colores.length > 3 && (
+                                                {p.Colores.filter(c => c.Stock > 0).length > 3 && (
                                                     <span className="text-xs text-gray-500 bg-gray-50 rounded-full px-2 py-0.5">
-                                                        +{p.Colores.length - 3}
+                                                        +{p.Colores.filter(c => c.Stock > 0).length - 3}
                                                     </span>
                                                 )}
                                             </div>
                                         ) : (
                                             <span className="text-sm text-gray-400">
-                                                {parseInt(p.UsaColores) === 1 ? 'Sin colores' : 'N/A'}
+                                                {parseInt(p.UsaColores) === 1 ? 'Sin stock' : 'N/A'}
                                             </span>
                                         )}
                                     </td>
+
 
                                     {/* Acciones */}
                                     <td className="py-3 px-4">
@@ -179,11 +205,10 @@ export const ProductosTable = ({
                                             </button>
                                             <button
                                                 onClick={() => onEdit(p)}
-                                                className={`p-1.5 rounded transition-colors ${
-                                                    estado === 'Activo'
-                                                        ? 'text-blue-600 hover:bg-blue-50'
-                                                        : 'text-gray-400 cursor-not-allowed'
-                                                }`}
+                                                className={`p-1.5 rounded transition-colors ${estado === 'Activo'
+                                                    ? 'text-blue-600 hover:bg-blue-50'
+                                                    : 'text-gray-400 cursor-not-allowed'
+                                                    }`}
                                                 title={estado === 'Activo' ? 'Editar' : 'Debe estar activo para editar'}
                                                 disabled={estado === 'Inactivo'}
                                             >
@@ -191,11 +216,10 @@ export const ProductosTable = ({
                                             </button>
                                             <button
                                                 onClick={() => onDelete(p)}
-                                                className={`p-1.5 rounded transition-colors ${
-                                                    estado === 'Inactivo'
-                                                        ? 'text-red-600 hover:bg-red-50'
-                                                        : 'text-gray-400 cursor-not-allowed'
-                                                }`}
+                                                className={`p-1.5 rounded transition-colors ${estado === 'Inactivo'
+                                                    ? 'text-red-600 hover:bg-red-50'
+                                                    : 'text-gray-400 cursor-not-allowed'
+                                                    }`}
                                                 title={estado === 'Inactivo' ? 'Eliminar' : 'Debe estar inactivo para eliminar'}
                                                 disabled={estado === 'Activo'}
                                             >
