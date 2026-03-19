@@ -1,27 +1,31 @@
 import express from 'express';
 import {
-    getAllProveedores,
-    getProveedorById,
-    createProveedor,
-    deleteProveedor,
-    updateProveedor,
-    // 🔥 Nuevas funciones importadas
-    getProveedoresPaginated,
-    buscarProveedores
+  getAllProveedores,
+  getProveedorById,
+  createProveedor,
+  deleteProveedor,
+  updateProveedor,
+  getProveedoresPaginated,
+  buscarProveedores,
+  validarCampoUnico
 } from '../controllers/proveedores.controller.js';
 
 const router = express.Router();
 
-// 🔥 Ruta principal con paginación (GET /api/proveedores)
+// Ruta principal con paginación
 router.get('/', getProveedoresPaginated);
 
-// 🔥 Ruta de búsqueda con paginación (GET /api/proveedores/buscar)
+// Ruta de búsqueda con paginación
 router.get('/buscar', buscarProveedores);
 
-// 📌 Ruta para obtener TODOS los proveedores (sin paginación) - para compatibilidad
+
+// Rutas de validación en tiempo real
+router.get('/validar-campo', validarCampoUnico);
+
+// Ruta para obtener todos los proveedores (compatibilidad)
 router.get('/todos', getAllProveedores);
 
-// Rutas CRUD (específicas después de las rutas con parámetros)
+// Rutas CRUD
 router.get('/:id', getProveedorById);
 router.post('/', createProveedor);
 router.put('/:id', updateProveedor);

@@ -143,20 +143,20 @@ export const OrderForm = ({
       setDetallesCrear(nuevos);
       setModalProductosAbierto(false);
     } else {
-      console.error('❌ No hay índice seleccionado');
+      console.error(' No hay índice seleccionado');
       toast.error('Error al seleccionar producto');
     }
   };
 
   // Handlers para servicios
   const abrirModalServicios = (index) => {
-    console.log('🔧 Abriendo selector servicios para índice:', index);
+    console.log('Abriendo selector servicios para índice:', index);
     setCurrentDetailIndex(index);
     setModalServiciosAbierto(true);
   };
 
   const seleccionarServicio = (servicio) => {
-    console.log('🔧 Servicio seleccionado:', servicio);
+    console.log(' Servicio seleccionado:', servicio);
     
     if (currentDetailIndex !== null) {
       const nuevos = [...detallesCrear];
@@ -177,8 +177,8 @@ export const OrderForm = ({
 
   // Handlers para colores (solo para productos)
   const abrirModalColores = (index) => {
-    console.log('🎨 Abriendo modal colores para índice:', index);
-    console.log('🎨 Detalle en índice:', detallesCrear[index]);
+    console.log(' Abriendo modal colores para índice:', index);
+    console.log(' Detalle en índice:', detallesCrear[index]);
     
     // Solo abrir si es producto
     if (detallesCrear[index]?.tipo === 'producto') {

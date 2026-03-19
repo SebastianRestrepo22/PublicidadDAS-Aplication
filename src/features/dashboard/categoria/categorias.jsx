@@ -442,11 +442,11 @@ export const Categorias = () => {
                   <button
                     type="submit"
                     disabled={loading || nombreDuplicado || verificandoNombre}
-                    className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 bg-green-500 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? "Guardando..." : "Guardar cambios"}
                   </button>
-                  <button
+                  <button 
                     type="button"
                     onClick={handleCloseModal}
                     disabled={loading}
