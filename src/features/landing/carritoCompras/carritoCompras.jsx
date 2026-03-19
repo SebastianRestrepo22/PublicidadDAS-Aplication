@@ -106,26 +106,22 @@ export const CarritoCompras = () => {
   }, [colorsLoaded, productColors, cart]);
 
   // Función para obtener el stock disponible según el color
-  const getStockDisponible = (item) => {
-    // Si es un producto con color seleccionado
-    if (item.ProductoId && item.customization?.color?.ColorId) {
-      // Buscar el color en productColors para obtener su stock específico
-      const colors = productColors[item.ProductoId] || [];
-      const colorSeleccionado = colors.find(c => c.ColorId === item.customization.color.ColorId);
-
-      if (colorSeleccionado) {
-        // Actualizar el stock en el item para mantener consistencia
-        if (item.customization.color.Stock !== colorSeleccionado.Stock) {
-          // Actualizar el objeto en memoria (opcional, pero útil)
-          item.customization.color.Stock = colorSeleccionado.Stock;
-        }
-        return colorSeleccionado.Stock;
-      }
+const getStockDisponible = (item) => {
+  // Si es un producto
+  if (item.ProductoId) {
+    // Si tiene color seleccionado, el stock ya debería estar en item.Stock
+    if (item.customization?.color?.ColorId) {
+      // El stock del color ya lo guardamos en item.Stock cuando agregamos al carrito
+      return item.Stock || 0;
     }
-
-    // Si no tiene color o no encontramos stock del color, usar stock general
-    return item.Stock ?? item.stock ?? null;
-  };
+    
+    // Si no tiene color, usar stock general del producto
+    return item.Stock || 0;
+  }
+  
+  // Si es servicio, no hay stock
+  return null;
+};
 
   const handleIncrease = (item) => {
     const stockDisponible = getStockDisponible(item);
@@ -250,13 +246,14 @@ export const CarritoCompras = () => {
     return "item";
   };
 
-  const formatPrice = (precio) => {
-    return new Intl.NumberFormat("es-CO", {
-      style: "currency",
-      currency: "COP",
-      minimumFractionDigits: 0,
-    }).format(precio);
-  };
+ const formatPrice = (precio) => {
+  const formateado = new Intl.NumberFormat("es-CO", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(precio);
+  
+  return `COP ${formateado}`;
+};
 
   const calculateItemTotal = (item) => {
     const price = Number(item.Precio) || 0;

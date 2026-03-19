@@ -27,7 +27,6 @@ import { ServicioDetalle } from "../features/landing/nuestrosservicios/servicioD
 import { ProductosDashboard } from "../features/dashboard/productos/producto";
 import { ServiciosDashboard } from "../features/dashboard/servicios/servicio";
 import { ProductoDetalle } from "../features/landing/nuestrosproductos/productoDetalle";
-import { EditarCarritoServicio } from "../features/landing/carritoCompras/CarritoProductos/editarCarritoServicio";
 import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidosClientes";
 import DetallePedido from "../features/landing/historial/detallePedidos";
 import { Clientes } from "../features/dashboard/clientes/clientes";
@@ -127,7 +126,6 @@ export const Routers = () => {
 
         {/* ===== RUTAS DE CARRITO Y CHECKOUT (ACCESIBLES SIN LOGIN) ===== */}
         <Route path="/carritodecompras" element={<CarritoCompras />} />
-        <Route path="/editarcarritoservicio" element={<EditarCarritoServicio />} />
         <Route path="/checkout" element={<Checkout />} />
 
         {/* ===== RUTAS DE CLIENTE (PROTEGIDAS CON PRIVATEROUTE) ===== */}

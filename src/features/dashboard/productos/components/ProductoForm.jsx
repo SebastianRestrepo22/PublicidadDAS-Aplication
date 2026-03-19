@@ -1,5 +1,6 @@
+// ProductoForm.jsx - VERSIÓN CORREGIDA
 import React, { useEffect, useRef, useState } from "react";
-import { ChevronDown, Check, AlertTriangle, Link, Upload } from "lucide-react";
+import { ChevronDown, Check, AlertTriangle, Link, Upload, Package } from "lucide-react";
 import Modal from "../../components/modals/modal.jsx";
 
 export const ProductoForm = ({
@@ -8,9 +9,6 @@ export const ProductoForm = ({
     setValues,
     editData,
     categorias,
-    colores,
-    coloresConStock,
-    setColoresConStock,
     handleSubmit,
     isSubmitting,
     submitted,
@@ -20,8 +18,6 @@ export const ProductoForm = ({
     handleNombreBlur,
     validateImagen,
     goToBackToList,
-    openColores,
-    setOpenColores,
     openCategoriasModal,
     setOpenCategoriasModal,
     categoriaBusqueda,
@@ -34,65 +30,19 @@ export const ProductoForm = ({
     const buttonLabel = mode === "edit" ? "Editar" : "Crear";
     const isEditing = mode === "edit";
 
-    // Estado para el modal de confirmación de cambio a stock general
-    const [openConfirmModal, setOpenConfirmModal] = useState(false);
-    // Estado para el modal de confirmación de cambio a stock por color
-    const [openConfirmColorModal, setOpenConfirmColorModal] = useState(false);
-
-    const [usacoloresTemporal, setUsaColoresTemporal] = useState(values.UsaColores);
-
-    // Estado para controlar la pestaña activa de imagen
-    const [imagenTab, setImagenTab] = useState("url"); // "url" o "file"
-
     // Estado para errores de validación del nombre
     const [nombreFormatoError, setNombreFormatoError] = useState("");
 
     // Referencia para el input de archivo
     const fileInputRef = useRef(null);
 
-    // Referencia para almacenar el último stock válido
-    const stockRef = useRef(values.Stock);
-
-    // Actualiza cuando values.UsaColores cambia
-    useEffect(() => {
-        setUsaColoresTemporal(values.UsaColores);
-    }, [values.UsaColores]);
-
-    // Actualizar la referencia cuando cambia el stock
-    useEffect(() => {
-        if (values.Stock !== undefined && values.Stock !== null) {
-            stockRef.current = values.Stock;
-        }
-    }, [values.Stock]);
-
-    // Efecto para cuando deseleccionan todos los colores
-    useEffect(() => {
-        // Si está en modo colores, no hay colores seleccionados
-        if (parseInt(values.UsaColores) === 1 && coloresConStock.length === 0) {
-            // Recuperar el stock que tenía antes
-            const stockOriginal = isEditing && editData?.Stock !== null && editData?.Stock !== undefined
-                ? editData.Stock
-                : stockRef.current || 0;
-
-            // Cambiar automáticamente a stock general
-            setValues(prev => ({
-                ...prev,
-                UsaColores: "0",
-                Stock: stockOriginal
-            }));
-        }
-    }, [coloresConStock.length]);
+    // Estado para controlar la pestaña activa de imagen
+    const [imagenTab, setImagenTab] = useState("url"); // "url" o "file"
 
     // Función para validar que el nombre solo contenga caracteres válidos
     const validateNombreFormato = (nombre) => {
         if (!nombre) return "";
-
-        // Expresión regular CORREGIDA: permite letras (con tildes), números, espacios y caracteres comunes
-        // El problema anterior era que faltaba la bandera 'u' para caracteres Unicode y algunos caracteres no estabn bien escapados
         const nombreProductoRegex = /^[A-Za-zÁáÉéÍíÓóÚúÑñ0-9\s\-\.\,\(\)]+$/;
-
-        console.log("Validando nombre:", nombre, "Resultado:", nombreProductoRegex.test(nombre));
-
         if (!nombreProductoRegex.test(nombre)) {
             return "El nombre solo puede contener letras, números, espacios y los caracteres: - . , ( )";
         }
@@ -103,10 +53,8 @@ export const ProductoForm = ({
     const validateImageUrl = (url) => {
         if (!url) return "";
         if (url.startsWith('data:image')) return "";
-
-        // Validación más permisiva y segura
         try {
-            new URL(url); // Usa el nativo del navegador
+            new URL(url);
             return "";
         } catch (e) {
             return "Ingrese una URL válida (http:// o https://)";
@@ -117,14 +65,12 @@ export const ProductoForm = ({
     const validateImageFile = (file) => {
         if (!file) return "No se ha seleccionado ningún archivo";
 
-        // Validar tipo de archivo
         const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/bmp'];
         if (!allowedTypes.includes(file.type)) {
             return "Tipo de archivo no permitido. Use: JPG, PNG, GIF, WEBP, SVG o BMP";
         }
 
-        // Validar tamaño (máximo 5MB)
-        const maxSize = 5 * 1024 * 1024; // 5MB en bytes
+        const maxSize = 5 * 1024 * 1024; // 5MB
         if (file.size > maxSize) {
             return "El archivo es demasiado grande. Tamaño máximo: 5MB";
         }
@@ -137,11 +83,8 @@ export const ProductoForm = ({
         const { name, value } = e.target;
 
         if (name === "Nombre") {
-            // Validar formato
             const formatoError = validateNombreFormato(value);
             setNombreFormatoError(formatoError);
-
-            // Crear un evento personalizado si hay error
             if (formatoError && handleNombreBlur) {
                 const customEvent = {
                     target: e.target,
@@ -149,41 +92,33 @@ export const ProductoForm = ({
                 };
                 handleNombreBlur(customEvent);
             } else if (handleNombreBlur) {
-                // Si no hay error, pasar el evento normal
                 handleNombreBlur(e);
             }
         }
 
         if (name === "Imagen" && imagenTab === "url") {
-            // Validar URL de imagen
             const urlError = validateImageUrl(value);
             if (validateImagen) {
                 validateImagen(urlError || value);
             }
         }
 
-        // Llamar al handleChanges original del padre
         handleChanges(e);
     };
 
     // Manejar blur del nombre con validación adicional
     const handleProductNombreBlur = (e) => {
         const { value } = e.target;
-
-        // Validar formato
         const formatoError = validateNombreFormato(value);
         setNombreFormatoError(formatoError);
 
-        // Si hay error de formato, lo manejamos
         if (formatoError && handleNombreBlur) {
-            // Crear un evento personalizado para pasar el error
             const customEvent = {
                 ...e,
                 validationError: formatoError
             };
             handleNombreBlur(customEvent);
         } else if (handleNombreBlur) {
-            // Si no hay error, llamar al handleNombreBlur original
             handleNombreBlur(e);
         }
     };
@@ -197,113 +132,25 @@ export const ProductoForm = ({
         }
     };
 
-    // Manejar cambio en UsaColores de forma inteligente
+    // Manejar cambio en UsaColores (AHORA ES SOLO INFORMATIVO)
     const handleUsaColoresChange = (e) => {
         const nuevoValor = e.target.value;
-        const valorAnterior = values.UsaColores;
-
-        // Actualizar inmediatamente el select visual
-        setUsaColoresTemporal(nuevoValor);
-
-        // Si estamos cambiando de 1 a 0 (colores -> stock general)
-        if (valorAnterior === "1" && nuevoValor === "0") {
-            // Preservar el stock que tenía antes de cambiar a colores
-            const stockOriginal = isEditing && editData?.Stock !== null && editData?.Stock !== undefined
-                ? editData.Stock
-                : stockRef.current || 0;
-
-            // Si hay colores asignados, abrir modal de confirmación
-            if (coloresConStock.length > 0) {
-                setOpenConfirmModal(true);
-            } else {
-                // Si no hay colores, cambiar directamente
-                setValues(prev => ({
-                    ...prev,
-                    UsaColores: nuevoValor,
-                    Stock: stockOriginal
-                }));
-            }
-        }
-        // Si estamos cambiando de 0 a 1 (stock general -> colores)
-        else if (valorAnterior === "0" && nuevoValor === "1") {
-            const tieneStock = values.Stock !== null && values.Stock !== undefined && values.Stock !== "" && parseInt(values.Stock) > 0;
-
-            if (tieneStock) {
-                stockRef.current = values.Stock;
-                setOpenConfirmColorModal(true);
-            } else {
-                setValues(prev => ({
-                    ...prev,
-                    UsaColores: nuevoValor,
-                    Stock: null
-                }));
-            }
-        }
-        // Cualquier otro cambio
-        else {
-            handleChanges(e);
-        }
-    };
-
-    // Confirmar cambio a stock general
-    const handleConfirmStockGeneral = () => {
-        const stockOriginal = isEditing && editData?.Stock !== null && editData?.Stock !== undefined
-            ? editData.Stock
-            : stockRef.current || 0;
-
-        // Limpiar colores ANTES de cambiar el estado
-        setColoresConStock([]);
-
+        
+        // Solo actualizar el valor, sin lógica compleja de stock
         setValues(prev => ({
             ...prev,
-            UsaColores: "0",
-            Stock: stockOriginal
+            UsaColores: nuevoValor
         }));
-
-        // Actualizar el select visual
-        setUsaColoresTemporal("0");
-
-        setOpenConfirmModal(false);
-    };
-
-    // Cancelar cambio a stock general
-    const handleCancelStockGeneral = () => {
-        // Restaurar el valor anterior en el select
-        setUsaColoresTemporal("1");
-        setOpenConfirmModal(false);
-    };
-
-    const handleConfirmStockColor = () => {
-        setValues(prev => ({
-            ...prev,
-            UsaColores: "1",
-            Stock: null
-        }));
-
-        // Actualizar el select visual
-        setUsaColoresTemporal("1");
-
-        setOpenConfirmColorModal(false);
-        setOpenColores(true);
-    };
-
-    // Cancelar cambio a stock por color
-    const handleCancelStockColor = () => {
-        // Restaurar el valor anterior en el select
-        setUsaColoresTemporal("0");
-        setOpenConfirmColorModal(false);
     };
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            // Validar el archivo
             const fileError = validateImageFile(file);
             if (fileError) {
                 if (validateImagen) {
                     validateImagen(fileError);
                 }
-                // Limpiar el input
                 if (fileInputRef.current) {
                     fileInputRef.current.value = '';
                 }
@@ -319,7 +166,7 @@ export const ProductoForm = ({
                     },
                 });
                 if (validateImagen) {
-                    validateImagen(""); // Limpiar error
+                    validateImagen("");
                 }
             };
             reader.readAsDataURL(file);
@@ -421,15 +268,31 @@ export const ProductoForm = ({
                     </div>
                 </div>
 
+                {/* SECCIÓN DE STOCK - AHORA SOLO INFORMATIVA */}
                 <div className="space-y-4">
-                    <h4 className="font-medium text-gray-700">Configuración de stock</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Sistema de colores */}
+                    <h4 className="font-medium text-gray-700 flex items-center gap-2">
+                        <Package size={16} />
+                        Configuración de stock
+                    </h4>
+                    
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p className="text-sm text-blue-800 mb-2">
+                            <strong>Importante:</strong> El stock se gestiona automáticamente desde el módulo de compras.
+                        </p>
+                        <p className="text-xs text-blue-600">
+                            • Si el producto usa colores, el stock se asigna por color al realizar compras<br/>
+                            • Si no usa colores, el stock se asigna de forma general al realizar compras<br/>
+                            • El stock que ves aquí es solo informativo y refleja el inventario actual
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Sistema de colores - SOLO INFORMATIVO */}
                         <div className="flex flex-col gap-1">
                             <label className="font-medium">¿Usa sistema de colores?</label>
                             <select
                                 name="UsaColores"
-                                value={usacoloresTemporal}
+                                value={values.UsaColores}
                                 onChange={handleUsaColoresChange}
                                 className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 disabled={isSubmitting}
@@ -438,95 +301,42 @@ export const ProductoForm = ({
                                 <option value="1">Sí - Stock por color</option>
                             </select>
                             <p className="text-xs text-gray-500 mt-1">
-                                {values.UsaColores === "0"
-                                    ? "Stock único para todas las variantes"
-                                    : "Stock independiente por color"}
+                                Esta configuración determina cómo se comportará el producto en compras
                             </p>
                         </div>
 
-                        {/* Stock general */}
-                        <div className={`flex flex-col gap-1 transition-all duration-200 ${parseInt(values.UsaColores) === 0 ? 'opacity-100' : 'opacity-50 pointer-events-none'
-                            }`}>
-                            <label className="font-medium">
-                                Stock general {parseInt(values.UsaColores) === 0 && '*'}
-                            </label>
-                            <input
-                                type="number"
-                                placeholder={parseInt(values.UsaColores) === 0 ? "Cantidad disponible" : "No aplica"}
-                                name="Stock"
-                                value={parseInt(values.UsaColores) === 0 ? (values.Stock > 0 ? values.Stock : "") : ""}
-                                onChange={handleChanges}
-                                min="0"
-                                step="1"
-                                className={`w-full h-10 px-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white
-                                    ${submitted && parseInt(values.UsaColores) === 0 && (values.Stock === null || values.Stock === undefined || values.Stock === "" || parseInt(values.Stock) <= 0)
-                                        ? "border-red-500"
-                                        : "border-gray-300"}`}
-                                disabled={isSubmitting || parseInt(values.UsaColores) === 1}
-                            />
-                            <div className="min-h-[20px] mt-0.5">
-                                {parseInt(values.UsaColores) === 0 && submitted && (values.Stock === null || values.Stock === undefined || values.Stock === "" || parseInt(values.Stock) <= 0) && (
-                                    <p className="text-red-500 text-[12px] leading-4">
-                                        Ingrese una cantidad válida (0 o más)
-                                    </p>
-                                )}
-                                {parseInt(values.UsaColores) === 0 && values.Stock > 0 && (
-                                    <p className="text-green-600 text-[12px] leading-4">
-                                        Stock disponible: {values.Stock} unidades
-                                    </p>
-                                )}
-                                {parseInt(values.UsaColores) === 0 && isEditing && editData?.Stock > 0 && values.Stock === editData.Stock && (
-                                    <p className="text-blue-600 text-[12px] leading-4">
-                                        Stock original: {editData.Stock} unidades
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Gestión de colores */}
-                        <div className={`flex flex-col gap-1 transition-all duration-200 ${parseInt(values.UsaColores) === 1 ? 'opacity-100' : 'opacity-50 pointer-events-none'
-                            }`}>
-                            <label className="font-medium">
-                                Colores con stock {parseInt(values.UsaColores) === 1 && '*'}
-                            </label>
-                            <button
-                                type="button"
-                                onClick={() => setOpenColores(true)}
-                                className={`h-10 px-4 text-sm rounded-lg w-fit flex items-center gap-2 transition-colors ${parseInt(values.UsaColores) === 1
-                                    ? coloresConStock.length > 0
-                                        ? "bg-blue-500 text-white hover:bg-blue-600"
-                                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                    }`}
-                                disabled={isSubmitting || parseInt(values.UsaColores) === 0}
-                            >
-                                <span>
-                                    {parseInt(values.UsaColores) === 1
-                                        ? coloresConStock.length > 0 ? "Editar colores" : "Asignar colores"
-                                        : "No disponible"}
-                                </span>
-                                {parseInt(values.UsaColores) === 1 && coloresConStock.length > 0 && (
-                                    <span className="bg-white text-blue-600 text-xs px-2 py-0.5 rounded-full">
-                                        {coloresConStock.length}
+                        {/* Stock actual - SOLO LECTURA */}
+                        <div className="flex flex-col gap-1">
+                            <label className="font-medium">Stock actual (informativo)</label>
+                            <div className="w-full h-10 px-3 border border-gray-200 rounded-lg bg-gray-50 flex items-center">
+                                {parseInt(values.UsaColores) === 0 ? (
+                                    <span className="text-gray-700">
+                                        {editData?.Stock || 0} unidades en stock general
+                                    </span>
+                                ) : (
+                                    <span className="text-gray-700">
+                                        Stock gestionado por color (ver en detalles)
                                     </span>
                                 )}
-                            </button>
-                            <div className="min-h-[20px] mt-0.5">
-                                {parseInt(values.UsaColores) === 1 && coloresConStock.length > 0 ? (
-                                    <div className="text-xs text-gray-600">
-                                        <p>{coloresConStock.length} color(es) asignado(s)</p>
-                                        <p>Stock total: {coloresConStock.reduce((sum, c) => sum + (parseInt(c.Stock) || 0), 0)} unidades</p>
-                                    </div>
-                                ) : parseInt(values.UsaColores) === 1 ? (
-                                    <p className="text-xs text-gray-500">
-                                        Click para asignar colores y stock
-                                    </p>
-                                ) : null}
                             </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Este valor se actualiza automáticamente con las compras
+                            </p>
                         </div>
                     </div>
+
+                    {/* Mensaje informativo adicional para edición */}
+                    {isEditing && editData && (
+                        <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                            <p className="text-xs text-gray-600">
+                                <strong>Nota:</strong> El stock actual de este producto es de <strong>{editData.Stock || 0} unidades</strong>.
+                                Para modificarlo, debes realizar una compra en el módulo de compras.
+                            </p>
+                        </div>
+                    )}
                 </div>
 
+                {/* SECCIÓN DE IMAGEN (sin cambios) */}
                 <div className="space-y-4">
                     <h4 className="font-medium text-gray-700">Imagen del producto</h4>
 
@@ -635,6 +445,7 @@ export const ProductoForm = ({
                     </div>
                 </div>
 
+                {/* SECCIÓN DE PRECIO Y CATEGORÍA (sin cambios) */}
                 <div className="space-y-4">
                     <h4 className="font-medium text-gray-700">Precio y categorización</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -749,6 +560,7 @@ export const ProductoForm = ({
                     </div>
                 </div>
 
+                {/* BOTONES (sin cambios) */}
                 <div className="flex gap-4 mt-4 pt-4 border-t border-gray-200">
                     <button
                         type="submit"
@@ -777,109 +589,6 @@ export const ProductoForm = ({
                     </button>
                 </div>
             </form>
-
-            {/* Modal de confirmación para cambiar a stock general */}
-            <Modal open={openConfirmModal} onClose={handleCancelStockGeneral}>
-                <div className="p-6 bg-white rounded-xl w-[450px]">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                            <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                        </div>
-                        <h3 className="text-lg font-bold text-gray-800">
-                            ¿Cambiar a stock general?
-                        </h3>
-                    </div>
-
-                    <div className="mb-6">
-                        <p className="text-gray-600 mb-3">
-                            Tienes <span className="font-semibold text-blue-600">{coloresConStock.length} color(es)</span> asignado(s) con stock.
-                        </p>
-                        <p className="text-gray-600">
-                            Al cambiar a stock general se eliminarán todos los colores y el stock por color que has configurado.
-                        </p>
-
-                        {coloresConStock.length > 0 && (
-                            <div className="mt-4 p-3 bg-gray-50 rounded-lg max-h-32 overflow-y-auto">
-                                <p className="text-xs font-medium text-gray-700 mb-2">Resumen de stock:</p>
-                                {coloresConStock.map(color => (
-                                    <div key={color.ColorId} className="flex justify-between text-xs text-gray-600 py-1">
-                                        <div className="flex items-center gap-2">
-                                            <span
-                                                className="w-3 h-3 rounded-full"
-                                                style={{ backgroundColor: color.Hex }}
-                                            />
-                                            <span>{color.Nombre}:</span>
-                                        </div>
-                                        <span className="font-medium">{color.Stock || 0} unidades</span>
-                                    </div>
-                                ))}
-                                <div className="mt-2 pt-2 border-t border-gray-200 flex justify-between text-xs font-medium">
-                                    <span>Stock total:</span>
-                                    <span className="text-blue-600">
-                                        {coloresConStock.reduce((sum, c) => sum + (parseInt(c.Stock) || 0), 0)} unidades
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex gap-3">
-                        <button
-                            onClick={handleConfirmStockGeneral}
-                            className="flex-1 bg-yellow-500 text-white py-2.5 rounded-lg font-medium hover:bg-yellow-600 transition-colors"
-                        >
-                            Sí, cambiar a stock general
-                        </button>
-                        <button
-                            onClick={handleCancelStockGeneral}
-                            className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-300 transition-colors"
-                        >
-                            No, mantener colores
-                        </button>
-                    </div>
-                </div>
-            </Modal>
-
-            {/* Modal de confirmación para cambiar a stock por color */}
-            <Modal open={openConfirmColorModal} onClose={handleCancelStockColor}>
-                <div className="p-6 bg-white rounded-xl w-[450px]">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <AlertTriangle className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <h3 className="text-lg font-bold text-gray-800">
-                            ¿Cambiar a stock por color?
-                        </h3>
-                    </div>
-
-                    <div className="mb-6">
-                        <p className="text-gray-600 mb-3">
-                            Tienes <span className="font-semibold text-blue-600">{values.Stock > 0 ? values.Stock : stockRef.current}</span> unidades en stock general.
-                        </p>
-                        <p className="text-gray-600">
-                            Al cambiar a stock por color, el stock general se perderá y deberás asignar stock a cada color individualmente.
-                        </p>
-                        <p className="text-gray-600 mt-2 text-sm">
-                            ¿Deseas continuar?
-                        </p>
-                    </div>
-
-                    <div className="flex gap-3">
-                        <button
-                            onClick={handleConfirmStockColor}
-                            className="flex-1 bg-blue-500 text-white py-2.5 rounded-lg font-medium hover:bg-blue-600 transition-colors"
-                        >
-                            Sí, cambiar a stock por color
-                        </button>
-                        <button
-                            onClick={handleCancelStockColor}
-                            className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-300 transition-colors"
-                        >
-                            No, mantener stock general
-                        </button>
-                    </div>
-                </div>
-            </Modal>
         </>
     );
 };

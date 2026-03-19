@@ -398,7 +398,7 @@ export const Proveedores = () => {
                   resetCreateForm();
                   setOpenCreate(true);
                 }}
-                className="inline-flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 sm:px-6 sm:py-3 rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap text-sm sm:text-base"
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow"
               >
                 <Plus size={18} /> Nuevo proveedor
               </button>

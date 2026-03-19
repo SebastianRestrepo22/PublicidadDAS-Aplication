@@ -182,10 +182,17 @@ export const getColoresProducto = async (productoId) => {
 
 export const getProductoByIdService = async (id) => {
   try {
-    const res = await axios.get(`${url}producto/${id}`);
+    console.log("🔍 Buscando producto por ID:", id);
+    const res = await axios.get(`http://localhost:3000/producto/${id}`);
+    console.log("✅ Producto encontrado:", res.data);
+    
+    // El producto YA debería venir con su propiedad 'Colores'
+    console.log("🎨 Colores del producto:", res.data.Colores);
+    
     return res.data;
   } catch (error) {
-    return { status: false, message: "No se pudo obtener el producto", error };
+    console.error("❌ Error en getProductoByIdService:", error);
+    return null;
   }
 };
 

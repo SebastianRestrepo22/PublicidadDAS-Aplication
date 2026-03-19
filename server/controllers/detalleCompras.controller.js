@@ -4,7 +4,8 @@ import {
     getDetalleByCompraIdModel,
     createDetalleModel,
     deleteDetalleModel,
-    updateDetalleModel 
+    updateDetalleModel,
+    actualizarStockProducto  
 } from '../models/detalleCompras.model.js';
 
 // Obtener todos los detalles
@@ -122,7 +123,27 @@ export const createDetalle = async (req, res) => {
       colores: colores || [] // Enviar array de colores
     });
 
-    res.status(201).json(result);
+     if (colores && colores.length > 0) {
+      // Producto con colores - actualizar cada color
+      console.log(`🎨 Actualizando stock por color para producto ${ProductoId}`);
+      for (const color of colores) {
+        await actualizarStockProducto(
+          ProductoId, 
+          color.ColorId, 
+          color.Stock  // Usar color.Stock (la cantidad de ese color)
+        );
+        console.log(`   - Color ${color.ColorId}: +${color.Stock} unidades`);
+      }
+    } else {
+      // Producto sin color - stock general
+      console.log(`📦 Actualizando stock general para producto ${ProductoId}: +${Cantidad} unidades`);
+      await actualizarStockProducto(ProductoId, null, Cantidad);
+    }
+
+    // 3. Obtener el detalle completo para devolverlo
+    const detalleCompleto = await getDetalleByIdModel(result.DetalleCompraId);
+
+    res.status(201).json(detalleCompleto);
   } catch (err) {
     console.error("Error al crear el detalle:", err.message);
     res.status(500).json({ error: err.message });
@@ -130,6 +151,7 @@ export const createDetalle = async (req, res) => {
 };
 
 // Actualizar detalle - AHORA CON COLORES
+// Actualizar detalle - AHORA CON ACTUALIZACIÓN DE STOCK
 export const updateDetalle = async (req, res) => {
   const id = req.params.id;
   const { ProductoId, Cantidad, Descripcion, PrecioUnitario, colores } = req.body;
@@ -139,6 +161,32 @@ export const updateDetalle = async (req, res) => {
   }
 
   try {
+    // 1. Obtener el detalle actual para saber el stock anterior
+    const detalleActual = await getDetalleByIdModel(id);
+    if (!detalleActual) {
+      return res.status(404).json({ message: "Detalle no encontrado" });
+    }
+
+    // 2. REVERTIR el stock anterior (restar lo que se había sumado)
+    if (detalleActual.colores && detalleActual.colores.length > 0) {
+      // Revertir stock por color
+      for (const color of detalleActual.colores) {
+        await actualizarStockProducto(
+          detalleActual.ProductoId,
+          color.ColorId,
+          -color.Stock  // Negativo para revertir
+        );
+      }
+    } else {
+      // Revertir stock general
+      await actualizarStockProducto(
+        detalleActual.ProductoId,
+        null,
+        -detalleActual.Cantidad  // Negativo para revertir
+      );
+    }
+
+    // 3. Actualizar el detalle
     const result = await updateDetalleModel(id, {
       ProductoId: ProductoId || null,
       Cantidad,
@@ -151,6 +199,19 @@ export const updateDetalle = async (req, res) => {
       return res.status(404).json({ message: "Detalle no encontrado" });
     }
 
+    // 4. APLICAR el nuevo stock
+    if (colores && colores.length > 0) {
+      for (const color of colores) {
+        await actualizarStockProducto(
+          ProductoId,
+          color.ColorId,
+          color.Stock
+        );
+      }
+    } else {
+      await actualizarStockProducto(ProductoId, null, Cantidad);
+    }
+
     res.json({ message: "Detalle actualizado correctamente" });
   } catch (err) {
     console.error("Error al actualizar detalle:", err);
@@ -158,18 +219,38 @@ export const updateDetalle = async (req, res) => {
   }
 };
 
-// Eliminar detalle
+// Eliminar detalle 
 export const deleteDetalle = async (req, res) => {
   const id = req.params.id;
 
   try {
-    const result = await deleteDetalleModel(id);
-
-    if (result.affectedRows === 0) {
+    // 1. Obtener el detalle para saber qué stock revertir
+    const detalle = await getDetalleByIdModel(id);
+    if (!detalle) {
       return res.status(404).json({ message: "Detalle no encontrado" });
     }
 
-    res.json({ message: "Detalle eliminado correctamente" });
+    // 2. REVERTIR el stock (restar lo que se había sumado)
+    if (detalle.colores && detalle.colores.length > 0) {
+      for (const color of detalle.colores) {
+        await actualizarStockProducto(
+          detalle.ProductoId,
+          color.ColorId,
+          -color.Stock
+        );
+      }
+    } else {
+      await actualizarStockProducto(
+        detalle.ProductoId,
+        null,
+        -detalle.Cantidad
+      );
+    }
+
+    // 3. Eliminar el detalle
+    const result = await deleteDetalleModel(id);
+
+    res.json({ message: "Detalle eliminado correctamente y stock revertido" });
   } catch (err) {
     console.error("Error al eliminar detalle:", err.message);
     res.status(500).json({ error: err.message });

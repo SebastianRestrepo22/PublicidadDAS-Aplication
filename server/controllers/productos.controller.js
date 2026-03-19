@@ -11,6 +11,7 @@ import {
   updateDataProducto,
   getProductosPaginated
 } from '../models/producto.model.js';
+import { actualizarStockProducto } from '../models/detalleCompras.model.js';
 
 // Crear producto - Ahora incluye UsaColores y Stock
 export const postProducto = async (req, res) => {
@@ -22,8 +23,7 @@ export const postProducto = async (req, res) => {
     Descuento,
     CategoriaId,
     Estado,
-    UsaColores = 0,
-    Stock = null
+    UsaColores = 0,  // 🔥 ÚNICO indicador: ¿el producto PUEDE tener colores?
   } = req.body;
 
   try {
@@ -34,23 +34,9 @@ export const postProducto = async (req, res) => {
       })
     }
 
-    // Validar UsaColores
+    // Validar UsaColores (solo 0 o 1)
     if (UsaColores !== 0 && UsaColores !== 1) {
       return res.status(400).json({ message: 'UsaColores debe ser 0 o 1' });
-    }
-
-    // Si no usa colores, Stock es obligatorio
-    if (UsaColores === 0 && (Stock === null || Stock === undefined || Stock < 0)) {
-      return res.status(400).json({
-        message: 'Para productos sin colores, el stock es obligatorio y debe ser mayor o igual a 0'
-      });
-    }
-
-    // Si usa colores, Stock debe ser null
-    if (UsaColores === 1 && Stock !== null) {
-      return res.status(400).json({
-        message: 'Para productos con colores, el stock debe ser null (se maneja por color)'
-      });
     }
 
     const existente = await nombreProductoExiste(Nombre);
@@ -61,6 +47,7 @@ export const postProducto = async (req, res) => {
 
     const ProductoId = uuidv4();
 
+    // 🔥 SOLO guardar información básica, NO colores
     await createProducto({
       ProductoId,
       Nombre,
@@ -71,14 +58,14 @@ export const postProducto = async (req, res) => {
       CategoriaId,
       Estado,
       UsaColores,
-      Stock
+      Stock: 0
     });
 
     res.status(201).json({
       message: 'Producto creado exitosamente',
       ProductoId,
       UsaColores,
-      Stock
+      Stock: 0
     });
   } catch (error) {
     console.error('Error al crear producto:', error);
@@ -87,7 +74,6 @@ export const postProducto = async (req, res) => {
 };
 
 // Cambiar estado del producto
-// Cambiar estado del producto - PRESERVANDO EL STOCK
 export const cambiarEstadoProducto = async (req, res) => {
   const { id } = req.params;
   const { Estado } = req.body;
@@ -99,44 +85,19 @@ export const cambiarEstadoProducto = async (req, res) => {
       });
     }
 
-    // PRIMERO: Obtener el producto actual para preservar su stock
-    const productoActual = await getDataProductoById(id);
-
-    if (productoActual.length === 0) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
-    }
-
-    const producto = productoActual[0];
-
-    // Preparar datos para actualizar, incluyendo el stock actual
-    const datosActualizacion = {
+    // Solo actualizar el estado, el stock no se toca
+    const result = await updateDataProducto({
       ProductoId: id,
       Estado
-    };
-
-    // PRESERVAR EL STOCK: solo si el producto no usa colores
-    if (producto.UsaColores === 0) {
-      datosActualizacion.Stock = producto.Stock;
-    }
-
-    // También preservar UsaColores para evitar que se pierda
-    datosActualizacion.UsaColores = producto.UsaColores;
-
-    // Actualizar con todos los datos necesarios
-    const result = await updateDataProducto(datosActualizacion);
+      // ❌ No incluir Stock ni UsaColores
+    });
 
     if (result === 0) {
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
 
     res.status(200).json({
-      message: `Producto ${Estado === 'Activo' ? 'activado' : 'desactivado'} correctamente`,
-      producto: {
-        ProductoId: id,
-        Estado,
-        Stock: producto.Stock,
-        UsaColores: producto.UsaColores
-      }
+      message: `Producto ${Estado === 'Activo' ? 'activado' : 'desactivado'} correctamente`
     });
   } catch (error) {
     console.error('Error al cambiar estado:', error);
@@ -216,16 +177,61 @@ export const getAllProducto = async (req, res) => {
 };
 
 // Obtener producto por ID
+// controllers/productos.controller.js
 export const getProductoById = async (req, res) => {
   const { id } = req.params;
   try {
-    const productos = await getDataProductoById(id);
+    const [productoRows] = await dbPool.query(
+      `SELECT * FROM Productos WHERE ProductoId = ?`,
+      [id]
+    );
 
-    if (productos.length === 0) {
+    if (productoRows.length === 0) {
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
 
-    res.status(200).json(productos[0]);
+    const producto = productoRows[0];
+
+    // 🔥 Obtener colores desde compras para este producto
+    const [coloresDesdeCompras] = await dbPool.query(`
+      SELECT DISTINCT
+        c.ColorId,
+        c.Nombre,
+        c.Hex,
+        COALESCE(pcs.Stock, 0) AS Stock
+      FROM detallecompras dc
+      INNER JOIN Colores c ON c.ColorId = dc.ColorId
+      LEFT JOIN productocolores_stock pcs ON pcs.ProductoId = dc.ProductoId AND pcs.ColorId = dc.ColorId
+      WHERE dc.ProductoId = ? AND dc.ColorId IS NOT NULL
+    `, [id]);
+
+    // 🔥 También obtener colores con stock (de compras anteriores)
+    const [coloresConStock] = await dbPool.query(`
+      SELECT 
+        c.ColorId,
+        c.Nombre,
+        c.Hex,
+        pcs.Stock
+      FROM productocolores_stock pcs
+      INNER JOIN Colores c ON c.ColorId = pcs.ColorId
+      WHERE pcs.ProductoId = ? AND pcs.Stock > 0
+    `, [id]);
+
+    // Combinar colores únicos (usar Map para evitar duplicados)
+    const coloresMap = new Map();
+    
+    [...coloresDesdeCompras, ...coloresConStock].forEach(color => {
+      if (!coloresMap.has(color.ColorId) || coloresMap.get(color.ColorId).Stock < color.Stock) {
+        coloresMap.set(color.ColorId, color);
+      }
+    });
+
+    const coloresUnicos = Array.from(coloresMap.values());
+
+    res.status(200).json({
+      ...producto,
+      Colores: coloresUnicos
+    });
   } catch (error) {
     console.error('Error al obtener producto:', error);
     res.status(500).json({ message: 'Error interno del servidor' });
@@ -242,70 +248,49 @@ export const updateProducto = async (req, res) => {
     Precio,
     Descuento,
     CategoriaId,
-    UsaColores = 0,
-    Stock = null
+    UsaColores = 0,  
   } = req.body;
 
-  console.log('========================================');
-  console.log('📥 BACKEND - updateProducto:');
-  console.log('ID:', id);
-  console.log('UsaColores recibido:', UsaColores, 'Tipo:', typeof UsaColores);
-  console.log('Stock recibido:', Stock, 'Tipo:', typeof Stock);
-  console.log('Body completo:', req.body);
-  console.log('========================================');
-
   try {
+    const usaColoresNum = parseInt(UsaColores) || 0;
 
-    // Al inicio de updateProducto
-const UsaColores = parseInt(req.body.UsaColores) || 0;
-const Stock = req.body.Stock !== null && req.body.Stock !== undefined 
-  ? parseInt(req.body.Stock) 
-  : null;
-
-console.log('UsaColores convertido:', UsaColores, 'Tipo:', typeof UsaColores);
     if (!Nombre) {
-      return res.status(400).json({
-        message: 'El nombre es obligatorio'
-      });
+      return res.status(400).json({ message: 'El nombre es obligatorio' });
     }
 
-    // Validar UsaColores
-    if (UsaColores !== 0 && UsaColores !== 1) {
+    if (usaColoresNum !== 0 && usaColoresNum !== 1) {
       return res.status(400).json({ message: 'UsaColores debe ser 0 o 1' });
     }
 
-    // Si no usa colores, Stock debe ser un número >= 0
-    if (UsaColores === 0) {
-      if (Stock === null || Stock === undefined) {
-        return res.status(400).json({
-          message: 'Para productos sin colores, el stock es obligatorio'
-        });
-      }
-
-      const stockNumber = Number(Stock);
-      if (isNaN(stockNumber) || stockNumber < 0) {
-        return res.status(400).json({
-          message: 'El stock debe ser un número mayor o igual a 0'
-        });
-      }
+    // Obtener producto actual
+    const productoActual = await getDataProductoById(id);
+    if (productoActual.length === 0) {
+      return res.status(404).json({ message: 'Producto no encontrado' });
     }
 
-    // Si usa colores, Stock debe ser null o undefined
-    if (UsaColores === 1) {
-      if (Stock !== null && Stock !== undefined) {
-        return res.status(400).json({
-          message: 'Para productos con colores, el stock debe ser null (se maneja por color)'
-        });
-      }
+    const producto = productoActual[0];
+
+    // 🔥 Verificar si ya tiene colores en compras
+    const [coloresEnCompras] = await dbPool.query(
+      `SELECT DISTINCT ColorId FROM detallecompras 
+       WHERE ProductoId = ? AND ColorId IS NOT NULL`,
+      [id]
+    );
+
+    // Si ya tiene colores registrados por compras, no permitir cambiar UsaColores a false
+    if (coloresEnCompras.length > 0 && usaColoresNum === 0) {
+      return res.status(400).json({
+        message: 'No puedes desactivar colores porque ya hay compras con colores para este producto'
+      });
     }
 
+    // Verificar duplicados de nombre
     const duplicates = await findDuplicateName({ ProductoId: id, Nombre });
     if (duplicates.length > 0) {
-      return res.status(409).json({
-        message: 'El nombre ya existe.'
-      });
-    };
+      return res.status(409).json({ message: 'El nombre ya existe.' });
+    }
 
+    // Actualizar SOLO datos básicos, NO colores ni stock
     const result = await updateDataProducto({
       ProductoId: id,
       Nombre,
@@ -314,8 +299,8 @@ console.log('UsaColores convertido:', UsaColores, 'Tipo:', typeof UsaColores);
       Precio,
       Descuento,
       CategoriaId,
-      UsaColores,
-      Stock
+      UsaColores: usaColoresNum,
+      // NO incluir colores ni stock
     });
 
     if (result === 0) {
@@ -327,8 +312,8 @@ console.log('UsaColores convertido:', UsaColores, 'Tipo:', typeof UsaColores);
       producto: {
         ProductoId: id,
         Nombre,
-        UsaColores,
-        Stock
+        UsaColores: usaColoresNum,
+        Stock: producto.Stock
       }
     });
   } catch (error) {

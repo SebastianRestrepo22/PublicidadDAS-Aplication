@@ -20,7 +20,7 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer";
-import { getColoresProducto, getProductoByIdService } from "../../dashboard/productos/services/services.products";
+import { getProductoByIdService } from "../../dashboard/productos/services/services.products";
 
 export const ProductoDetalle = () => {
   const { id } = useParams();
@@ -68,30 +68,40 @@ export const ProductoDetalle = () => {
     }
   }, []);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        let prod = producto;
-        let colores = [];
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+      let prod = producto;
 
+      // Si no tenemos el producto del state, cargarlo
+      if (!prod) {
+        console.log("🔄 Cargando producto desde servicio...");
+        prod = await getProductoByIdService(id);
+        
         if (!prod) {
-          prod = await getProductoByIdService(id);
-          setProducto(prod);
+          console.error("❌ Producto no encontrado");
+          toast.error("Producto no encontrado");
+          navigate("/productos");
+          return;
         }
-
-        colores = await getColoresProducto(id);
-        calcularStocks(prod, colores);
-
-      } catch (err) {
-        console.error("Error cargando producto:", err);
-        toast.error("Producto no encontrado");
-        navigate("/productos");
+        
+        setProducto(prod);
       }
-    };
 
-    fetchData();
-  }, [id, navigate, producto, calcularStocks]);
+      // ✅ Los colores YA VIENEN en el producto
+      console.log("🎨 Colores del producto:", prod.Colores);
+      
+      // Calcular stocks con los colores que ya vienen en el producto
+      calcularStocks(prod, prod.Colores || []);
 
+    } catch (err) {
+      console.error("❌ Error crítico cargando producto:", err);
+      toast.error("Error al cargar el producto");
+    }
+  };
+
+  fetchData();
+}, [id, navigate, producto, calcularStocks]);
   // Actualizar stock disponible cuando cambia el color seleccionado
   useEffect(() => {
     if (tipoStock === "colores" && colorSeleccionado) {
@@ -122,13 +132,14 @@ export const ProductoDetalle = () => {
     );
   }
 
-  const formatPrice = (precio) => {
-    return new Intl.NumberFormat("es-CO", {
-      style: "currency",
-      currency: "COP",
-      minimumFractionDigits: 0,
-    }).format(precio);
-  };
+const formatPrice = (precio) => {
+  const formateado = new Intl.NumberFormat("es-CO", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(precio);
+  
+  return `COP ${formateado}`;
+};
 
   const precioFinal =
     producto.Descuento > 0
@@ -169,91 +180,82 @@ export const ProductoDetalle = () => {
     }
   };
 
-  const handleAddToCart = () => {
-    // Validaciones según tipo de stock
-    if (tipoStock === "colores") {
-      // Verificar si hay colores seleccionados
-      if (coloresSeleccionados.length === 0) {
-        toast.error("Por favor selecciona al menos un color");
-        return;
-      }
-
-      // Verificar que todas las cantidades sean válidas
-      for (const item of coloresSeleccionados) {
-        if (item.cantidad <= 0) {
-          toast.error(`La cantidad para ${item.nombre} debe ser mayor a 0`);
-          return;
-        }
-
-        const colorOriginal = coloresProducto.find(c => c.ColorId === item.colorId);
-        if (!colorOriginal) {
-          toast.error(`Color ${item.nombre} no válido`);
-          return;
-        }
-
-        // Verificar stock en carrito
-        const existingInCart = cart.filter(cartItem =>
-          cartItem.ProductoId === producto.ProductoId &&
-          cartItem.customization?.color?.ColorId === item.colorId
-        );
-        const currentQuantityInCart = existingInCart.reduce((sum, cartItem) => sum + cartItem.quantity, 0);
-        const newTotalQuantity = currentQuantityInCart + item.cantidad;
-
-        if (newTotalQuantity > colorOriginal.Stock) {
-          toast.error(
-            `Solo hay ${colorOriginal.Stock} unidades disponibles de ${item.nombre} ` +
-            `(ya tienes ${currentQuantityInCart} en carrito)`
-          );
-          return;
-        }
-      }
-
-      // Agregar cada color seleccionado al carrito
-      coloresSeleccionados.forEach(item => {
-        const colorOriginal = coloresProducto.find(c => c.ColorId === item.colorId);
-
-        const customizacion = {
-          color: {
-            ColorId: colorOriginal.ColorId,
-            Nombre: colorOriginal.Nombre,
-            Hex: colorOriginal.Hex,
-            Stock: colorOriginal.Stock
-          }
-        };
-
-        addToCart(producto, customizacion, item.cantidad);
-      });
-
-      // Resetear selección después de agregar
-      setColoresSeleccionados([]);
-
-      toast.success(`${coloresSeleccionados.length} color(es) agregado(s) al carrito`);
-
-    } else {
-      // Stock general (comportamiento actual)
-      const cantidadNum = parseInt(cantidad) || 1;
-
-      if (stockDisponible === 0) {
-        toast.error("Producto sin stock disponible");
-        return;
-      }
-
-      const existing = cart.find(
-        (item) => item.ProductoId === producto.ProductoId
-      );
-      const currentQuantity = existing ? existing.quantity : 0;
-      const newQuantity = currentQuantity + cantidadNum;
-
-      if (newQuantity > stockDisponible) {
-        toast.error(`Solo hay ${stockDisponible} unidades disponibles`);
-        return;
-      }
-
-      addToCart(producto, {}, cantidadNum);
-      toast.success(`${cantidadNum} ${producto.Nombre} agregado${cantidadNum > 1 ? "s" : ""} al carrito`);
+ const handleAddToCart = () => {
+  if (tipoStock === "colores") {
+    if (coloresSeleccionados.length === 0) {
+      toast.error("Por favor selecciona al menos un color");
+      return;
     }
-  };
 
+    // Verificar que todas las cantidades sean válidas
+    for (const item of coloresSeleccionados) {
+      if (item.cantidad <= 0) {
+        toast.error(`La cantidad para ${item.nombre} debe ser mayor a 0`);
+        return;
+      }
+
+      const colorOriginal = coloresProducto.find(c => c.ColorId === item.colorId);
+      if (!colorOriginal) {
+        toast.error(`Color ${item.nombre} no válido`);
+        return;
+      }
+
+      // Verificar stock en carrito
+      const existingInCart = cart.filter(cartItem =>
+        cartItem.ProductoId === producto.ProductoId &&
+        cartItem.customization?.color?.ColorId === item.colorId
+      );
+      const currentQuantityInCart = existingInCart.reduce((sum, cartItem) => sum + cartItem.quantity, 0);
+      const newTotalQuantity = currentQuantityInCart + item.cantidad;
+
+      if (newTotalQuantity > colorOriginal.Stock) {
+        toast.error(
+          `Solo hay ${colorOriginal.Stock} unidades disponibles de ${item.nombre} ` +
+          `(ya tienes ${currentQuantityInCart} en carrito)`
+        );
+        return;
+      }
+    }
+
+    // Agregar cada color seleccionado al carrito
+    coloresSeleccionados.forEach(item => {
+      const colorOriginal = coloresProducto.find(c => c.ColorId === item.colorId);
+
+      const customizacion = {
+        color: {
+          ColorId: colorOriginal.ColorId,
+          Nombre: colorOriginal.Nombre,
+          Hex: colorOriginal.Hex,
+          Stock: colorOriginal.Stock  // ✅ Guardar stock actual para validaciones futuras
+        }
+      };
+
+      addToCart(producto, customizacion, item.cantidad);
+    });
+
+    setColoresSeleccionados([]);
+    toast.success(`${coloresSeleccionados.length} color(es) agregado(s) al carrito`);
+
+  } else {
+    // Stock general (igual que antes)
+    const cantidadNum = parseInt(cantidad) || 1;
+    if (stockDisponible === 0) {
+      toast.error("Producto sin stock disponible");
+      return;
+    }
+    const existing = cart.find(
+      (item) => item.ProductoId === producto.ProductoId
+    );
+    const currentQuantity = existing ? existing.quantity : 0;
+    const newQuantity = currentQuantity + cantidadNum;
+    if (newQuantity > stockDisponible) {
+      toast.error(`Solo hay ${stockDisponible} unidades disponibles`);
+      return;
+    }
+    addToCart(producto, {}, cantidadNum);
+    toast.success(`${cantidadNum} ${producto.Nombre} agregado${cantidadNum > 1 ? "s" : ""} al carrito`);
+  }
+};
   const handleColorSelection = (color, checked) => {
     if (checked) {
       // Agregar color a la selección

@@ -1,31 +1,22 @@
+// ProductoView.jsx
 import React from "react";
-import { Check } from "lucide-react";
 
 export const ProductoView = ({
   editData,
   categorias,
-  coloresConStock,
   goToEdit,
   goToBackToList
 }) => {
   if (!editData) return <div>Cargando...</div>;
 
-  const stockTotal = coloresConStock.reduce((sum, c) => sum + (c.Stock || 0), 0);
   const estado = editData.Estado || 'Activo';
 
-   // Formatear precio
-    const formatPrice = (value, currency = '$') => {
-        if (value === null || value === undefined || value === '') return `${currency}0.00`;
-
-        // Convertir a número si es string
-        const num = typeof value === 'string' ? parseFloat(value) : value;
-
-        // Verificar si es un número válido
-        if (isNaN(num)) return `${currency}0.00`;
-
-        // Formatear con separador de miles y 2 decimales
-        return `${currency}${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
-    };
+  const formatPrice = (value, currency = '$') => {
+    if (value === null || value === undefined || value === '') return `${currency}0.00`;
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(num)) return `${currency}0.00`;
+    return `${currency}${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+  };
 
   return (
     <div className="text-left space-y-4 p-4 bg-white rounded-lg shadow-md">
@@ -46,51 +37,18 @@ export const ProductoView = ({
             {estado}
           </span>
         </div>
-        <div><strong>Stock total:</strong> {stockTotal} unidades</div>
         <div>
-          <strong>Colores con stock:</strong>
-          {coloresConStock.length > 0 ? (
-            <div className="mt-2 space-y-2">
-              {coloresConStock.map(c => (
-                <div key={c.ColorId} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-6 h-6 rounded-full border"
-                      style={{ backgroundColor: c.Hex }}
-                      title={c.Nombre}
-                    />
-                    <span>{c.Nombre}</span>
-                  </div>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${c.Stock === 0 ? 'bg-red-100 text-red-800' :
-                    c.Stock < 10 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                    {c.Stock} unidades
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <span className="text-gray-400 ml-2">No tiene colores asignados</span>
+          <strong>Stock:</strong> {editData.Stock || 0} unidades
+          {parseInt(editData.UsaColores) === 1 && (
+            <span className="ml-2 text-xs text-blue-600">(Stock por color - ver en tabla)</span>
           )}
         </div>
         <div><strong>Categoría:</strong> {categorias.find(c => c.CategoriaId === editData.CategoriaId)?.Nombre || editData.CategoriaId}</div>
         <div>
-          <strong>Colores:</strong>
-          <div className="flex gap-2 mt-2">
-            {coloresConStock.length > 0 ? (
-              coloresConStock.map(c => (
-                <span
-                  key={c.ColorId}
-                  className="w-6 h-6 rounded-full border"
-                  style={{ backgroundColor: c.Hex }}
-                  title={c.Nombre}
-                />
-              ))
-            ) : (
-              <span className="text-gray-400">No tiene colores asignados</span>
-            )}
-          </div>
+          <strong>Sistema de colores:</strong> 
+          <span className="ml-2 text-sm">
+            {parseInt(editData.UsaColores) === 1 ? 'Sí' : 'No'}
+          </span>
         </div>
       </div>
       {editData.Imagen && (
