@@ -41,13 +41,13 @@ export const DetalleItem = ({
   // 🔥 Manejar cambio de precio - permitir números y puntos
   const handlePrecioChange = (e) => {
     const value = e.target.value;
-    // Permitir vacío, números, puntos y comas
+    // Permitir vacío, números y puntos (para formato de miles)
     if (value === '' || /^[\d.,]*$/.test(value)) {
       onActualizar(index, "Precio", value);
     }
   };
 
-  // 🔥 Manejar blur del precio - limpiar y convertir a número
+  // 🔥 Manejar blur del precio - formatear con puntos de miles
   const handlePrecioBlur = () => {
     let precio = detalle.Precio;
     if (!precio || precio === '') {
@@ -55,12 +55,28 @@ export const DetalleItem = ({
       return;
     }
 
-    // Limpiar el string: eliminar puntos y comas, luego convertir a número
-    const precioLimpio = String(precio).replace(/[.,]/g, '');
+    // Limpiar el string: eliminar puntos (separadores de miles) y convertir a número
+    const precioLimpio = String(precio).replace(/\./g, '').replace(',', '.');
     const precioNumero = parseFloat(precioLimpio) || 0;
     
     console.log('💰 Precio original:', precio, 'Limpio:', precioLimpio, 'Número:', precioNumero);
+    
+    // Guardar el número sin formato
     onActualizar(index, "Precio", precioNumero);
+  };
+
+  // Formatear el precio para mostrarlo con puntos de miles
+  const precioFormateado = () => {
+    if (!detalle.Precio && detalle.Precio !== 0) return '';
+    
+    // Si es string, intentar limpiarlo primero
+    let valorNumerico = detalle.Precio;
+    if (typeof valorNumerico === 'string') {
+      valorNumerico = parseFloat(valorNumerico.replace(/\./g, '').replace(',', '.')) || 0;
+    }
+    
+    // Formatear con puntos de miles (ej: 1.200.000)
+    return valorNumerico.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   };
 
   // Manejar cambio de cantidad
@@ -181,14 +197,14 @@ export const DetalleItem = ({
           />
         </div>
 
-        {/* 🔥 Precio Unitario con signo $ y limpieza */}
+        {/*  Precio Unitario con signo $ y formato de miles */}
         <div className="col-span-2">
           <div className="relative">
             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 font-medium">$</span>
             <input
               type="text"
               inputMode="numeric"
-              value={detalle.Precio || ''}
+              value={precioFormateado()}
               onChange={handlePrecioChange}
               onBlur={handlePrecioBlur}
               placeholder="0"
@@ -198,10 +214,10 @@ export const DetalleItem = ({
           </div>
         </div>
 
-        {/* Subtotal con signo $ */}
+        {/* Subtotal con formato de miles */}
         <div className="col-span-2">
           <div className="px-3 py-2 bg-blue-50 rounded-lg text-right font-semibold text-blue-700 text-sm">
-            ${subtotal.toLocaleString('es-CO')}
+              {formatPrice(subtotal)}  
           </div>
         </div>
 

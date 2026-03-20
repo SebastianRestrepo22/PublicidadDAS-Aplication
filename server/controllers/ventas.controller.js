@@ -439,7 +439,6 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
       return { success: false, alreadyExists: true, VentaId: ventaExistente[0].VentaId };
     }
 
-    // 🔥 MODIFICADO: Consultar explícitamente MetodoPago para pasarlo al model
     const [pedidoRows] = await connection.query(
       `SELECT 
         PedidoClienteId, MetodoPago, ClienteId, ClienteNombre, ClienteTelefono, 
@@ -456,9 +455,6 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
     }
     const pedido = pedidoRows[0];
 
-    // 🔥 NUEVO: Extraer MetodoPago para pasarlo al model
-    const metodoPago = pedido.MetodoPago;
-
     const [detallesRows] = await connection.query(
       `SELECT * FROM detallepedidosclientes WHERE PedidoClienteId = ?`,
       [PedidoClienteId]
@@ -468,8 +464,8 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
       throw new Error("El pedido no tiene detalles");
     }
 
-    // 🔥 MODIFICADO: Pasar metodoPago y connection al model
-    const result = await createVentaFromPedidoModel(pedido, UsuarioVendedorId, metodoPago, connection);
+    // Ya no necesitamos pasar metodoPago porque el modelo siempre crea como 'pagado'
+    const result = await createVentaFromPedidoModel(pedido, UsuarioVendedorId, null, connection);
 
     if (!result.success) {
       await connection.rollback();
@@ -478,7 +474,6 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
 
     const VentaId = result.VentaId;
 
-    // 🔥 Los detalles se crean AQUÍ (una sola vez) con la función dedicada
     await createDetallesVentaFromPedidoModel(connection, VentaId, detallesRows);
 
     await connection.commit();
@@ -487,11 +482,10 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
     const detallesCompletos = await getDetalleVentaByVentaIdModel(VentaId);
     ventaCreada.detalle = detallesCompletos;
 
-    // 🔥 Solo enviar factura si está pagado (no si está pendiente)
     const correoCliente = pedido.ClienteCorreo || ventaCreada.ClienteCorreo;
     const nombreCliente = pedido.ClienteNombre || ventaCreada.ClienteNombre || 'Cliente';
 
-    if (ventaCreada.Estado === 'pagado' && correoCliente) {
+    if (correoCliente) {
       try {
         await sendVentaFacturaEmail(
           correoCliente,

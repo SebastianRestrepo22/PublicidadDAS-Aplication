@@ -23,7 +23,7 @@ import { dbPool } from "../lib/db.js";
 export const getPedidosClientes = async (req, res) => {
   try {
     console.log('🔍 [CONTROLLER] Obteniendo pedidos con paginación');
-    
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const filtroCampo = req.query.filtroCampo || null;
@@ -46,7 +46,7 @@ export const getPedidosClientes = async (req, res) => {
 
     if (filtroCampo && filtroValor) {
       let campoDB;
-      switch(filtroCampo) {
+      switch (filtroCampo) {
         case 'PedidoClienteId':
           campoDB = 'p.PedidoClienteId';
           break;
@@ -179,7 +179,7 @@ export const buscarPedidos = async (req, res) => {
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
-    
+
     let whereClause = '';
     let params = [];
 
@@ -273,15 +273,15 @@ export const buscarPedidos = async (req, res) => {
 
   } catch (error) {
     console.error('❌ [BUSCAR] Error al buscar pedidos:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error interno del servidor',
-      error: error.message 
+      error: error.message
     });
   }
 };
 
 // ========================================
-// ✅ CREAR PEDIDO
+// ✅ CREAR PEDIDO (MODIFICADO - SIN VENTA AUTOMÁTICA)
 // ========================================
 export const createPedidoCliente = async (req, res) => {
   let nuevoPedido = null;
@@ -318,14 +318,9 @@ export const createPedidoCliente = async (req, res) => {
       ClienteNombre = null,
       ClienteTelefono = null,
       ClienteCorreo = null,
+      Origen = "admin", // Nuevo campo para identificar origen
       detalle = []
     } = pedidoData;
-
-    // 🔥 NORMALIZAR: Convertir a mayúsculas para comparar
-    const metodoPagoNormalizado = MetodoPago ? MetodoPago.toUpperCase() : MetodoPago;
-    
-    console.log('💰 Método de pago recibido (original):', MetodoPago);
-    console.log('💰 Método de pago normalizado:', metodoPagoNormalizado);
 
     // Validar Total
     const totalLimpio = parseFloat(Total);
@@ -349,20 +344,19 @@ export const createPedidoCliente = async (req, res) => {
       ? FechaRegistro.split("T")[0]
       : new Date().toISOString().split("T")[0];
 
-    // 🔥 NUEVA LÓGICA: Pagos inmediatos: transferencia, efectivo, QR → todos van a ventas (aprobado)
-    const pagosInmediatos = ["TRANSFERENCIA", "EFECTIVO", "QR"];
-    const estadoInicial = pagosInmediatos.includes(metodoPagoNormalizado) ? "aprobado" : "pendiente";
+    // 🔥 NUEVA LÓGICA: Todos los pedidos se crean como PENDIENTE
+    // La venta se generará SOLO cuando se apruebe el pedido
+    const estadoInicial = "pendiente";
 
-    console.log(`💰 Método de pago normalizado: ${metodoPagoNormalizado}`);
-    console.log(`📊 Es pago inmediato: ${pagosInmediatos.includes(metodoPagoNormalizado)}`);
-    console.log(`📊 Estado inicial calculado: ${estadoInicial}`);
+    console.log(`📊 Estado inicial calculado: ${estadoInicial} (todos los pedidos)`);
+    console.log(`📊 Origen del pedido: ${Origen}`);
 
-    // Crear pedido (guardar con el valor original, no normalizado)
+    // Crear pedido (siempre pendiente)
     nuevoPedido = await createPedidoClienteModel({
       ClienteId: ClienteId || null,
       FechaRegistro: fechaProcesada,
       Total: totalLimpio,
-      MetodoPago,  // Guardamos el valor original (qr, QR, transferencia, etc)
+      MetodoPago,  // Guardamos el valor original
       Voucher: voucherUrl || null,
       NombreRecibe: NombreRecibe || null,
       TelefonoEntrega: TelefonoEntrega || null,
@@ -371,13 +365,15 @@ export const createPedidoCliente = async (req, res) => {
       TipoCliente,
       ClienteNombre: ClienteNombre || null,
       ClienteTelefono: ClienteTelefono || null,
-      ClienteCorreo: ClienteCorreo || null
+      ClienteCorreo: ClienteCorreo || null,
+      Origen // Nuevo campo
     });
 
     console.log("✅ Pedido creado en BD:", nuevoPedido);
     console.log("📊 Estado guardado en BD:", nuevoPedido.Estado);
+    console.log("📊 Origen guardado:", nuevoPedido.Origen);
 
-    // Crear detalles del pedido (SIN TAMAÑO PARA SERVICIOS)
+    // Crear detalles del pedido
     for (let i = 0; i < detalle.length; i++) {
       const item = detalle[i];
 
@@ -427,31 +423,12 @@ export const createPedidoCliente = async (req, res) => {
     console.log("📦 Pedido completo después de crear detalles:", {
       id: pedidoCompleto.PedidoClienteId,
       estado: pedidoCompleto.Estado,
-      metodo: pedidoCompleto.MetodoPago
+      metodo: pedidoCompleto.MetodoPago,
+      origen: pedidoCompleto.Origen
     });
 
-    // 🔥 Si es pago inmediato (transferencia, efectivo, QR), crear venta automáticamente
-    if (pagosInmediatos.includes(metodoPagoNormalizado)) {
-      try {
-        console.log(`💰 Creando venta automática para pedido pagado con ${MetodoPago}`);
-        
-        const resultadoVenta = await crearVentaDesdePedidoId(pedidoCompleto.PedidoClienteId, null);
-        pedidoCompleto.Estado = "aprobado";
-        pedidoCompleto.ventaCreada = {
-          id: resultadoVenta.VentaId,
-          estado: 'pagado',
-          metodo: MetodoPago
-        };
-        
-        console.log(`✅ Venta creada automáticamente: ${resultadoVenta.VentaId}`);
-        console.log(`📊 Estado final del pedido: ${pedidoCompleto.Estado}`);
-      } catch (ventaError) {
-        console.error(`❌ Error creando venta automática para ${MetodoPago}:`, ventaError);
-      }
-    }
-
-    // Enviar email de confirmación
-    if (pedidoCompleto.ClienteId) {
+    // Enviar email de confirmación solo si es pedido de admin
+    if (pedidoCompleto.Origen === 'admin' && pedidoCompleto.ClienteId) {
       const cliente = await getClienteByIdModel(pedidoCompleto.ClienteId);
       if (cliente?.CorreoElectronico) {
         await sendPedidoEstadoEmail(
@@ -459,7 +436,7 @@ export const createPedidoCliente = async (req, res) => {
           cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
           nuevoPedido.PedidoClienteId,
           pedidoCompleto.Estado,
-          "Tu pedido ha sido recibido"
+          "Tu pedido ha sido recibido y está pendiente de confirmación"
         );
       }
     }
@@ -505,7 +482,7 @@ export const createPedidoCliente = async (req, res) => {
   }
 };
 
-// ✅ ACTUALIZAR PEDIDO
+// ✅ ACTUALIZAR PEDIDO (CON SOPORTE PARA VOUCHER)
 export const updatePedidoCliente = async (req, res) => {
   const { id } = req.params;
   let updates = { ...req.body };
@@ -514,6 +491,7 @@ export const updatePedidoCliente = async (req, res) => {
     console.log('🔍 [PEDIDOS] ===== INICIANDO ACTUALIZACIÓN =====');
     console.log('📦 ID del pedido:', id);
     console.log('📦 Updates recibidos:', updates);
+    console.log('📦 Archivo recibido:', req.file);
 
     // Obtener el pedido actual
     const pedidoActual = await getPedidoClienteByIdModel(id);
@@ -521,45 +499,20 @@ export const updatePedidoCliente = async (req, res) => {
       return res.status(404).json({ message: 'Pedido no encontrado.' });
     }
 
+    // Si viene un archivo, construir la URL del voucher
+    if (req.file) {
+      const protocol = req.protocol;
+      const host = req.get('host');
+      const voucherUrl = `${protocol}://${host}/uploads/vouchers/${req.file.filename}`;
+      updates.Voucher = voucherUrl;
+      
+      console.log('📎 Nuevo voucher URL:', voucherUrl);
+    }
+
     // Si se está actualizando el estado
     if (updates.Estado) {
       const estadoAnterior = pedidoActual.Estado;
       const nuevoEstado = updates.Estado;
-
-      // 🔥 NUEVA VALIDACIÓN: No permitir cambio a estado anterior
-      const ordenEstados = {
-        'pendiente': 1,
-        'aprobado': 2,
-        'en_proceso': 2,
-        'en_camino': 3,
-        'entregado': 4,
-        'finalizado': 3,
-        'cancelado': 999 // El cancelado puede ocurrir en cualquier momento
-      };
-
-      // Si el nuevo estado es cancelado, siempre permitir
-      if (nuevoEstado !== 'cancelado') {
-        const nivelAnterior = ordenEstados[estadoAnterior];
-        const nivelNuevo = ordenEstados[nuevoEstado];
-
-        console.log('📊 Validación de estados:', {
-          estadoAnterior,
-          nuevoEstado,
-          nivelAnterior,
-          nivelNuevo
-        });
-
-        // Si el estado anterior tiene nivel y el nuevo estado tiene nivel
-        if (nivelAnterior && nivelNuevo) {
-          // No permitir retroceder
-          if (nivelNuevo < nivelAnterior) {
-            return res.status(400).json({
-              message: `No se puede cambiar de "${estadoAnterior}" a "${nuevoEstado}". Solo se puede avanzar a estados posteriores.`,
-              error: 'transicion_invalida'
-            });
-          }
-        }
-      }
 
       // Validar estados según método de pago
       if (pedidoActual.MetodoPago === "transferencia" ||
@@ -572,7 +525,7 @@ export const updatePedidoCliente = async (req, res) => {
           });
         }
       }
-      // 🔥 CONTRA ENTREGA
+      // CONTRA ENTREGA
       else if (pedidoActual.MetodoPago === "contra_entrega") {
         const estadosPermitidosContraEntrega = ['pendiente', 'en_proceso', 'en_camino', 'entregado', 'cancelado'];
         if (!estadosPermitidosContraEntrega.includes(nuevoEstado)) {
@@ -598,7 +551,7 @@ export const updatePedidoCliente = async (req, res) => {
     const updated = await getPedidoClienteByIdModel(id);
     updated.detalle = await getDetallePedidoByPedidoIdModel(id);
 
-    // 🔥 Si es transferencia/efectivo y se aprueba, crear venta
+    // Si es transferencia/efectivo y se aprueba, crear venta
     if ((pedidoActual.MetodoPago === "transferencia" || pedidoActual.MetodoPago === "efectivo") &&
       updates.Estado === 'aprobado' && pedidoActual.Estado !== 'aprobado') {
       try {
@@ -625,7 +578,7 @@ export const updatePedidoCliente = async (req, res) => {
       }
     }
 
-    // 🔥 Si es contra entrega y llega a 'entregado', crear venta
+    // Si es contra entrega y llega a 'entregado', crear venta
     if (pedidoActual.MetodoPago === "contra_entrega" && updates.Estado === 'entregado' && pedidoActual.Estado !== 'entregado') {
       try {
         const [ventaExistente] = await dbPool.execute(
@@ -680,10 +633,31 @@ export const updatePedidoCliente = async (req, res) => {
       }
     }
 
+    // Enviar email con voucher si se subió uno nuevo
+    if (req.file && updated.ClienteId) {
+      const cliente = await getClienteByIdModel(updated.ClienteId);
+      if (cliente?.CorreoElectronico) {
+        await sendVoucherEmail(
+          cliente.CorreoElectronico,
+          cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
+          id,
+          updates.Voucher
+        ).catch(err => console.error('Error enviando email de voucher:', err));
+      }
+    }
+
     res.json(updated);
 
   } catch (error) {
     console.error('❌ [PEDIDOS] Error:', error);
+    
+    // Si hay error y se subió un archivo, eliminarlo
+    if (req.file) {
+      fs.unlink(req.file.path, (err) => {
+        if (err) console.error('Error eliminando archivo:', err);
+      });
+    }
+    
     res.status(500).json({
       message: 'Error al actualizar el pedido',
       error: error.message
@@ -743,7 +717,7 @@ export const getMisPedidos = async (req, res) => {
     // Agregar detalles a cada pedido
     for (let p of pedidos) {
       p.detalle = await getDetallePedidoByPedidoIdModel(p.PedidoClienteId);
-      
+
       // 🔥 Determinar qué estado mostrar
       if (p.EsVenta) {
         // Si tiene venta y NO es contra entrega, mostrar estado de la venta

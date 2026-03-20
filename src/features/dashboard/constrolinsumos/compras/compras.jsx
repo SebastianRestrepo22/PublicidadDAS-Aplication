@@ -3,7 +3,7 @@ import { useCompras, ESTADOS_COMPRA } from "./hook/useCompras";
 import { ComprasList } from "./components/ComprasList";
 import { ComprasCreate } from "./components/ComprasCreate";
 import { ComprasView } from "./components/ComprasView";
-import { ComprasSelectProducto } from "./components/ComprasSelectProducto";
+import { ComprasSelectProducto } from "../../constrolinsumos/compras/components/ComprasSelectProducto";
 import { getDetallesByCompraId, createCompra, createDetalleCompra } from "./services/services.compras";
 import { toast, ToastContainer } from "react-toastify";
 import axios from "axios";
@@ -107,12 +107,15 @@ export const Compras = () => {
   const [errores, setErrores] = useState([]);
   const [returnTo, setReturnTo] = useState(null);
 
-  // Select Producto
+  // Select Producto - NUEVA ESTRUCTURA CON PAGINACIÓN
   const [searchTermProductos, setSearchTermProductos] = useState("");
-  const [currentPageProductos, setCurrentPageProductos] = useState(1);
-  const [totalPagesProductos, setTotalPagesProductos] = useState(1);
-  const [totalProductos, setTotalProductos] = useState(0);
   const [productosPaginados, setProductosPaginados] = useState([]);
+  const [productosPagination, setProductosPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 3
+  });
   const [loadingProductos, setLoadingProductos] = useState(false);
   const [currentDetailIndex, setCurrentDetailIndex] = useState(-1);
 
@@ -186,30 +189,54 @@ export const Compras = () => {
   };
 
   const loadProductosPaginados = async (page = 1, search = "") => {
-    setLoadingProductos(true);
-    try {
-      const resultado = await buscarProductosPorCampo(
-        search ? "nombre" : null,
-        search,
-        page,
-        itemsPerPage
-      );
+  setLoadingProductos(true);
+  try {
+    console.log("🔍 Cargando productos - página:", page, "búsqueda:", search);
+    
+    const resultado = await buscarProductosPorCampo(
+      search ? "nombre" : null,
+      search,
+      page,
+      3  // ← SOLICITAMOS 3 PRODUCTOS POR PÁGINA
+    );
 
-      setProductosPaginados(resultado.data);
-      setTotalProductos(resultado.total);
-      setTotalPagesProductos(resultado.pages);
-      setCurrentPageProductos(page);
+    console.log("📦 RESULTADO DEL BACKEND - COMPLETO:", resultado);
+    console.log("📊 totalItems:", resultado.totalItems);
+    console.log("📊 totalPages:", resultado.totalPages);
+    console.log("📊 currentPage:", resultado.currentPage);
+    console.log("📊 itemsPerPage:", resultado.itemsPerPage);
+    console.log("📊 productos recibidos:", resultado.data?.length);
 
-    } catch (error) {
-      console.error("Error:", error);
-      setProductosPaginados([]);
-      setTotalPagesProductos(1);
-      setTotalProductos(0);
-      toast.error("Error al cargar productos");
-    } finally {
-      setLoadingProductos(false);
+    // ✅ Actualizar estados
+    setProductosPaginados(resultado.data || []);
+    setProductosPagination({
+      currentPage: resultado.currentPage || page,
+      totalPages: resultado.totalPages || 1,
+      totalItems: resultado.totalItems || 0,
+      itemsPerPage: resultado.itemsPerPage || 3
+    });
+
+    // ✅ Verificación explícita
+    if (resultado.totalPages > 1) {
+      console.log(`✅ ¡PAGINACIÓN ACTIVADA! ${resultado.totalPages} páginas disponibles`);
+    } else {
+      console.log("ℹ️ Sin paginación (una sola página)");
     }
-  };
+
+  } catch (error) {
+    console.error("Error:", error);
+    setProductosPaginados([]);
+    setProductosPagination({
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 3
+    });
+    toast.error("Error al cargar productos");
+  } finally {
+    setLoadingProductos(false);
+  }
+};
 
   // Navigation
   const goToCreate = () => {
@@ -306,6 +333,13 @@ export const Compras = () => {
     setReturnTo(from);
     setCurrentDetailIndex(index);
     setSearchTermProductos("");
+    // Resetear paginación al abrir el selector
+    setProductosPagination({
+      currentPage: 1,
+      totalPages: 1,
+      totalItems: 0,
+      itemsPerPage: 3
+    });
     loadProductosPaginados(1, "");
     setViewMode("select-producto");
   };
@@ -392,7 +426,6 @@ export const Compras = () => {
       const compraData = {
         ProveedorId: formCrear.ProveedorId,
         Total: total
-        // 🔥 Ya no enviamos Estado porque el backend lo pone como 'aprobado'
       };
 
       const compraCreada = await createCompra(compraData);
@@ -511,9 +544,7 @@ export const Compras = () => {
             searchTermProductos={searchTermProductos}
             setSearchTermProductos={setSearchTermProductos}
             productosPaginados={productosPaginados}
-            totalProductos={totalProductos}
-            currentPageProductos={currentPageProductos}
-            totalPagesProductos={totalPagesProductos}
+            productosPagination={productosPagination}  // ← NUEVO PROP
             loadingProductos={loadingProductos}
             onLoadProductos={loadProductosPaginados}
             onSelectProducto={seleccionarProductoDesdeVista}

@@ -57,7 +57,7 @@ export const ComprasList = ({
         <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center">
           <button
             onClick={onCreate}
-            className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow"
           >
             <Plus size={18} /> Nueva compra
           </button>

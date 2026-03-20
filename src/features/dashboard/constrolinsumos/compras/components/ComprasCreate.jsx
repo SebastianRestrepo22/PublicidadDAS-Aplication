@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, ChevronRight, Package, Palette, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronRight, Package, Palette, Plus, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon } from "lucide-react";
 import { ProductoColoresModal } from "../../../productos/components/ProductoColoresModal";
 import { ComprasSelectProveedorSimple } from "../components/ComprasSelectProveedorSimple";
 import { toast } from "react-toastify";
@@ -34,6 +34,9 @@ export const ComprasCreate = ({
   getProductoDisplay,
   calcularTotal
 }) => {
+  // Estados para paginación de artículos
+  const [currentPageArticulos, setCurrentPageArticulos] = useState(1);
+  const itemsPerPageArticulos = 3; // 3 artículos por página
 
   const [showColorModal, setShowColorModal] = useState(false);
   const [detalleIndexColor, setDetalleIndexColor] = useState(null);
@@ -45,6 +48,26 @@ export const ComprasCreate = ({
       setFormCrear(prev => ({ ...prev, FechaRegistro: getTodayDate() }));
     }
   }, [formCrear.FechaRegistro, setFormCrear]);
+
+  // Resetear a página 1 cuando se añade o elimina un artículo
+  useEffect(() => {
+    setCurrentPageArticulos(1);
+  }, [detallesCrear.length]);
+
+  // Calcular artículos a mostrar en la página actual
+  const getCurrentPageArticulos = () => {
+    const startIndex = (currentPageArticulos - 1) * itemsPerPageArticulos;
+    const endIndex = startIndex + itemsPerPageArticulos;
+    return detallesCrear.slice(startIndex, endIndex);
+  };
+
+  // Calcular total de páginas
+  const totalPagesArticulos = Math.ceil(detallesCrear.length / itemsPerPageArticulos);
+
+  // Manejar cambio de página
+  const handlePageChange = (page) => {
+    setCurrentPageArticulos(page);
+  };
 
   const abrirSelectorColor = (index, producto) => {
     if (!producto) {
@@ -186,27 +209,56 @@ export const ComprasCreate = ({
     }
   };
 
-  // ✅ Función para manejar cambios en cantidad: permite editar, bloquea negativos y cero
+  // Función para manejar cambios en cantidad
   const handleCantidadChange = (index, value) => {
-    // Permitir vacío mientras el usuario escribe
     if (value === '') {
       onActualizarDetalle(index, "Cantidad", '');
       return;
     }
-    // Solo permitir números positivos
     const num = Number(value);
     if (num > 0) {
       onActualizarDetalle(index, "Cantidad", value);
     }
   };
 
-  // ✅ Validar al perder el foco: si está vacío o es inválido, restaurar a 1
+  // Validar al perder el foco
   const handleCantidadBlur = (index, value) => {
     const num = Number(value);
     if (!value || isNaN(num) || num <= 0) {
       onActualizarDetalle(index, "Cantidad", 1);
     }
   };
+
+  // Función para manejar cambios en precio unitario
+  const handlePrecioChange = (index, value) => {
+    if (value === '') {
+      onActualizarDetalle(index, "PrecioUnitario", '');
+      onActualizarDetalle(index, "Subtotal", 0);
+      return;
+    }
+    const num = Number(value);
+    if (num >= 0) {
+      onActualizarDetalle(index, "PrecioUnitario", value);
+      // Recalcular subtotal
+      const cantidad = Number(detallesCrear[index].Cantidad) || 0;
+      onActualizarDetalle(index, "Subtotal", num * cantidad);
+    }
+  };
+
+  const handlePrecioBlur = (index, value) => {
+    const num = Number(value);
+    if (!value || isNaN(num) || num < 0) {
+      onActualizarDetalle(index, "PrecioUnitario", 0);
+      onActualizarDetalle(index, "Subtotal", 0);
+    } else {
+      // Formatear a 2 decimales
+      onActualizarDetalle(index, "PrecioUnitario", num.toFixed(2));
+      const cantidad = Number(detallesCrear[index].Cantidad) || 0;
+      onActualizarDetalle(index, "Subtotal", (num * cantidad).toFixed(2));
+    }
+  };
+
+  const currentArticulos = getCurrentPageArticulos();
 
   return (
     <>
@@ -233,7 +285,7 @@ export const ComprasCreate = ({
 
         {/* Información General */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {/* PROVEEDOR CON SELECT SIMPLE - Solo muestra nombre, no ID */}
+          {/* PROVEEDOR CON SELECT SIMPLE */}
           <div className="flex flex-col gap-1">
             <label className="font-medium text-sm">Proveedor *</label>
             <ComprasSelectProveedorSimple
@@ -243,13 +295,24 @@ export const ComprasCreate = ({
                 setFormCrear(prev => ({
                   ...prev,
                   ProveedorId: proveedor?.ProveedorId || "",
-                  nombreProveedor: proveedor?.NombreProveedor || "" // ✅ Solo guardamos el nombre para mostrar
+                  nombreProveedor: proveedor?.NombreProveedor || ""
                 }));
               }}
               error={errores.some(e => e.toLowerCase().includes('proveedor'))}
             />
           </div>
 
+          {/* Fecha (solo lectura) */}
+          <div className="flex flex-col gap-1">
+            <label className="font-medium text-sm">Fecha de Registro</label>
+            <input
+              type="date"
+              value={formCrear.FechaRegistro}
+              onChange={(e) => setFormCrear(prev => ({ ...prev, FechaRegistro: e.target.value }))}
+              className="h-10 px-3 border rounded-lg bg-white text-sm w-full"
+              max={getTodayDate()}
+            />
+          </div>
 
           {/* Total */}
           <div className="flex flex-col gap-1">
@@ -270,9 +333,9 @@ export const ComprasCreate = ({
             <button
               type="button"
               onClick={onAñadirDetalle}
-              className="text-sm bg-green-100 text-green-700 px-3 py-1.5 rounded-lg hover:bg-green-200 transition-colors flex items-center gap-1"
+              className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm"
             >
-              <Package size={14} />
+              <Plus size={14} />
               Agregar artículo
             </button>
           </div>
@@ -287,213 +350,282 @@ export const ComprasCreate = ({
             <div className="col-span-1"></div>
           </div>
 
-          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-            {detallesCrear.map((d, index) => {
-              const producto = productos.find(p => p.ProductoId === d.ProductoId);
-              const tieneProducto = !!d.ProductoId;
-              const usaColores = producto?.UsaColores === 1 || producto?.UsaColores === true || producto?.UsaColores === "1";
-              const tipoStock = d.tipoStock || (usaColores ? 'colores' : 'general');
-              const tieneColores = d.colores && d.colores.length > 0;
+          {/* Contenedor de artículos - Sin altura fija */}
+          <div className="space-y-3">
+            {currentArticulos.length > 0 ? (
+              currentArticulos.map((d, index) => {
+                // Calcular el índice real en el array completo
+                const realIndex = (currentPageArticulos - 1) * itemsPerPageArticulos + index;
+                const producto = productos.find(p => p.ProductoId === d.ProductoId);
+                const tieneProducto = !!d.ProductoId;
+                const usaColores = producto?.UsaColores === 1 || producto?.UsaColores === true || producto?.UsaColores === "1";
+                const tipoStock = d.tipoStock || (usaColores ? 'colores' : 'general');
+                const tieneColores = d.colores && d.colores.length > 0;
 
-              return (
-                <div key={index} className="bg-gray-50 border rounded-lg p-4">
-                  {/* Fila principal */}
-                  <div className="grid grid-cols-12 gap-3 items-start">
-                    {/* Producto -  Muestra solo el nombre, no el ID */}
-                    <div className="col-span-4">
-                      <button
-                        type="button"
-                        onClick={() => onSelectProducto("create", index)}
-                        className={`w-full text-left flex items-center gap-2 p-2 rounded-lg border h-10 ${tieneProducto
-                          ? 'border-emerald-500 bg-emerald-50 hover:bg-emerald-100'
-                          : 'border-dashed border-gray-300 bg-white hover:border-emerald-400 hover:bg-emerald-50'
-                          }`}
-                      >
-                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${tieneProducto ? 'bg-emerald-500' : 'bg-gray-400'
-                          }`}>
-                          <Package size={12} className="text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`font-medium text-xs truncate ${tieneProducto ? 'text-emerald-800' : 'text-gray-500'
-                            }`}>
-                            {producto?.Nombre || "Seleccionar producto"} {/*  Solo nombre */}
-                          </p>
-                          {producto?.SKU && (
-                            <p className="text-[10px] text-gray-500 truncate">SKU: {producto.SKU}</p>
-                          )}
-                        </div>
-                        <ChevronRight size={12} className="text-gray-400 flex-shrink-0" />
-                      </button>
-                    </div>
-
-                    {/* Tipo de stock */}
-                    <div className="col-span-2">
-                      {tieneProducto ? (
-                        <select
-                          value={tipoStock}
-                          onChange={(e) => handleTipoStockChange(index, e.target.value)}
-                          className="w-full h-10 px-2 border rounded-lg text-xs bg-white"
-                        >
-                          <option value="general">Stock General</option>
-                          <option value="colores">Stock por Color</option>
-                        </select>
-                      ) : (
-                        <div className="h-10 px-2 border rounded-lg bg-gray-100 flex items-center text-xs text-gray-400">
-                          -
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Cantidad -  Permite editar libremente, bloquea negativos y cero */}
-                    <div className="col-span-2">
-                      {tieneProducto ? (
-                        tipoStock === 'general' ? (
-                          <input
-                            type="number"
-                            value={d.Cantidad ?? 1}
-                            onChange={(e) => handleCantidadChange(index, e.target.value)}
-                            onBlur={(e) => handleCantidadBlur(index, e.target.value)}
-                            className="w-full h-10 px-2 border rounded-lg text-xs text-center"
-                            placeholder="1"
-                          />
-                        ) : (
-                          <input
-                            type="number"
-                            value={d.Cantidad || 0}
-                            className="w-full h-10 px-2 border rounded-lg text-xs text-center bg-gray-100"
-                            disabled
-                            readOnly
-                            placeholder="0"
-                          />
-                        )
-                      ) : (
-                        <div className="h-10 px-2 border rounded-lg bg-gray-100 flex items-center justify-center text-xs text-gray-400">
-                          -
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Precio Unitario */}
-                    <div className="col-span-2">
-                      {tieneProducto ? (
-                        <div className="relative">
-                          <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs">
-                            $
-                          </span>
-                          <input
-                            type="number"
-                            value={d.PrecioUnitario || 0}
-                            onChange={(e) => onActualizarDetalle(index, "PrecioUnitario", e.target.value)}
-                            className="w-full h-10 pl-6 pr-2 border rounded-lg text-xs text-right"
-                            min="0"
-                            step="0.01"
-                            placeholder="0.00"
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-10 px-2 border rounded-lg bg-gray-100 flex items-center justify-end text-xs text-gray-400">
-                          -
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Subtotal */}
-                    <div className="col-span-1 flex items-center justify-end h-10">
-                      {tieneProducto ? (
-                        <span className="text-xs font-semibold text-blue-700">
-                          {formatPrice(d.Subtotal)}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400">-</span>
-                      )}
-                    </div>
-
-                    {/* Botón eliminar */}
-                    <div className="col-span-1 flex justify-end">
-                      {detallesCrear.length > 1 && (
+                return (
+                  <div key={realIndex} className="bg-gray-50 border rounded-lg p-4">
+                    {/* Fila principal */}
+                    <div className="grid grid-cols-12 gap-3 items-start">
+                      {/* Producto */}
+                      <div className="col-span-4">
                         <button
                           type="button"
-                          onClick={() => onEliminarDetalle(index)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-full transition-colors"
-                          title="Eliminar artículo"
+                          onClick={() => onSelectProducto("create", realIndex)}
+                          className={`w-full text-left flex items-center gap-2 p-2 rounded-lg border h-10 ${
+                            tieneProducto
+                              ? 'border-emerald-500 bg-emerald-50 hover:bg-emerald-100'
+                              : 'border-dashed border-gray-300 bg-white hover:border-emerald-400 hover:bg-emerald-50'
+                          }`}
                         >
-                          <Trash2 size={16} />
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                            tieneProducto ? 'bg-emerald-500' : 'bg-gray-400'
+                          }`}>
+                            <Package size={12} className="text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-medium text-xs truncate ${
+                              tieneProducto ? 'text-emerald-800' : 'text-gray-500'
+                            }`}>
+                              {producto?.Nombre || "Seleccionar producto"}
+                            </p>
+                            {producto?.SKU && (
+                              <p className="text-[10px] text-gray-500 truncate">SKU: {producto.SKU}</p>
+                            )}
+                          </div>
+                          <ChevronRight size={12} className="text-gray-400 flex-shrink-0" />
                         </button>
-                      )}
-                    </div>
-                  </div>
+                      </div>
 
-                  {/* Selector de colores */}
-                  {tieneProducto && tipoStock === 'colores' && (
-                    <div className="mt-3">
-                      <div className="grid grid-cols-12 gap-3">
-                        <div className="col-span-4">
-                          <div className="text-xs font-medium text-gray-500 mb-1">Color</div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (producto) {
-                                abrirSelectorColor(index, producto);
-                              } else {
-                                toast.error("Debe seleccionar un producto primero");
-                                onActualizarDetalle(index, "tipoStock", "general");
-                              }
-                            }}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border w-full ${tieneColores
-                              ? 'border-purple-500 bg-purple-50'
-                              : 'border-dashed border-gray-300 bg-white hover:border-purple-400'
-                              }`}
+                      {/* Tipo de stock */}
+                      <div className="col-span-2">
+                        {tieneProducto ? (
+                          <select
+                            value={tipoStock}
+                            onChange={(e) => handleTipoStockChange(realIndex, e.target.value)}
+                            className="w-full h-10 px-2 border rounded-lg text-xs bg-white"
                           >
-                            <Palette size={16} className={tieneColores ? 'text-purple-600' : 'text-gray-400'} />
-                            <span className={`text-xs ${tieneColores ? 'text-purple-800 font-medium' : 'text-gray-500'}`}>
-                              {tieneColores
-                                ? `${d.colores.length} colores seleccionados`
-                                : 'Seleccionar colores'
-                              }
-                            </span>
-                            <ChevronRight size={14} className="text-gray-400 ml-auto" />
-                          </button>
-                        </div>
-
-                        {/* Mostrar colores seleccionados */}
-                        {tieneColores && (
-                          <div className="col-span-8">
-                            <div className="text-xs font-medium text-gray-500 mb-1">Colores seleccionados</div>
-                            <div className="flex flex-wrap gap-2">
-                              {d.colores.map(color => (
-                                <div
-                                  key={color.ColorId}
-                                  className="flex items-center gap-1 text-xs bg-white px-2 py-1 rounded border"
-                                  title={`${color.Nombre}: ${color.Stock} unidades`}
-                                >
-                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color.Hex }} />
-                                  <span className="font-medium">{color.Nombre}</span>
-                                  <span className="text-gray-500 ml-1">({color.Stock})</span>
-                                </div>
-                              ))}
-                            </div>
+                            <option value="general">Stock General</option>
+                            <option value="colores">Stock por Color</option>
+                          </select>
+                        ) : (
+                          <div className="h-10 px-2 border rounded-lg bg-gray-100 flex items-center text-xs text-gray-400">
+                            -
                           </div>
                         )}
                       </div>
-                    </div>
-                  )}
 
-                  {/* Descripción */}
-                  {tieneProducto && (
-                    <div className="mt-3">
-                      <input
-                        type="text"
-                        value={d.Descripcion || ''}
-                        onChange={(e) => onActualizarDetalle(index, "Descripcion", e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
-                        placeholder="Descripción adicional (opcional)"
-                      />
+                      {/* Cantidad */}
+                      <div className="col-span-2">
+                        {tieneProducto ? (
+                          tipoStock === 'general' ? (
+                            <input
+                              type="number"
+                              value={d.Cantidad ?? 1}
+                              onChange={(e) => handleCantidadChange(realIndex, e.target.value)}
+                              onBlur={(e) => handleCantidadBlur(realIndex, e.target.value)}
+                              className="w-full h-10 px-2 border rounded-lg text-xs text-center"
+                              placeholder="1"
+                              min="1"
+                              step="1"
+                            />
+                          ) : (
+                            <input
+                              type="number"
+                              value={d.Cantidad || 0}
+                              className="w-full h-10 px-2 border rounded-lg text-xs text-center bg-gray-100"
+                              disabled
+                              readOnly
+                              placeholder="0"
+                            />
+                          )
+                        ) : (
+                          <div className="h-10 px-2 border rounded-lg bg-gray-100 flex items-center justify-center text-xs text-gray-400">
+                            -
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Precio Unitario */}
+                      <div className="col-span-2">
+                        {tieneProducto ? (
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs">
+                              $
+                            </span>
+                            <input
+                              type="number"
+                              value={d.PrecioUnitario ?? 0}
+                              onChange={(e) => handlePrecioChange(realIndex, e.target.value)}
+                              onBlur={(e) => handlePrecioBlur(realIndex, e.target.value)}
+                              className="w-full h-10 pl-6 pr-2 border rounded-lg text-xs text-right"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-10 px-2 border rounded-lg bg-gray-100 flex items-center justify-end text-xs text-gray-400">
+                            -
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Subtotal */}
+                      <div className="col-span-1 flex items-center justify-end h-10">
+                        {tieneProducto ? (
+                          <span className="text-xs font-semibold text-blue-700">
+                            {formatPrice(d.Subtotal)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </div>
+
+                      {/* Botón eliminar */}
+                      <div className="col-span-1 flex justify-end">
+                        {detallesCrear.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onEliminarDetalle(realIndex);
+                              // Si después de eliminar, la página actual se queda vacía, ir a la anterior
+                              if (currentArticulos.length === 1 && currentPageArticulos > 1) {
+                                setCurrentPageArticulos(currentPageArticulos - 1);
+                              }
+                            }}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-full transition-colors"
+                            title="Eliminar artículo"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+
+                    {/* Selector de colores */}
+                    {tieneProducto && tipoStock === 'colores' && (
+                      <div className="mt-3">
+                        <div className="grid grid-cols-12 gap-3">
+                          <div className="col-span-4">
+                            <div className="text-xs font-medium text-gray-500 mb-1">Color</div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (producto) {
+                                  abrirSelectorColor(realIndex, producto);
+                                } else {
+                                  toast.error("Debe seleccionar un producto primero");
+                                  onActualizarDetalle(realIndex, "tipoStock", "general");
+                                }
+                              }}
+                              className={`flex items-center gap-2 px-3 py-2 rounded-lg border w-full ${
+                                tieneColores
+                                  ? 'border-purple-500 bg-purple-50'
+                                  : 'border-dashed border-gray-300 bg-white hover:border-purple-400'
+                              }`}
+                            >
+                              <Palette size={16} className={tieneColores ? 'text-purple-600' : 'text-gray-400'} />
+                              <span className={`text-xs ${
+                                tieneColores ? 'text-purple-800 font-medium' : 'text-gray-500'
+                              }`}>
+                                {tieneColores
+                                  ? `${d.colores.length} colores seleccionados`
+                                  : 'Seleccionar colores'
+                                }
+                              </span>
+                              <ChevronRight size={14} className="text-gray-400 ml-auto" />
+                            </button>
+                          </div>
+
+                          {/* Mostrar colores seleccionados */}
+                          {tieneColores && (
+                            <div className="col-span-8">
+                              <div className="text-xs font-medium text-gray-500 mb-1">Colores seleccionados</div>
+                              <div className="flex flex-wrap gap-2">
+                                {d.colores.map(color => (
+                                  <div
+                                    key={color.ColorId}
+                                    className="flex items-center gap-1 text-xs bg-white px-2 py-1 rounded border"
+                                    title={`${color.Nombre}: ${color.Stock} unidades`}
+                                  >
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color.Hex }} />
+                                    <span className="font-medium">{color.Nombre}</span>
+                                    <span className="text-gray-500 ml-1">({color.Stock})</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Descripción */}
+                    {tieneProducto && (
+                      <div className="mt-3">
+                        <input
+                          type="text"
+                          value={d.Descripcion || ''}
+                          onChange={(e) => onActualizarDetalle(realIndex, "Descripcion", e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
+                          placeholder="Descripción adicional (opcional)"
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-8 text-gray-500 border-2 border-dashed rounded-lg">
+                No hay artículos agregados. Haz clic en "Agregar artículo" para comenzar.
+              </div>
+            )}
           </div>
+
+          {/* PAGINACIÓN - Solo visible cuando hay más de 3 artículos */}
+          {totalPagesArticulos > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-gray-600">
+                Mostrando {currentArticulos.length} de {detallesCrear.length} artículos
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(currentPageArticulos - 1)}
+                  disabled={currentPageArticulos <= 1}
+                  className="flex items-center gap-1 px-3 py-1.5 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-sm"
+                >
+                  <ChevronLeft size={16} />
+                  Anterior
+                </button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPagesArticulos }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => handlePageChange(page)}
+                      className={`w-8 h-8 rounded-full text-sm ${
+                        currentPageArticulos === page
+                          ? 'bg-blue-600 text-white'
+                          : 'hover:bg-gray-100'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                
+                <button
+                  onClick={() => handlePageChange(currentPageArticulos + 1)}
+                  disabled={currentPageArticulos >= totalPagesArticulos}
+                  className="flex items-center gap-1 px-3 py-1.5 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-sm"
+                >
+                  Siguiente
+                  <ChevronRightIcon size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Total y botones */}

@@ -88,6 +88,8 @@ export const getVentaByIdModel = async (ventaId) => {
     throw error;
   }
 };
+
+
 export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId, metodoPago = null, connection = null) => {
   // Manejo de conexión: si no se pasa una externa, crear y liberar propia
   const useConnection = connection || await dbPool.getConnection();
@@ -141,14 +143,12 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId, 
       clienteCorreo = pedidoData.ClienteCorreo || null;
     }
 
-    // 🔥 NUEVO: Determinar estado de la venta según método de pago
-    const estadoVenta = (metodoPago === 'transferencia' || metodoPago === 'QR') 
-      ? 'pendiente' 
-      : 'pagado';
+    // 🔥 NUEVA LÓGICA: TODAS las ventas creadas desde pedidos se crean como PAGADO
+    // porque solo se llaman cuando el pedido está aprobado (transferencia) o entregado (contra entrega)
+    const estadoVenta = 'pagado';
 
-    console.log(`🔍 Venta creada - Pedido: ${pedidoData.PedidoClienteId}, Pago: ${metodoPago}, Estado: ${estadoVenta}`);
+    console.log(`🔍 Venta creada - Pedido: ${pedidoData.PedidoClienteId}, Estado: ${estadoVenta}`);
 
-    // 🔥 MODIFICADO: INSERT incluye ahora el campo Voucher (heredado del pedido si existe)
     await useConnection.query(
       `INSERT INTO ventas (
         VentaId, Origen, PedidoClienteId, ClienteId, ClienteNombre, 
@@ -167,7 +167,7 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId, 
         IVA,
         total,
         estadoVenta,
-        pedidoData.Voucher || null  // ← NUEVO: Se copia el voucher del pedido a la venta
+        pedidoData.Voucher || null
       ]
     );
 
@@ -177,12 +177,13 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId, 
     return {
       success: true,
       VentaId: VentaId,
-      alreadyExists: false
+      alreadyExists: false,
+      estado: estadoVenta
     };
 
   } catch (error) {
     if (!connection) await useConnection.rollback();
-    console.error("Error en createVentaFromPedidoModel:", error);
+    console.error("❌ Error en createVentaFromPedidoModel:", error);
     throw error;
   } finally {
     if (shouldRelease && useConnection) {
@@ -365,6 +366,10 @@ export const getVentasPaginated = async ({
 
   const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
+  // Agregar log para ver la consulta
+  console.log('🔍 [MODEL] Query params:', params);
+  console.log('🔍 [MODEL] Where clause:', whereClause);
+
   const [rows] = await dbPool.query(`
     SELECT 
       v.VentaId,
@@ -393,6 +398,8 @@ export const getVentasPaginated = async ({
     ORDER BY v.FechaVenta DESC
     LIMIT ? OFFSET ?
   `, [...params, limit, offset]);
+
+  console.log(`✅ [MODEL] ${rows.length} ventas encontradas`);
 
   const [countResult] = await dbPool.query(`
     SELECT COUNT(DISTINCT v.VentaId) as total 

@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from "react";
 import {
   ArrowLeft, User, CreditCard,
-  Check, X, Plus,
+  X, Plus,
   Package, UserCheck, Store,
-  ChevronRight, ChevronLeft
+  ChevronRight, ChevronLeft, Save, Upload, FileText
 } from "lucide-react";
 import { toast } from "react-toastify";
 import {
   calcularTotalDetalles,
-  getProductoNombre,
   getColorById,
   formatPrice
 } from "../pedidos/utils/pedidosHelpers";
+import axios from "axios";
 
 import { ClientSelector } from "./ClientSelector";
 import { ProductSelector } from "./ProductSelector";
@@ -19,7 +19,8 @@ import { ServicioSelector } from "./ServicioSelector";
 import { ProductoColoresModal } from "../../productos/components/ProductoColoresModal";
 import { DetalleItem } from "./DetalleItem";
 
-export const OrderForm = ({
+export const OrderEdit = ({
+  pedidoOriginal,
   formCrear,
   setFormCrear,
   detallesCrear,
@@ -28,8 +29,6 @@ export const OrderForm = ({
   setTipoClienteCrear,
   clienteWalkinCrear,
   setClienteWalkinCrear,
-  voucherFileCrear,
-  setVoucherFileCrear,
   uploading,
   errores,
   productos,
@@ -37,7 +36,7 @@ export const OrderForm = ({
   colores,
   clientes,
   onBack,
-  onCreate
+  onUpdate
 }) => {
   // Estados para modales
   const [modalProductosAbierto, setModalProductosAbierto] = useState(false);
@@ -46,7 +45,7 @@ export const OrderForm = ({
   const [modalClientesAbierto, setModalClientesAbierto] = useState(false);
   const [currentDetailIndex, setCurrentDetailIndex] = useState(null);
 
-  // Estados para cliente seleccionado
+  // Estado para cliente seleccionado
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
 
   // Estado para colores del producto seleccionado
@@ -54,48 +53,125 @@ export const OrderForm = ({
 
   // Estados para paginación de artículos
   const [currentPageArticulos, setCurrentPageArticulos] = useState(1);
-  const itemsPerPageArticulos = 3; // 3 artículos por página
+  const itemsPerPageArticulos = 3;
 
-  // Efecto para fecha automática
+  // Estado para el voucher (comprobante)
+  const [voucherFile, setVoucherFile] = useState(null);
+  const [voucherPreview, setVoucherPreview] = useState(null);
+  const [uploadingVoucher, setUploadingVoucher] = useState(false);
+
+  // Determinar si el pedido NO tiene comprobante (solo aplica para pedidos sin voucher)
+  const noTieneComprobante = !formCrear?.Voucher && !voucherPreview;
+
+  // Determinar si el método de pago es transferencia
+  const esTransferencia = formCrear?.MetodoPago === 'transferencia';
+
+  // Efecto para inicializar el cliente cuando se carga el componente
   useEffect(() => {
-    if (!formCrear.FechaRegistro) {
-      const hoy = new Date().toISOString().split('T')[0];
-      setFormCrear({ ...formCrear, FechaRegistro: hoy });
-    }
-  }, [formCrear, setFormCrear]);
+    console.log('🔄 Inicializando OrderEdit con pedidoOriginal:', pedidoOriginal);
 
-  // Efecto para detectar cuando el modal de colores se cierra
-  useEffect(() => {
-    if (!modalColoresProductoAbierto && currentDetailIndex !== null) {
-      // El modal se acaba de cerrar
-      console.log('🎨 Modal cerrado, colores seleccionados:', coloresSeleccionados);
+    if (pedidoOriginal?.ClienteId && tipoClienteCrear === 'registrado') {
+      console.log('🎯 Cliente ID del pedido original:', pedidoOriginal.ClienteId);
 
-      if (coloresSeleccionados && coloresSeleccionados.length > 0) {
-        const nuevos = [...detallesCrear];
-        const colorSeleccionado = coloresSeleccionados[0];
+      // Buscar en clientes si ya están cargados
+      if (clientes.length > 0) {
+        const clienteInicial = clientes.find(c =>
+          c.CedulaId === pedidoOriginal.ClienteId ||
+          c.ClienteId === pedidoOriginal.ClienteId ||
+          c.id === pedidoOriginal.ClienteId
+        );
 
-        nuevos[currentDetailIndex] = {
-          ...nuevos[currentDetailIndex],
-          ColorId: colorSeleccionado.ColorId,
-          ColorNombre: colorSeleccionado.Nombre,
-          ColorHex: colorSeleccionado.Hex
-        };
+        if (clienteInicial) {
+          console.log('✅ Cliente inicial encontrado:', clienteInicial);
 
-        setDetallesCrear(nuevos);
-        toast.success(`Color ${colorSeleccionado.Nombre} asignado al producto`);
-      } else if (coloresSeleccionados.length === 0 && detallesCrear[currentDetailIndex]?.ColorId) {
-        // Si no hay colores seleccionados pero antes había uno, lo quitamos
-        const nuevos = [...detallesCrear];
-        nuevos[currentDetailIndex] = {
-          ...nuevos[currentDetailIndex],
-          ColorId: null,
-          ColorNombre: null,
-          ColorHex: null
-        };
-        setDetallesCrear(nuevos);
+          // Crear el objeto cliente con la estructura correcta
+          const clienteData = {
+            CedulaId: clienteInicial.CedulaId || clienteInicial.ClienteId || clienteInicial.id,
+            NombreCompleto: clienteInicial.NombreCompleto || clienteInicial.Nombre,
+            Telefono: clienteInicial.Telefono,
+            CorreoElectronico: clienteInicial.CorreoElectronico
+          };
+
+          setClienteSeleccionado(clienteData);
+        } else {
+          console.log('⚠️ Cliente no encontrado en lista inicial');
+        }
+      } else {
+        console.log('⚠️ Lista de clientes vacía en inicialización');
       }
     }
-  }, [modalColoresProductoAbierto, coloresSeleccionados, currentDetailIndex]);
+  }, [pedidoOriginal, clientes, tipoClienteCrear]);
+
+  // Efecto para inicializar la vista previa del voucher
+  useEffect(() => {
+    if (formCrear?.Voucher) {
+      setVoucherPreview(formCrear.Voucher);
+    }
+  }, [formCrear?.Voucher]);
+
+  // Efecto único para cargar el cliente seleccionado
+  useEffect(() => {
+    const cargarClienteSeleccionado = async () => {
+      // Solo proceder si hay un ClienteId y es tipo registrado
+      if (!formCrear.ClienteId || tipoClienteCrear !== 'registrado') {
+        return;
+      }
+
+      console.log('🔍 Intentando cargar cliente con ID:', formCrear.ClienteId);
+      console.log('📊 Estado actual - clientes cargados:', clientes.length);
+      console.log('📊 clienteSeleccionado actual:', clienteSeleccionado);
+
+      // Si ya tenemos un cliente seleccionado y coincide, no hacer nada
+      if (clienteSeleccionado) {
+        const idCoincide =
+          clienteSeleccionado.CedulaId === formCrear.ClienteId ||
+          clienteSeleccionado.ClienteId === formCrear.ClienteId ||
+          clienteSeleccionado.id === formCrear.ClienteId;
+
+        if (idCoincide) {
+          console.log('✅ Cliente ya seleccionado correctamente');
+          return;
+        }
+      }
+
+      // Buscar en la lista de clientes actual
+      if (clientes.length > 0) {
+        const clienteEncontrado = clientes.find(c =>
+          c.CedulaId === formCrear.ClienteId ||
+          c.ClienteId === formCrear.ClienteId ||
+          c.id === formCrear.ClienteId
+        );
+
+        if (clienteEncontrado) {
+          console.log('✅ Cliente encontrado en lista:', clienteEncontrado);
+
+          // Crear el objeto cliente con la estructura correcta
+          const clienteData = {
+            CedulaId: clienteEncontrado.CedulaId || clienteEncontrado.ClienteId || clienteEncontrado.id,
+            NombreCompleto: clienteEncontrado.NombreCompleto || clienteEncontrado.Nombre,
+            Telefono: clienteEncontrado.Telefono,
+            CorreoElectronico: clienteEncontrado.CorreoElectronico
+          };
+
+          setClienteSeleccionado(clienteData);
+          return;
+        } else {
+          console.log('⚠️ Cliente no encontrado en la lista. IDs disponibles:',
+            clientes.map(c => ({
+              CedulaId: c.CedulaId,
+              ClienteId: c.ClienteId,
+              id: c.id,
+              Nombre: c.NombreCompleto || c.Nombre
+            }))
+          );
+        }
+      } else {
+        console.log('⚠️ Lista de clientes vacía, esperando carga...');
+      }
+    };
+
+    cargarClienteSeleccionado();
+  }, [formCrear.ClienteId, clientes, tipoClienteCrear, clienteSeleccionado]);
 
   // Resetear a página 1 cuando se añade o elimina un artículo
   useEffect(() => {
@@ -109,10 +185,8 @@ export const OrderForm = ({
     return detallesCrear.slice(startIndex, endIndex);
   };
 
-  // Calcular total de páginas
   const totalPagesArticulos = Math.ceil(detallesCrear.length / itemsPerPageArticulos);
 
-  // Manejar cambio de página
   const handlePageChange = (page) => {
     setCurrentPageArticulos(page);
   };
@@ -123,7 +197,17 @@ export const OrderForm = ({
   };
 
   const seleccionarCliente = (cliente) => {
-    setClienteSeleccionado(cliente);
+    console.log('👤 Seleccionando cliente:', cliente);
+
+    // Crear el objeto cliente con la estructura correcta
+    const clienteData = {
+      CedulaId: cliente.CedulaId || cliente.ClienteId || cliente.id,
+      NombreCompleto: cliente.NombreCompleto || cliente.Nombre,
+      Telefono: cliente.Telefono,
+      CorreoElectronico: cliente.CorreoElectronico
+    };
+
+    setClienteSeleccionado(clienteData);
     setFormCrear({
       ...formCrear,
       ClienteId: cliente.CedulaId || cliente.ClienteId || cliente.id || "",
@@ -136,15 +220,11 @@ export const OrderForm = ({
 
   // Handlers para productos
   const abrirModalProductos = (index) => {
-    console.log('📦 Abriendo selector productos para índice:', index);
     setCurrentDetailIndex(index);
     setModalProductosAbierto(true);
   };
 
   const seleccionarProducto = (producto) => {
-    console.log('📦 Producto seleccionado:', producto);
-    console.log('📦 Para índice:', currentDetailIndex);
-
     if (currentDetailIndex !== null) {
       const nuevos = [...detallesCrear];
       nuevos[currentDetailIndex] = {
@@ -162,26 +242,18 @@ export const OrderForm = ({
         ProductoNombre: producto.Nombre,
         ProductoImagen: producto.Imagen || ""
       };
-
-      console.log('📦 Detalle actualizado:', nuevos[currentDetailIndex]);
       setDetallesCrear(nuevos);
       setModalProductosAbierto(false);
-    } else {
-      console.error(' No hay índice seleccionado');
-      toast.error('Error al seleccionar producto');
     }
   };
 
   // Handlers para servicios
   const abrirModalServicios = (index) => {
-    console.log('Abriendo selector servicios para índice:', index);
     setCurrentDetailIndex(index);
     setModalServiciosAbierto(true);
   };
 
   const seleccionarServicio = (servicio) => {
-    console.log(' Servicio seleccionado:', servicio);
-
     if (currentDetailIndex !== null) {
       const nuevos = [...detallesCrear];
       nuevos[currentDetailIndex] = {
@@ -199,16 +271,11 @@ export const OrderForm = ({
     setModalServiciosAbierto(false);
   };
 
-  // Handlers para colores (solo para productos)
+  // Handlers para colores
   const abrirModalColores = (index) => {
-    console.log(' Abriendo modal colores para índice:', index);
-    console.log(' Detalle en índice:', detallesCrear[index]);
-
-    // Solo abrir si es producto
     if (detallesCrear[index]?.tipo === 'producto') {
       const detalleProducto = detallesCrear[index];
 
-      // Verificar que tenga un ProductoId
       if (!detalleProducto.ProductoId) {
         toast.warning("El producto no tiene un ID válido");
         return;
@@ -216,13 +283,9 @@ export const OrderForm = ({
 
       setCurrentDetailIndex(index);
 
-      // Cargar el color actual si existe en el formato que espera el modal
       if (detalleProducto.ColorId) {
-        // Buscar el color completo en la lista de colores
         const colorCompleto = colores.find(c => c.ColorId === detalleProducto.ColorId);
-
         if (colorCompleto) {
-          // El modal espera un array de objetos con ColorId, Stock, Nombre, Hex
           setColoresSeleccionados([{
             ColorId: colorCompleto.ColorId,
             Stock: 1,
@@ -230,7 +293,6 @@ export const OrderForm = ({
             Hex: colorCompleto.Hex || colorCompleto.CodigoHex
           }]);
         } else {
-          // Si no encontramos el color completo, usamos la info del detalle
           setColoresSeleccionados([{
             ColorId: detalleProducto.ColorId,
             Stock: 1,
@@ -248,11 +310,25 @@ export const OrderForm = ({
     }
   };
 
+  useEffect(() => {
+    if (!modalColoresProductoAbierto && currentDetailIndex !== null) {
+      if (coloresSeleccionados && coloresSeleccionados.length > 0) {
+        const nuevos = [...detallesCrear];
+        const colorSeleccionado = coloresSeleccionados[0];
+        nuevos[currentDetailIndex] = {
+          ...nuevos[currentDetailIndex],
+          ColorId: colorSeleccionado.ColorId,
+          ColorNombre: colorSeleccionado.Nombre,
+          ColorHex: colorSeleccionado.Hex
+        };
+        setDetallesCrear(nuevos);
+      }
+    }
+  }, [modalColoresProductoAbierto, coloresSeleccionados, currentDetailIndex]);
+
   // Handlers para detalles
   const cambiarTipoDetalle = (index, nuevoTipo) => {
-    console.log('Cambiando tipo de detalle:', index, nuevoTipo);
     const nuevos = [...detallesCrear];
-
     if (nuevoTipo === 'producto') {
       nuevos[index] = {
         ...nuevos[index],
@@ -279,7 +355,6 @@ export const OrderForm = ({
       };
       setTimeout(() => abrirModalServicios(index), 100);
     }
-
     setDetallesCrear(nuevos);
   };
 
@@ -304,41 +379,78 @@ export const OrderForm = ({
   const eliminarDetalle = (index) => {
     if (detallesCrear.length > 1) {
       setDetallesCrear(prev => prev.filter((_, i) => i !== index));
-      // Si después de eliminar, la página actual se queda vacía, ir a la anterior
       const currentArticulos = getCurrentPageArticulos();
       if (currentArticulos.length === 1 && currentPageArticulos > 1) {
         setCurrentPageArticulos(currentPageArticulos - 1);
       }
     } else {
-      const nuevos = [...detallesCrear];
-      nuevos[0] = {
-        ...nuevos[0],
-        ProductoId: null,
-        ServicioId: null,
-        UrlImagen: "",
-        Precio: 0,
-        ColorId: null,
-        tipoStock: 'general'
-      };
-      setDetallesCrear(nuevos);
+      toast.warning("El pedido debe tener al menos un artículo");
     }
   };
 
   const actualizarDetalle = (index, campo, valor) => {
     const nuevos = [...detallesCrear];
     nuevos[index] = { ...nuevos[index], [campo]: valor };
+
+    // Recalcular subtotal si cambia cantidad o precio
+    if (campo === 'Cantidad' || campo === 'Precio') {
+      const cantidad = Number(nuevos[index].Cantidad) || 0;
+      const precio = Number(nuevos[index].Precio) || 0;
+      nuevos[index].Subtotal = cantidad * precio;
+    }
+
     setDetallesCrear(nuevos);
+  };
+
+  // Handler para subir voucher
+  const handleVoucherChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tamaño (máximo 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('El archivo debe ser menor a 10MB');
+      e.target.value = null;
+      return;
+    }
+
+    // Validar tipo de archivo
+    const tiposPermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    if (!tiposPermitidos.includes(file.type)) {
+      toast.error('Solo se permiten imágenes (JPEG, PNG, GIF, WEBP) y PDF');
+      e.target.value = null;
+      return;
+    }
+
+    setVoucherFile(file);
+
+    // Crear vista previa
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setVoucherPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const eliminarVoucher = () => {
+    setVoucherFile(null);
+    setVoucherPreview(null);
+    // También actualizar formCrear para eliminar el voucher existente
+    setFormCrear({
+      ...formCrear,
+      Voucher: null,
+      VoucherPreview: null
+    });
   };
 
   // Funciones helper
   const getItemNombre = (detalle) => {
-    // Si ya tenemos el nombre guardado en el detalle, usarlo
     if (detalle.ProductoNombre) return detalle.ProductoNombre;
-
     if (detalle.ProductoId) {
       const producto = productos.find(p => p.ProductoId === detalle.ProductoId);
       return producto?.Nombre || "Producto";
-    } else if (detalle.ServicioId) {
+    }
+    if (detalle.ServicioId) {
       const servicio = servicios.find(s => s.ServicioId === detalle.ServicioId);
       return servicio?.Nombre || "Servicio";
     }
@@ -346,14 +458,13 @@ export const OrderForm = ({
   };
 
   const getItemImagen = (detalle) => {
-    // Si ya tenemos la imagen en el detalle, usarla
     if (detalle.UrlImagen) return detalle.UrlImagen;
     if (detalle.ProductoImagen) return detalle.ProductoImagen;
-
     if (detalle.ProductoId) {
       const producto = productos.find(p => p.ProductoId === detalle.ProductoId);
       return producto?.Imagen || "";
-    } else if (detalle.ServicioId) {
+    }
+    if (detalle.ServicioId) {
       const servicio = servicios.find(s => s.ServicioId === detalle.ServicioId);
       return servicio?.Imagen || "";
     }
@@ -369,6 +480,101 @@ export const OrderForm = ({
 
   const currentArticulos = getCurrentPageArticulos();
 
+  console.log('📊 Estado final - clienteSeleccionado:', clienteSeleccionado);
+  console.log('📊 formCrear:', {
+    ClienteId: formCrear.ClienteId,
+    NombreCliente: formCrear.NombreCliente
+  });
+
+  const handleSubmit = async () => {
+    // Validaciones básicas
+    const errs = [];
+    if (!formCrear.FechaRegistro) errs.push("La fecha es obligatoria.");
+    if (tipoClienteCrear === 'walkin' && !clienteWalkinCrear.Nombre) {
+      errs.push("El nombre del cliente es obligatorio");
+    }
+    if (!detallesCrear?.length) errs.push("Agregue al menos un producto/servicio.");
+
+    if (errs.length) {
+      setErrores(errs);
+      toast.error("Corrija los errores");
+      return;
+    }
+
+    // Preparar FormData
+    const formData = new FormData();
+
+    // Preparar los datos del pedido
+    const detallesLimpios = detallesCrear.map(d => {
+      let precioLimpio = 0;
+      if (d.Precio) {
+        const precioStr = String(d.Precio).replace(/\./g, '').replace(',', '.');
+        precioLimpio = parseFloat(precioStr) || 0;
+      }
+
+      return {
+        DetallePedidoClienteId: d.DetallePedidoClienteId || null,
+        ProductoId: d.ProductoId?.trim() || null,
+        ServicioId: d.ServicioId?.trim() || null,
+        Cantidad: Number(d.Cantidad) || 1,
+        Descripcion: d.Descripcion || "",
+        UrlImagen: d.UrlImagen || "",
+        Precio: precioLimpio,
+        ColorId: d.ColorId || null
+      };
+    });
+
+    const pedidoActualizado = {
+      ClienteId: tipoClienteCrear === 'registrado' ? formCrear.ClienteId?.trim() || null : null,
+      FechaRegistro: formCrear.FechaRegistro,
+      Total: Number(formCrear.Total) || 0,
+      MetodoPago: formCrear.MetodoPago,
+      NombreRecibe: formCrear.MetodoPago === "contra_entrega" ? formCrear.NombreRecibe || null : null,
+      TelefonoEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.TelefonoEntrega || null : null,
+      DireccionEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.DireccionEntrega || null : null,
+      TipoCliente: tipoClienteCrear,
+      ClienteNombre: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Nombre || null : null,
+      ClienteTelefono: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Telefono || null : null,
+      ClienteCorreo: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Correo || null : null,
+      detalle: detallesLimpios
+    };
+
+    formData.append('pedido', JSON.stringify(pedidoActualizado));
+
+    // Si hay un nuevo voucher, agregarlo al FormData
+    if (voucherFile) {
+      formData.append('voucher', voucherFile);
+      console.log('📎 Adjuntando voucher:', voucherFile.name);
+    }
+
+    try {
+      setUploadingVoucher(true);
+      const response = await axios.put(
+        `http://localhost:3000/api/pedidos-clientes/${pedidoOriginal.PedidoClienteId}`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        }
+      );
+
+      console.log('✅ Respuesta del servidor:', response.data);
+      toast.success("Pedido actualizado correctamente");
+      onBack(); // Esto llama a goToList() que recarga los datos
+    } catch (err) {
+      console.error('❌ Error:', err);
+      toast.error(`Error: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setUploadingVoucher(false);
+    }
+  };
+
+  // Función para determinar si la URL es una imagen
+  const esImagen = (url) => {
+    if (!url) return false;
+    const extension = url.split('.').pop().toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension);
+  };
+
   return (
     <>
       <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -380,7 +586,10 @@ export const OrderForm = ({
           >
             <ArrowLeft size={18} />
           </button>
-          <h3 className="text-lg font-bold text-slate-800">Nuevo Pedido</h3>
+          <h3 className="text-lg font-bold text-slate-800">Editar Pedido</h3>
+          <span className="ml-auto text-sm text-slate-500 font-mono">
+            ID: {pedidoOriginal?.PedidoClienteId?.substring(0, 8)}...
+          </span>
         </div>
 
         {/* Errores */}
@@ -413,8 +622,8 @@ export const OrderForm = ({
                     setClienteSeleccionado(null);
                   }}
                   className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${tipoClienteCrear === 'registrado'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                 >
                   <UserCheck size={24} className="mb-2" />
@@ -431,13 +640,13 @@ export const OrderForm = ({
                     setClienteSeleccionado(null);
                   }}
                   className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${tipoClienteCrear === 'walkin'
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                 >
                   <Store size={24} className="mb-2" />
-                  <div className="font-medium">Cliente No Registrado</div>
-                  <div className="text-sm text-center mt-1">Cliente no existente</div>
+                  <div className="font-medium">Cliente Walk-in</div>
+                  <div className="text-sm text-center mt-1">Cliente ocasional</div>
                 </button>
               </div>
             </div>
@@ -445,15 +654,28 @@ export const OrderForm = ({
             {/* Cliente Registrado */}
             {tipoClienteCrear === 'registrado' && (
               <div>
-                {clienteSeleccionado ? (
+                {(clienteSeleccionado || formCrear.ClienteId) ? (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="font-medium text-green-800">Cliente seleccionado:</p>
                         <p className="text-sm mt-1">
-                          <span className="font-medium">{formCrear.NombreCliente}</span>
-                          {formCrear.TelefonoEntrega && ` - ${formCrear.TelefonoEntrega}`}
+                          <span className="font-medium">
+                            {clienteSeleccionado?.NombreCompleto ||
+                              formCrear.NombreCliente ||
+                              'Cliente'}
+                          </span>
+                          {(clienteSeleccionado?.Telefono || formCrear.TelefonoEntrega) && (
+                            <span className="ml-2 text-slate-600">
+                              📞 {clienteSeleccionado?.Telefono || formCrear.TelefonoEntrega}
+                            </span>
+                          )}
                         </p>
+                        {clienteSeleccionado?.CorreoElectronico && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            ✉️ {clienteSeleccionado.CorreoElectronico}
+                          </p>
+                        )}
                       </div>
                       <button
                         onClick={() => {
@@ -512,10 +734,6 @@ export const OrderForm = ({
                     value={clienteWalkinCrear.Telefono}
                     onChange={(e) => {
                       const value = e.target.value.replace(/\D/g, '');
-                      if (value && value[0] !== '3') {
-                        toast.warning('El teléfono debe comenzar con 3');
-                        return;
-                      }
                       setClienteWalkinCrear({ ...clienteWalkinCrear, Telefono: value });
                     }}
                     className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
@@ -537,80 +755,54 @@ export const OrderForm = ({
             )}
           </div>
 
-          {/* MÉTODO DE PAGO - MODIFICADO */}
+          {/* MÉTODO DE PAGO - Solo lectura en edición */}
           <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
             <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
               <CreditCard size={20} /> Método de Pago
             </h4>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div>
-                <select
-                  value={formCrear.MetodoPago}
-                  onChange={(e) => setFormCrear({ ...formCrear, MetodoPago: e.target.value })}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  {/* MISMAS OPCIONES PARA AMBOS TIPOS DE CLIENTE */}
-                  <option value="transferencia">Transferencia Bancaria</option>
-                  <option value="contra_entrega">Contra Entrega</option>
-                </select>
-              </div>
-
-              {formCrear.MetodoPago === "transferencia" && (
-                <div className="lg:col-span-2">
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file && file.size > 10 * 1024 * 1024) {
-                        toast.error('El archivo debe ser menor a 10MB');
-                        e.target.value = null;
-                        return;
-                      }
-                      setVoucherFileCrear(file);
-                    }}
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                  {voucherFileCrear && (
-                    <div className="mt-2 flex items-center justify-between p-2 bg-green-50 rounded-lg">
-                      <span className="text-sm text-green-700 truncate">{voucherFileCrear.name}</span>
-                      <button onClick={() => setVoucherFileCrear(null)} className="text-red-600 hover:text-red-800">
-                        <X size={16} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {formCrear.MetodoPago === "contra_entrega" && (
-                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <input
-                    type="text"
-                    value={formCrear.NombreRecibe || ""}
-                    onChange={(e) => setFormCrear({ ...formCrear, NombreRecibe: e.target.value })}
-                    placeholder="Nombre quien recibe"
-                    className="px-4 py-3 border rounded-lg"
-                  />
-                  <input
-                    type="tel"
-                    value={formCrear.TelefonoEntrega || ""}
-                    onChange={(e) => setFormCrear({ ...formCrear, TelefonoEntrega: e.target.value.replace(/\D/g, '') })}
-                    placeholder="Teléfono"
-                    className="px-4 py-3 border rounded-lg"
-                    maxLength="10"
-                  />
-                  <textarea
-                    value={formCrear.DireccionEntrega || ""}
-                    onChange={(e) => setFormCrear({ ...formCrear, DireccionEntrega: e.target.value })}
-                    placeholder="Dirección"
-                    className="px-4 py-3 border rounded-lg"
-                    rows="1"
-                  />
-                </div>
-              )}
+            <div className="p-3 bg-slate-100 rounded-lg">
+              <p className="text-sm font-medium">
+                {formCrear.MetodoPago === 'transferencia' ? 'Transferencia Bancaria' :
+                  formCrear.MetodoPago === 'contra_entrega' ? 'Contra Entrega' :
+                    formCrear.MetodoPago}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">El método de pago no se puede modificar</p>
             </div>
           </div>
+
+          {/* COMPROBANTE DE PAGO - Solo para transferencia y cuando NO tiene comprobante */}
+          {esTransferencia && noTieneComprobante && (
+            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+              <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
+                <FileText size={20} /> Comprobante de Pago
+              </h4>
+
+              <div>
+                <label className="block mb-2 text-sm text-slate-600">
+                  Este pedido no tiene comprobante adjunto. Puedes subir uno ahora:
+                </label>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleVoucherChange}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white"
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  Formatos permitidos: JPG, PNG, GIF, WEBP, PDF. Máximo 10MB.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Mensaje informativo cuando ya tiene comprobante */}
+          {esTransferencia && !noTieneComprobante && (
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <p className="text-sm text-blue-700 flex items-center gap-2">
+                <FileText size={16} />
+                Este pedido ya tiene un comprobante adjunto. Para modificarlo, puedes cancelar el pedido y crear uno nuevo.
+              </p>
+            </div>
+          )}
 
           {/* PRODUCTOS Y SERVICIOS */}
           <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
@@ -637,10 +829,9 @@ export const OrderForm = ({
               <div className="col-span-1 text-right">ACCIÓN</div>
             </div>
 
-            {/* Contenedor de artículos - SIN altura fija */}
+            {/* Contenedor de artículos */}
             <div className="space-y-4">
               {currentArticulos.map((detalle, index) => {
-                // Calcular el índice real en el array completo
                 const realIndex = (currentPageArticulos - 1) * itemsPerPageArticulos + index;
                 const esServicio = isService(detalle);
                 const itemSeleccionado = hasItem(detalle);
@@ -673,13 +864,12 @@ export const OrderForm = ({
               })}
             </div>
 
-            {/* PAGINACIÓN - Solo visible cuando hay más de 3 artículos */}
+            {/* Paginación */}
             {totalPagesArticulos > 1 && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
                 <div className="text-sm text-slate-600">
                   Mostrando {currentArticulos.length} de {detallesCrear.length} artículos
                 </div>
-
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handlePageChange(currentPageArticulos - 1)}
@@ -689,22 +879,20 @@ export const OrderForm = ({
                     <ChevronLeft size={16} />
                     Anterior
                   </button>
-
                   <div className="flex items-center gap-1">
                     {Array.from({ length: totalPagesArticulos }, (_, i) => i + 1).map((page) => (
                       <button
                         key={page}
                         onClick={() => handlePageChange(page)}
                         className={`w-8 h-8 rounded-full text-sm ${currentPageArticulos === page
-                            ? 'bg-blue-600 text-white'
-                            : 'hover:bg-slate-100'
+                          ? 'bg-blue-600 text-white'
+                          : 'hover:bg-slate-100'
                           }`}
                       >
                         {page}
                       </button>
                     ))}
                   </div>
-
                   <button
                     onClick={() => handlePageChange(currentPageArticulos + 1)}
                     disabled={currentPageArticulos >= totalPagesArticulos}
@@ -731,19 +919,20 @@ export const OrderForm = ({
           {/* BOTONES */}
           <div className="flex gap-4 pt-4">
             <button
-              onClick={onCreate}
-              disabled={uploading}
-              className={`flex-1 ${uploading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'
+              onClick={handleSubmit}
+              disabled={uploading || uploadingVoucher}
+              className={`flex-1 ${uploading || uploadingVoucher ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
                 } text-white py-3.5 rounded-lg font-medium flex items-center justify-center gap-2`}
             >
-              {uploading ? (
+              {uploading || uploadingVoucher ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  Creando...
+                  Guardando...
                 </>
               ) : (
                 <>
-                  Crear Pedido
+                  <Save size={18} />
+                  Guardar Cambios
                 </>
               )}
             </button>

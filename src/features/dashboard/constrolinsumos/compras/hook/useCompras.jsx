@@ -8,7 +8,7 @@ import {
 import { toast } from "react-toastify";
 
 export const ESTADOS_COMPRA = {
-  APROBADO: 'aprobado' // 🔥 Solo un estado
+  APROBADO: 'aprobado' //  Solo un estado
 };
 
 export const useCompras = () => {
@@ -75,13 +75,15 @@ export const useCompras = () => {
     try {
       let resultado;
 
-      if (filtroCampo && filtroValor) {
+      if (filtroCampo && filtroValor && filtroValor.trim() !== '') {
+        // Usar búsqueda
         resultado = await buscarCompras(filtroCampo, filtroValor, currentPage, itemsPerPage);
       } else {
+        // Usar paginación normal
         resultado = await getComprasPaginated(currentPage, itemsPerPage);
       }
 
-      console.log("📥 fetchCompras - RESPUESTA CRUDA:", resultado);
+      console.log("📥 fetchCompras - RESPUESTA:", resultado);
 
       if (!resultado) {
         console.error("❌ resultado es null/undefined");
@@ -89,21 +91,22 @@ export const useCompras = () => {
         return;
       }
 
-      // 🔥 Extraer datos y paginación
+      // Extraer datos y paginación
       const data = resultado?.data || [];
       const pagination = resultado?.pagination || { 
         totalItems: 0, 
         totalPages: 1, 
-        currentPage, 
-        itemsPerPage 
+        currentPage: currentPage, 
+        itemsPerPage: itemsPerPage 
       };
 
       console.log("✅ fetchCompras - DATOS EXTRAÍDOS:", {
         cantidad: data.length,
-        pagination
+        totalItems: pagination.totalItems,
+        totalPages: pagination.totalPages
       });
 
-      // 🔥 ACTUALIZAR ESTADOS
+      // Actualizar estados
       setPaginatedData(data);
       setCompras(data);
       setTotalItems(pagination.totalItems);
@@ -121,25 +124,27 @@ export const useCompras = () => {
     }
   };
 
-  // 🔥 Cargar catálogos al montar
+  // Cargar catálogos al montar
   useEffect(() => {
     fetchCatalogos();
   }, []);
 
-  // 🔥 Cargar compras al montar el componente
+  // Cargar compras al montar el componente
   useEffect(() => {
     console.log("🔄 Cargando compras iniciales...");
     fetchCompras();
   }, []);
 
-  // 🔥 Resetear a página 1 cuando cambian los filtros
+  // Resetear a página 1 cuando cambian los filtros
   useEffect(() => {
-    setCurrentPage(1);
+    if (filtroCampo || filtroValor) {
+      setCurrentPage(1);
+    }
   }, [filtroCampo, filtroValor]);
 
-  // 🔥 Cargar compras cuando cambian: página, items por página o filtros
+  // Cargar compras cuando cambian: página, items por página o filtros
   useEffect(() => {
-    console.log("🔄 EJECUTANDO fetchCompras POR CAMBIO EN DEPENDENCIAS");
+    console.log("🔄 EJECUTANDO fetchCompras POR CAMBIO");
     fetchCompras();
   }, [currentPage, itemsPerPage, filtroCampo, filtroValor]);
 
