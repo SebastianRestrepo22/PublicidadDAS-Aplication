@@ -18,11 +18,19 @@ export const useRoles = () => {
   const [permissionsByModule, setPermissionsByModule] = useState({});
   const [filtroCampo, setFiltroCampo] = useState('');
   const [filtroValor, setFiltroValor] = useState('');
-  
+
   // Estados para errores del formulario
   const [submitted, setSubmitted] = useState(false);
   const [rolError, setRolError] = useState('');
   const [originalNombre, setOriginalNombre] = useState('');
+
+  // ✅ AGREGAR: Estado para el modal de confirmación
+  const [confirmEstadoModal, setConfirmEstadoModal] = useState({
+    open: false,
+    rolId: null,
+    nuevoEstado: null,
+    nombreRol: ''
+  });
 
   // Cargar permisos
   useEffect(() => {
@@ -30,7 +38,7 @@ export const useRoles = () => {
       try {
         const permisos = await getPermissions();
         setAllPermissions(permisos);
-        
+
         const grouped = permisos.reduce((acc, permiso) => {
           const modulo = permiso.Modulo || 'General';
           if (!acc[modulo]) acc[modulo] = [];
@@ -81,9 +89,29 @@ export const useRoles = () => {
     cargarRoles();
   }, [currentPage, itemsPerPage, filtroCampo, filtroValor]);
 
-  const handleToggleEstado = async (roleId, nuevoEstado) => {
+  // ✅ MODIFICAR: handleToggleEstado para usar el modal
+  const handleToggleEstado = (roleId, nuevoEstado, nombreRol, isSystem) => {
+    // Si es rol del sistema, mostrar mensaje y no abrir modal
+    if (isSystem) {
+      toast.warning(`El rol "${nombreRol}" es del sistema y no se puede desactivar`);
+      return;
+    }
+
+    // Abrir modal de confirmación
+    setConfirmEstadoModal({
+      open: true,
+      rolId: roleId,
+      nuevoEstado,
+      nombreRol
+    });
+  };
+
+  // ✅ AGREGAR: Función para confirmar el cambio de estado
+  const handleConfirmToggleEstado = async () => {
+    const { rolId, nuevoEstado } = confirmEstadoModal;
+
     try {
-      const response = await axios.put(`http://localhost:3000/roles/${roleId}/estado`, {
+      const response = await axios.put(`http://localhost:3000/roles/${rolId}/estado`, {
         estado: nuevoEstado
       });
       toast.success(response.data.message);
@@ -94,6 +122,8 @@ export const useRoles = () => {
       } else {
         toast.error("No se pudo actualizar el estado del rol.");
       }
+    } finally {
+      setConfirmEstadoModal({ open: false, rolId: null, nuevoEstado: null, nombreRol: '' });
     }
   };
 
@@ -201,12 +231,17 @@ export const useRoles = () => {
     permissionsByModule,
     filtroCampo,
     filtroValor,
-    
+
     // Estados de error
     submitted,
     rolError,
     originalNombre,
-    
+
+    // ✅ ESTO ES LO QUE FALTA - DEBE ESTAR AQUÍ
+    confirmEstadoModal,
+    setConfirmEstadoModal,
+    handleConfirmToggleEstado,
+
     // Setters
     setCurrentPage,
     setItemsPerPage,
@@ -218,7 +253,7 @@ export const useRoles = () => {
     setSubmitted,
     setRolError,
     setOriginalNombre,
-    
+
     // Funciones
     cargarRoles,
     handleToggleEstado,

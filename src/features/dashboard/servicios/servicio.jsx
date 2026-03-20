@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react"; 
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -14,6 +14,7 @@ import { FormularioServicio } from "./components/FormularioServicio";
 import { DetalleServicio } from "./components/DetalleServicio";
 import { ModalCategorias } from "./components/ModalCategorias";
 import { ModalEliminar } from "./components/ModalEliminar";
+import { ConfirmServicioModal } from "./modals/ConfirmServicioModal";
 
 export const ServiciosDashboard = () => {
     const navigate = useNavigate();
@@ -31,7 +32,7 @@ export const ServiciosDashboard = () => {
     const servicios = useServicios(mode, id, paginacion.refrescar);
 
     // ✅ Usar el hook correctamente (sin parámetros)
-    const { 
+    const {
         allData,           // ← Datos de categorías (paginados)
         cargarCategorias   // ← Función para recargar
     } = useCategorias();
@@ -64,7 +65,7 @@ export const ServiciosDashboard = () => {
     const categoriasFiltradasLocales = useMemo(() => {
         if (!Array.isArray(categoriasLocales)) return [];
         if (!categoriaBusquedaLocal) return categoriasLocales;
-        return categoriasLocales.filter(cat => 
+        return categoriasLocales.filter(cat =>
             cat.Nombre?.toLowerCase().includes(categoriaBusquedaLocal.toLowerCase())
         );
     }, [categoriasLocales, categoriaBusquedaLocal]);
@@ -90,8 +91,8 @@ export const ServiciosDashboard = () => {
     const obtenerNombreCategoriaLocal = (id) => {
         if (!id) return "Seleccionar categoría";
         // Buscar primero en categoriasLocales, luego en allData como fallback
-        const cat = categoriasLocales.find(c => c.CategoriaId === id) || 
-                   allData?.find(c => c.CategoriaId === id);
+        const cat = categoriasLocales.find(c => c.CategoriaId === id) ||
+            allData?.find(c => c.CategoriaId === id);
         return cat ? cat.Nombre : "Categoría no encontrada";
     };
 
@@ -122,6 +123,23 @@ export const ServiciosDashboard = () => {
                             }}
                             editData={servicios.editData}
                             onConfirm={servicios.handleDelete}
+                        />
+
+                        <ConfirmServicioModal
+                            open={servicios.confirmEstadoModal.open}
+                            onClose={() => servicios.setConfirmEstadoModal({
+                                open: false,
+                                servicioId: null,
+                                nuevoEstado: null,
+                                nombreServicio: ''
+                            })}
+                            onConfirm={servicios.handleConfirmToggleEstado}
+                            title={`${servicios.confirmEstadoModal.nuevoEstado === 'Activo' ? 'Activar' : 'Desactivar'} Servicio`}
+                            message={`¿Estás seguro de que deseas ${servicios.confirmEstadoModal.nuevoEstado === 'Activo' ? 'activar' : 'desactivar'} este servicio?`}
+                            servicioNombre={servicios.confirmEstadoModal.nombreServicio}
+                            type={servicios.confirmEstadoModal.nuevoEstado === 'Activo' ? 'info' : 'warning'}
+                            confirmText={servicios.confirmEstadoModal.nuevoEstado === 'Activo' ? 'Sí, activar' : 'Sí, desactivar'}
+                            cancelText="Cancelar"
                         />
 
                         <TablaServicios

@@ -3,6 +3,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Search, Plus, ArrowLeft } from "lucide-react";
 import { deleteDataproducto, GetDataproductos, postDataproductos, updateDataproductos, buscarProductos, cambiarEstadoProducto } from "./services/services.products.js";
 import axios from "axios";
+import { ConfirmProductoModal } from "./modals/ConfirmProductoModal.jsx";
 
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -39,6 +40,13 @@ export const ProductosDashboard = () => {
     CategoriaId: "",
     UsaColores: "0",
     Stock: 0
+  });
+
+  const [confirmEstadoModal, setConfirmEstadoModal] = useState({
+    open: false,
+    productoId: null,
+    nuevoEstado: null,
+    nombreProducto: ''
   });
 
   const [filtroEstado, setFiltroEstado] = useState('');
@@ -279,16 +287,28 @@ export const ProductosDashboard = () => {
     }
   };
 
-  const handleToggleEstado = async (productoId, nuevoEstado) => {
+  const handleToggleEstado = (productoId, nuevoEstado) => {
+    const producto = paginatedData.find(p => p.ProductoId === productoId);
+    if (!producto) return;
+
+    setConfirmEstadoModal({
+      open: true,
+      productoId,
+      nuevoEstado,
+      nombreProducto: producto.Nombre
+    });
+  };
+
+  // Agrega esta función después de handleToggleEstado
+  const handleConfirmToggleEstado = async () => {
+    const { productoId, nuevoEstado } = confirmEstadoModal;
+
     try {
       const response = await cambiarEstadoProducto(productoId, nuevoEstado);
 
       if (response.status === 200) {
         toast.success(`Producto ${nuevoEstado === 'Activo' ? 'activado' : 'desactivado'} correctamente`);
-
-        //  recargar con paginación backend
         await cargarProducto();
-
       } else if (response.status === 400 && response.data?.message) {
         toast.error(response.data.message);
       } else {
@@ -296,12 +316,18 @@ export const ProductosDashboard = () => {
       }
     } catch (error) {
       console.error('Error al cambiar estado:', error);
-
       if (error.response?.status === 400 && error.response?.data?.message) {
         toast.error(error.response.data.message);
       } else {
         toast.error("Error al cambiar el estado");
       }
+    } finally {
+      setConfirmEstadoModal({
+        open: false,
+        productoId: null,
+        nuevoEstado: null,
+        nombreProducto: ''
+      });
     }
   };
 
@@ -559,6 +585,18 @@ export const ProductosDashboard = () => {
               </div>
             </Modal>
 
+            <ConfirmProductoModal
+              open={confirmEstadoModal.open}
+              onClose={() => setConfirmEstadoModal({ open: false, productoId: null, nuevoEstado: null, nombreProducto: '' })}
+              onConfirm={handleConfirmToggleEstado}
+              title={`${confirmEstadoModal.nuevoEstado === 'Activo' ? 'Activar' : 'Desactivar'} Producto`}
+              message={`¿Estás seguro de que deseas ${confirmEstadoModal.nuevoEstado === 'Activo' ? 'activar' : 'desactivar'} este producto?`}
+              productoNombre={confirmEstadoModal.nombreProducto}
+              type={confirmEstadoModal.nuevoEstado === 'Activo' ? 'info' : 'warning'}
+              confirmText={confirmEstadoModal.nuevoEstado === 'Activo' ? 'Sí, activar' : 'Sí, desactivar'}
+              cancelText="Cancelar"
+            />
+
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
               <div className="overflow-x-auto">
                 <ProductosTable
@@ -655,7 +693,6 @@ export const ProductosDashboard = () => {
               setValues={setValues}
               editData={editData}
               categorias={categorias}
-              colores={colores}
               handleSubmit={handleSubmit}
               isSubmitting={isSubmitting}
               submitted={submitted}

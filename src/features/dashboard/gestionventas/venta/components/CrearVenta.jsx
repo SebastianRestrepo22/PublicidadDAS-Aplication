@@ -74,7 +74,7 @@ export const CrearVenta = () => {
     const [paginaActual, setPaginaActual] = useState(1);
     const [cargando, setCargando] = useState(false);
 
-    const itemsPorPagina = 5;
+    const itemsPorPagina = 3;
     const totalPaginas = Math.ceil(detalles.length / itemsPorPagina);
     const indiceInicial = (paginaActual - 1) * itemsPorPagina;
     const detallesPaginados = detalles.slice(indiceInicial, indiceInicial + itemsPorPagina);

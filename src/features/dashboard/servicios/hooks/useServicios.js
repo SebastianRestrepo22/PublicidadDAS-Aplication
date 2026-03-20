@@ -25,6 +25,12 @@ export const useServicios = (mode, id, onRefrescarLista) => {
     const [nombreError, setNombreError] = useState('');
     const [editData, setEditData] = useState(null);
     const [openEliminar, setOpenEliminar] = useState(false);
+    const [confirmEstadoModal, setConfirmEstadoModal] = useState({
+        open: false,
+        servicioId: null,
+        nuevoEstado: null,
+        nombreServicio: ''
+    })
 
     useEffect(() => {
         if (mode === "view" || mode === "edit") {
@@ -112,17 +118,29 @@ export const useServicios = (mode, id, onRefrescarLista) => {
         setIsSubmitting(false);
     };
 
-    const handleToggleEstado = async (servicioId, nuevoEstado) => {
+    const handleToggleEstado = (servicioId, nuevoEstado, nombreServicio = '') => {
+        setConfirmEstadoModal({
+            open: true,
+            servicioId,
+            nuevoEstado,
+            nombreServicio
+        });
+    };
+
+    // Agrega esta función después de handleToggleEstado
+    const handleConfirmToggleEstado = async () => {
+        const { servicioId, nuevoEstado } = confirmEstadoModal;
+
         try {
             const response = await cambiarEstadoServicio(servicioId, nuevoEstado);
 
             if (response.status === 200) {
                 toast.success(`Servicio ${nuevoEstado === 'Activo' ? 'activado' : 'desactivado'} correctamente`);
-                
+
                 if (mode === "list" && onRefrescarLista) {
                     await onRefrescarLista();
                 }
-                
+
                 if (editData && editData.ServicioId === servicioId) {
                     setEditData(prev => ({ ...prev, Estado: nuevoEstado }));
                 }
@@ -132,6 +150,13 @@ export const useServicios = (mode, id, onRefrescarLista) => {
         } catch (error) {
             console.error('Error al cambiar estado:', error);
             toast.error("Error al cambiar el estado");
+        } finally {
+            setConfirmEstadoModal({
+                open: false,
+                servicioId: null,
+                nuevoEstado: null,
+                nombreServicio: ''
+            });
         }
     };
 
@@ -190,11 +215,11 @@ export const useServicios = (mode, id, onRefrescarLista) => {
 
                 if (response.status === 200) {
                     toast.success("Servicio actualizado correctamente");
-                    
+
                     if (onRefrescarLista) {
                         await onRefrescarLista();
                     }
-                    
+
                     goToBackToList();
                 } else {
                     toast.error("Error al actualizar el servicio");
@@ -209,7 +234,7 @@ export const useServicios = (mode, id, onRefrescarLista) => {
                     if (onRefrescarLista) {
                         await onRefrescarLista();
                     }
-                    
+
                     goToBackToList();
                 } else {
                     toast.error("Error al crear el servicio");
@@ -223,42 +248,42 @@ export const useServicios = (mode, id, onRefrescarLista) => {
         }
     };
 
-  const handleDelete = async (id) => {
-    try {
-        const response = await deleteDataservicio(id);
+    const handleDelete = async (id) => {
+        try {
+            const response = await deleteDataservicio(id);
 
-        if (response.status === 200) {
-            toast.success(response.data.message);
-            
-            if (mode === "list" && onRefrescarLista) {
-                await onRefrescarLista();
+            if (response.status === 200) {
+                toast.success(response.data.message);
+
+                if (mode === "list" && onRefrescarLista) {
+                    await onRefrescarLista();
+                }
+
+                if (mode !== "list") {
+                    goToBackToList();
+                }
+
+                setOpenEliminar(false);
+                setEditData(null);
             }
-            
-            if (mode !== "list") {
-                goToBackToList();
+            // Manejar respuesta 409: servicio asociado
+            else if (response.status === 409) {
+                toast.warning(response.data.message);
             }
-            
-            setOpenEliminar(false);
-            setEditData(null);
-        } 
-        // Manejar respuesta 409: servicio asociado
-        else if (response.status === 409) {
-            toast.warning(response.data.message);
-        } 
-        else {
-            toast.error(response.message || "No se pudo eliminar el servicio");
+            else {
+                toast.error(response.message || "No se pudo eliminar el servicio");
+            }
+        } catch (error) {
+            console.error("Error al eliminar servicio:", error);
+
+            // Manejar error de red o respuesta con mensaje de asociación
+            if (error.response?.status === 409) {
+                toast.warning(error.response.data.message);
+            } else {
+                toast.error(error.response?.data?.message || "Error al eliminar el servicio");
+            }
         }
-    } catch (error) {
-        console.error("Error al eliminar servicio:", error);
-        
-        // Manejar error de red o respuesta con mensaje de asociación
-        if (error.response?.status === 409) {
-            toast.warning(error.response.data.message);
-        } else {
-            toast.error(error.response?.data?.message || "Error al eliminar el servicio");
-        }
-    }
-};
+    };
 
     const handleDeleteClick = (servicio) => {
         setEditData(servicio);
@@ -283,6 +308,9 @@ export const useServicios = (mode, id, onRefrescarLista) => {
         goToCreate,
         goToView,
         goToEdit,
-        resetForm
+        resetForm,
+        confirmEstadoModal,
+        setConfirmEstadoModal,
+        handleConfirmToggleEstado
     };
 };
