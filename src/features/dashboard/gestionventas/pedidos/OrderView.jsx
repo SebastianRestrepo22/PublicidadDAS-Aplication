@@ -3,7 +3,7 @@ import {
   ArrowLeft, Package, User, CreditCard,
   Calendar, Phone, MapPin, FileText,
   CheckCircle, XCircle, Clock, Truck,
-  AlertCircle, Edit, Download, Printer
+  AlertCircle, Edit, Download, Printer, X
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { formatDate, formatPrice, shortenId } from "../pedidos/utils/pedidosHelpers";
@@ -21,26 +21,16 @@ export const OrderView = ({
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [updating, setUpdating] = useState(false);
+  const [showVoucherModal, setShowVoucherModal] = useState(false);
 
-  // 🔥 ORDEN DE ESTADOS PARA VALIDACIÓN VISUAL
-  const ordenEstados = {
-    'pendiente': 1,
-    'aprobado': 2,
-    'en_proceso': 2,
-    'en_camino': 3,
-    'entregado': 4,
-    'finalizado': 3,
-    'cancelado': 999
-  };
+  // Determinar si el pedido viene de la landing page
+  const esPedidoLanding = selectedPedido?.Origen === 'landing' || selectedPedido?.EsLanding === true;
 
   // Determinar el tipo de pago
   const esContraEntrega = selectedPedido?.MetodoPago === 'contra_entrega';
-  const esPagoInmediato = selectedPedido?.MetodoPago === 'transferencia' || selectedPedido?.MetodoPago === 'efectivo';
 
-  // Estados permitidos según el método de pago
-  const estadosPermitidos = esContraEntrega 
-    ? ['pendiente', 'en_proceso', 'en_camino', 'entregado', 'cancelado']
-    : ['pendiente', 'aprobado', 'finalizado', 'cancelado'];
+  // Estados permitidos según el método de pago (SOLO APROBADO Y CANCELADO)
+  const estadosPermitidos = ['aprobado', 'cancelado'];
 
   const getEstadoColor = (estado) => {
     switch (estado) {
@@ -81,40 +71,9 @@ export const OrderView = ({
     return labels[estado] || estado;
   };
 
-  // 🔥 Función para verificar si un estado es accesible (no anterior)
-  const isEstadoAccesible = (estado) => {
-    if (estado === 'cancelado') return true; // Cancelar siempre permitido
-    
-    const estadoActual = selectedPedido?.Estado;
-    if (!estadoActual) return true;
-    
-    const nivelActual = ordenEstados[estadoActual];
-    const nivelEstado = ordenEstados[estado];
-    
-    // Si no tenemos niveles definidos, permitir
-    if (!nivelActual || !nivelEstado) return true;
-    
-    // Solo permitir si el nivel es mayor o igual (no retroceder)
-    return nivelEstado >= nivelActual;
-  };
-
-  // 🔥 Función para obtener el mensaje de tooltip
-  const getEstadoTooltip = (estado) => {
-    if (!isEstadoAccesible(estado)) {
-      return `No puedes cambiar de "${getEstadoLabel(selectedPedido.Estado)}" a "${getEstadoLabel(estado)}". Solo puedes avanzar a estados posteriores.`;
-    }
-    return `Cambiar estado a ${getEstadoLabel(estado)}`;
-  };
-
   const handleEstadoChange = async (nuevoEstado) => {
     if (nuevoEstado === 'cancelado') {
       setShowCancelModal(true);
-      return;
-    }
-
-    // 🔥 Validación adicional en el frontend
-    if (!isEstadoAccesible(nuevoEstado)) {
-      toast.warning(`No puedes cambiar de "${getEstadoLabel(selectedPedido.Estado)}" a "${getEstadoLabel(nuevoEstado)}"`);
       return;
     }
 
@@ -124,9 +83,9 @@ export const OrderView = ({
       
       let mensaje = `Estado actualizado a ${getEstadoLabel(nuevoEstado)}`;
       
-      // Mensaje especial para cuando se entrega un pedido de contra entrega
-      if (esContraEntrega && nuevoEstado === 'entregado') {
-        mensaje = '✅ Pedido entregado - Se generó la venta automáticamente';
+      // Mensaje especial para cuando se aprueba un pedido (genera venta)
+      if (nuevoEstado === 'aprobado') {
+        mensaje = '✅ Pedido aprobado - Se generó la venta automáticamente';
       }
       
       toast.success(mensaje);
@@ -187,6 +146,13 @@ export const OrderView = ({
     return color || (item.ColorNombre ? { Nombre: item.ColorNombre, Hex: item.ColorHex } : null);
   };
 
+  // Determinar si el voucher es una imagen
+  const esImagen = (url) => {
+    if (!url) return false;
+    const extension = url.split('.').pop().toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension);
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border p-6">
       {/* Header */}
@@ -198,7 +164,26 @@ export const OrderView = ({
           <ArrowLeft size={18} />
         </button>
         <h3 className="text-lg font-bold text-slate-800">Detalle del Pedido</h3>
-        <span className="ml-auto text-sm text-slate-500 font-mono">
+        
+        {/* Botón de editar - Solo para pedidos de admin en estado pendiente */}
+        {!esPedidoLanding && selectedPedido.Estado === 'pendiente' && (
+          <button
+            onClick={() => onEdit(selectedPedido)}
+            className="ml-auto p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors shadow-md"
+            title="Editar pedido"
+          >
+            <Edit size={18} />
+          </button>
+        )}
+        
+        {/* Badge de origen para pedidos de landing */}
+        {esPedidoLanding && (
+          <span className="ml-auto px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
+            Pedido Web
+          </span>
+        )}
+        
+        <span className="ml-2 text-sm text-slate-500 font-mono">
           ID: {shortenId(selectedPedido.PedidoClienteId)}
         </span>
       </div>
@@ -218,7 +203,7 @@ export const OrderView = ({
                 {getEstadoLabel(selectedPedido.Estado)}
               </span>
               <span className="text-sm text-slate-500">
-                Última actualización: {formatDate(selectedPedido.FechaRegistro)}
+                Fecha: {formatDate(selectedPedido.FechaRegistro)}
               </span>
             </div>
 
@@ -227,54 +212,57 @@ export const OrderView = ({
               {esContraEntrega ? (
                 <span className="text-purple-600 bg-purple-50 px-3 py-1 rounded-full inline-flex items-center gap-1">
                   <Truck size={14} />
-                  Contra Entrega - Flujo de envío
+                  Contra Entrega - Se generará venta al entregar
                 </span>
               ) : (
-                <span className="text-green-600 bg-green-50 px-3 py-1 rounded-full inline-flex items-center gap-1">
-                  <CheckCircle size={14} />
-                  Pago {selectedPedido.MetodoPago === 'efectivo' ? 'en Efectivo' : 'por Transferencia'} - Venta generada
+                <span className="text-amber-600 bg-amber-50 px-3 py-1 rounded-full inline-flex items-center gap-1">
+                  <Clock size={14} />
+                  Transferencia - Pendiente de aprobación
                 </span>
               )}
             </div>
 
-            {userRole === 'admin' && (
+            {userRole === 'admin' && !esPedidoLanding && (
               <div className="mt-4">
-                <p className="text-sm font-medium text-slate-700 mb-2">Cambiar estado:</p>
-                <div className="flex flex-wrap gap-2">
-                  {estadosPermitidos.map((estado) => {
-                    const accesible = isEstadoAccesible(estado);
-                    const esActual = estado === selectedPedido.Estado;
-                    
-                    return (
-                      <button
-                        key={estado}
-                        onClick={() => accesible && handleEstadoChange(estado)}
-                        disabled={updating || esActual || !accesible}
-                        title={getEstadoTooltip(estado)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative ${
-                          esActual
-                            ? getEstadoColor(estado)
-                            : accesible
-                              ? 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer'
-                              : 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed opacity-50'
-                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {getEstadoLabel(estado)}
-                        {!accesible && !esActual && (
-                          <span className="absolute -top-1 -right-1 w-2 h-2 bg-gray-400 rounded-full"></span>
-                        )}
-                      </button>
-                    );
-                  })}
+                <p className="text-sm font-medium text-slate-700 mb-2">
+                  Acciones:
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {/* Botón Aprobar - Solo si está pendiente */}
+                  {selectedPedido.Estado === 'pendiente' && (
+                    <button
+                      onClick={() => handleEstadoChange('aprobado')}
+                      disabled={updating}
+                      className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2 shadow-sm"
+                    >
+                      <CheckCircle size={18} />
+                      Aprobar Pedido
+                    </button>
+                  )}
+                  
+                  {/* Botón Cancelar - Siempre visible si no está cancelado */}
+                  {selectedPedido.Estado !== 'cancelado' && (
+                    <button
+                      onClick={() => setShowCancelModal(true)}
+                      disabled={updating}
+                      className="px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2 shadow-sm"
+                    >
+                      <XCircle size={18} />
+                      Cancelar Pedido
+                    </button>
+                  )}
                 </div>
-                
-                {/* Mensaje informativo sobre estados no disponibles */}
-                {estadosPermitidos.some(e => !isEstadoAccesible(e) && e !== selectedPedido.Estado) && (
-                  <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
-                    <AlertCircle size={12} />
-                    Los estados atenuados no están disponibles porque son anteriores al estado actual.
-                  </p>
-                )}
+              </div>
+            )}
+
+            {/* Mensaje para pedidos de landing (no editables) */}
+            {esPedidoLanding && (
+              <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <p className="text-sm text-purple-700 flex items-center gap-2">
+                  <AlertCircle size={16} />
+                  Los pedidos realizados desde la web no pueden ser modificados.
+                  Solo puedes consultar su estado.
+                </p>
               </div>
             )}
           </div>
@@ -346,6 +334,13 @@ export const OrderView = ({
                   <p className="font-medium">{selectedPedido.ClienteCorreo}</p>
                 </div>
               )}
+              {selectedPedido.TipoCliente === 'walkin' && (
+                <div className="mt-2">
+                  <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">
+                    Cliente Walk-in
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -360,7 +355,7 @@ export const OrderView = ({
                 <p className="text-sm text-slate-500">Método</p>
                 <p className="font-medium capitalize">
                   {selectedPedido.MetodoPago === 'transferencia' ? 'Transferencia Bancaria' :
-                   selectedPedido.MetodoPago === 'efectivo' ? 'Efectivo' :
+                   selectedPedido.MetodoPago === 'contra_entrega' ? 'Contra Entrega' :
                    selectedPedido.MetodoPago?.replace('_', ' ')}
                 </p>
               </div>
@@ -391,15 +386,13 @@ export const OrderView = ({
               {selectedPedido.Voucher && (
                 <div>
                   <p className="text-sm text-slate-500 mb-1">Comprobante</p>
-                  <a
-                    href={selectedPedido.Voucher}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800"
+                  <button
+                    onClick={() => setShowVoucherModal(true)}
+                    className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline"
                   >
                     <FileText size={16} />
                     Ver voucher
-                  </a>
+                  </button>
                 </div>
               )}
             </div>
@@ -421,7 +414,16 @@ export const OrderView = ({
             </div>
           </div>
 
-          {/* Mensaje informativo según el tipo de pago */}
+          {/* Mensajes informativos según estado */}
+          {selectedPedido.Estado === 'aprobado' && (
+            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+              <p className="text-sm text-green-700 flex items-center gap-2">
+                <CheckCircle size={16} />
+                ✅ Pedido aprobado - Venta generada automáticamente
+              </p>
+            </div>
+          )}
+
           {esContraEntrega && selectedPedido.Estado === 'entregado' && (
             <div className="bg-green-50 p-4 rounded-lg border border-green-200">
               <p className="text-sm text-green-700 flex items-center gap-2">
@@ -431,11 +433,25 @@ export const OrderView = ({
             </div>
           )}
 
-          {esPagoInmediato && (
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-700 flex items-center gap-2">
-                <CheckCircle size={16} />
-                💰 Pago recibido - Venta generada
+          {selectedPedido.Estado === 'pendiente' && (
+            <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+              <p className="text-sm text-amber-700 flex items-center gap-2">
+                <Clock size={16} />
+                ⏳ Pedido pendiente de confirmación. Al aprobar se generará la venta.
+              </p>
+            </div>
+          )}
+
+          {selectedPedido.Estado === 'cancelado' && (
+            <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+              <p className="text-sm text-red-700 flex items-center gap-2">
+                <XCircle size={16} />
+                ❌ Pedido cancelado
+                {selectedPedido.MotivoCancelacion && (
+                  <span className="block mt-1 text-xs">
+                    Motivo: {selectedPedido.MotivoCancelacion}
+                  </span>
+                )}
               </p>
             </div>
           )}
@@ -473,6 +489,58 @@ export const OrderView = ({
                 className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
               >
                 Volver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de voucher */}
+      {showVoucherModal && selectedPedido.Voucher && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-bold text-slate-800">Comprobante de Pago</h3>
+              <button
+                onClick={() => setShowVoucherModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-4 bg-gray-50">
+              {esImagen(selectedPedido.Voucher) ? (
+                <div className="flex justify-center">
+                  <img 
+                    src={selectedPedido.Voucher} 
+                    alt="Voucher" 
+                    className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center p-8">
+                  <FileText size={64} className="text-blue-500 mb-4" />
+                  <p className="text-slate-600 mb-4">No se puede previsualizar este archivo</p>
+                  <a
+                    href={selectedPedido.Voucher}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-2"
+                  >
+                    <Download size={16} />
+                    Descargar archivo
+                  </a>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 border-t flex justify-end">
+              <button
+                onClick={() => setShowVoucherModal(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                Cerrar
               </button>
             </div>
           </div>

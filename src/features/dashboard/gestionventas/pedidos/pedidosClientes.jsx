@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import "react-toastify/dist/ReactToastify.css";  // ← CORREGIDO
+
 import axios from "axios";
 
 // Servicios
@@ -17,9 +18,10 @@ import {
 import { OrderList } from "./OrderList";
 import { OrderForm } from "./OrderForm";
 import { OrderView } from "./OrderView";
+import { OrderEdit } from "./OrderEdit";  
 
 // Helpers
-import { generateTempId, calcularTotalDetalles } from "../../gestionventas/pedidos/utils/pedidosHelpers";
+import { generateTempId, calcularTotalDetalles } from "../pedidos/utils/pedidosHelpers";
 
 const getTodayDate = () => {
   const today = new Date();
@@ -34,7 +36,7 @@ export const PedidosClientes = () => {
   const [viewMode, setViewMode] = useState("list");
   const [selectedPedido, setSelectedPedido] = useState(null);
   const [updating, setUpdating] = useState(false);
-  const [loading, setLoading] = useState(false); // ← ESTADO FALTANTE
+  // ELIMINADO: const [loading, setLoading] = useState(false);
 
   // Catálogos
   const [productos, setProductos] = useState([]);
@@ -113,7 +115,7 @@ export const PedidosClientes = () => {
 
   // Calcular total
   useEffect(() => {
-    if (viewMode === "create") {
+    if (viewMode === "create" || viewMode === "edit") {
       const total = calcularTotalDetalles(detallesCrear);
       setFormCrear(prev => ({ ...prev, Total: total }));
     }
@@ -122,22 +124,22 @@ export const PedidosClientes = () => {
   // Función para cargar pedidos con paginación
   const fetchPedidos = async (page = currentPage) => {
     try {
-      setLoading(true); // ← AHORA SÍ ESTÁ DEFINIDO
-      
+      // ELIMINADO: setLoading(true);
+
       const params = new URLSearchParams({
         page: page,
         limit: itemsPerPage
       });
-      
+
       if (filtroCampo && filtroText) {
         params.append('filtroCampo', filtroCampo);
         params.append('filtroValor', filtroText);
       }
-      
+
       const response = await axios.get(`http://localhost:3000/api/pedidos-clientes?${params.toString()}`);
-      
+
       const { data, pagination } = response.data;
-      
+
       // Obtener detalles para cada pedido
       const conDetalles = await Promise.all(
         data.map(async (p) => {
@@ -157,31 +159,31 @@ export const PedidosClientes = () => {
           }
         })
       );
-      
+
       setPaginatedData(conDetalles);
       setTotalItems(pagination.totalItems);
       setTotalPages(pagination.totalPages);
       setCurrentPage(pagination.currentPage);
-      
+
     } catch (err) {
       console.error("Error cargando pedidos:", err);
       toast.error("Error al cargar pedidos");
     } finally {
-      setLoading(false); // ← AHORA SÍ ESTÁ DEFINIDO
+      // ELIMINADO: setLoading(false);
     }
   };
 
-  // Cargar pedidos al montar el componente y cuando cambien filtros/paginación
+  // Cargar pedidos al montar el componente una sola vez
   useEffect(() => {
-    fetchPedidos(currentPage);
-  }, [currentPage, itemsPerPage, filtroCampo, filtroText]);
+    fetchPedidos(1);
+  }, []); // ← SOLO SE EJECUTA UNA VEZ AL MONTAR
 
   // Navegación
   const goToList = () => {
     setViewMode("list");
     setSelectedPedido(null);
     setErrores([]);
-    fetchPedidos(1); // Recargar al volver a la lista
+    fetchPedidos(1);
   };
 
   const goToCreate = () => {
@@ -207,22 +209,61 @@ export const PedidosClientes = () => {
     }
   };
 
+  // Función goToEdit
   const goToEdit = async (pedido) => {
     try {
+      console.log('✏️ Editando pedido:', pedido.PedidoClienteId);
+
       const det = await getDetallesByPedidoId(pedido.PedidoClienteId);
-      setSelectedPedido({
+
+      const pedidoAEditar = {
         ...pedido,
         detalle: Array.isArray(det)
           ? det.map(item => ({
               ...item,
-              _tempId: item.DetallePedidoClienteId || generateTempId()
+              _tempId: item.DetallePedidoClienteId || generateTempId(),
+              tipo: item.ProductoId ? 'producto' : 'servicio',
+              tipoStock: item.ColorId ? 'por_color' : 'general',
+              ProductoNombre: item.ProductoNombre,
+              ServicioNombre: item.ServicioNombre,
+              ColorNombre: item.ColorNombre,
+              ColorHex: item.ColorHex
             }))
           : []
+      };
+
+      setFormCrear({
+        ClienteId: pedido.ClienteId || "",
+        NombreCliente: pedido.NombreCliente || pedido.ClienteNombre || "",
+        FechaRegistro: pedido.FechaRegistro?.split('T')[0] || getTodayDate(),
+        Total: pedido.Total || 0,
+        Estado: pedido.Estado || "pendiente",
+        MetodoPago: pedido.MetodoPago || "transferencia",
+        NombreRecibe: pedido.NombreRecibe || "",
+        TelefonoEntrega: pedido.TelefonoEntrega || "",
+        DireccionEntrega: pedido.DireccionEntrega || "",
+        Voucher: pedido.Voucher || "",
+        VoucherPreview: ""
       });
+
+      setDetallesCrear(pedidoAEditar.detalle);
+      setTipoClienteCrear(pedido.TipoCliente || 'registrado');
+
+      if (pedido.TipoCliente === 'walkin') {
+        setClienteWalkinCrear({
+          Nombre: pedido.ClienteNombre || "",
+          Telefono: pedido.ClienteTelefono || "",
+          Correo: pedido.ClienteCorreo || ""
+        });
+      }
+
+      setSelectedPedido(pedidoAEditar);
       setErrores([]);
       setViewMode("edit");
-    } catch {
-      toast.error("Error al cargar para editar");
+
+    } catch (error) {
+      console.error('❌ Error al cargar para editar:', error);
+      toast.error('Error al cargar el pedido para editar');
     }
   };
 
@@ -260,140 +301,193 @@ export const PedidosClientes = () => {
     setErrores([]);
   };
 
-
   const handleCreate = async () => {
-  // Validaciones básicas
-  const errs = [];
-  if (!formCrear.FechaRegistro) errs.push("La fecha es obligatoria.");
-  if (tipoClienteCrear === 'walkin' && !clienteWalkinCrear.Nombre) {
-    errs.push("El nombre del cliente es obligatorio");
-  }
-  if (!detallesCrear?.length) errs.push("Agregue al menos un producto/servicio.");
+    const errs = [];
+    if (!formCrear.FechaRegistro) errs.push("La fecha es obligatoria.");
+    if (tipoClienteCrear === 'walkin' && !clienteWalkinCrear.Nombre) {
+      errs.push("El nombre del cliente es obligatorio");
+    }
+    if (!detallesCrear?.length) errs.push("Agregue al menos un producto/servicio.");
 
-  if (errs.length) {
-    setErrores(errs);
-    toast.error("Corrija los errores");
-    return;
-  }
-
-  try {
-    setUploading(true);
-
-    // Construir detalles LIMPIANDO EL PRECIO
-    const detallesLimpios = detallesCrear.map(d => {
-      // 🔥 Limpiar el precio: eliminar puntos y convertir a número
-      let precioLimpio = 0;
-      if (d.Precio) {
-        // Si es string, eliminar puntos y comas, luego convertir a número
-        const precioStr = String(d.Precio).replace(/[.,]/g, '');
-        precioLimpio = parseFloat(precioStr) || 0;
-      }
-      
-      const detalle = {
-        ProductoId: d.ProductoId?.trim() || null,
-        ServicioId: d.ServicioId?.trim() || null,
-        Cantidad: Number(d.Cantidad) || 1,
-        Descripcion: d.Descripcion || "",
-        UrlImagen: d.UrlImagen || "",
-        Precio: precioLimpio,  // ← AHORA USA EL PRECIO LIMPIO
-        ColorId: d.ColorId || null
-      };
-      return detalle;
-    });
-
-    console.log('💰 Precios limpios:', detallesLimpios.map(d => d.Precio));
-
-    // Construir el pedido completo
-    const pedidoCompleto = {
-      ClienteId: tipoClienteCrear === 'registrado' ? formCrear.ClienteId?.trim() || null : null,
-      FechaRegistro: formCrear.FechaRegistro,
-      Total: Number(formCrear.Total) || 0,
-      Estado: formCrear.Estado,
-      MetodoPago: formCrear.MetodoPago,
-      NombreRecibe: formCrear.MetodoPago === "contra_entrega" ? formCrear.NombreRecibe || null : null,
-      TelefonoEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.TelefonoEntrega || null : null,
-      DireccionEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.DireccionEntrega || null : null,
-      TipoCliente: tipoClienteCrear,
-      ClienteNombre: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Nombre || null : null,
-      ClienteTelefono: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Telefono || null : null,
-      ClienteCorreo: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Correo || null : null,
-      detalle: detallesLimpios
-    };
-
-    console.log('📦 Pedido completo a enviar:', pedidoCompleto);
-
-    const formData = new FormData();
-    formData.append('pedido', JSON.stringify(pedidoCompleto));
-
-    if (formCrear.MetodoPago === "transferencia" && voucherFileCrear) {
-      formData.append('voucher', voucherFileCrear);
+    if (errs.length) {
+      setErrores(errs);
+      toast.error("Corrija los errores");
+      return;
     }
 
-    const response = await axios.post('http://localhost:3000/api/pedidos-clientes', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    try {
+      setUploading(true);
 
-    toast.success("Pedido creado correctamente");
-    goToList();
+      const detallesLimpios = detallesCrear.map(d => {
+        let precioLimpio = 0;
+        if (d.Precio) {
+          const precioStr = String(d.Precio).replace(/\./g, '').replace(',', '.');
+          precioLimpio = parseFloat(precioStr) || 0;
+        }
 
-  } catch (err) {
-    console.error('❌ Error:', err);
-    toast.error(`Error: ${err.response?.data?.error || err.message}`);
-  } finally {
-    setUploading(false);
-  }
-};
+        return {
+          ProductoId: d.ProductoId?.trim() || null,
+          ServicioId: d.ServicioId?.trim() || null,
+          Cantidad: Number(d.Cantidad) || 1,
+          Descripcion: d.Descripcion || "",
+          UrlImagen: d.UrlImagen || "",
+          Precio: precioLimpio,
+          ColorId: d.ColorId || null
+        };
+      });
 
- 
+      const pedidoCompleto = {
+        ClienteId: tipoClienteCrear === 'registrado' ? formCrear.ClienteId?.trim() || null : null,
+        FechaRegistro: formCrear.FechaRegistro,
+        Total: Number(formCrear.Total) || 0,
+        Estado: formCrear.Estado,
+        MetodoPago: formCrear.MetodoPago,
+        NombreRecibe: formCrear.MetodoPago === "contra_entrega" ? formCrear.NombreRecibe || null : null,
+        TelefonoEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.TelefonoEntrega || null : null,
+        DireccionEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.DireccionEntrega || null : null,
+        TipoCliente: tipoClienteCrear,
+        ClienteNombre: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Nombre || null : null,
+        ClienteTelefono: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Telefono || null : null,
+        ClienteCorreo: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Correo || null : null,
+        detalle: detallesLimpios
+      };
+
+      const formData = new FormData();
+      formData.append('pedido', JSON.stringify(pedidoCompleto));
+
+      if (formCrear.MetodoPago === "transferencia" && voucherFileCrear) {
+        formData.append('voucher', voucherFileCrear);
+      }
+
+      const response = await axios.post('http://localhost:3000/api/pedidos-clientes', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      toast.success("Pedido creado correctamente");
+      goToList();
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      toast.error(`Error: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleUpdate = async (pedidoId) => {
+    try {
+      setUploading(true);
+
+      const detallesLimpios = detallesCrear.map(d => {
+        let precioLimpio = 0;
+        if (d.Precio) {
+          const precioStr = String(d.Precio).replace(/\./g, '').replace(',', '.');
+          precioLimpio = parseFloat(precioStr) || 0;
+        }
+
+        return {
+          DetallePedidoClienteId: d.DetallePedidoClienteId || null,
+          ProductoId: d.ProductoId?.trim() || null,
+          ServicioId: d.ServicioId?.trim() || null,
+          Cantidad: Number(d.Cantidad) || 1,
+          Descripcion: d.Descripcion || "",
+          UrlImagen: d.UrlImagen || "",
+          Precio: precioLimpio,
+          ColorId: d.ColorId || null
+        };
+      });
+
+      const pedidoActualizado = {
+        ClienteId: tipoClienteCrear === 'registrado' ? formCrear.ClienteId?.trim() || null : null,
+        FechaRegistro: formCrear.FechaRegistro,
+        Total: Number(formCrear.Total) || 0,
+        MetodoPago: formCrear.MetodoPago,
+        NombreRecibe: formCrear.MetodoPago === "contra_entrega" ? formCrear.NombreRecibe || null : null,
+        TelefonoEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.TelefonoEntrega || null : null,
+        DireccionEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.DireccionEntrega || null : null,
+        TipoCliente: tipoClienteCrear,
+        ClienteNombre: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Nombre || null : null,
+        ClienteTelefono: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Telefono || null : null,
+        ClienteCorreo: tipoClienteCrear === 'walkin' ? clienteWalkinCrear.Correo || null : null,
+        detalle: detallesLimpios
+      };
+
+      console.log('📦 Enviando actualización:', pedidoActualizado);
+
+      const response = await axios.put(
+        `http://localhost:3000/api/pedidos-clientes/${pedidoId}`,
+        pedidoActualizado,
+        {
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      toast.success("Pedido actualizado correctamente");
+      goToList();
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      toast.error(`Error: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleUpdateEstado = async (estado, motivo = "") => {
-  if (!selectedPedido) return;
+    if (!selectedPedido) return;
 
-  try {
-    setUpdating(true);
+    try {
+      setUpdating(true);
 
-    const payload = { Estado: estado };
-    if (estado === 'cancelado' && motivo) {
-      payload.motivo = motivo;
-    }
-
-    console.log('Enviando actualización:', payload);
-
-    const response = await axios.put(
-      `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
-      payload,
-      {
-        headers: { 'Content-Type': 'application/json' }
+      const payload = { Estado: estado };
+      if (estado === 'cancelado' && motivo) {
+        payload.motivo = motivo;
       }
-    );
 
-    setSelectedPedido(prev => ({
-      ...prev,
-      Estado: estado,
-      MotivoCancelacion: estado === 'cancelado' ? motivo : prev.MotivoCancelacion
-    }));
+      console.log('Enviando actualización:', payload);
 
-    toast.success(`Pedido ${estado === 'cancelado' ? 'cancelado' : 'actualizado'} correctamente`);
-    
-    // Recargar la lista
-    await fetchPedidos(currentPage);
+      const response = await axios.put(
+        `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
+        payload,
+        {
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
 
-  } catch (err) {
-    console.error('Error detallado:', err.response?.data || err);
-    const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message;
-    toast.error(`Error: ${errorMsg}`);
-  } finally {
-    setUpdating(false);
-  }
-};
+      setSelectedPedido(prev => ({
+        ...prev,
+        Estado: estado,
+        MotivoCancelacion: estado === 'cancelado' ? motivo : prev.MotivoCancelacion
+      }));
+
+      toast.success(`Pedido ${estado === 'cancelado' ? 'cancelado' : 'actualizado'} correctamente`);
+      await fetchPedidos(currentPage);
+
+    } catch (err) {
+      console.error('Error detallado:', err.response?.data || err);
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message;
+      toast.error(`Error: ${errorMsg}`);
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
+    fetchPedidos(page); // Cargar pedidos de la nueva página
   };
 
   const handleItemsPerPageChange = (newItems) => {
     setItemsPerPage(newItems);
     setCurrentPage(1);
+    fetchPedidos(1); // Cargar con nuevos items por página
+  };
+
+  const handleFiltroChange = (campo, valor) => {
+    setFiltroCampo(campo);
+    setFiltroText(valor);
+    setCurrentPage(1);
+    fetchPedidos(1); // Cargar con nuevos filtros
   };
 
   return (
@@ -401,20 +495,13 @@ export const PedidosClientes = () => {
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-slate-800 mb-6">Gestión de Pedidos</h1>
 
-        {loading && viewMode === "list" && (
-          <div className="bg-white rounded-xl shadow-sm border p-8 mb-6 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-slate-600">Cargando pedidos...</p>
-          </div>
-        )}
-
-        {viewMode === "list" && !loading && (
+        {viewMode === "list" && (
           <OrderList
             paginatedData={paginatedData}
             filtroText={filtroText}
-            setFiltroText={setFiltroText}
+            setFiltroText={(text) => handleFiltroChange(filtroCampo, text)}
             filtroCampo={filtroCampo}
-            setFiltroCampo={setFiltroCampo}
+            setFiltroCampo={(campo) => handleFiltroChange(campo, filtroText)}
             currentPage={currentPage}
             totalPages={totalPages}
             itemsPerPage={itemsPerPage}
@@ -446,6 +533,28 @@ export const PedidosClientes = () => {
             clientes={clientes}
             onBack={goToList}
             onCreate={handleCreate}
+          />
+        )}
+
+        {viewMode === "edit" && selectedPedido && (
+          <OrderEdit
+            pedidoOriginal={selectedPedido}
+            formCrear={formCrear}
+            setFormCrear={setFormCrear}
+            detallesCrear={detallesCrear}
+            setDetallesCrear={setDetallesCrear}
+            tipoClienteCrear={tipoClienteCrear}
+            setTipoClienteCrear={setTipoClienteCrear}
+            clienteWalkinCrear={clienteWalkinCrear}
+            setClienteWalkinCrear={setClienteWalkinCrear}
+            uploading={uploading}
+            errores={errores}
+            productos={productos}
+            servicios={servicios}
+            colores={colores}
+            clientes={clientes}
+            onBack={goToList}
+            onUpdate={handleUpdate}
           />
         )}
 

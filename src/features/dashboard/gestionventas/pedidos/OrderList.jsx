@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Eye, Plus, Search } from "lucide-react";
 import { Pagination } from "../../components/paginacion/pagination";
-import { formatDate, shortenId, formatPrice } from "../../gestionventas/pedidos/utils/pedidosHelpers";
+import { formatDate, shortenId, formatPrice } from "../pedidos/utils/pedidosHelpers";
 
 export const OrderList = ({
   paginatedData,
@@ -63,7 +63,8 @@ export const OrderList = ({
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
           <button
             onClick={goToCreate}
-            className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap text-sm"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow"
+
           >
             <Plus size={18} /> Nuevo pedido
           </button>
@@ -148,7 +149,7 @@ export const OrderList = ({
                   </td>
                   <td className="px-6 py-4 text-sm">{formatDate(pedido.FechaRegistro)}</td>
                   <td className="px-6 py-4 text-sm font-bold text-blue-600">
-                    {formatPrice(pedido.Total)}
+                    {formatPrice(pedido.Total)} 
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm font-medium capitalize">

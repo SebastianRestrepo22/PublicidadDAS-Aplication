@@ -16,7 +16,7 @@ import { uploadVoucher } from "../lib/upload.js";
 const router = Router();
 
 // ===== RUTAS DE BÚSQUEDA (antes que las dinámicas) =====
-router.get("/buscar", buscarPedidos);  // ← NUEVA: Ruta para búsqueda con paginación
+router.get("/buscar", buscarPedidos);  //  Ruta para búsqueda con paginación
 
 // ===== RUTAS POST Y PUT (con Multer) =====
 router.post("/", uploadVoucher.single('voucher'), createPedidoCliente);

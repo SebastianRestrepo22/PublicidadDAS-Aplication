@@ -27,6 +27,7 @@ export const getAllPedidosClientesModel = async (clienteId = null) => {
       p.ClienteNombre,
       p.ClienteTelefono,
       p.ClienteCorreo,
+      p.Origen,  -- ← NUEVO CAMPO
       -- 🔥 Información de la venta si existe
       v.VentaId,
       v.Estado AS EstadoVenta,
@@ -67,7 +68,8 @@ export const getPedidoClienteByIdModel = async (pedidoId) => {
       p.TipoCliente,
       p.ClienteNombre,
       p.ClienteTelefono,
-      p.ClienteCorreo
+      p.ClienteCorreo,
+      p.Origen  -- ← NUEVO CAMPO
     FROM pedidosclientes p
     LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
     WHERE p.PedidoClienteId = ?
@@ -90,12 +92,14 @@ export const createPedidoClienteModel = async ({
   TipoCliente = "registrado",
   ClienteNombre = null,
   ClienteTelefono = null,
-  ClienteCorreo = null
+  ClienteCorreo = null,
+  Origen = "admin" // Nuevo campo
 }) => {
   const PedidoClienteId = uuidv4();
 
   console.log('📝 [MODEL] Creando pedido con estado:', Estado);
   console.log('📝 [MODEL] Método de pago:', MetodoPago);
+  console.log('📝 [MODEL] Origen:', Origen);
 
   await dbPool.execute(
     `
@@ -114,16 +118,17 @@ export const createPedidoClienteModel = async ({
       TipoCliente,
       ClienteNombre,
       ClienteTelefono,
-      ClienteCorreo
+      ClienteCorreo,
+      Origen
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       PedidoClienteId,
       ClienteId ?? null,
       FechaRegistro,
       Total,
-      Estado,          // ✅ Este es el estado que se guarda en BD
+      Estado,
       MetodoPago,
       Voucher ?? null,
       NombreRecibe ?? null,
@@ -132,7 +137,8 @@ export const createPedidoClienteModel = async ({
       TipoCliente,
       ClienteNombre ?? null,
       ClienteTelefono ?? null,
-      ClienteCorreo ?? null
+      ClienteCorreo ?? null,
+      Origen // Nuevo campo
     ]
   );
 
@@ -153,7 +159,8 @@ export const createPedidoClienteModel = async ({
       p.TipoCliente,
       p.ClienteNombre,
       p.ClienteTelefono,
-      p.ClienteCorreo
+      p.ClienteCorreo,
+      p.Origen
     FROM pedidosclientes p
     LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
     WHERE p.PedidoClienteId = ?
@@ -162,6 +169,7 @@ export const createPedidoClienteModel = async ({
   );
 
   console.log('✅ [MODEL] Pedido guardado con estado:', rows[0]?.Estado);
+  console.log('✅ [MODEL] Origen guardado:', rows[0]?.Origen);
 
   return rows[0];
 };
@@ -248,7 +256,8 @@ export const getPedidosClientesPaginated = async ({
         p.TipoCliente,
         p.ClienteNombre,
         p.ClienteTelefono,
-        p.ClienteCorreo
+        p.ClienteCorreo,
+        p.Origen
       FROM pedidosclientes p
       LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
       ${whereClause}
@@ -333,7 +342,8 @@ export const buscarPedidosClientesPaginated = async ({
         p.TipoCliente,
         p.ClienteNombre,
         p.ClienteTelefono,
-        p.ClienteCorreo
+        p.ClienteCorreo,
+        p.Origen
       FROM pedidosclientes p
       LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
       ${whereClause}

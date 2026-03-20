@@ -160,7 +160,6 @@ export const getComprasPaginated = async (req, res) => {
   }
 };
 
-// 🔎 Búsqueda con paginación
 export const buscarCompras = async (req, res) => {
   try {
     const { q, page = 1, limit = 10 } = req.query;
@@ -184,7 +183,7 @@ export const buscarCompras = async (req, res) => {
     res.json({
       data: rows,
       pagination: {
-        total: total[0].total,
+        totalItems: total[0].total,
         currentPage: parseInt(page),
         itemsPerPage: parseInt(limit),
         totalPages: Math.ceil(total[0].total / limit)

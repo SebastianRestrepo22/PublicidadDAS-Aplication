@@ -5,7 +5,6 @@ import {
   Store, Palette
 } from "lucide-react";
 import { ESTADOS_COMPRA } from "../hook/useCompras";
-import { generarFacturaCompraPDF } from './InvoicePDF.jsx';
 import { toast } from "react-toastify";
 
 const getShortId = (id) => {
@@ -115,12 +114,6 @@ export const ComprasView = ({
           colores: coloresProcesados
         };
       });
-
-      generarFacturaCompraPDF(
-        selectedCompra,
-        detallesConNombres,
-        proveedor
-      );
 
       toast.success('Factura generada correctamente');
     } catch (error) {
