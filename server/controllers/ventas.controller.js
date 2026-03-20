@@ -443,7 +443,7 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
       `SELECT 
         PedidoClienteId, MetodoPago, ClienteId, ClienteNombre, ClienteTelefono, 
         ClienteCorreo, Total, TipoCliente, Estado, FechaRegistro, Voucher,
-        NombreRecibe, TelefonoEntrega, DireccionEntrega
+        NombreRecibe, TelefonoEntrega, DireccionEntrega, Origen
       FROM pedidosclientes 
       WHERE PedidoClienteId = ?`,
       [PedidoClienteId]
@@ -464,8 +464,14 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
       throw new Error("El pedido no tiene detalles");
     }
 
-    // Ya no necesitamos pasar metodoPago porque el modelo siempre crea como 'pagado'
-    const result = await createVentaFromPedidoModel(pedido, UsuarioVendedorId, null, connection);
+    // 🔥 DETERMINAR ESTADO SEGÚN ORIGEN
+    const esLanding = pedido.Origen === 'cliente';
+    const estadoVenta = esLanding ? 'pendiente' : 'pagado';
+    
+    console.log(`📊 Pedido origen: ${pedido.Origen}, Estado venta: ${estadoVenta}`);
+
+    // 🔥 PASAR EL ESTADO COMO QUINTO PARÁMETRO
+    const result = await createVentaFromPedidoModel(pedido, UsuarioVendedorId, null, connection, estadoVenta);
 
     if (!result.success) {
       await connection.rollback();
@@ -482,22 +488,7 @@ export const crearVentaDesdePedidoId = async (PedidoClienteId, UsuarioVendedorId
     const detallesCompletos = await getDetalleVentaByVentaIdModel(VentaId);
     ventaCreada.detalle = detallesCompletos;
 
-    const correoCliente = pedido.ClienteCorreo || ventaCreada.ClienteCorreo;
-    const nombreCliente = pedido.ClienteNombre || ventaCreada.ClienteNombre || 'Cliente';
-
-    if (correoCliente) {
-      try {
-        await sendVentaFacturaEmail(
-          correoCliente,
-          nombreCliente,
-          VentaId,
-          ventaCreada.Total,
-          detallesCompletos
-        );
-      } catch (emailError) {
-        console.error("Error enviando correo de factura:", emailError);
-      }
-    }
+    console.log(`✅ Venta creada como ${estadoVenta}: ${VentaId}`);
 
     return {
       success: true,

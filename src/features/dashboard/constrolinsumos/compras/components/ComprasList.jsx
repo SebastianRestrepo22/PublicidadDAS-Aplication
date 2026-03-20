@@ -77,7 +77,7 @@ export const ComprasList = ({
             <select
               value={filtroCampo}
               onChange={(e) => setFiltroCampo(e.target.value)}
-              className="border rounded-lg px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="border rounded-lg px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Filtrar por campo</option>
               <option value="id">ID Compra</option>

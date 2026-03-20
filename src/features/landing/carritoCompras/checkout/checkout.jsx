@@ -34,6 +34,14 @@ const extractValidColorId = (item) => {
   return null;
 };
 
+// ✅ FUNCIÓN PARA FORMATEAR PRECIOS EN COP
+const formatCOP = (value) => {
+  if (value === undefined || value === null) return 'COP 0';
+  const num = typeof value === 'number' ? value : parseFloat(value);
+  if (isNaN(num)) return 'COP 0';
+  return num.toLocaleString("es-CO", { style: "currency", currency: "COP" });
+};
+
 export const Checkout = () => {
   const { cart, getTotal, clearCart } = useCart();
   const { user } = useAuth();
@@ -191,7 +199,7 @@ export const Checkout = () => {
           Tamaño,
           Descripcion: descripcion,
           UrlImagen: item.options?.urlImagen || item.UrlImagen || null,
-          UrlImagenPersonalizada: UrlArchivoPersonalizado, // Puede ser imagen, PDF, Word, etc.
+          UrlImagenPersonalizada: UrlArchivoPersonalizado,
           ColorId
         };
       });
@@ -227,9 +235,10 @@ export const Checkout = () => {
       const payload = {
         ClienteId: user.CedulaId,
         FechaRegistro: new Date().toISOString().split("T")[0],
-        Total: totalSeguro, // Usar el total seguro
+        Total: totalSeguro, 
         Estado: "pendiente",
         MetodoPago: metodoPago === "entrega" ? "contra_entrega" : metodoPago,
+        Origen: "cliente",
         detalle: detallesFinales
       };
 
@@ -287,7 +296,8 @@ export const Checkout = () => {
       if (metodoPago === "qr" || metodoPago === "transferencia") {
         setVoucher({
           id: pedidoId,
-          total: totalSeguro, // Usar el total seguro
+          total: totalSeguro,
+          totalFormateado: formatCOP(totalSeguro),
           fecha: new Date().toLocaleDateString("es-CO", {
             weekday: 'long',
             year: 'numeric',
@@ -311,7 +321,8 @@ export const Checkout = () => {
           state: {
             metodo: "entrega",
             id: pedidoId,
-            total: totalSeguro
+            total: totalSeguro,
+            totalFormateado: formatCOP(totalSeguro)
           }
         });
         toast.success("¡Pedido creado! Se procesará al recibir tu entrega");
@@ -379,6 +390,7 @@ export const Checkout = () => {
                 id: pedidoId,
                 referencia: `PED${pedidoId.toString().padStart(6, '0')}`,
                 total: voucher?.total,
+                totalFormateado: formatCOP(voucher?.total || 0),
                 voucherUrl: data.voucher
               }
             });
@@ -562,6 +574,16 @@ export const Checkout = () => {
           </div>
         </div>
 
+        {/* Total del pedido con formato COP */}
+        <div className="mt-6 text-center">
+          <div className="inline-block bg-gray-100 rounded-xl p-4">
+            <p className="text-sm text-gray-600">Total a pagar</p>
+            <p className="text-2xl font-bold text-gray-900">
+              {voucher.totalFormateado || formatCOP(voucher.total)}
+            </p>
+          </div>
+        </div>
+
         {/* Botón de volver */}
         <div className="mt-8 text-center">
           <button
@@ -674,10 +696,7 @@ export const Checkout = () => {
                     <div className="flex justify-between">
                       <h3 className="font-medium text-gray-900">{item.Nombre}</h3>
                       <span className="font-bold text-gray-900">
-                        {(item.Precio * item.quantity).toLocaleString("es-CO", {
-                          style: "currency",
-                          currency: "COP"
-                        })}
+                        {formatCOP(item.Precio * item.quantity)}
                       </span>
                     </div>
                     <div className="flex items-center gap-4 mt-1">
@@ -702,7 +721,7 @@ export const Checkout = () => {
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold text-gray-900">Total a pagar</span>
                 <span className="text-3xl font-bold text-black">
-                  {calcularTotalSeguro().toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+                  {formatCOP(calcularTotalSeguro())}
                 </span>
               </div>
             </div>

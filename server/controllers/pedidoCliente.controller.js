@@ -39,6 +39,9 @@ export const getPedidosClientes = async (req, res) => {
     // Construir WHERE clause
     const whereConditions = [];
 
+    // 🔥 NUEVO: Excluir pedidos de landing (origen = 'cliente')
+    whereConditions.push(`p.Origen != 'cliente'`);
+
     if (tipoPago) {
       whereConditions.push('p.MetodoPago = ?');
       params.push(tipoPago);
@@ -70,10 +73,7 @@ export const getPedidosClientes = async (req, res) => {
       params.push(`%${filtroValor}%`);
     }
 
-    // 🔥 NUEVA LÓGICA: Solo mostrar pedidos que deben estar en el módulo de pedidos
-    // 1. Todos los pedidos de contra entrega (sin importar su estado)
-    // 2. Pedidos de otros métodos (transferencia, efectivo, QR) que NO estén aprobados
-    //    (es decir, pendientes, cancelados, etc.)
+    // 🔥 MISMA LÓGICA: Solo mostrar pedidos que deben estar en el módulo de pedidos
     whereConditions.push(`(
       p.MetodoPago = 'contra_entrega' 
       OR 
@@ -101,7 +101,8 @@ export const getPedidosClientes = async (req, res) => {
         p.TipoCliente,
         p.ClienteNombre,
         p.ClienteTelefono,
-        p.ClienteCorreo
+        p.ClienteCorreo,
+        p.Origen
       FROM pedidosclientes p
       LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
       ${whereClause}
@@ -186,6 +187,9 @@ export const buscarPedidos = async (req, res) => {
     // Construir condiciones WHERE
     const whereConditions = [];
 
+    // 🔥 NUEVO: Excluir pedidos de landing (origen = 'cliente')
+    whereConditions.push(`p.Origen != 'cliente'`);
+
     // Búsqueda por campo específico
     if (campo && valor) {
       whereConditions.push(`${columna} LIKE ?`);
@@ -226,7 +230,8 @@ export const buscarPedidos = async (req, res) => {
         p.TipoCliente,
         p.ClienteNombre,
         p.ClienteTelefono,
-        p.ClienteCorreo
+        p.ClienteCorreo,
+        p.Origen
       FROM pedidosclientes p
       LEFT JOIN usuarios u ON p.ClienteId = u.CedulaId
       ${whereClause}
@@ -281,7 +286,7 @@ export const buscarPedidos = async (req, res) => {
 };
 
 // ========================================
-// ✅ CREAR PEDIDO (MODIFICADO - SIN VENTA AUTOMÁTICA)
+// ✅ CREAR PEDIDO (CORREGIDO - LANDING VA A VENTAS COMO PENDIENTE)
 // ========================================
 export const createPedidoCliente = async (req, res) => {
   let nuevoPedido = null;
@@ -318,9 +323,11 @@ export const createPedidoCliente = async (req, res) => {
       ClienteNombre = null,
       ClienteTelefono = null,
       ClienteCorreo = null,
-      Origen = "admin", // Nuevo campo para identificar origen
+      Origen = "admin",
       detalle = []
     } = pedidoData;
+
+    console.log('📌 ORIGEN RECIBIDO:', Origen);
 
     // Validar Total
     const totalLimpio = parseFloat(Total);
@@ -344,19 +351,20 @@ export const createPedidoCliente = async (req, res) => {
       ? FechaRegistro.split("T")[0]
       : new Date().toISOString().split("T")[0];
 
-    // 🔥 NUEVA LÓGICA: Todos los pedidos se crean como PENDIENTE
-    // La venta se generará SOLO cuando se apruebe el pedido
-    const estadoInicial = "pendiente";
+    // 🔥 NUEVA LÓGICA:
+    // - Admin: estado = 'pendiente' (aparece en módulo de pedidos)
+    // - Landing: estado = 'pendiente' pero va directamente a ventas
+    const esLanding = Origen === 'cliente';
+    const estadoInicial = "pendiente"; // AMBOS COMIENZAN COMO PENDIENTE
 
-    console.log(`📊 Estado inicial calculado: ${estadoInicial} (todos los pedidos)`);
-    console.log(`📊 Origen del pedido: ${Origen}`);
+    console.log(`📊 Origen: ${Origen}, Es landing: ${esLanding}, Estado inicial: ${estadoInicial}`);
 
     // Crear pedido (siempre pendiente)
     nuevoPedido = await createPedidoClienteModel({
       ClienteId: ClienteId || null,
       FechaRegistro: fechaProcesada,
       Total: totalLimpio,
-      MetodoPago,  // Guardamos el valor original
+      MetodoPago,
       Voucher: voucherUrl || null,
       NombreRecibe: NombreRecibe || null,
       TelefonoEntrega: TelefonoEntrega || null,
@@ -366,7 +374,7 @@ export const createPedidoCliente = async (req, res) => {
       ClienteNombre: ClienteNombre || null,
       ClienteTelefono: ClienteTelefono || null,
       ClienteCorreo: ClienteCorreo || null,
-      Origen // Nuevo campo
+      Origen
     });
 
     console.log("✅ Pedido creado en BD:", nuevoPedido);
@@ -382,14 +390,13 @@ export const createPedidoCliente = async (req, res) => {
       const Cantidad = item.Cantidad ? parseInt(item.Cantidad) : 1;
       const Precio = parseFloat(item.PrecioUnitario || item.Precio || 0);
       const ColorId = item.ColorId || null;
-      const Tamaño = null; // Siempre null para servicios
+      const Tamaño = null;
       const Descripcion = item.Descripcion || null;
       const UrlImagen = item.UrlImagen ? item.UrlImagen.trim() : null;
-      const UrlImagenPersonalizada = null; // Ya no se usa
+      const UrlImagenPersonalizada = null;
 
       const Subtotal = parseFloat((Cantidad * Precio).toFixed(2));
 
-      // Validar campos requeridos
       if (!ProductoId && !ServicioId) {
         throw new Error(`Detalle ${i + 1}: Se requiere ProductoId o ServicioId`);
       }
@@ -420,15 +427,37 @@ export const createPedidoCliente = async (req, res) => {
     const pedidoCompleto = await getPedidoClienteByIdModel(nuevoPedido.PedidoClienteId);
     pedidoCompleto.detalle = await getDetallePedidoByPedidoIdModel(nuevoPedido.PedidoClienteId);
 
-    console.log("📦 Pedido completo después de crear detalles:", {
+    console.log("📦 Pedido completo:", {
       id: pedidoCompleto.PedidoClienteId,
       estado: pedidoCompleto.Estado,
       metodo: pedidoCompleto.MetodoPago,
       origen: pedidoCompleto.Origen
     });
 
-    // Enviar email de confirmación solo si es pedido de admin
-    if (pedidoCompleto.Origen === 'admin' && pedidoCompleto.ClienteId) {
+    // 🔥 SI ES LANDING, CREAR VENTA AUTOMÁTICAMENTE COMO PENDIENTE
+    if (esLanding) {
+      try {
+        console.log(`💰 Creando venta pendiente para pedido desde landing (${MetodoPago})`);
+        
+        const resultadoVenta = await crearVentaDesdePedidoId(pedidoCompleto.PedidoClienteId, null);
+        
+        if (resultadoVenta.success) {
+          console.log(`✅ Venta creada automáticamente como PENDIENTE: ${resultadoVenta.VentaId}`);
+          pedidoCompleto.ventaCreada = {
+            id: resultadoVenta.VentaId,
+            estado: 'pendiente', // ← AHORA ES PENDIENTE
+            origen: 'landing'
+          };
+        } else {
+          console.warn(`⚠️ No se pudo crear la venta: ${resultadoVenta.message || 'Error desconocido'}`);
+        }
+      } catch (ventaError) {
+        console.error(`❌ Error creando venta automática:`, ventaError);
+      }
+    }
+
+    // Enviar email de confirmación
+    if (pedidoCompleto.ClienteId) {
       const cliente = await getClienteByIdModel(pedidoCompleto.ClienteId);
       if (cliente?.CorreoElectronico) {
         await sendPedidoEstadoEmail(
@@ -436,21 +465,10 @@ export const createPedidoCliente = async (req, res) => {
           cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
           nuevoPedido.PedidoClienteId,
           pedidoCompleto.Estado,
-          "Tu pedido ha sido recibido y está pendiente de confirmación"
+          esLanding 
+            ? "Tu pedido ha sido recibido y está pendiente de confirmación" 
+            : "Tu pedido ha sido recibido y está pendiente de confirmación"
         );
-      }
-    }
-
-    // Enviar email con voucher si existe
-    if (pedidoCompleto.Voucher && pedidoCompleto.ClienteId) {
-      const cliente = await getClienteByIdModel(pedidoCompleto.ClienteId);
-      if (cliente?.CorreoElectronico) {
-        await sendVoucherEmail(
-          cliente.CorreoElectronico,
-          cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
-          nuevoPedido.PedidoClienteId,
-          pedidoCompleto.Voucher
-        ).catch(err => console.error('Error enviando email de voucher:', err));
       }
     }
 
@@ -459,7 +477,6 @@ export const createPedidoCliente = async (req, res) => {
   } catch (error) {
     console.error("❌ Error al crear pedido:", error.message);
 
-    // Limpiar pedido huérfano
     if (nuevoPedido?.PedidoClienteId) {
       try {
         await deleteDetallesByPedidoIdModel(nuevoPedido.PedidoClienteId);

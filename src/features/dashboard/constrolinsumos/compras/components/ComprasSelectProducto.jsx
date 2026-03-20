@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { ArrowLeft, Search, ChevronLeft, ChevronRight } from "lucide-react";
 
 const formatPrice = (value) => {
@@ -6,58 +6,33 @@ const formatPrice = (value) => {
   return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
 };
 
-const getShortId = (id) => {
-  const str = String(id || "");
-  return str.length > 3 ? str.substring(0, 3) : str;
-};
-
 export const ComprasSelectProducto = ({
   searchTermProductos,
   setSearchTermProductos,
   productosPaginados,
-  totalProductos,
-  currentPageProductos,
-  totalPagesProductos,
+  productosPagination, // ← NUEVO PROP con la paginación del backend
   loadingProductos,
   onLoadProductos,
   onSelectProducto,
   onCancel
 }) => {
-  // Estados para paginación en frontend
-  const [filteredProducts, setFilteredProducts] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 3; // 3 items por página
-
-  // Filtrar productos cuando cambia el término de búsqueda
-  useEffect(() => {
-    if (searchTermProductos.trim() === "") {
-      setFilteredProducts(productosPaginados);
-    } else {
-      const filtered = productosPaginados.filter(producto => 
-        producto.Nombre.toLowerCase().includes(searchTermProductos.toLowerCase()) ||
-        (producto.SKU && producto.SKU.toLowerCase().includes(searchTermProductos.toLowerCase()))
-      );
-      setFilteredProducts(filtered);
-    }
-    setCurrentPage(1); // Resetear a primera página al filtrar
-  }, [searchTermProductos, productosPaginados]);
-
-  // Calcular productos a mostrar en la página actual
-  const getCurrentPageProducts = () => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredProducts.slice(startIndex, endIndex);
+  const handleSearchChange = (e) => {
+    const term = e.target.value;
+    setSearchTermProductos(term);
+    // Llamar al backend con la página 1 y el término de búsqueda
+    onLoadProductos(1, term);
   };
 
-  // Calcular total de páginas en frontend
-  const totalFrontendPages = Math.ceil(filteredProducts.length / itemsPerPage);
-
-  // Manejar cambio de página
   const handlePageChange = (page) => {
-    setCurrentPage(page);
+    // Llamar al backend con la página seleccionada
+    onLoadProductos(page, searchTermProductos);
   };
 
-  const currentProducts = getCurrentPageProducts();
+  // Usar la paginación que viene del backend
+  const currentPage = productosPagination?.currentPage || 1;
+  const totalPages = productosPagination?.totalPages || 1;
+  const totalItems = productosPagination?.totalItems || 0;
+  const itemsPerPage = productosPagination?.itemsPerPage || 3;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -83,12 +58,7 @@ export const ComprasSelectProducto = ({
             type="text"
             placeholder="Buscar por nombre o SKU..."
             value={searchTermProductos}
-            onChange={(e) => {
-              const term = e.target.value;
-              setSearchTermProductos(term);
-              // También llamar al backend para búsqueda más amplia
-              onLoadProductos(1, term);
-            }}
+            onChange={handleSearchChange}
             className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             autoFocus
           />
@@ -98,23 +68,22 @@ export const ComprasSelectProducto = ({
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
           <span className="text-gray-600">
-            Mostrando {currentProducts.length} de {filteredProducts.length} productos
+            Mostrando {productosPaginados.length} de {totalItems} productos
           </span>
           <span className="text-gray-600">
-            Página {currentPage} de {totalFrontendPages || 1}
+            Página {currentPage} de {totalPages || 1}
           </span>
         </div>
         
-        {/* Contenedor sin scroll - altura fija para 3 items */}
-        <div className="bg-gray-50 rounded-lg border" style={{ height: 'auto', minHeight: '200px' }}>
+        <div className="bg-gray-50 rounded-lg border" style={{ minHeight: '200px' }}>
           {loadingProductos ? (
             <div className="p-8 text-center">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
               <p className="mt-2 text-gray-600">Cargando productos...</p>
             </div>
-          ) : currentProducts.length > 0 ? (
+          ) : productosPaginados.length > 0 ? (
             <div className="divide-y">
-              {currentProducts.map((item) => (
+              {productosPaginados.map((item) => (
                 <div
                   key={item.ProductoId}
                   onClick={() => onSelectProducto(item)}
@@ -142,8 +111,8 @@ export const ComprasSelectProducto = ({
         </div>
       </div>
 
-      {/* Paginación en frontend - solo visible cuando hay más de 3 productos */}
-      {totalFrontendPages > 1 && (
+      {/* Paginación del backend - solo visible cuando hay más de 1 página */}
+      {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
           <button
             onClick={() => handlePageChange(currentPage - 1)}
@@ -155,14 +124,14 @@ export const ComprasSelectProducto = ({
           </button>
           
           <div className="flex items-center gap-2">
-            {Array.from({ length: Math.min(5, totalFrontendPages) }, (_, i) => {
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               let pageNum;
-              if (totalFrontendPages <= 5) {
+              if (totalPages <= 5) {
                 pageNum = i + 1;
               } else if (currentPage <= 3) {
                 pageNum = i + 1;
-              } else if (currentPage >= totalFrontendPages - 2) {
-                pageNum = totalFrontendPages - 4 + i;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
               } else {
                 pageNum = currentPage - 2 + i;
               }
@@ -184,7 +153,7 @@ export const ComprasSelectProducto = ({
           
           <button
             onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage >= totalFrontendPages}
+            disabled={currentPage >= totalPages}
             className="flex items-center gap-1 px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
           >
             Siguiente
