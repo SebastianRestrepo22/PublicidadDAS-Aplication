@@ -43,7 +43,8 @@ export const getVentaByIdModel = async (ventaId) => {
         pc.FechaRegistro AS FechaPedido,
         pc.Estado AS EstadoPedido,
         pc.MetodoPago AS MetodoPagoPedido,
-        pc.Voucher AS VoucherPedido  -- ← NUEVO: Traer voucher del pedido como fallback
+        pc.Voucher AS VoucherPedido,
+        pc.Origen AS OrigenPedido
       FROM ventas v
       LEFT JOIN usuarios u ON v.UsuarioVendedorId = u.CedulaId
       LEFT JOIN pedidosclientes pc ON v.PedidoClienteId = pc.PedidoClienteId
@@ -57,7 +58,7 @@ export const getVentaByIdModel = async (ventaId) => {
 
     const venta = ventaRows[0];
 
-    // 🔥 NUEVO: Si la venta no tiene voucher propio, usar el del pedido (para compatibilidad)
+    // Si la venta no tiene voucher propio, usar el del pedido (para compatibilidad)
     if (!venta.Voucher && venta.VoucherPedido) {
       venta.Voucher = venta.VoucherPedido;
     }
@@ -89,8 +90,8 @@ export const getVentaByIdModel = async (ventaId) => {
   }
 };
 
-
-export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId, metodoPago = null, connection = null) => {
+// 🔥 MODIFICADO: Acepta estadoVenta como quinto parámetro
+export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId, metodoPago = null, connection = null, estadoVenta = 'pagado') => {
   // Manejo de conexión: si no se pasa una externa, crear y liberar propia
   const useConnection = connection || await dbPool.getConnection();
   const shouldRelease = !connection;
@@ -143,10 +144,7 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId, 
       clienteCorreo = pedidoData.ClienteCorreo || null;
     }
 
-    // 🔥 NUEVA LÓGICA: TODAS las ventas creadas desde pedidos se crean como PAGADO
-    // porque solo se llaman cuando el pedido está aprobado (transferencia) o entregado (contra entrega)
-    const estadoVenta = 'pagado';
-
+    // 🔥 USAR EL ESTADO PASADO COMO PARÁMETRO
     console.log(`🔍 Venta creada - Pedido: ${pedidoData.PedidoClienteId}, Estado: ${estadoVenta}`);
 
     await useConnection.query(
@@ -166,7 +164,7 @@ export const createVentaFromPedidoModel = async (pedidoData, usuarioVendedorId, 
         subtotal,
         IVA,
         total,
-        estadoVenta,
+        estadoVenta, // ← AHORA USA EL ESTADO DEL PARÁMETRO
         pedidoData.Voucher || null
       ]
     );
@@ -366,7 +364,6 @@ export const getVentasPaginated = async ({
 
   const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
-  // Agregar log para ver la consulta
   console.log('🔍 [MODEL] Query params:', params);
   console.log('🔍 [MODEL] Where clause:', whereClause);
 

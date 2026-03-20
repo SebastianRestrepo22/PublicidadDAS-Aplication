@@ -35,11 +35,7 @@ export const GraficosEstadisticos = () => {
         headers: { 'Content-Type': 'application/json' }
       });
 
-      console.log('📡 Respuesta status:', response.status);
-
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error response:', errorText);
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
 
@@ -56,20 +52,18 @@ export const GraficosEstadisticos = () => {
     }
   };
 
-  // Función para asegurar que los valores sean números válidos
   const asegurarNumero = (valor) => {
     if (valor === undefined || valor === null) return 0;
-    if (typeof valor === 'string') {
-      // Eliminar cualquier carácter no numérico excepto punto decimal
-      const limpio = valor.replace(/[^0-9.-]/g, '');
-      const num = parseFloat(limpio);
-      return isNaN(num) ? 0 : num;
-    }
     const num = Number(valor);
     return isNaN(num) ? 0 : num;
   };
 
-  // Formateador seguro para el eje Y
+  const formatearVariacion = (valor) => {
+    const num = asegurarNumero(valor);
+    if (num === 0) return '0%';
+    return num > 0 ? `+${num}%` : `${num}%`;
+  };
+
   const formatearEjeY = (valor) => {
     const num = asegurarNumero(valor);
     if (num === 0) return '$0';
@@ -82,26 +76,14 @@ export const GraficosEstadisticos = () => {
     return `$${num}`;
   };
 
-  // Procesar datos para los gráficos
   const procesarDatos = (data, key) => {
     if (!data || !Array.isArray(data)) return [];
-    return data.map(item => {
-      const valorOriginal = item[key];
-      const valorSeguro = asegurarNumero(valorOriginal);
-      
-      // Log para depuración
-      if (isNaN(valorSeguro)) {
-        console.warn(`⚠️ Valor NaN detectado en ${key}:`, item);
-      }
-      
-      return {
-        ...item,
-        [key]: valorSeguro
-      };
-    });
+    return data.map(item => ({
+      ...item,
+      [key]: asegurarNumero(item[key])
+    }));
   };
 
-  // Tooltip personalizado con manejo seguro de NaN
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const valor = asegurarNumero(payload[0]?.value);
@@ -159,21 +141,12 @@ export const GraficosEstadisticos = () => {
     );
   }
 
-  // Procesar datos asegurando números
   const ventasMensuales = procesarDatos(datos.ventasMensuales, 'ventas');
   const ventasSemanales = procesarDatos(datos.ventasSemanales, 'ventas');
   const pedidosSemanales = procesarDatos(datos.pedidosSemanales, 'pedidos');
   const comprasSemanales = procesarDatos(datos.comprasSemanales, 'compras');
   
   const totales = datos.totales || {};
-
-  console.log('📊 Datos procesados:', {
-    ventasMensuales: ventasMensuales.length,
-    ventasSemanales: ventasSemanales.length,
-    pedidosSemanales: pedidosSemanales.length,
-    comprasSemanales: comprasSemanales.length,
-    totales
-  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -182,8 +155,9 @@ export const GraficosEstadisticos = () => {
       </div>
 
       <div className="p-6">
-        {/* Tarjetas de estadísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Tarjetas de estadísticas - 3 tarjetas (sin crecimiento) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Tarjeta Ventas */}
           <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow p-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-sm font-medium">Ventas Totales</span>
@@ -193,11 +167,11 @@ export const GraficosEstadisticos = () => {
               ${asegurarNumero(totales.ventasTotales).toLocaleString('es-CO')}
             </div>
             <p className="text-xs text-blue-100">
-              {asegurarNumero(totales.variacionVentas) > 0 ? '+' : ''}
-              {asegurarNumero(totales.variacionVentas)}% desde el mes pasado
+              {formatearVariacion(totales.variacionVentas)} desde el mes pasado
             </p>
           </div>
 
+          {/* Tarjeta Pedidos */}
           <div className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl shadow p-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-sm font-medium">Pedidos</span>
@@ -207,11 +181,11 @@ export const GraficosEstadisticos = () => {
               {asegurarNumero(totales.pedidos).toLocaleString('es-CO')}
             </div>
             <p className="text-xs text-green-100">
-              {asegurarNumero(totales.variacionPedidos) > 0 ? '+' : ''}
-              {asegurarNumero(totales.variacionPedidos)}% desde el mes pasado
+              {formatearVariacion(totales.variacionPedidos)} desde el mes pasado
             </p>
           </div>
 
+          {/* Tarjeta Compras */}
           <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow p-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-sm font-medium">Compras Semanales</span>
@@ -224,24 +198,9 @@ export const GraficosEstadisticos = () => {
               Promedio por semana
             </p>
           </div>
-
-          <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-xl shadow p-4">
-            <div className="flex items-center justify-between pb-2">
-              <span className="text-sm font-medium">Crecimiento</span>
-              <TrendingUp className="h-4 w-4" />
-            </div>
-            <div className="text-2xl font-bold">
-              {asegurarNumero(totales.crecimiento) > 0 ? '+' : ''}
-              {asegurarNumero(totales.crecimiento)}%
-            </div>
-            <p className="text-xs text-yellow-100">
-              {asegurarNumero(totales.variacionCrecimiento) > 0 ? '+' : ''}
-              {asegurarNumero(totales.variacionCrecimiento)}% desde la semana pasada
-            </p>
-          </div>
         </div>
 
-        {/* Gráficos */}
+        {/* Gráficos - 4 gráficos (sin cambios) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Ventas Mensuales */}
           <div className="bg-white rounded-xl shadow p-4">

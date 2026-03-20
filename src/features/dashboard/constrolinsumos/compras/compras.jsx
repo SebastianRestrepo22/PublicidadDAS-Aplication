@@ -197,7 +197,7 @@ export const Compras = () => {
       search ? "nombre" : null,
       search,
       page,
-      3  // ← SOLICITAMOS 3 PRODUCTOS POR PÁGINA
+      3  
     );
 
     console.log("📦 RESULTADO DEL BACKEND - COMPLETO:", resultado);
@@ -544,7 +544,7 @@ export const Compras = () => {
             searchTermProductos={searchTermProductos}
             setSearchTermProductos={setSearchTermProductos}
             productosPaginados={productosPaginados}
-            productosPagination={productosPagination}  // ← NUEVO PROP
+            productosPagination={productosPagination} 
             loadingProductos={loadingProductos}
             onLoadProductos={loadProductosPaginados}
             onSelectProducto={seleccionarProductoDesdeVista}
