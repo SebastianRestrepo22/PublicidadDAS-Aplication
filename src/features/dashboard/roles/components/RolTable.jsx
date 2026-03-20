@@ -2,13 +2,13 @@ import React from 'react';
 import { Edit, Eye, Shield, Trash2 } from 'lucide-react';
 import { Toggle } from './Toggle';
 
-export const RolTable = ({ 
-  roles, 
-  onEdit, 
-  onPermissions, 
-  onView, 
-  onDelete, 
-  onToggleEstado 
+export const RolTable = ({
+  roles,
+  onEdit,
+  onPermissions,
+  onView,
+  onDelete,
+  onToggleEstado
 }) => {
   if (roles.length === 0) {
     return (
@@ -43,7 +43,12 @@ export const RolTable = ({
                 <div className="flex justify-center">
                   <Toggle
                     checked={rol.Estado === "Activo"}
-                    onChange={(value) => onToggleEstado(rol.RoleId, value ? "Activo" : "Inactivo")}
+                    onChange={(value) => onToggleEstado(
+                      rol.RoleId,
+                      value ? "Activo" : "Inactivo",
+                      rol.Nombre, 
+                      rol.IsSystem  
+                    )}
                   />
                 </div>
               </td>

@@ -52,11 +52,10 @@ export const TablaServicios = ({
                             const nombreCategoria = categorias.find(c => c.CategoriaId === p.CategoriaId)?.Nombre || "—";
 
                             return (
-                                <tr 
-                                    key={p.ServicioId} 
-                                    className={`hover:bg-slate-50 transition-colors duration-150 ${
-                                        estado === 'Inactivo' ? 'bg-gray-50 opacity-75' : ''
-                                    }`}
+                                <tr
+                                    key={p.ServicioId}
+                                    className={`hover:bg-slate-50 transition-colors duration-150 ${estado === 'Inactivo' ? 'bg-gray-50 opacity-75' : ''
+                                        }`}
                                 >
                                     {/* Servicio (Nombre + Imagen + Descripción) */}
                                     <td className="py-3 px-4">
@@ -99,20 +98,20 @@ export const TablaServicios = ({
                                         <div className="flex items-center gap-2">
                                             <button
                                                 type="button"
-                                                onClick={() => onToggleEstado(p.ServicioId, estado === 'Activo' ? 'Inactivo' : 'Activo')}
-                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${
-                                                    estado === 'Activo' ? 'bg-green-500' : 'bg-gray-300'
-                                                }`}
+                                                onClick={() => onToggleEstado(
+                                                    p.ServicioId,
+                                                    estado === 'Activo' ? 'Inactivo' : 'Activo',
+                                                    p.Nombre  
+                                                )} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${estado === 'Activo' ? 'bg-green-500' : 'bg-gray-300'
+                                                    }`}
                                             >
                                                 <span
-                                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${
-                                                        estado === 'Activo' ? 'translate-x-5' : 'translate-x-1'
-                                                    }`}
+                                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${estado === 'Activo' ? 'translate-x-5' : 'translate-x-1'
+                                                        }`}
                                                 />
                                             </button>
-                                            <span className={`text-xs font-medium ${
-                                                estado === 'Activo' ? 'text-green-600' : 'text-gray-500'
-                                            }`}>
+                                            <span className={`text-xs font-medium ${estado === 'Activo' ? 'text-green-600' : 'text-gray-500'
+                                                }`}>
                                                 {estado}
                                             </span>
                                         </div>
@@ -128,8 +127,8 @@ export const TablaServicios = ({
                                     {/* Acciones */}
                                     <td className="py-3 px-4">
                                         <div className="flex items-center gap-1">
-                                            <button 
-                                                onClick={() => onView(p)} 
+                                            <button
+                                                onClick={() => onView(p)}
                                                 className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
                                                 title="Ver detalles"
                                             >
@@ -137,11 +136,10 @@ export const TablaServicios = ({
                                             </button>
                                             <button
                                                 onClick={() => onEdit(p)}
-                                                className={`p-1.5 rounded transition-colors ${
-                                                    estado === 'Activo'
+                                                className={`p-1.5 rounded transition-colors ${estado === 'Activo'
                                                         ? 'text-blue-600 hover:bg-blue-50'
                                                         : 'text-gray-400 cursor-not-allowed'
-                                                }`}
+                                                    }`}
                                                 title={estado === 'Activo' ? 'Editar' : 'Debe estar activo para editar'}
                                                 disabled={estado === 'Inactivo'}
                                             >
@@ -149,11 +147,10 @@ export const TablaServicios = ({
                                             </button>
                                             <button
                                                 onClick={() => onDelete(p)}
-                                                className={`p-1.5 rounded transition-colors ${
-                                                    estado === 'Inactivo'
+                                                className={`p-1.5 rounded transition-colors ${estado === 'Inactivo'
                                                         ? 'text-red-600 hover:bg-red-50'
                                                         : 'text-gray-400 cursor-not-allowed'
-                                                }`}
+                                                    }`}
                                                 title={estado === 'Inactivo' ? 'Eliminar' : 'Debe estar inactivo para eliminar'}
                                                 disabled={estado === 'Activo'}
                                             >

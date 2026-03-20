@@ -11,46 +11,56 @@ import { RolView } from "./components/RolView.jsx";
 import { RolDelete } from "./components/RolDelete.jsx";
 import { PermissionsModal } from "./components/PermissionsModal.jsx";
 import { useRoles } from "./hooks/useRoles";
+import { ConfirmRolModal } from "./modals/ConfirmRolModal.jsx";
+
 
 export const Roles = () => {
   const {
-    paginatedData,
-    currentPage,
-    itemsPerPage,
-    totalItems,
-    totalPages,
-    formData,
-    editData,
-    allPermissions,
-    selectedPermissions,
-    permissionsByModule,
-    filtroCampo,
-    filtroValor,
-    
-    // Estados de error
-    submitted,
-    rolError,
-    originalNombre,
-    
-    setCurrentPage,
-    setItemsPerPage,
-    setFormData,
-    setEditData,
-    setSelectedPermissions,
-    setFiltroCampo,
-    setFiltroValor,
-    setSubmitted,
-    setRolError,
-    setOriginalNombre,
-    
-    cargarRoles,
-    handleToggleEstado,
-    handleSubmit,
-    handleDelete,
-    handleSavePermissions,
-    loadRolePermissions,
-    resetFormErrors
-  } = useRoles();
+  // Estados
+  paginatedData,
+  currentPage,
+  itemsPerPage,
+  totalItems,
+  totalPages,
+  formData,
+  editData,
+  allPermissions,
+  selectedPermissions,
+  permissionsByModule,
+  filtroCampo,
+  filtroValor,
+
+  // Estados de error
+  submitted,
+  rolError,
+  originalNombre,
+
+  // ✅ ESTOS VIENEN DEL HOOK
+  confirmEstadoModal,
+  setConfirmEstadoModal,
+  handleConfirmToggleEstado,
+
+  // Setters
+  setCurrentPage,
+  setItemsPerPage,
+  setFormData,
+  setEditData,
+  setSelectedPermissions,
+  setFiltroCampo,
+  setFiltroValor,
+  setSubmitted,
+  setRolError,
+  setOriginalNombre,
+
+  // Funciones
+  cargarRoles,
+  handleToggleEstado,
+  handleSubmit,
+  handleDelete,
+  handleSavePermissions,
+  loadRolePermissions,
+  resetFormErrors
+} = useRoles();
 
   // Estados para modales
   const [openCreate, setOpenCreate] = useState(false);
@@ -165,7 +175,7 @@ export const Roles = () => {
     } else {
       const allPermisoIds = allPermissions.map(p => p.PermisoId);
       const allSelected = allPermisoIds.every(id => selectedPermissions.includes(id));
-      
+
       if (allSelected) {
         setSelectedPermissions([]);
       } else {
@@ -269,6 +279,18 @@ export const Roles = () => {
               onCancel={() => setOpenEliminar(false)}
             />
           </Modal>
+
+          <ConfirmRolModal
+            open={confirmEstadoModal.open}
+            onClose={() => setConfirmEstadoModal({ open: false, rolId: null, nuevoEstado: null, nombreRol: '' })}
+            onConfirm={handleConfirmToggleEstado}
+            title={`${confirmEstadoModal.nuevoEstado === 'Activo' ? 'Activar' : 'Desactivar'} Rol`}
+            message={`¿Estás seguro de que deseas ${confirmEstadoModal.nuevoEstado === 'Activo' ? 'activar' : 'desactivar'} este rol?`}
+            rolNombre={confirmEstadoModal.nombreRol}
+            type={confirmEstadoModal.nuevoEstado === 'Activo' ? 'info' : 'warning'}
+            confirmText={confirmEstadoModal.nuevoEstado === 'Activo' ? 'Sí, activar' : 'Sí, desactivar'}
+            cancelText="Cancelar"
+          />
 
           {/* Tabla */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
