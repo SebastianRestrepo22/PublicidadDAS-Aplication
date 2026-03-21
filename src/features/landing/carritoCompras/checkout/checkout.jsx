@@ -14,22 +14,18 @@ const isValidUUID = (str) => {
 const extractValidColorId = (item) => {
   if (!item?.customization?.color) return null;
 
-  // Caso 1: UUID válido en customization.color
   if (typeof item.customization.color === 'string' && isValidUUID(item.customization.color)) {
     return item.customization.color;
   }
 
-  // Caso 2: Objeto con ColorId UUID
   if (item.customization.color?.ColorId && isValidUUID(item.customization.color.ColorId)) {
     return item.customization.color.ColorId;
   }
 
-  // Caso 3: Objeto con id UUID
   if (item.customization.color?.id && isValidUUID(item.customization.color.id)) {
     return item.customization.color.id;
   }
 
-  // Cualquier otro caso → null (evita error FK constraint)
   console.warn(`⚠️ Color no válido para "${item.Nombre}":`, item.customization.color);
   return null;
 };
@@ -42,6 +38,19 @@ const formatCOP = (value) => {
   return num.toLocaleString("es-CO", { style: "currency", currency: "COP" });
 };
 
+// 🔥 CONVERTIR BASE64 A FILE
+const base64ToFile = (base64, filename) => {
+  const arr = base64.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+};
+
 export const Checkout = () => {
   const { cart, getTotal, clearCart } = useCart();
   const { user } = useAuth();
@@ -50,7 +59,6 @@ export const Checkout = () => {
   const [error, setError] = useState("");
   const [voucher, setVoucher] = useState(null);
 
-  // ====== DATOS BANCARIOS ======
   const DATOS_BANCARIOS_REALES = {
     nombreTitular: "Luis Marino Moreno",
     numeroCuenta: "24079288086",
@@ -63,7 +71,6 @@ export const Checkout = () => {
     horarioAtencion: "Lunes a Viernes 8am-6pm"
   };
 
-  // Estados para métodos de pago
   const [metodoPago, setMetodoPago] = useState("qr");
   const [datosEntrega, setDatosEntrega] = useState({
     nombreRecibe: "",
@@ -72,7 +79,6 @@ export const Checkout = () => {
   });
   const [erroresEntrega, setErroresEntrega] = useState({});
 
-  // ====== VALIDACIÓN DE ENTREGA ======
   const validarEntrega = () => {
     const errores = {};
     if (!datosEntrega.nombreRecibe.trim()) errores.nombreRecibe = "Requerido";
@@ -82,32 +88,24 @@ export const Checkout = () => {
     return Object.keys(errores).length === 0;
   };
 
-  // ====== FUNCIÓN PARA CALCULAR TOTAL DE FORMA SEGURA ======
   const calcularTotalSeguro = () => {
     const total = getTotal();
-    console.log('💰 Total recibido de getTotal():', total, 'Tipo:', typeof total);
-    
-    // Convertir a número de forma segura
     let totalNumerico = 0;
     
     if (total === null || total === undefined) {
-      console.warn('⚠️ getTotal() devolvió null/undefined');
       totalNumerico = 0;
     } else if (typeof total === 'number') {
       totalNumerico = total;
     } else if (typeof total === 'string') {
-      // Limpiar el string: eliminar símbolos de moneda, comas, espacios
       const totalLimpio = total.replace(/[$,.]/g, '').trim();
       totalNumerico = parseFloat(totalLimpio) || 0;
     } else {
       totalNumerico = Number(total) || 0;
     }
     
-    console.log('💰 Total numérico final:', totalNumerico);
     return totalNumerico;
   };
 
-  // ====== ENVIAR PEDIDO ======
   const enviarPedido = async () => {
     if (!user) {
       setError("Debes iniciar sesión");
@@ -125,17 +123,8 @@ export const Checkout = () => {
     setError("");
 
     try {
-      console.log('🔍 DEBUG - Cart items:', cart.map(item => ({
-        id: item.id,
-        nombre: item.Nombre,
-        tieneCustomization: !!item.customization,
-        archivosAdjuntos: item.customization?.archivosAdjuntos,
-        urlArchivo: item.customization?.archivosAdjuntos?.[0]?.url,
-        tipoArchivo: item.customization?.archivosAdjuntos?.[0]?.tipo
-      })));
-
-      // ✅ CONSTRUIR DETALLES CON VALIDACIÓN SEGURA Y URL DE ARCHIVO PERSONALIZADO
-      const detallesValidados = cart.map(item => {
+      // ✅ CONSTRUIR DETALLES - NO ENVIAR IMÁGENES EN BASE64
+      const detallesFinales = cart.map(item => {
         const ProductoId = item.ProductoId || null;
         const ServicioId = item.ServicioId || null;
 
@@ -143,20 +132,16 @@ export const Checkout = () => {
           throw new Error(`El ítem "${item.Nombre || item.id}" no tiene ProductoId ni ServicioId válido`);
         }
 
-        // ✅ EXTRAER COLORID SEGURO
         const ColorId = extractValidColorId(item);
 
-        // ✅ TAMAÑO SOLO PARA SERVICIOS
         let Tamaño = null;
         if (ServicioId) {
           const t = (item.Tamaño || item.customization?.Tamaño)?.trim();
           Tamaño = t && ['Pequeña', 'Mediana', 'Grande'].includes(t) ? t : "Mediana";
         }
 
-        // ✅ DESCRIPCIÓN CON COLOR SI NO ES UUID
         let descripcion = item.options?.descripcion || item.Descripcion || item.customization?.Descripcion || "";
 
-        // Agregar nombre del color a la descripción si no es UUID
         if (item.customization?.color && !ColorId) {
           const colorName = typeof item.customization.color === 'string'
             ? item.customization.color
@@ -167,28 +152,20 @@ export const Checkout = () => {
           }
         }
 
-        // ✅ EXTRAER URL DE ARCHIVO PERSONALIZADO (cualquier tipo: imagen, PDF, Word, etc.)
         let UrlArchivoPersonalizado = null;
-        let tipoArchivo = null;
-        let nombreArchivo = null;
-        
         if (item.customization?.archivosAdjuntos?.length > 0) {
           const archivo = item.customization.archivosAdjuntos[0];
           if (archivo.url) {
-            // Construir URL completa si es necesario
             UrlArchivoPersonalizado = archivo.url.startsWith('http') 
               ? archivo.url 
               : `http://localhost:3000${archivo.url}`;
-            
-            tipoArchivo = archivo.tipo || archivo.type || 'desconocido';
-            nombreArchivo = archivo.nombre || archivo.name || 'archivo';
-            
-            console.log(`📎 Archivo personalizado encontrado para ${item.Nombre}:`, {
-              url: UrlArchivoPersonalizado,
-              tipo: tipoArchivo,
-              nombre: nombreArchivo
-            });
           }
+        }
+
+        // 🔥 NO ENVIAR UrlImagen SI ES BASE64
+        let urlImagen = null;
+        if (item.UrlImagen && !item.UrlImagen.startsWith('data:image')) {
+          urlImagen = item.UrlImagen;
         }
 
         return {
@@ -198,37 +175,19 @@ export const Checkout = () => {
           Precio: item.Precio || 0,
           Tamaño,
           Descripcion: descripcion,
-          UrlImagen: item.options?.urlImagen || item.UrlImagen || null,
+          UrlImagen: urlImagen, // ← SOLO URLS, NO BASE64
           UrlImagenPersonalizada: UrlArchivoPersonalizado,
           ColorId
         };
-      });
-
-      // ✅ VALIDACIÓN FINAL
-      const detallesFinales = detallesValidados.filter(detalle => {
-        if (!detalle.ProductoId && !detalle.ServicioId) {
-          console.error(`❌ Item sin ProductoId/ServicioId omitido:`, detalle);
-          return false;
-        }
-        return true;
       });
 
       if (detallesFinales.length === 0) {
         throw new Error("No hay items válidos para procesar el pedido");
       }
 
-      console.log('🔍 DEBUG - Detalles finales con archivos:', detallesFinales.map(d => ({
-        tieneArchivoPersonalizado: !!d.UrlImagenPersonalizada,
-        urlArchivoPersonalizado: d.UrlImagenPersonalizada,
-        urlImagen: d.UrlImagen
-      })));
-
-      // 🔥 CALCULAR TOTAL DE FORMA SEGURA
       const totalSeguro = calcularTotalSeguro();
       
-      // Validar que el total sea un número válido
       if (isNaN(totalSeguro) || totalSeguro <= 0) {
-        console.error('❌ Total inválido después de calcular:', totalSeguro);
         throw new Error("El total del pedido no es válido");
       }
 
@@ -242,29 +201,30 @@ export const Checkout = () => {
         detalle: detallesFinales
       };
 
-      // ✅ AGREGAR DATOS DE ENTREGA SI ES CONTRA ENTREGA
       if (metodoPago === "entrega") {
         payload.NombreRecibe = datosEntrega.nombreRecibe;
         payload.TelefonoEntrega = datosEntrega.telefono;
         payload.DireccionEntrega = datosEntrega.direccion;
       }
 
-      console.log('📦 Payload a enviar:', JSON.stringify(payload, null, 2));
-
-      // ✅ ENVIAR AL BACKEND
       const formData = new FormData();
-
       formData.append("pedido", JSON.stringify(payload));
 
-      // Adjuntar archivos de los items (si existen y son archivos físicos)
+      // 🔥 ADJUNTAR ARCHIVOS FÍSICOS
       cart.forEach((item, index) => {
+        // Archivos personalizados del servicio
         if (item.customization?.archivosAdjuntosOriginales) {
           item.customization.archivosAdjuntosOriginales.forEach((file, fileIndex) => {
             if (file instanceof File) {
               formData.append(`archivo_${index}_${fileIndex}`, file);
-              console.log(`📎 Adjuntando archivo físico: ${file.name} (${file.type})`);
             }
           });
+        }
+        
+        // 🔥 SI HAY UNA IMAGEN EN BASE64, CONVERTIRLA A FILE Y ADJUNTARLA
+        if (item.UrlImagen && item.UrlImagen.startsWith('data:image')) {
+          const file = base64ToFile(item.UrlImagen, `imagen_${index}.jpg`);
+          formData.append(`archivo_${index}_imagen`, file);
         }
       });
 
@@ -275,24 +235,13 @@ export const Checkout = () => {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        const errorMsg = errorData.error || errorData.message || `Error ${res.status}: ${res.statusText}`;
-        throw new Error(errorMsg);
+        throw new Error(errorData.error || errorData.message || `Error ${res.status}: ${res.statusText}`);
       }
 
       const data = await res.json();
-      console.log('✅ Respuesta del servidor:', data);
-      
-      // Verificar si el archivo se guardó
-      if (data.detalle?.[0]?.UrlImagenPersonalizada) {
-        console.log('🎉 ¡Archivo guardado correctamente en la BD!');
-      } else {
-        console.warn('⚠️ El archivo NO se guardó en la BD');
-      }
-
       const pedidoId = String(data.PedidoClienteId).trim();
       clearCart();
 
-      // ✅ GENERAR VOUCHER PARA PAGOS ELECTRÓNICOS
       if (metodoPago === "qr" || metodoPago === "transferencia") {
         setVoucher({
           id: pedidoId,
@@ -330,7 +279,7 @@ export const Checkout = () => {
 
     } catch (e) {
       console.error("❌ Error completo al crear pedido:", e);
-      const errorMsg = e.message || "Ocurrió un error al procesar tu pedido. Verifica los datos e intenta nuevamente.";
+      const errorMsg = e.message || "Ocurrió un error al procesar tu pedido.";
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -338,7 +287,7 @@ export const Checkout = () => {
     }
   };
 
-  // ====== COMPONENTE: Subir comprobante (acepta imágenes y PDF) ======
+  // ====== COMPONENTE: Subir comprobante ======
   const SubirComprobanteBanco = ({ pedidoId, metodo }) => {
     const [file, setFile] = useState(null);
     const [uploading, setUploading] = useState(false);
@@ -351,13 +300,11 @@ export const Checkout = () => {
         return;
       }
 
-      // Validar tamaño (máx 10MB)
       if (file.size > 10 * 1024 * 1024) {
         toast.error("El archivo debe ser menor a 10MB");
         return;
       }
 
-      // Validar tipo (imágenes y PDF)
       if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
         toast.error("Solo se permiten imágenes o PDFs");
         return;
@@ -368,9 +315,6 @@ export const Checkout = () => {
 
       setUploading(true);
       try {
-        console.log('📤 Subiendo comprobante para pedido:', pedidoId);
-        console.log('📄 Archivo:', file.name, 'Tipo:', file.type);
-
         const res = await fetch(`http://localhost:3000/api/pedidos-clientes/${pedidoId}/voucher`, {
           method: "POST",
           body: formData
@@ -378,8 +322,6 @@ export const Checkout = () => {
 
         if (res.ok) {
           const data = await res.json();
-          console.log('✅ Comprobante subido y pedido actualizado:', data);
-
           setSuccess(true);
           toast.success("¡Comprobante enviado! Revisaremos tu pago en 24-48 horas");
 
@@ -395,16 +337,13 @@ export const Checkout = () => {
               }
             });
           }, 2000);
-
         } else {
           const errorData = await res.json().catch(() => ({}));
-          console.error('❌ Error del servidor:', errorData);
-          const errorMsg = errorData.error || "Error al subir el comprobante. Intenta nuevamente";
-          toast.error(errorMsg);
+          toast.error(errorData.error || "Error al subir el comprobante");
         }
       } catch (err) {
         console.error("Error subiendo comprobante:", err);
-        toast.error("No se pudo conectar al servidor. Verifica tu conexión");
+        toast.error("No se pudo conectar al servidor");
       } finally {
         setUploading(false);
       }
@@ -449,35 +388,21 @@ export const Checkout = () => {
                 </label>
                 <p className="pl-1">o arrastra y suelta</p>
               </div>
-              <p className="text-xs text-gray-500">
-                PNG, JPG, GIF, PDF hasta 10MB
-              </p>
+              <p className="text-xs text-gray-500">PNG, JPG, GIF, PDF hasta 10MB</p>
               {file && (
                 <p className="text-sm text-green-600 font-medium mt-1">
                   ✓ Archivo seleccionado: {file.name}
-                  <span className="text-gray-500 ml-2">
-                    ({(file.size / 1024 / 1024).toFixed(2)} MB) - {file.type}
-                  </span>
                 </p>
               )}
             </div>
           </div>
         </div>
-
         <button
           type="submit"
           disabled={uploading}
           className={`w-full py-4 rounded-xl font-bold text-white transition-all ${uploading ? "bg-gray-400" : "bg-black hover:bg-gray-800 hover:shadow-lg"}`}
         >
-          {uploading ? (
-            <div className="flex items-center justify-center gap-2">
-              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.644z"></path>
-              </svg>
-              Enviando comprobante...
-            </div>
-          ) : "Enviar comprobante y finalizar"}
+          {uploading ? "Enviando comprobante..." : "Enviar comprobante y finalizar"}
         </button>
       </form>
     );
@@ -487,7 +412,6 @@ export const Checkout = () => {
   if (voucher) {
     return (
       <div className="p-4 md:p-6 max-w-6xl mx-auto min-h-screen">
-        {/* Encabezado */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -499,11 +423,8 @@ export const Checkout = () => {
               {voucher.metodo === "qr" ? "Paga con QR Bancolombia" : "Transferencia Bancaria"}
             </h1>
           </div>
-
           <div className="inline-flex items-center gap-4 bg-blue-50 px-4 py-2 rounded-full">
-            <span className="text-sm font-medium text-blue-700">
-              Pedido: <span className="font-bold">#{voucher.id}</span>
-            </span>
+            <span className="text-sm font-medium text-blue-700">Pedido: #{voucher.id}</span>
             <span className="text-gray-400">•</span>
             <span className="text-sm text-gray-600">{voucher.fecha}</span>
             <span className="text-gray-400">•</span>
@@ -512,9 +433,7 @@ export const Checkout = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Columna 1: Información importante y Tiempo límite */}
           <div className="lg:col-span-1 space-y-6">
-            {/* Información importante */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
               <h3 className="font-bold text-yellow-800 mb-3 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -523,22 +442,11 @@ export const Checkout = () => {
                 Información importante
               </h3>
               <ul className="space-y-2 text-sm text-yellow-700">
-                <li className="flex items-start gap-2">
-                  <span className="font-bold">•</span>
-                  <span>Tu pedido se procesará solo después de confirmar el pago (24-48 horas)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold">•</span>
-                  <span>Guarda el comprobante de pago de tu banco</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold">•</span>
-                  <span>Si tienes problemas con el pago, contacta a: {DATOS_BANCARIOS_REALES.telefonoSoporte}</span>
-                </li>
+                <li className="flex items-start gap-2"><span className="font-bold">•</span><span>Tu pedido se procesará solo después de confirmar el pago (24-48 horas)</span></li>
+                <li className="flex items-start gap-2"><span className="font-bold">•</span><span>Guarda el comprobante de pago de tu banco</span></li>
+                <li className="flex items-start gap-2"><span className="font-bold">•</span><span>Si tienes problemas con el pago, contacta a: {DATOS_BANCARIOS_REALES.telefonoSoporte}</span></li>
               </ul>
             </div>
-
-            {/* Tiempo límite */}
             <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
@@ -554,7 +462,6 @@ export const Checkout = () => {
             </div>
           </div>
 
-          {/* Columna 2: Sube tu comprobante */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="bg-gray-900 text-white p-5">
@@ -566,7 +473,6 @@ export const Checkout = () => {
                 </div>
                 <p className="text-gray-300 mt-1">Después de pagar, adjunta aquí tu comprobante para confirmar tu pedido</p>
               </div>
-
               <div className="p-6">
                 <SubirComprobanteBanco pedidoId={voucher.id} metodo={voucher.metodo} />
               </div>
@@ -574,7 +480,6 @@ export const Checkout = () => {
           </div>
         </div>
 
-        {/* Total del pedido con formato COP */}
         <div className="mt-6 text-center">
           <div className="inline-block bg-gray-100 rounded-xl p-4">
             <p className="text-sm text-gray-600">Total a pagar</p>
@@ -584,12 +489,8 @@ export const Checkout = () => {
           </div>
         </div>
 
-        {/* Botón de volver */}
         <div className="mt-8 text-center">
-          <button
-            onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium"
-          >
+          <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -597,7 +498,6 @@ export const Checkout = () => {
           </button>
         </div>
 
-        {/* Contacto */}
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-500">
             ¿Problemas con el pago? Contacta a soporte:{" "}
@@ -628,20 +528,9 @@ export const Checkout = () => {
   // ====== RENDER: Checkout normal ======
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto min-h-screen">
-      {/* Título con flecha de retorno */}
       <div className="mb-8 flex items-center gap-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-          aria-label="Volver"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6 text-gray-700"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
+        <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-gray-100 transition-colors" aria-label="Volver">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
@@ -663,23 +552,11 @@ export const Checkout = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Resumen del pedido */}
         <div className="lg:col-span-5">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4L7 13zm1 6a2 2 0 100 4 2 2 0 000-4zm6 0a2 2 0 100 4 2 2 0 000-4z"
-                />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4L7 13zm1 6a2 2 0 100 4 2 2 0 000-4zm6 0a2 2 0 100 4 2 2 0 000-4z" />
               </svg>
               Resumen del pedido ({cart.length} productos)
             </h2>
@@ -687,7 +564,7 @@ export const Checkout = () => {
             <div className="space-y-4 mb-6">
               {cart.map((item) => (
                 <div key={item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                  {item.UrlImagen && (
+                  {item.UrlImagen && !item.UrlImagen.startsWith('data:image') && (
                     <div className="w-16 h-16 rounded-lg bg-white border border-gray-200 overflow-hidden flex-shrink-0">
                       <img src={item.UrlImagen} alt={item.Nombre} className="w-full h-full object-cover" />
                     </div>
@@ -695,15 +572,11 @@ export const Checkout = () => {
                   <div className="flex-1">
                     <div className="flex justify-between">
                       <h3 className="font-medium text-gray-900">{item.Nombre}</h3>
-                      <span className="font-bold text-gray-900">
-                        {formatCOP(item.Precio * item.quantity)}
-                      </span>
+                      <span className="font-bold text-gray-900">{formatCOP(item.Precio * item.quantity)}</span>
                     </div>
                     <div className="flex items-center gap-4 mt-1">
                       <span className="text-sm text-gray-600">Cantidad: {item.quantity}</span>
-                      {item.Tamaño && (
-                        <span className="text-xs bg-gray-200 px-2 py-1 rounded">Tamaño: {item.Tamaño}</span>
-                      )}
+                      {item.Tamaño && <span className="text-xs bg-gray-200 px-2 py-1 rounded">Tamaño: {item.Tamaño}</span>}
                       {item.customization?.color && (
                         <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                           Color: {typeof item.customization.color === 'string'
@@ -720,47 +593,29 @@ export const Checkout = () => {
             <div className="border-t pt-6">
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold text-gray-900">Total a pagar</span>
-                <span className="text-3xl font-bold text-black">
-                  {formatCOP(calcularTotalSeguro())}
-                </span>
+                <span className="text-3xl font-bold text-black">{formatCOP(calcularTotalSeguro())}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Métodos de pago */}
         <div className="lg:col-span-7 space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-5 flex items-center gap-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 10h18M7 15h10l4-8H5.4L7 13zm1 6a2 2 0 100 4 2 2 0 000-4zm6 0a2 2 0 100 4 2 2 0 000-4z"
-                />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h10l4-8H5.4L7 13zm1 6a2 2 0 100 4 2 2 0 000-4zm6 0a2 2 0 100 4 2 2 0 000-4z" />
               </svg>
               Método de pago
             </h2>
 
             {/* Opción 1: QR */}
             <div
-              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "qr" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-                }`}
+              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "qr" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"}`}
               onClick={() => setMetodoPago("qr")}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "qr" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                      }`}
-                  >
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "qr" ? "border-blue-500 bg-blue-500" : "border-gray-300"}`}>
                     {metodoPago === "qr" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                   </div>
                   <div>
@@ -768,20 +623,12 @@ export const Checkout = () => {
                     <div className="text-sm text-gray-600">Escanea con la app de Bancolombia para pagar al instante</div>
                   </div>
                 </div>
-                {metodoPago === "qr" && (
-                  <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">
-                    SELECCIONADO
-                  </div>
-                )}
+                {metodoPago === "qr" && <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">SELECCIONADO</div>}
               </div>
               {metodoPago === "qr" && (
                 <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
                   <div className="flex justify-center">
-                    <img
-                      src={DATOS_BANCARIOS_REALES.qrCode}
-                      alt="QR Bancolombia"
-                      className="w-36 h-36 object-contain"
-                    />
+                    <img src={DATOS_BANCARIOS_REALES.qrCode} alt="QR Bancolombia" className="w-36 h-36 object-contain" />
                   </div>
                   <div className="text-xs text-gray-600 mt-3 text-center">
                     Cuenta: {DATOS_BANCARIOS_REALES.numeroCuenta} • {DATOS_BANCARIOS_REALES.tipoCuenta}
@@ -792,15 +639,11 @@ export const Checkout = () => {
 
             {/* Opción 2: Transferencia */}
             <div
-              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-                }`}
+              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"}`}
               onClick={() => setMetodoPago("transferencia")}
             >
               <div className="flex items-center gap-3">
-                <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                    }`}
-                >
+                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-500" : "border-gray-300"}`}>
                   {metodoPago === "transferencia" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                 </div>
                 <div>
@@ -811,18 +654,10 @@ export const Checkout = () => {
               {metodoPago === "transferencia" && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="text-sm space-y-2">
-                    <div>
-                      <span className="font-semibold">Titular:</span> {DATOS_BANCARIOS_REALES.nombreTitular.trim()}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Cuenta:</span> {DATOS_BANCARIOS_REALES.numeroCuenta}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Tipo:</span> {DATOS_BANCARIOS_REALES.tipoCuenta}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Banco:</span> {DATOS_BANCARIOS_REALES.banco}
-                    </div>
+                    <div><span className="font-semibold">Titular:</span> {DATOS_BANCARIOS_REALES.nombreTitular.trim()}</div>
+                    <div><span className="font-semibold">Cuenta:</span> {DATOS_BANCARIOS_REALES.numeroCuenta}</div>
+                    <div><span className="font-semibold">Tipo:</span> {DATOS_BANCARIOS_REALES.tipoCuenta}</div>
+                    <div><span className="font-semibold">Banco:</span> {DATOS_BANCARIOS_REALES.banco}</div>
                   </div>
                 </div>
               )}
@@ -830,15 +665,11 @@ export const Checkout = () => {
 
             {/* Opción 3: Contra entrega */}
             <div
-              className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "entrega" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"
-                }`}
+              className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "entrega" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"}`}
               onClick={() => setMetodoPago("entrega")}
             >
               <div className="flex items-center gap-3">
-                <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "entrega" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                    }`}
-                >
+                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${metodoPago === "entrega" ? "border-blue-500 bg-blue-500" : "border-gray-300"}`}>
                   {metodoPago === "entrega" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                 </div>
                 <div>
@@ -851,43 +682,16 @@ export const Checkout = () => {
                   <h4 className="font-semibold text-gray-800 mb-3">Datos de entrega</h4>
                   <div className="space-y-3">
                     <div>
-                      <input
-                        type="text"
-                        placeholder="Nombre completo *"
-                        value={datosEntrega.nombreRecibe}
-                        onChange={(e) => setDatosEntrega({ ...datosEntrega, nombreRecibe: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${erroresEntrega.nombreRecibe ? "border-red-500" : "border-gray-300"
-                          }`}
-                      />
-                      {erroresEntrega.nombreRecibe && (
-                        <p className="text-red-500 text-sm mt-1">{erroresEntrega.nombreRecibe}</p>
-                      )}
+                      <input type="text" placeholder="Nombre completo *" value={datosEntrega.nombreRecibe} onChange={(e) => setDatosEntrega({ ...datosEntrega, nombreRecibe: e.target.value })} className={`w-full p-3 rounded-lg border ${erroresEntrega.nombreRecibe ? "border-red-500" : "border-gray-300"}`} />
+                      {erroresEntrega.nombreRecibe && <p className="text-red-500 text-sm mt-1">{erroresEntrega.nombreRecibe}</p>}
                     </div>
                     <div>
-                      <input
-                        type="tel"
-                        placeholder="Teléfono *"
-                        value={datosEntrega.telefono}
-                        onChange={(e) => setDatosEntrega({ ...datosEntrega, telefono: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${erroresEntrega.telefono ? "border-red-500" : "border-gray-300"
-                          }`}
-                      />
-                      {erroresEntrega.telefono && (
-                        <p className="text-red-500 text-sm mt-1">{erroresEntrega.telefono}</p>
-                      )}
+                      <input type="tel" placeholder="Teléfono *" value={datosEntrega.telefono} onChange={(e) => setDatosEntrega({ ...datosEntrega, telefono: e.target.value })} className={`w-full p-3 rounded-lg border ${erroresEntrega.telefono ? "border-red-500" : "border-gray-300"}`} />
+                      {erroresEntrega.telefono && <p className="text-red-500 text-sm mt-1">{erroresEntrega.telefono}</p>}
                     </div>
                     <div>
-                      <textarea
-                        placeholder="Dirección completa *"
-                        value={datosEntrega.direccion}
-                        onChange={(e) => setDatosEntrega({ ...datosEntrega, direccion: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${erroresEntrega.direccion ? "border-red-500" : "border-gray-300"
-                          }`}
-                        rows="2"
-                      />
-                      {erroresEntrega.direccion && (
-                        <p className="text-red-500 text-sm mt-1">{erroresEntrega.direccion}</p>
-                      )}
+                      <textarea placeholder="Dirección completa *" value={datosEntrega.direccion} onChange={(e) => setDatosEntrega({ ...datosEntrega, direccion: e.target.value })} className={`w-full p-3 rounded-lg border ${erroresEntrega.direccion ? "border-red-500" : "border-gray-300"}`} rows="2" />
+                      {erroresEntrega.direccion && <p className="text-red-500 text-sm mt-1">{erroresEntrega.direccion}</p>}
                     </div>
                   </div>
                 </div>
@@ -895,24 +699,12 @@ export const Checkout = () => {
             </div>
           </div>
 
-          {/* Botón de confirmar */}
           <button
             onClick={enviarPedido}
             disabled={loading || cart.length === 0}
-            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${loading || cart.length === 0
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-black hover:bg-gray-800 hover:shadow-xl"
-              }`}
+            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${loading || cart.length === 0 ? "bg-gray-400 cursor-not-allowed" : "bg-black hover:bg-gray-800 hover:shadow-xl"}`}
           >
-            {loading ? (
-              <div className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.644z"></path>
-                </svg>
-                Procesando...
-              </div>
-            ) : cart.length === 0 ? "Carrito vacío" : "Confirmar pedido"}
+            {loading ? "Procesando..." : cart.length === 0 ? "Carrito vacío" : "Confirmar pedido"}
           </button>
         </div>
       </div>

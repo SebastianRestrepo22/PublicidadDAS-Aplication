@@ -29,8 +29,18 @@ export const OrderView = ({
   // Determinar el tipo de pago
   const esContraEntrega = selectedPedido?.MetodoPago === 'contra_entrega';
 
-  // Estados permitidos según el método de pago (SOLO APROBADO Y CANCELADO)
-  const estadosPermitidos = ['aprobado', 'cancelado'];
+  // 🔥 ESTADOS PERMITIDOS SEGÚN MÉTODO DE PAGO
+  const getEstadosPermitidos = () => {
+    if (esContraEntrega) {
+      // Estados para contra entrega: flujo completo de envío
+      return ['pendiente', 'en_proceso', 'en_camino', 'entregado', 'cancelado'];
+    } else {
+      // Estados para transferencia/QR: solo aprobado y cancelado
+      return ['pendiente', 'aprobado', 'cancelado'];
+    }
+  };
+
+  const estadosPermitidos = getEstadosPermitidos();
 
   const getEstadoColor = (estado) => {
     switch (estado) {
@@ -71,9 +81,46 @@ export const OrderView = ({
     return labels[estado] || estado;
   };
 
+  // 🔥 VERIFICAR SI EL ESTADO ES ACCESIBLE (no retroceder)
+  const ordenEstados = {
+    'pendiente': 1,
+    'aprobado': 2,
+    'en_proceso': 2,
+    'en_camino': 3,
+    'entregado': 4,
+    'finalizado': 3,
+    'cancelado': 999
+  };
+
+  const isEstadoAccesible = (estado) => {
+    if (estado === 'cancelado') return true;
+    
+    const estadoActual = selectedPedido?.Estado;
+    if (!estadoActual) return true;
+    
+    const nivelActual = ordenEstados[estadoActual];
+    const nivelEstado = ordenEstados[estado];
+    
+    if (!nivelActual || !nivelEstado) return true;
+    
+    return nivelEstado >= nivelActual;
+  };
+
+  const getEstadoTooltip = (estado) => {
+    if (!isEstadoAccesible(estado)) {
+      return `No puedes cambiar de "${getEstadoLabel(selectedPedido.Estado)}" a "${getEstadoLabel(estado)}". Solo puedes avanzar a estados posteriores.`;
+    }
+    return `Cambiar estado a ${getEstadoLabel(estado)}`;
+  };
+
   const handleEstadoChange = async (nuevoEstado) => {
     if (nuevoEstado === 'cancelado') {
       setShowCancelModal(true);
+      return;
+    }
+
+    if (!isEstadoAccesible(nuevoEstado)) {
+      toast.warning(`No puedes cambiar de "${getEstadoLabel(selectedPedido.Estado)}" a "${getEstadoLabel(nuevoEstado)}"`);
       return;
     }
 
@@ -84,13 +131,17 @@ export const OrderView = ({
       let mensaje = `Estado actualizado a ${getEstadoLabel(nuevoEstado)}`;
       
       // Mensaje especial para cuando se aprueba un pedido (genera venta)
-      if (nuevoEstado === 'aprobado') {
+      if (!esContraEntrega && nuevoEstado === 'aprobado') {
         mensaje = '✅ Pedido aprobado - Se generó la venta automáticamente';
+      }
+      
+      // Mensaje especial para cuando se entrega un pedido de contra entrega
+      if (esContraEntrega && nuevoEstado === 'entregado') {
+        mensaje = '✅ Pedido entregado - Se generó la venta automáticamente';
       }
       
       toast.success(mensaje);
       
-      // Redirigir a la tabla después de 1.5 segundos
       setTimeout(() => {
         onBack();
       }, 1500);
@@ -115,7 +166,6 @@ export const OrderView = ({
       setCancelReason("");
       toast.success('Pedido cancelado correctamente');
       
-      // Redirigir a la tabla después de 1.5 segundos
       setTimeout(() => {
         onBack();
       }, 1500);
@@ -225,33 +275,43 @@ export const OrderView = ({
             {userRole === 'admin' && !esPedidoLanding && (
               <div className="mt-4">
                 <p className="text-sm font-medium text-slate-700 mb-2">
-                  Acciones:
+                  Cambiar estado:
                 </p>
-                <div className="flex flex-wrap gap-3">
-                  {/* Botón Aprobar - Solo si está pendiente */}
-                  {selectedPedido.Estado === 'pendiente' && (
-                    <button
-                      onClick={() => handleEstadoChange('aprobado')}
-                      disabled={updating}
-                      className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2 shadow-sm"
-                    >
-                      <CheckCircle size={18} />
-                      Aprobar Pedido
-                    </button>
-                  )}
-                  
-                  {/* Botón Cancelar - Siempre visible si no está cancelado */}
-                  {selectedPedido.Estado !== 'cancelado' && (
-                    <button
-                      onClick={() => setShowCancelModal(true)}
-                      disabled={updating}
-                      className="px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2 shadow-sm"
-                    >
-                      <XCircle size={18} />
-                      Cancelar Pedido
-                    </button>
-                  )}
+                <div className="flex flex-wrap gap-2">
+                  {estadosPermitidos.map((estado) => {
+                    const accesible = isEstadoAccesible(estado);
+                    const esActual = estado === selectedPedido.Estado;
+                    
+                    return (
+                      <button
+                        key={estado}
+                        onClick={() => accesible && handleEstadoChange(estado)}
+                        disabled={updating || esActual || !accesible}
+                        title={getEstadoTooltip(estado)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative ${
+                          esActual
+                            ? getEstadoColor(estado)
+                            : accesible
+                              ? 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer'
+                              : 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed opacity-50'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {getEstadoLabel(estado)}
+                        {!accesible && !esActual && (
+                          <span className="absolute -top-1 -right-1 w-2 h-2 bg-gray-400 rounded-full"></span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
+                
+                {/* Mensaje informativo sobre estados no disponibles */}
+                {estadosPermitidos.some(e => !isEstadoAccesible(e) && e !== selectedPedido.Estado) && (
+                  <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    Los estados atenuados no están disponibles porque son anteriores al estado actual.
+                  </p>
+                )}
               </div>
             )}
 
@@ -415,7 +475,7 @@ export const OrderView = ({
           </div>
 
           {/* Mensajes informativos según estado */}
-          {selectedPedido.Estado === 'aprobado' && (
+          {selectedPedido.Estado === 'aprobado' && !esContraEntrega && (
             <div className="bg-green-50 p-4 rounded-lg border border-green-200">
               <p className="text-sm text-green-700 flex items-center gap-2">
                 <CheckCircle size={16} />
@@ -437,7 +497,25 @@ export const OrderView = ({
             <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
               <p className="text-sm text-amber-700 flex items-center gap-2">
                 <Clock size={16} />
-                ⏳ Pedido pendiente de confirmación. Al aprobar se generará la venta.
+                ⏳ Pedido pendiente de confirmación.
+              </p>
+            </div>
+          )}
+
+          {esContraEntrega && selectedPedido.Estado === 'en_proceso' && (
+            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+              <p className="text-sm text-purple-700 flex items-center gap-2">
+                <Package size={16} />
+                📦 Pedido en proceso de preparación.
+              </p>
+            </div>
+          )}
+
+          {esContraEntrega && selectedPedido.Estado === 'en_camino' && (
+            <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+              <p className="text-sm text-orange-700 flex items-center gap-2">
+                <Truck size={16} />
+                🚚 Pedido en camino hacia tu dirección.
               </p>
             </div>
           )}

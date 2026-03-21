@@ -141,9 +141,10 @@ export const OrderForm = ({
     setModalProductosAbierto(true);
   };
 
+  // En la función seleccionarProducto (cuando se selecciona un producto)
   const seleccionarProducto = (producto) => {
     console.log('📦 Producto seleccionado:', producto);
-    console.log('📦 Para índice:', currentDetailIndex);
+    console.log('🎨 Colores del producto:', producto.Colores);
 
     if (currentDetailIndex !== null) {
       const nuevos = [...detallesCrear];
@@ -156,19 +157,18 @@ export const OrderForm = ({
         Descripcion: producto.Descripcion || "",
         UrlImagen: producto.Imagen || "",
         ColorId: null,
-        tipoStock: 'general',
+        tipoStock: producto.UsaColores === 1 ? 'colores' : 'general',
         Stock: producto.Stock || 0,
         UsaColores: producto.UsaColores || 0,
         ProductoNombre: producto.Nombre,
-        ProductoImagen: producto.Imagen || ""
+        ProductoImagen: producto.Imagen || "",
+        //  GUARDAR LOS COLORES DEL PRODUCTO
+        coloresDisponibles: producto.Colores || []  // ← NUEVO
       };
 
       console.log('📦 Detalle actualizado:', nuevos[currentDetailIndex]);
       setDetallesCrear(nuevos);
       setModalProductosAbierto(false);
-    } else {
-      console.error(' No hay índice seleccionado');
-      toast.error('Error al seleccionar producto');
     }
   };
 
@@ -199,9 +199,8 @@ export const OrderForm = ({
     setModalServiciosAbierto(false);
   };
 
-  // Handlers para colores (solo para productos)
   const abrirModalColores = (index) => {
-    console.log(' Abriendo modal colores para índice:', index);
+    console.log('🎨 Abriendo modal colores para índice:', index);
     console.log(' Detalle en índice:', detallesCrear[index]);
 
     // Solo abrir si es producto
@@ -214,29 +213,34 @@ export const OrderForm = ({
         return;
       }
 
+      // 🔥 OBTENER LOS COLORES DEL PRODUCTO
+      const coloresDelProducto = detalleProducto.coloresDisponibles || [];
+
+      if (coloresDelProducto.length === 0) {
+        toast.warning("Este producto no tiene colores disponibles");
+        return;
+      }
+
+      console.log('🎨 Colores disponibles para este producto:', coloresDelProducto);
+
       setCurrentDetailIndex(index);
 
-      // Cargar el color actual si existe en el formato que espera el modal
+      // Cargar el color actual si existe
       if (detalleProducto.ColorId) {
-        // Buscar el color completo en la lista de colores
-        const colorCompleto = colores.find(c => c.ColorId === detalleProducto.ColorId);
+        const colorCompleto = coloresDelProducto.find(c =>
+          c.ColorId === detalleProducto.ColorId ||
+          c.id === detalleProducto.ColorId
+        );
 
         if (colorCompleto) {
-          // El modal espera un array de objetos con ColorId, Stock, Nombre, Hex
           setColoresSeleccionados([{
             ColorId: colorCompleto.ColorId,
-            Stock: 1,
+            Stock: colorCompleto.Stock || 1,
             Nombre: colorCompleto.Nombre,
-            Hex: colorCompleto.Hex || colorCompleto.CodigoHex
+            Hex: colorCompleto.Hex || colorCompleto.CodigoHex || '#ccc'
           }]);
         } else {
-          // Si no encontramos el color completo, usamos la info del detalle
-          setColoresSeleccionados([{
-            ColorId: detalleProducto.ColorId,
-            Stock: 1,
-            Nombre: detalleProducto.ColorNombre || 'Color',
-            Hex: detalleProducto.ColorHex || '#ccc'
-          }]);
+          setColoresSeleccionados([]);
         }
       } else {
         setColoresSeleccionados([]);
@@ -413,8 +417,8 @@ export const OrderForm = ({
                     setClienteSeleccionado(null);
                   }}
                   className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${tipoClienteCrear === 'registrado'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                 >
                   <UserCheck size={24} className="mb-2" />
@@ -431,8 +435,8 @@ export const OrderForm = ({
                     setClienteSeleccionado(null);
                   }}
                   className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${tipoClienteCrear === 'walkin'
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                 >
                   <Store size={24} className="mb-2" />
@@ -696,8 +700,8 @@ export const OrderForm = ({
                         key={page}
                         onClick={() => handlePageChange(page)}
                         className={`w-8 h-8 rounded-full text-sm ${currentPageArticulos === page
-                            ? 'bg-blue-600 text-white'
-                            : 'hover:bg-slate-100'
+                          ? 'bg-blue-600 text-white'
+                          : 'hover:bg-slate-100'
                           }`}
                       >
                         {page}
@@ -779,7 +783,7 @@ export const OrderForm = ({
       <ProductoColoresModal
         open={modalColoresProductoAbierto}
         onClose={() => setModalColoresProductoAbierto(false)}
-        colores={colores}
+        colores={detallesCrear[currentDetailIndex]?.coloresDisponibles || colores} 
         coloresConStock={coloresSeleccionados}
         setColoresConStock={setColoresSeleccionados}
       />
