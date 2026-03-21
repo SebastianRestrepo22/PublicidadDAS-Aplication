@@ -33,6 +33,7 @@ router.get("/", getPedidosClientes);  // Esta ruta ya maneja paginación vía qu
 router.get("/:id", getPedidoClienteById);
 
 // ===== RUTA DELETE =====
+
 router.delete("/:id", deletePedidoCliente);
 
 console.log("✅ Rutas de pedidos registradas");
