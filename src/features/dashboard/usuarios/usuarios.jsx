@@ -39,24 +39,26 @@ export const Usuarios = () => {
   const [openEditar, setOpenEditar] = useState(false);
   const [openVer, setOpenVer] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
+   const [refresh, setRefresh] = useState(false);
 
-  const cargarUsuarios = async () => {
+  const API_URL = import.meta.env.VITE_API_URL;
+
+ const cargarUsuarios = async () => {
     try {
       let resultado;
 
       if (filtroCampo && filtroValor) {
-        // Búsqueda con filtros + paginación
         resultado = await buscarUsuarios(filtroCampo, filtroValor, currentPage, itemsPerPage);
       } else {
-        // Listado normal con paginación
         resultado = await GetDataUser(currentPage, itemsPerPage);
       }
 
-      // Extracción segura de datos
       const data = resultado && resultado.data && Array.isArray(resultado.data) ? resultado.data : [];
       const pagination = resultado && resultado.pagination ? resultado.pagination : {};
 
-      setPaginatedData(data);
+      console.log("Datos cargados:", data.length); // 👈 Para debug
+      
+      setPaginatedData([...data]); // 👈 Crear una nueva referencia
       setTotalItems(pagination.totalItems || 0);
       setTotalPages(pagination.totalPages || 1);
 
@@ -76,7 +78,7 @@ export const Usuarios = () => {
   useEffect(() => {
     const fetchTiposDocumento = async () => {
       try {
-        const response = await axios.get("http://localhost:3000/tipos-documento");
+        const response = await axios.get(`${API_URL}/tipos-documento`);
         setTiposDocumento(response.data); // response.data debe ser un array de { TipoDocumentoId, Nombre }
       } catch (error) {
         console.error("Error obteniendo tipos de documento:", error);
@@ -114,7 +116,7 @@ export const Usuarios = () => {
 
   useEffect(() => {
     cargarUsuarios();
-  }, [currentPage, itemsPerPage, filtroCampo, filtroValor]);
+  }, [currentPage, itemsPerPage, filtroCampo, filtroValor, refresh]);
 
   const [correoError, setCorreoError] = useState("");
   const [cedulaError, setCedulaError] = useState("");
@@ -255,8 +257,9 @@ export const Usuarios = () => {
     }
 
     try {
-      const response = await axios.get(`http://localhost:3000/user/validar-correo?correo=${values.CorreoElectronico}`);
-      setCorreoError(response.data.exists ? 'Este correo ya está registrado' : '');
+      const response = await axios.get(`${API_URL}/user/validar-correo`, {
+        params: { correo: values.CorreoElectronico }
+      }); setCorreoError(response.data.exists ? 'Este correo ya está registrado' : '');
     } catch {
       setCorreoError('No se pudo validar el correo');
     }
@@ -270,8 +273,9 @@ export const Usuarios = () => {
     if (cedulaFormatoError) return;
 
     try {
-      const response = await axios.get(`http://localhost:3000/user/validar-cedula?cedula=${values.CedulaId}`);
-      setCedulaError(response.data.exists ? 'Esta cédula ya está registrada' : '');
+      const response = await axios.get(`${API_URL}/user/validar-cedula`, {
+        params: { cedula: values.CedulaId }
+      }); setCedulaError(response.data.exists ? 'Esta cédula ya está registrada' : '');
     } catch {
       setCedulaError('No se pudo validar la cédula');
     }
@@ -285,8 +289,9 @@ export const Usuarios = () => {
     if (telefonoFormatoError) return;
 
     try {
-      const response = await axios.get(`http://localhost:3000/user/validar-telefono?telefono=${values.Telefono}`);
-      setTelefonoError(response.data.exists ? 'Este teléfono ya está registrado' : '');
+      const response = await axios.get(`${API_URL}/user/validar-telefono`, {
+        params: { telefono: values.Telefono }
+      }); setTelefonoError(response.data.exists ? 'Este teléfono ya está registrado' : '');
     } catch {
       setTelefonoError('No se pudo validar el teléfono');
     }
@@ -351,6 +356,8 @@ export const Usuarios = () => {
         if (response.status === 200) {
           toast.success("Usuario actualizado correctamente");
           setOpenEditar(false);
+          setRefresh(prev => !prev);
+          resetForm();
         }
       } else {
         response = await postDataUsers(values);
@@ -359,14 +366,16 @@ export const Usuarios = () => {
         if (response?.status === 201) {
           toast.success("Usuario creado correctamente");
           await cargarUsuarios();  // Recarga INMEDIATA después del toast
+          setRefresh(prev => !prev); 
           setOpenCreate(false);
+          resetForm();
         } else {
           // Manejo de error específico
           const errorMsg = response?.data?.message || "Error al crear el usuario";
           toast.error(errorMsg);
         }
       }
-      resetForm(); 
+      resetForm();
 
     } catch (error) {
       console.error(error);
@@ -398,34 +407,35 @@ export const Usuarios = () => {
   };
 
   // Eliminar usuario
-const handleDelete = async (id) => {
-  try {
-    const response = await deleteDataUser(id);
+  const handleDelete = async (id) => {
+    try {
+      const response = await deleteDataUser(id);
 
-    if (response?.status === 200 || response?.status === 201) {
-      toast.success(response.data?.message || "Usuario eliminado correctamente");
-      await cargarUsuarios();
-      setOpenEliminar(false);
+      if (response?.status === 200 || response?.status === 201) {
+        toast.success(response.data?.message || "Usuario eliminado correctamente");
+        await cargarUsuarios();
+         setRefresh(prev => !prev); 
+        setOpenEliminar(false);
+      }
+    } catch (error) {
+      // Manejo específico por código de estado
+      if (error.response?.status === 403) {
+        // Usuario del sistema o último administrador
+        toast.warning(error.response.data?.message || "Este usuario no puede ser eliminado");
+      } else if (error.response?.status === 409) {
+        // Tiene pedidos asociados
+        toast.warning(error.response.data?.message || "No se puede eliminar porque tiene pedidos asociados");
+      } else {
+        // Error genérico
+        toast.error(error.response?.data?.message || "Error al eliminar el usuario");
+      }
+
+      // No cerrar modal si hubo error (para que el usuario vea el mensaje)
+      if (error.response?.status === 200 || error.response?.status === 201) {
+        setOpenEliminar(false);
+      }
     }
-  } catch (error) {
-    // Manejo específico por código de estado
-    if (error.response?.status === 403) {
-      // Usuario del sistema o último administrador
-      toast.warning(error.response.data?.message || "Este usuario no puede ser eliminado");
-    } else if (error.response?.status === 409) {
-      // Tiene pedidos asociados
-      toast.warning(error.response.data?.message || "No se puede eliminar porque tiene pedidos asociados");
-    } else {
-      // Error genérico
-      toast.error(error.response?.data?.message || "Error al eliminar el usuario");
-    }
-    
-    // No cerrar modal si hubo error (para que el usuario vea el mensaje)
-    if (error.response?.status === 200 || error.response?.status === 201) {
-      setOpenEliminar(false);
-    }
-  }
-};
+  };
 
   // FUNCIONES DE PAGINACIÓN 
   const handlePageChange = (page) => {

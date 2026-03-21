@@ -35,8 +35,14 @@ dotenv.config();
 
 const app = express();
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL || "http://localhost:5173" // Vite default
+];
 
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins
+}));
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 

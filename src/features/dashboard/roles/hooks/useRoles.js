@@ -32,6 +32,8 @@ export const useRoles = () => {
     nombreRol: ''
   });
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   // Cargar permisos
   useEffect(() => {
     const loadPermissions = async () => {
@@ -111,9 +113,10 @@ export const useRoles = () => {
     const { rolId, nuevoEstado } = confirmEstadoModal;
 
     try {
-      const response = await axios.put(`http://localhost:3000/roles/${rolId}/estado`, {
-        estado: nuevoEstado
-      });
+      const response = await axios.put(
+        `${API_URL}/roles/${rolId}/estado`,
+        { estado: nuevoEstado }
+      );
       toast.success(response.data.message);
       await cargarRoles();
     } catch (error) {
@@ -171,7 +174,9 @@ export const useRoles = () => {
 
   const handleDelete = async (id) => {
     try {
-      const response = await axios.delete(`http://localhost:3000/roles/${id}`);
+      const response = await axios.delete(
+        `${API_URL}/roles/${id}`
+      );
       toast.success(response.data.message);
       await cargarRoles();
       return true;

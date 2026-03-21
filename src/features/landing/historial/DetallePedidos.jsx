@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from '../components/Navbar';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { 
-  ArrowLeft, MapPin, User, CreditCard, Package, Clock, CheckCircle, XCircle, 
-  Image as ImageIcon, Truck, AlertCircle, DollarSign 
+import {
+  ArrowLeft, MapPin, User, CreditCard, Package, Clock, CheckCircle, XCircle,
+  Image as ImageIcon, Truck, AlertCircle, DollarSign
 } from 'lucide-react';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL;
 
 const DetallePedido = () => {
   const navigate = useNavigate();
@@ -27,16 +27,16 @@ const DetallePedido = () => {
     if (pedido) {
       const metodo = pedido.MetodoPago?.toLowerCase() || '';
       setEsContraEntrega(metodo === 'contra_entrega');
-      
+
       // Verificar si tiene venta asociada
       setEsVenta(!!pedido.VentaId || pedido.EsVenta === true);
-      
+
       // 🔥 Usar EstadoParaMostrar si existe, sino usar Estado
       const estado = pedido.EstadoParaMostrar || pedido.Estado;
       setEstadoActual(estado);
-      
-      console.log('📦 Tipo de pedido:', { 
-        metodo, 
+
+      console.log('📦 Tipo de pedido:', {
+        metodo,
         esContraEntrega: metodo === 'contra_entrega',
         esVenta: !!pedido.VentaId || pedido.EsVenta === true,
         estadoPedido: pedido.Estado,
@@ -51,7 +51,7 @@ const DetallePedido = () => {
   useEffect(() => {
     const cargarProductos = async () => {
       try {
-        const productosRes = await axios.get(`${'http://localhost:3000'}/producto?estado=Activo`).catch(() => ({ data: [] }));
+        const productosRes = await axios.get(`${API_URL}/producto?estado=Activo`).catch(() => ({ data: [] }));
         setProductos(productosRes.data || []);
         setLoading(false);
       } catch (err) {
@@ -72,26 +72,26 @@ const DetallePedido = () => {
   const getEstadoLabel = (estado) => {
     // Si es una venta (transferencia/QR/efectivo)
     if (esVenta || (!esContraEntrega && pedido?.VentaId)) {
-      const labelsVentas = { 
-        pendiente: 'Pendiente', 
+      const labelsVentas = {
+        pendiente: 'Pendiente',
         pagado: 'Pagado',
-        cancelado: 'Cancelado' 
+        cancelado: 'Cancelado'
       };
       return labelsVentas[estado] || estado;
     }
-    
+
     // Si es contra entrega
     if (esContraEntrega) {
-      const labelsContraEntrega = { 
-        pendiente: 'Pendiente', 
-        en_proceso: 'En Proceso', 
-        en_camino: 'En Camino', 
-        entregado: 'Entregado', 
-        cancelado: 'Cancelado' 
+      const labelsContraEntrega = {
+        pendiente: 'Pendiente',
+        en_proceso: 'En Proceso',
+        en_camino: 'En Camino',
+        entregado: 'Entregado',
+        cancelado: 'Cancelado'
       };
       return labelsContraEntrega[estado] || estado;
     }
-    
+
     // Por defecto
     return estado;
   };
@@ -99,7 +99,7 @@ const DetallePedido = () => {
   // 🔥 Función para obtener el color del badge
   const getStatusBadgeColor = (estado) => {
     const estadoLower = estado?.toLowerCase();
-    
+
     // Si es una venta (transferencia/QR/efectivo)
     if (esVenta || (!esContraEntrega && pedido?.VentaId)) {
       switch (estadoLower) {
@@ -109,7 +109,7 @@ const DetallePedido = () => {
         default: return 'bg-gray-100 text-gray-800 border-gray-200';
       }
     }
-    
+
     // Si es contra entrega
     if (esContraEntrega) {
       switch (estadoLower) {
@@ -121,14 +121,14 @@ const DetallePedido = () => {
         default: return 'bg-gray-100 text-gray-800 border-gray-200';
       }
     }
-    
+
     return 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
   // 🔥 Función para obtener el ícono del estado
   const getEstadoIcon = (estado) => {
     const estadoLower = estado?.toLowerCase();
-    
+
     // Si es una venta
     if (esVenta || (!esContraEntrega && pedido?.VentaId)) {
       switch (estadoLower) {
@@ -138,7 +138,7 @@ const DetallePedido = () => {
         default: return <Package className="w-4 h-4" />;
       }
     }
-    
+
     // Si es contra entrega
     if (esContraEntrega) {
       switch (estadoLower) {
@@ -150,7 +150,7 @@ const DetallePedido = () => {
         default: return <Package className="w-4 h-4" />;
       }
     }
-    
+
     return <Package className="w-4 h-4" />;
   };
 
@@ -171,29 +171,29 @@ const DetallePedido = () => {
   // Función para normalizar URLs
   const normalizeImageUrl = (url) => {
     if (!url) return null;
-    
+
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return url;
     }
-    
+
     if (url.startsWith('data:image')) {
       return url;
     }
-    
+
     let cleanPath = url.replace(/^\/+/, '');
-    return `${'http://localhost:3000'}/${cleanPath}`;
+    return `${API_URL}/${cleanPath}`;
   };
 
   // Función para obtener la imagen del producto
   const getItemImage = (item) => {
     console.log('🔍 Buscando imagen para item:', item);
-    
+
     if (item.UrlImagen) {
       const url = normalizeImageUrl(item.UrlImagen);
       console.log('📸 Usando UrlImagen del item:', url);
       return url;
     }
-    
+
     if (productos.length > 0 && item.ProductoId) {
       const producto = productos.find(p => p.ProductoId === item.ProductoId);
       if (producto?.Imagen) {
@@ -202,7 +202,7 @@ const DetallePedido = () => {
         return url;
       }
     }
-    
+
     console.log('❌ No se encontró imagen, usando default');
     return DEFAULT_PRODUCT_IMAGE;
   };
@@ -250,7 +250,7 @@ const DetallePedido = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <Navbar />
-      
+
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <button onClick={() => navigate('/cliente/MisPedidos')} className="inline-flex items-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-4 py-2 rounded-lg transition-all mb-6">
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -269,13 +269,12 @@ const DetallePedido = () => {
               </p>
               {/* Indicador del tipo */}
               <div className="mt-2">
-                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
-                  esContraEntrega 
-                    ? 'bg-purple-100 text-purple-700' 
-                    : esVenta 
+                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${esContraEntrega
+                    ? 'bg-purple-100 text-purple-700'
+                    : esVenta
                       ? 'bg-green-100 text-green-700'
                       : 'bg-blue-100 text-blue-700'
-                }`}>
+                  }`}>
                   {esContraEntrega ? (
                     <>
                       <Truck size={12} />
@@ -312,7 +311,7 @@ const DetallePedido = () => {
                 <p className="font-semibold text-gray-900 mt-0.5">{pedido.NombreCliente || 'N/A'}</p>
               </div>
             </div>
-            
+
             {/* Mostrar dirección SOLO para contra entrega */}
             {esContraEntrega && (
               <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl">
@@ -355,7 +354,7 @@ const DetallePedido = () => {
             </div>
             Productos ({soloProductos.length})
           </h2>
-          
+
           <div className="space-y-4">
             {soloProductos.length > 0 ? (
               soloProductos.map((item, index) => {
@@ -364,7 +363,7 @@ const DetallePedido = () => {
                 const itemTotal = unitPrice * quantity;
                 const imageUrl = getItemImage(item);
                 const itemName = item.Descripcion || item.descripcion || item.Nombre || `Producto ${index + 1}`;
-                
+
                 return (
                   <div key={item.DetallePedidoId || item.id || index} className="flex flex-col sm:flex-row gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                     <div className="w-full sm:w-32 h-32 flex-shrink-0">
@@ -392,7 +391,7 @@ const DetallePedido = () => {
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-gray-900 text-base leading-tight">{itemName}</h3>
-                          
+
                           {/* Mostrar color si existe */}
                           {item.ColorId && item.ColorNombre && (
                             <div className="flex items-center gap-1 mt-1">
@@ -451,7 +450,7 @@ const DetallePedido = () => {
           <button onClick={() => navigate('/cliente/MisPedidos')} className="flex-1 bg-white text-gray-700 border border-gray-300 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors">
             Volver a Mis Pedidos
           </button>
-          
+
           {/* Botón de seguimiento solo para contra entrega en camino */}
           {esContraEntrega && estadoActual === 'en_camino' && (
             <button className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors">

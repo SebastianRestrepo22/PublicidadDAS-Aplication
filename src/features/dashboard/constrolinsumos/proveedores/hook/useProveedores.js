@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import axios from 'axios';
-import { 
-  getProveedoresPaginated, 
+import {
+  getProveedoresPaginated,
   buscarProveedores,
   createProveedor,
   updateProveedor,
   deleteProveedor,
-  getAllProveedores 
+  getAllProveedores
 } from '../services/services.proveedores';
 
-const API_BASE = 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const useProveedores = () => {
   const [allData, setAllData] = useState([]);
@@ -20,20 +20,20 @@ export const useProveedores = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [estadoActivos, setEstadoActivos] = useState({});
-  
-  const [formData, setFormData] = useState({ 
-    nombreProveedor: "", 
+
+  const [formData, setFormData] = useState({
+    nombreProveedor: "",
     nit: "",
     telefono: "",
     correo: "",
     direccion: "",
     estado: 1
   });
-  
+
   const [editData, setEditData] = useState(null);
   const [filtroCampo, setFiltroCampo] = useState('');
   const [filtroValor, setFiltroValor] = useState('');
-  
+
   // Estados para errores del formulario
   const [submitted, setSubmitted] = useState(false);
   const [nombreError, setNombreError] = useState('');
@@ -41,18 +41,18 @@ export const useProveedores = () => {
   const [telefonoError, setTelefonoError] = useState('');
   const [correoError, setCorreoError] = useState('');
   const [direccionError, setDireccionError] = useState('');
-  
+
   // Estados para validación de unicidad
   const [nombreDuplicado, setNombreDuplicado] = useState(false);
   const [nitDuplicado, setNitDuplicado] = useState(false);
   const [telefonoDuplicado, setTelefonoDuplicado] = useState(false);
   const [correoDuplicado, setCorreoDuplicado] = useState(false);
-  
+
   const [verificandoNombre, setVerificandoNombre] = useState(false);
   const [verificandoNit, setVerificandoNit] = useState(false);
   const [verificandoTelefono, setVerificandoTelefono] = useState(false);
   const [verificandoCorreo, setVerificandoCorreo] = useState(false);
-  
+
   const [originalNombre, setOriginalNombre] = useState('');
   const [originalNit, setOriginalNit] = useState('');
   const [originalTelefono, setOriginalTelefono] = useState('');
@@ -97,7 +97,7 @@ export const useProveedores = () => {
     if (!nit || !nit.trim()) {
       return { valido: true, mensaje: "" };
     }
-    
+
     const nitLimpio = nit.trim();
     if (!nitLimpio.startsWith('3')) {
       return { valido: false, mensaje: "El NIT debe comenzar con el número 3" };
@@ -153,7 +153,7 @@ export const useProveedores = () => {
   const verificarNombreDuplicado = async (nombre, proveedorIdActual = null) => {
     // Limpiar timeout anterior
     if (timeouts.nombre) clearTimeout(timeouts.nombre);
-    
+
     // Validar formato primero
     const formatoValido = validarFormatoNombre(nombre);
     if (!formatoValido.valido) {
@@ -174,13 +174,13 @@ export const useProveedores = () => {
           campo: 'nombre',
           valor: nombreLimpio
         });
-        
+
         if (proveedorIdActual) {
           params.append('excludeId', proveedorIdActual);
         }
 
-        const response = await axios.get(`${'http://localhost:3000/api'}/proveedores/validar-campo?${params}`);
-        
+        const response = await axios.get(`${API_URL}/api/proveedores/validar-campo?${params}`);
+
         if (response.data.existe) {
           setNombreDuplicado(true);
           setNombreError("⚠️ Ya existe un proveedor con este nombre");
@@ -201,7 +201,7 @@ export const useProveedores = () => {
 
   const verificarNitDuplicado = async (nit, proveedorIdActual = null) => {
     if (timeouts.nit) clearTimeout(timeouts.nit);
-    
+
     if (!nit || !nit.trim()) {
       setNitError("");
       setNitDuplicado(false);
@@ -227,13 +227,13 @@ export const useProveedores = () => {
           campo: 'nit',
           valor: nitLimpio
         });
-        
+
         if (proveedorIdActual) {
           params.append('excludeId', proveedorIdActual);
         }
 
-        const response = await axios.get(`${'http://localhost:3000/api'}/proveedores/validar-campo?${params}`);
-        
+        const response = await axios.get(`${API_URL}/api/proveedores/validar-campo?${params}`);
+
         if (response.data.existe) {
           setNitDuplicado(true);
           setNitError("⚠️ Ya existe un proveedor con este NIT");
@@ -254,7 +254,7 @@ export const useProveedores = () => {
 
   const verificarTelefonoDuplicado = async (telefono, proveedorIdActual = null) => {
     if (timeouts.telefono) clearTimeout(timeouts.telefono);
-    
+
     const formatoValido = validarFormatoTelefono(telefono);
     if (!formatoValido.valido) {
       setTelefonoError(formatoValido.mensaje);
@@ -272,13 +272,13 @@ export const useProveedores = () => {
           campo: 'telefono',
           valor: telefono
         });
-        
+
         if (proveedorIdActual) {
           params.append('excludeId', proveedorIdActual);
         }
 
-        const response = await axios.get(`${'http://localhost:3000/api'}/proveedores/validar-campo?${params}`);
-        
+        const response = await axios.get(`${API_URL}/api/proveedores/validar-campo?${params}`);
+
         if (response.data.existe) {
           setTelefonoDuplicado(true);
           setTelefonoError("⚠️ Ya existe un proveedor con este teléfono");
@@ -299,7 +299,7 @@ export const useProveedores = () => {
 
   const verificarCorreoDuplicado = async (correo, proveedorIdActual = null) => {
     if (timeouts.correo) clearTimeout(timeouts.correo);
-    
+
     const formatoValido = validarFormatoCorreo(correo);
     if (!formatoValido.valido) {
       setCorreoError(formatoValido.mensaje);
@@ -318,13 +318,13 @@ export const useProveedores = () => {
           campo: 'correo',
           valor: correoLimpio
         });
-        
+
         if (proveedorIdActual) {
           params.append('excludeId', proveedorIdActual);
         }
 
-        const response = await axios.get(`${'http://localhost:3000/api'}/proveedores/validar-campo?${params}`);
-        
+        const response = await axios.get(`${API_URL}/api/proveedores/validar-campo?${params}`);
+
         if (response.data.existe) {
           setCorreoDuplicado(true);
           setCorreoError("⚠️ Ya existe un proveedor con este correo");
@@ -473,7 +473,7 @@ export const useProveedores = () => {
     setLoading(true);
 
     const esEdicion = !!editData?.ProveedorId;
-    
+
     // Validar todas las verificaciones en progreso
     if (verificandoNombre || verificandoNit || verificandoTelefono || verificandoCorreo) {
       toast.warning("Por favor espera a que terminen las validaciones");
@@ -518,9 +518,9 @@ export const useProveedores = () => {
       }
     } catch (error) {
       console.error("Error en handleSubmit:", error);
-      
+
       const serverMessage = error?.response?.data?.error || error?.response?.data?.message;
-      
+
       if (serverMessage) {
         if (serverMessage.toLowerCase().includes("nombre")) {
           setNombreError(serverMessage);
@@ -563,7 +563,7 @@ export const useProveedores = () => {
 
   const handleToggleEstado = async () => {
     if (!editData || estadoPendiente === null) return;
-    
+
     setLoading(true);
     try {
       const response = await updateProveedor(editData.ProveedorId, {
@@ -604,8 +604,8 @@ export const useProveedores = () => {
   };
 
   const resetForm = () => {
-    setFormData({ 
-      nombreProveedor: "", 
+    setFormData({
+      nombreProveedor: "",
       nit: "",
       telefono: "",
       correo: "",
@@ -614,7 +614,7 @@ export const useProveedores = () => {
     });
     setEditData(null);
     resetFormErrors();
-    
+
     // Limpiar timeouts
     Object.values(timeouts).forEach(timeout => {
       if (timeout) clearTimeout(timeout);
@@ -642,7 +642,7 @@ export const useProveedores = () => {
     setOriginalNit(proveedor.Nit);
     setOriginalTelefono(proveedor.Telefono);
     setOriginalCorreo(proveedor.Correo);
-    
+
     setOpenEditar(true);
   };
 
@@ -685,7 +685,7 @@ export const useProveedores = () => {
     filtroCampo,
     filtroValor,
     estadoActivos,
-    
+
     // Estados de UI
     loading,
     openCreate,
@@ -694,7 +694,7 @@ export const useProveedores = () => {
     openEliminar,
     openConfirmarEstado,
     estadoPendiente,
-    
+
     // Estados de error y validación
     submitted,
     nombreError,
@@ -714,7 +714,7 @@ export const useProveedores = () => {
     originalNit,
     originalTelefono,
     originalCorreo,
-    
+
     // Setters
     setCurrentPage,
     setItemsPerPage,
@@ -728,24 +728,24 @@ export const useProveedores = () => {
     setTelefonoError,
     setCorreoError,
     setDireccionError,
-    
+
     // Funciones principales
     cargarProveedores,
     cargarTodosLosProveedores,
     handleSubmit,
     handleDelete,
     handleToggleEstado,
-    
+
     // Funciones de validación
     verificarNombreDuplicado,
     verificarNitDuplicado,
     verificarTelefonoDuplicado,
     verificarCorreoDuplicado,
-    
+
     // Funciones de utilidad
     resetFormErrors,
     resetForm,
-    
+
     // Handlers de modales
     openCreateModal,
     openEditarModal,

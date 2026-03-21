@@ -60,6 +60,8 @@ export const OrderEdit = ({
   const [voucherPreview, setVoucherPreview] = useState(null);
   const [uploadingVoucher, setUploadingVoucher] = useState(false);
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   // Determinar si el pedido NO tiene comprobante (solo aplica para pedidos sin voucher)
   const noTieneComprobante = !formCrear?.Voucher && !voucherPreview;
 
@@ -550,7 +552,7 @@ export const OrderEdit = ({
     try {
       setUploadingVoucher(true);
       const response = await axios.put(
-        `http://localhost:3000/api/pedidos-clientes/${pedidoOriginal.PedidoClienteId}`,
+        `${API_URL}/api/pedidos-clientes/${pedidoOriginal.PedidoClienteId}`,
         formData,
         {
           headers: { 'Content-Type': 'multipart/form-data' }

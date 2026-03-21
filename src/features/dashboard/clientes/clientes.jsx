@@ -39,6 +39,8 @@ export const Clientes = () => {
   const [openVer, setOpenVer] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   const location = useLocation();
   const mode = useMemo(() => {
     if (location.pathname.includes('/editar')) return 'edit';
@@ -100,7 +102,7 @@ export const Clientes = () => {
   useEffect(() => {
     const fetchTiposDocumento = async () => {
       try {
-        const response = await axios.get("http://localhost:3000/tipos-documento");
+        const response = await axios.get(`${API_URL}/tipos-documento`);
         setTiposDocumento(response.data);
       } catch (error) {
         console.error("Error obteniendo tipos de documento:", error);
@@ -194,7 +196,7 @@ export const Clientes = () => {
       return;
     }
     try {
-      const response = await axios.get(`http://localhost:3000/user/validar-correo?correo=${values.CorreoElectronico}`);
+      const response = await axios.get(`${API_URL}/user/validar-correo?correo=${values.CorreoElectronico}`);
       setCorreoError(response.data.exists ? 'Este correo ya está registrado' : '');
     } catch {
       setCorreoError('No se pudo validar el correo');
@@ -206,7 +208,7 @@ export const Clientes = () => {
     validateCedulaFormat(values.CedulaId);
     if (cedulaFormatoError) return;
     try {
-      const response = await axios.get(`http://localhost:3000/user/validar-cedula?cedula=${values.CedulaId}`);
+      const response = await axios.get(`${API_URL}/user/validar-cedula?cedula=${values.CedulaId}`);
       setCedulaError(response.data.exists ? 'Esta cédula ya está registrada' : '');
     } catch {
       setCedulaError('No se pudo validar la cédula');
@@ -218,7 +220,7 @@ export const Clientes = () => {
     validateTelefonoFormat(values.Telefono);
     if (telefonoFormatoError) return;
     try {
-      const response = await axios.get(`http://localhost:3000/user/validar-telefono?telefono=${values.Telefono}`);
+      const response = await axios.get(`${API_URL}/user/validar-telefono?telefono=${values.Telefono}`);
       setTelefonoError(response.data.exists ? 'Este teléfono ya está registrado' : '');
     } catch {
       setTelefonoError('No se pudo validar el teléfono');
@@ -265,9 +267,9 @@ export const Clientes = () => {
 
     try {
       const [correoRes, cedulaRes, telefonoRes] = await Promise.all([
-        axios.get(`http://localhost:3000/user/validar-correo?correo=${values.CorreoElectronico}`),
-        axios.get(`http://localhost:3000/user/validar-cedula?cedula=${values.CedulaId}`),
-        axios.get(`http://localhost:3000/user/validar-telefono?telefono=${values.Telefono}`)
+        axios.get(`${API_URL}/user/validar-correo?correo=${values.CorreoElectronico}`),
+        axios.get(`${API_URL}/user/validar-cedula?cedula=${values.CedulaId}`),
+        axios.get(`${API_URL}/user/validar-telefono?telefono=${values.Telefono}`)
       ]);
 
       if (!editData && correoRes.data.exists) {
@@ -342,38 +344,38 @@ export const Clientes = () => {
   };
 
   const handleDelete = async (id) => {
-  try {
-    const response = await deleteDataClient(id);
+    try {
+      const response = await deleteDataClient(id);
 
-    if (response.status === 200 || response.status === 201) {
-      toast.success(response.data.message);
-      
-      // Cerrar el modal primero
-      setOpenEliminar(false);
-      
-      // Resetear la paginación si es necesario
-      // Si después de eliminar, la página actual queda vacía, retroceder una página
-      if (paginatedData.length === 1 && currentPage > 1) {
-        setCurrentPage(currentPage - 1);
+      if (response.status === 200 || response.status === 201) {
+        toast.success(response.data.message);
+
+        // Cerrar el modal primero
+        setOpenEliminar(false);
+
+        // Resetear la paginación si es necesario
+        // Si después de eliminar, la página actual queda vacía, retroceder una página
+        if (paginatedData.length === 1 && currentPage > 1) {
+          setCurrentPage(currentPage - 1);
+        } else {
+          //Forzar recarga de la página actual
+          await cargarClientes();
+        }
+
       } else {
-        //Forzar recarga de la página actual
-        await cargarClientes();
+        toast.error(response.data?.message || "No se pudo eliminar el cliente");
       }
-      
-    } else {
-      toast.error(response.data?.message || "No se pudo eliminar el cliente");
+    } catch (error) {
+      if (error.response?.status === 409) {
+        toast.warning(error.response.data.message || "No se puede eliminar porque tiene pedidos asociados");
+      } else {
+        toast.error(error.response?.data?.message || "Error al eliminar el cliente");
+      }
+      if (error.response?.status !== 409) {
+        setOpenEliminar(false);
+      }
     }
-  } catch (error) {
-    if (error.response?.status === 409) {
-      toast.warning(error.response.data.message || "No se puede eliminar porque tiene pedidos asociados");
-    } else {
-      toast.error(error.response?.data?.message || "Error al eliminar el cliente");
-    }
-    if (error.response?.status !== 409) {
-      setOpenEliminar(false);
-    }
-  }
-};
+  };
 
   const handlePageChange = (page) => {
     setCurrentPage(page);

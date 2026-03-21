@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useMisPedidos } from '../hooks/useMisPedidos';
 import { Navbar } from '../components/Navbar';
 import axios from 'axios';
-import { 
-  Search, Package, Clock, CheckCircle, XCircle, ChevronRight, Truck, DollarSign 
+import {
+  Search, Package, Clock, CheckCircle, XCircle, ChevronRight, Truck, DollarSign
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
@@ -15,7 +15,9 @@ const MisPedidos = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [clienteId, setClienteId] = useState(null);
-  const { user, loading: authLoading } = useAuth(); 
+  const { user, loading: authLoading } = useAuth();
+
+  const API_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     if (user?.CedulaId) {
@@ -23,7 +25,7 @@ const MisPedidos = () => {
         try {
           const token = localStorage.getItem("token");
           const response = await axios.get(
-            `http://localhost:3000/user/${user.CedulaId}`,
+            `${API_URL}/user/${user.CedulaId}`,
             { headers: { Authorization: `Bearer ${token}` } }
           );
           setClienteId(String(response.data.CedulaId));
@@ -112,14 +114,14 @@ const MisPedidos = () => {
   };
 
   const handleOrderClick = (order) => {
-    navigate('/cliente/DetallePedido', { 
-      state: { pedido: order, clienteId } 
+    navigate('/cliente/DetallePedido', {
+      state: { pedido: order, clienteId }
     });
   };
 
   const handleCancelarPedido = async (pedidoId, e) => {
     e?.stopPropagation();
-    
+
     if (!window.confirm("¿Estás seguro de que deseas cancelar este pedido?")) {
       return;
     }
@@ -127,11 +129,9 @@ const MisPedidos = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.put(
-        `http://localhost:3000/api/pedidos-clientes/${pedidoId}`,
+        `${API_URL}/api/pedidos-clientes/${pedidoId}`,
         { Estado: "cancelado" },
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       if (response.status === 200) {
@@ -160,7 +160,7 @@ const MisPedidos = () => {
   const allStatuses = getUniqueStatuses();
   const filteredOrders = pedidos.filter((order) => {
     const estadoActual = getEstadoActual(order);
-    
+
     const matchesSearch = !searchTerm ||
       (order.PedidoClienteId && order.PedidoClienteId.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
       (order.detalle && order.detalle.some(d =>
@@ -223,7 +223,7 @@ const MisPedidos = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8 pt-16">
@@ -256,11 +256,10 @@ const MisPedidos = () => {
               <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
-                className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
-                  filterStatus === status
+                className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${filterStatus === status
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
                     : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 hover:shadow-sm'
-                }`}
+                  }`}
               >
                 {status === 'Todos' ? 'Todos los pedidos' : getEstadoLabel(status)}
                 <span className={`ml-2 ${filterStatus === status ? 'text-blue-100' : 'text-gray-500'}`}>
@@ -284,7 +283,7 @@ const MisPedidos = () => {
             <div className="space-y-4">
               {activeOrders.map((order) => {
                 const estadoActual = getEstadoActual(order);
-                
+
                 return (
                   <div
                     key={order.PedidoClienteId}
@@ -294,9 +293,8 @@ const MisPedidos = () => {
                     <div className="p-6">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3">
-                          <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                            esContraEntrega(order) ? 'bg-purple-100' : 'bg-green-100'
-                          }`}>
+                          <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${esContraEntrega(order) ? 'bg-purple-100' : 'bg-green-100'
+                            }`}>
                             {getTipoIcon(order)}
                           </div>
                           <div>
@@ -312,7 +310,7 @@ const MisPedidos = () => {
                             </p>
                           </div>
                         </div>
-                        
+
                         <div className="flex flex-col items-end gap-3">
                           <div className="flex items-center gap-3">
                             <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border ${getEstadoColor(estadoActual)}`}>
@@ -321,7 +319,7 @@ const MisPedidos = () => {
                             </span>
                             <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" />
                           </div>
-                          
+
                           {/* 🔥 Botón de Cancelar - SOLO para contra entrega Y pendiente */}
                           {puedeCancelar(order) && (
                             <button
@@ -374,7 +372,7 @@ const MisPedidos = () => {
                 .filter(order => !activeOrders.includes(order))
                 .map((order) => {
                   const estadoActual = getEstadoActual(order);
-                  
+
                   return (
                     <div
                       key={order.PedidoClienteId}
@@ -384,9 +382,8 @@ const MisPedidos = () => {
                       <div className="p-6">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                              esContraEntrega(order) ? 'bg-purple-50' : 'bg-green-50'
-                            }`}>
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${esContraEntrega(order) ? 'bg-purple-50' : 'bg-green-50'
+                              }`}>
                               {getTipoIcon(order)}
                             </div>
                             <div>
@@ -398,7 +395,7 @@ const MisPedidos = () => {
                               </p>
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center gap-3">
                             <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border ${getEstadoColor(estadoActual)}`}>
                               {getEstadoIcon(estadoActual)}

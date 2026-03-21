@@ -1,6 +1,7 @@
 import axios from "axios";
 
-const url = 'http://localhost:3000/client';
+const API_URL = import.meta.env.VITE_API_URL; 
+const url = `${API_URL}/client`; 
 
 // Listar todos los clientes
 export const getDataClients = async (page = 1, limit = 10, filtroCampo = null, filtroValor = null) => {

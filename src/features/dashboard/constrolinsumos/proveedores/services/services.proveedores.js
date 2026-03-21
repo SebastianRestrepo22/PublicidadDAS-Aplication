@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE = 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 // ========== FUNCIONES CON PAGINACIÓN ==========
 export const getProveedoresPaginated = async (page = 1, limit = 5, filtroCampo = null, filtroValor = null) => {
@@ -10,7 +10,7 @@ export const getProveedoresPaginated = async (page = 1, limit = 5, filtroCampo =
       limit: limit.toString(),
       ...(filtroCampo && filtroValor && { filtroCampo, filtroValor })
     });
-    const response = await axios.get(`${'http://localhost:3000/api'}/proveedores?${params}`);
+    const response = await axios.get(`${API_URL}/api/proveedores?${params}`);
     return response.data;
   } catch (error) {
     console.error("Error al obtener proveedores paginados:", error);
@@ -26,7 +26,7 @@ export const buscarProveedores = async (campo, valor, page = 1, limit = 5) => {
       page: page.toString(),
       limit: limit.toString()
     });
-    const response = await axios.get(`${'http://localhost:3000/api'}/proveedores/buscar?${params}`);
+    const response = await axios.get(`${API_URL}/api/proveedores/buscar?${params}`);
     return response.data;
   } catch (error) {
     console.error("Error al buscar proveedores:", error);
@@ -36,7 +36,7 @@ export const buscarProveedores = async (campo, valor, page = 1, limit = 5) => {
 
 export const getAllProveedores = async () => {
   try {
-    const response = await axios.get(`${'http://localhost:3000/api'}/proveedores/todos`);
+    const response = await axios.get(`${API_URL}/api/proveedores/todos`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("Error al obtener todos los proveedores:", error);
@@ -46,7 +46,7 @@ export const getAllProveedores = async () => {
 
 export const getProveedorById = async (id) => {
   try {
-    const response = await axios.get(`${'http://localhost:3000/api'}/proveedores/${id}`);
+    const response = await axios.get(`${API_URL}/api/proveedores/${id}`);
     return response.data;
   } catch (error) {
     console.error("Error al obtener proveedor por ID:", error);
@@ -56,7 +56,7 @@ export const getProveedorById = async (id) => {
 
 export const createProveedor = async (proveedorData) => {
   try {
-    const response = await axios.post(`${'http://localhost:3000/api'}/proveedores`, proveedorData);
+    const response = await axios.post(`${API_URL}/api/proveedores`, proveedorData);
     return response.data;
   } catch (error) {
     console.error("Error al crear proveedor:", error);
@@ -66,7 +66,7 @@ export const createProveedor = async (proveedorData) => {
 
 export const updateProveedor = async (id, proveedorData) => {
   try {
-    const response = await axios.put(`${'http://localhost:3000/api'}/proveedores/${id}`, proveedorData);
+    const response = await axios.put(`${API_URL}/api/proveedores/${id}`, proveedorData);
     return response.data;
   } catch (error) {
     console.error("Error al actualizar proveedor:", error);
@@ -76,7 +76,7 @@ export const updateProveedor = async (id, proveedorData) => {
 
 export const deleteProveedor = async (id) => {
   try {
-    const response = await axios.delete(`${'http://localhost:3000/api'}/proveedores/${id}`);
+    const response = await axios.delete(`${API_URL}/api/proveedores/${id}`);
     return response.data;
   } catch (error) {
     console.error("Error al eliminar proveedor:", error);
@@ -86,14 +86,9 @@ export const deleteProveedor = async (id) => {
 
 export const validarCampoUnico = async (campo, valor, excludeId = null) => {
   try {
-    const params = new URLSearchParams({
-      campo,
-      valor
-    });
-    if (excludeId) {
-      params.append('excludeId', excludeId);
-    }
-    const response = await axios.get(`${'http://localhost:3000/api'}/proveedores/validar-campo?${params}`);
+    const params = new URLSearchParams({ campo, valor });
+    if (excludeId) params.append('excludeId', excludeId);
+    const response = await axios.get(`${API_URL}/api/proveedores/validar-campo?${params}`);
     return response.data;
   } catch (error) {
     console.error('Error en validarCampoUnico:', error);
