@@ -1,12 +1,12 @@
 import React, { useEffect } from 'react';
 import axios from 'axios';
 
-export const RolForm = ({ 
-  formData, 
-  setFormData, 
-  editData, 
-  onSubmit, 
-  onCancel, 
+export const RolForm = ({
+  formData,
+  setFormData,
+  editData,
+  onSubmit,
+  onCancel,
   type = "create",
   submitted,
   setSubmitted,
@@ -15,6 +15,8 @@ export const RolForm = ({
   originalNombre,
   setOriginalNombre
 }) => {
+
+  const API_URL = import.meta.env.VITE_API_URL;
 
   // Actualizar originalNombre cuando cambia editData
   useEffect(() => {
@@ -29,7 +31,10 @@ export const RolForm = ({
     if (formData.Nombre === originalNombre) return;
 
     try {
-      const response = await axios.get(`http://localhost:3000/roles/validar-rol?rol=${formData.Nombre}`);
+      const response = await axios.get(
+        `${API_URL}/roles/validar-rol`,
+        { params: { rol: formData.Nombre } }
+      );
       if (response.data.exists) {
         setRolError('Este rol ya está registrado');
       } else {

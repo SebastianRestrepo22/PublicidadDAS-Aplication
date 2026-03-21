@@ -1,5 +1,6 @@
-import axios from "axios"
-const url = 'http://localhost:3000/'
+import axios from "axios";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const GetDataservicios = async (soloActivos = false, page = 1, limit = 10, filtroCampo = null, filtroValor = null) => {
   try {
@@ -17,7 +18,7 @@ export const GetDataservicios = async (soloActivos = false, page = 1, limit = 10
       params.filtroValor = filtroValor;
     }
     
-    const response = await axios.get(`${'http://localhost:3000/'}servicio`, { params });
+    const response = await axios.get(`${API_URL}/servicio`, { params });
     
     const responseData = response.data;
     const data = responseData?.data && Array.isArray(responseData.data) ? responseData.data : [];
@@ -28,10 +29,7 @@ export const GetDataservicios = async (soloActivos = false, page = 1, limit = 10
       itemsPerPage: limit 
     };
     
-    return {
-      data: data,
-      pagination: pagination
-    };
+    return { data, pagination };
   } catch (error) {
     console.error("Error en GetDataservicios:", error);
     return { 
@@ -42,44 +40,44 @@ export const GetDataservicios = async (soloActivos = false, page = 1, limit = 10
 };
 
 export const postDataservicios = async (data) => {
-    try {
-        const response = await axios.post('http://localhost:3000/' + 'servicio', data)
-        return response
-    } catch (error) {
-        console.error("Error en postDataservicios:", error)
-        return { status: false, message: "Error al crear servicio", error }
-    }
-}
+  try {
+    const response = await axios.post(`${API_URL}/servicio`, data);
+    return response;
+  } catch (error) {
+    console.error("Error en postDataservicios:", error);
+    return { status: false, message: "Error al crear servicio", error };
+  }
+};
 
 export const updateDataservicios = async (id, data) => {
-    try {
-        const response = await axios.put('http://localhost:3000/' + `servicio/${id}`, data);
-        return response;
-    } catch (error) {
-        console.error("Error en updateDataservicios:", error)
-        return { status: false, message: "Error al actualizar servicio", error };
-    }
-}
+  try {
+    const response = await axios.put(`${API_URL}/servicio/${id}`, data);
+    return response;
+  } catch (error) {
+    console.error("Error en updateDataservicios:", error);
+    return { status: false, message: "Error al actualizar servicio", error };
+  }
+};
 
 export const deleteDataservicio = async (id) => {
-    try {
-        const response = await axios.delete('http://localhost:3000/' + `servicio/${id}`);
-        return response;  // Retornar response completo, no solo data
-    } catch (error) {
-        console.error("Error en deleteDataservicio:", error);
-        // Retornar el error con su respuesta para que el hook pueda leer status y message
-        return error.response || { status: 500, message: "Error de conexión" };
-    }
-}
+  try {
+    const response = await axios.delete(`${API_URL}/servicio/${id}`);
+    return response;  // Retornar response completo, no solo data
+  } catch (error) {
+    console.error("Error en deleteDataservicio:", error);
+    return error.response || { status: 500, message: "Error de conexión" };
+  }
+};
+
 export const cambiarEstadoServicio = async (id, nuevoEstado) => {
-    try {
-        const response = await axios.patch('http://localhost:3000/' + `servicio/${id}/estado`, { Estado: nuevoEstado });
-        return response;
-    } catch (error) {
-        console.error("Error en cambiarEstadoServicio:", error)
-        return { status: false, message: "Error al cambiar estado", error };
-    }
-}
+  try {
+    const response = await axios.patch(`${API_URL}/servicio/${id}/estado`, { Estado: nuevoEstado });
+    return response;
+  } catch (error) {
+    console.error("Error en cambiarEstadoServicio:", error);
+    return { status: false, message: "Error al cambiar estado", error };
+  }
+};
 
 export const buscarservicios = async (campo, valor, page = 1, limit = 10, estado = null) => {
   try {
@@ -92,7 +90,7 @@ export const buscarservicios = async (campo, valor, page = 1, limit = 10, estado
     
     if (estado) params.estado = estado;
     
-    const response = await axios.get(`${'http://localhost:3000/'}servicio/buscar`, { params });
+    const response = await axios.get(`${API_URL}/servicio/buscar`, { params });
     
     const responseData = response.data;
     const data = responseData?.data && Array.isArray(responseData.data) ? responseData.data : [];
@@ -103,10 +101,7 @@ export const buscarservicios = async (campo, valor, page = 1, limit = 10, estado
       itemsPerPage: limit 
     };
     
-    return {
-      data: data,
-      pagination: pagination
-    };
+    return { data, pagination };
   } catch (error) {
     console.error("Error al buscar servicios:", error);
     return { 

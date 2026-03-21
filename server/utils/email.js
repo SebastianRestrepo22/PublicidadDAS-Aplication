@@ -28,7 +28,8 @@ transporter.verify(function (error, success) {
 
 export const sendResetPasswordEmail = async (correo, token) => {
   try {
-    const resetUrl = `http://localhost:5173/reset-password/${token}`;
+    const frontendBaseUrl = process.env.FRONTEND_URL;
+    const resetUrl = `${frontendBaseUrl}/reset-password/${token}`;
 
     const info = await transporter.sendMail({
       from: `"Gestión de Usuarios" <${process.env.EMAIL_USER}>`,
@@ -207,20 +208,20 @@ export const sendPedidoEstadoEmail = async (to, nombreCliente, pedidoId, nuevoEs
 
   try {
     await transporter.sendMail({
-      from: `"Tu Empresa" <${process.env.EMAIL_USER}>`,
+      from: `"PublicidadDAS" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
           <div style="text-align: center; padding: 20px 0; border-bottom: 2px solid #e2e8f0;">
-            <h1 style="color: #2d3748; margin: 0;">Tu Empresa</h1>
+            <h1 style="color: #2d3748; margin: 0;">PublicidadDAS</h1>
           </div>
           <div style="padding: 30px; background: white; border-radius: 10px; margin-top: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
             ${html}
           </div>
           <div style="text-align: center; margin-top: 30px; color: #718096; font-size: 14px;">
             <p>Este es un mensaje automático. No respondas a este correo.</p>
-            <p>© ${new Date().getFullYear()} Tu Empresa. Todos los derechos reservados.</p>
+            <p>© ${new Date().getFullYear()} PublicidadDAS. Todos los derechos reservados.</p>
           </div>
         </div>
       `,
@@ -244,7 +245,7 @@ export const sendVoucherEmail = async (to, nombreCliente, pedidoId, total) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
       <div style="text-align: center; padding: 20px 0; border-bottom: 2px solid #e2e8f0;">
-        <h1 style="color: #2d3748; margin: 0;">Tu Empresa</h1>
+        <h1 style="color: #2d3748; margin: 0;">PublicidadDAS</h1>
       </div>
       
       <div style="padding: 30px; background: white; border-radius: 10px; margin-top: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
@@ -277,14 +278,14 @@ export const sendVoucherEmail = async (to, nombreCliente, pedidoId, total) => {
 
       <div style="text-align: center; margin-top: 30px; color: #718096; font-size: 14px;">
         <p>Este es un mensaje automático. No respondas a este correo.</p>
-        <p>© ${new Date().getFullYear()} Tu Empresa. Todos los derechos reservados.</p>
+        <p>© ${new Date().getFullYear()} PublicidadDAS. Todos los derechos reservados.</p>
       </div>
     </div>
   `;
 
   try {
     await transporter.sendMail({
-      from: `"Tu Empresa" <${process.env.EMAIL_USER}>`,
+      from: `"PublicidadDAS" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       html,
@@ -428,7 +429,7 @@ export const sendVentaFacturaEmail = async (to, nombreCliente, ventaId, total, d
                   <table width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
                       <td class="stack" style="vertical-align: top;" width="60%">
-                        <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #000; letter-spacing: -0.5px;">PUBLICIDADDAS</h1>
+                        <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #000; letter-spacing: -0.5px;">PublicidadDAS</h1>
                         <p style="margin: 5px 0 0; color: #555; font-size: 12px;">Soluciones en Publicidad y Marketing</p>
                       </td>
                       <td class="stack text-right-mobile" style="vertical-align: top; text-align: right;" width="40%">
@@ -578,13 +579,12 @@ export const sendVentaFacturaEmail = async (to, nombreCliente, ventaId, total, d
                         <h4 style="margin: 0 0 8px; color: #000; font-size: 13px;">INFORMACIÓN IMPORTANTE</h4>
                         <p style="margin: 0 0 2px; color: #555; font-size: 10px;">• Esta factura es válida como comprobante de pago.</p>
                         <p style="margin: 0 0 2px; color: #555; font-size: 10px;">• Los productos/servicios cumplen con las especificaciones acordadas.</p>
-                        <p style="margin: 0; color: #555; font-size: 10px;">• Reclamos hasta 5 días hábiles después de la compra.</p>
                       </td>
                     </tr>
                     <tr>
                       <td style="text-align: center; padding-top: 15px; border-top: 1px solid #ccc;">
                         <p style="margin: 0; color: #777; font-size: 9px;">
-                          PublicidadDAS - NIT 901.234.567-8 | Calle 123 #45-67, Bogotá | Tel: (601) 234 5678
+                          PublicidadDAS - Medellín
                         </p>
                         <p style="margin: 3px 0 0; color: #777; font-size: 9px;">
                           © ${new Date().getFullYear()} PublicidadDAS - Documento generado electrónicamente
@@ -629,7 +629,7 @@ export const sendVentaAnuladaEmail = async (to, nombreCliente, ventaId, total) =
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
       <div style="text-align: center; padding: 20px 0; border-bottom: 2px solid #e74c3c;">
-        <h1 style="color: #2d3748; margin: 0;">Tu Empresa</h1>
+        <h1 style="color: #2d3748; margin: 0;">PublicidadDAS</h1>
         <p style="color: #666; margin-top: 5px;">Notificación de anulación</p>
       </div>
       
@@ -658,14 +658,14 @@ export const sendVentaAnuladaEmail = async (to, nombreCliente, ventaId, total) =
 
       <div style="text-align: center; margin-top: 30px; color: #718096; font-size: 14px;">
         <p>Este es un mensaje automático.</p>
-        <p>© ${new Date().getFullYear()} Tu Empresa.</p>
+        <p>© ${new Date().getFullYear()} PublicidadDAS.</p>
       </div>
     </div>
   `;
 
   try {
     await transporter.sendMail({
-      from: `"Tu Empresa" <${process.env.EMAIL_USER}>`,
+      from: `"PublicidadDAS" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       html,
@@ -690,7 +690,7 @@ export const sendVentaRechazadaEmail = async (to, nombreCliente, ventaId, total,
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
       <div style="text-align: center; padding: 20px 0; border-bottom: 2px solid #e67e22;">
-        <h1 style="color: #2d3748; margin: 0;">Tu Empresa</h1>
+        <h1 style="color: #2d3748; margin: 0;">PublicidadDAS</h1>
         <p style="color: #666; margin-top: 5px;">Notificación de rechazo de venta</p>
       </div>
       
@@ -721,14 +721,14 @@ export const sendVentaRechazadaEmail = async (to, nombreCliente, ventaId, total,
 
       <div style="text-align: center; margin-top: 30px; color: #718096; font-size: 14px;">
         <p>Este es un mensaje automático.</p>
-        <p>© ${new Date().getFullYear()} Tu Empresa.</p>
+        <p>© ${new Date().getFullYear()} PublicidadDAS.</p>
       </div>
     </div>
   `;
 
   try {
     await transporter.sendMail({
-      from: `"Tu Empresa" <${process.env.EMAIL_USER}>`,
+      from: `"PublicidadDAS" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       html,

@@ -7,6 +7,8 @@ export const useMisPedidos = (clienteId) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   const fetchPedidos = useCallback(async () => {
     // Solo hacer la solicitud si tenemos clienteId
     if (!clienteId) {
@@ -17,19 +19,19 @@ export const useMisPedidos = (clienteId) => {
     try {
       setLoading(true);
       setError(null);
-      
+
       console.log('Cargando pedidos para clienteId:', clienteId);
-      
+
       const { data } = await axios.get(
-        "http://localhost:3000/api/pedidos-clientes/mis-pedidos", 
+        `${API_URL}/api/pedidos-clientes/mis-pedidos`,
         {
-          params: { clienteId }, // Pasar como parámetro de consulta
+          params: { clienteId },
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`
           }
         }
       );
-      
+
       console.log('Pedidos recibidos:', data);
       setPedidos(data);
     } catch (err) {

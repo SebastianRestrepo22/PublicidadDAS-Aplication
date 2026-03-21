@@ -18,7 +18,7 @@ import {
 import { OrderList } from "./OrderList";
 import { OrderForm } from "./OrderForm";
 import { OrderView } from "./OrderView";
-import { OrderEdit } from "./OrderEdit";  
+import { OrderEdit } from "./OrderEdit";
 
 // Helpers
 import { generateTempId, calcularTotalDetalles } from "../pedidos/utils/pedidosHelpers";
@@ -90,6 +90,8 @@ export const PedidosClientes = () => {
   const [filtroCampo, setFiltroCampo] = useState("");
   const [filtroText, setFiltroText] = useState("");
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   // Cargar catálogos
   useEffect(() => {
     const fetchData = async () => {
@@ -136,7 +138,7 @@ export const PedidosClientes = () => {
         params.append('filtroValor', filtroText);
       }
 
-      const response = await axios.get(`http://localhost:3000/api/pedidos-clientes?${params.toString()}`);
+      const response = await axios.get(`${API_URL}/api/pedidos-clientes?${params.toString()}`);
 
       const { data, pagination } = response.data;
 
@@ -149,9 +151,9 @@ export const PedidosClientes = () => {
               ...p,
               detalle: Array.isArray(det)
                 ? det.map(item => ({
-                    ...item,
-                    _tempId: item.DetallePedidoClienteId || generateTempId()
-                  }))
+                  ...item,
+                  _tempId: item.DetallePedidoClienteId || generateTempId()
+                }))
                 : []
             };
           } catch {
@@ -198,9 +200,9 @@ export const PedidosClientes = () => {
         ...pedido,
         detalle: Array.isArray(det)
           ? det.map(item => ({
-              ...item,
-              _tempId: item.DetallePedidoClienteId || generateTempId()
-            }))
+            ...item,
+            _tempId: item.DetallePedidoClienteId || generateTempId()
+          }))
           : []
       });
       setViewMode("view");
@@ -220,15 +222,15 @@ export const PedidosClientes = () => {
         ...pedido,
         detalle: Array.isArray(det)
           ? det.map(item => ({
-              ...item,
-              _tempId: item.DetallePedidoClienteId || generateTempId(),
-              tipo: item.ProductoId ? 'producto' : 'servicio',
-              tipoStock: item.ColorId ? 'por_color' : 'general',
-              ProductoNombre: item.ProductoNombre,
-              ServicioNombre: item.ServicioNombre,
-              ColorNombre: item.ColorNombre,
-              ColorHex: item.ColorHex
-            }))
+            ...item,
+            _tempId: item.DetallePedidoClienteId || generateTempId(),
+            tipo: item.ProductoId ? 'producto' : 'servicio',
+            tipoStock: item.ColorId ? 'por_color' : 'general',
+            ProductoNombre: item.ProductoNombre,
+            ServicioNombre: item.ServicioNombre,
+            ColorNombre: item.ColorNombre,
+            ColorHex: item.ColorHex
+          }))
           : []
       };
 
@@ -359,7 +361,7 @@ export const PedidosClientes = () => {
         formData.append('voucher', voucherFileCrear);
       }
 
-      const response = await axios.post('http://localhost:3000/api/pedidos-clientes', formData, {
+      const response = await axios.post(`${API_URL}/api/pedidos-clientes`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
@@ -415,11 +417,9 @@ export const PedidosClientes = () => {
       console.log('📦 Enviando actualización:', pedidoActualizado);
 
       const response = await axios.put(
-        `http://localhost:3000/api/pedidos-clientes/${pedidoId}`,
+        `${API_URL}/api/pedidos-clientes/${pedidoId}`,
         pedidoActualizado,
-        {
-          headers: { 'Content-Type': 'application/json' }
-        }
+        { headers: { 'Content-Type': 'application/json' } }
       );
 
       toast.success("Pedido actualizado correctamente");
@@ -447,11 +447,9 @@ export const PedidosClientes = () => {
       console.log('Enviando actualización:', payload);
 
       const response = await axios.put(
-        `http://localhost:3000/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
+        `${API_URL}/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
         payload,
-        {
-          headers: { 'Content-Type': 'application/json' }
-        }
+        { headers: { 'Content-Type': 'application/json' } }
       );
 
       setSelectedPedido(prev => ({

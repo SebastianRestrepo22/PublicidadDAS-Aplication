@@ -40,6 +40,8 @@ export const CarritoCompras = () => {
   const [colorsLoaded, setColorsLoaded] = useState(false);
   const [imagenAmpliada, setImagenAmpliada] = useState(null);
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   // Función para cargar colores - MEMOIZADA
   const loadColorsForProducts = useCallback(async () => {
     const productIds = cart
@@ -106,22 +108,22 @@ export const CarritoCompras = () => {
   }, [colorsLoaded, productColors, cart]);
 
   // Función para obtener el stock disponible según el color
-const getStockDisponible = (item) => {
-  // Si es un producto
-  if (item.ProductoId) {
-    // Si tiene color seleccionado, el stock ya debería estar en item.Stock
-    if (item.customization?.color?.ColorId) {
-      // El stock del color ya lo guardamos en item.Stock cuando agregamos al carrito
+  const getStockDisponible = (item) => {
+    // Si es un producto
+    if (item.ProductoId) {
+      // Si tiene color seleccionado, el stock ya debería estar en item.Stock
+      if (item.customization?.color?.ColorId) {
+        // El stock del color ya lo guardamos en item.Stock cuando agregamos al carrito
+        return item.Stock || 0;
+      }
+
+      // Si no tiene color, usar stock general del producto
       return item.Stock || 0;
     }
-    
-    // Si no tiene color, usar stock general del producto
-    return item.Stock || 0;
-  }
-  
-  // Si es servicio, no hay stock
-  return null;
-};
+
+    // Si es servicio, no hay stock
+    return null;
+  };
 
   const handleIncrease = (item) => {
     const stockDisponible = getStockDisponible(item);
@@ -246,14 +248,14 @@ const getStockDisponible = (item) => {
     return "item";
   };
 
- const formatPrice = (precio) => {
-  const formateado = new Intl.NumberFormat("es-CO", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(precio);
-  
-  return `COP ${formateado}`;
-};
+  const formatPrice = (precio) => {
+    const formateado = new Intl.NumberFormat("es-CO", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(precio);
+
+    return `COP ${formateado}`;
+  };
 
   const calculateItemTotal = (item) => {
     const price = Number(item.Precio) || 0;
@@ -477,8 +479,8 @@ const getStockDisponible = (item) => {
                                   onClick={() => handleIncrease(item)}
                                   disabled={getStockDisponible(item) !== null && item.quantity >= getStockDisponible(item)}
                                   className={`w-8 h-8 flex items-center justify-center border rounded-lg transition-all ${getStockDisponible(item) !== null && item.quantity >= getStockDisponible(item)
-                                      ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
-                                      : 'border-blue-300 bg-blue-500 text-white hover:bg-blue-600'
+                                    ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                                    : 'border-blue-300 bg-blue-500 text-white hover:bg-blue-600'
                                     }`}
                                 >
                                   <Plus className="h-4 w-4" />
@@ -532,9 +534,8 @@ const getStockDisponible = (item) => {
                     );
 
                     const imagenSrc = imagenAdjunta?.url
-                      ? `http://localhost:3000${imagenAdjunta.url}`
+                      ? `${API_URL}${imagenAdjunta.url}`
                       : item.UrlImagen || item.Imagen || "https://via.placeholder.com/200";
-
                     return (
                       <div key={item.id} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors">
                         <div className="flex gap-4">
@@ -580,7 +581,7 @@ const getStockDisponible = (item) => {
 
                                               if (!archivo.url) return;
 
-                                              const url = `http://localhost:3000${archivo.url}`;
+                                              const url = `${API_URL}${archivo.url}`;
 
                                               if (archivo.esImagen) {
                                                 setImagenAmpliada(url);
@@ -592,7 +593,7 @@ const getStockDisponible = (item) => {
                                             {archivo.esImagen ? (
                                               <div className="relative">
                                                 <img
-                                                  src={`http://localhost:3000${archivo.url}`}
+                                                  src={`${API_URL}${archivo.url}`}
                                                   alt={archivo.nombre}
                                                   className="w-full h-16 object-cover rounded"
                                                 />

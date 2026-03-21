@@ -21,6 +21,8 @@ export const GraficosEstadisticos = () => {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   useEffect(() => {
     cargarDatosDashboard();
   }, []);
@@ -30,7 +32,7 @@ export const GraficosEstadisticos = () => {
       setCargando(true);
       console.log('🔍 Solicitando datos del dashboard...');
 
-      const response = await fetch('http://localhost:3000/api/dashboard/stats', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/stats`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -41,7 +43,7 @@ export const GraficosEstadisticos = () => {
 
       const datosReales = await response.json();
       console.log('📊 Datos dashboard recibidos:', datosReales);
-      
+
       setDatos(datosReales);
       setCargando(false);
 
@@ -88,12 +90,12 @@ export const GraficosEstadisticos = () => {
     if (active && payload && payload.length) {
       const valor = asegurarNumero(payload[0]?.value);
       const dataKey = payload[0]?.dataKey;
-      
+
       let icono = '📊';
       if (dataKey === 'ventas') icono = '💰';
       else if (dataKey === 'pedidos') icono = '📦';
       else if (dataKey === 'compras') icono = '🛒';
-      
+
       return (
         <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-100">
           <p className="font-medium text-gray-900 text-sm">{label}</p>
@@ -145,7 +147,7 @@ export const GraficosEstadisticos = () => {
   const ventasSemanales = procesarDatos(datos.ventasSemanales, 'ventas');
   const pedidosSemanales = procesarDatos(datos.pedidosSemanales, 'pedidos');
   const comprasSemanales = procesarDatos(datos.comprasSemanales, 'compras');
-  
+
   const totales = datos.totales || {};
 
   return (

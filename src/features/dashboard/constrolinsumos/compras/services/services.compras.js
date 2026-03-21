@@ -18,9 +18,9 @@ export const getComprasPaginated = async (page = 1, limit = 5, filtroCampo = nul
       params.append('filtroValor', filtroValor.trim());
     }
     
-    console.log("📤 getComprasPaginated - URL:", `${'http://localhost:3000'}/api/compras?${params}`);
+    console.log("📤 getComprasPaginated - URL:", `${API_URL}/api/compras?${params}`);
 
-    const response = await axios.get(`${'http://localhost:3000'}/api/compras?${params}`);
+    const response = await axios.get(`${API_URL}/api/compras?${params}`);
     
     console.log("✅ Respuesta:", {
       dataLength: response.data?.data?.length,
@@ -45,13 +45,12 @@ export const getComprasPaginated = async (page = 1, limit = 5, filtroCampo = nul
 
 export const buscarCompras = async (filtroCampo, filtroValor, page = 1, limit = 5) => {
   try {
-    // Construir el término de búsqueda según el campo
     let searchParam = {};
     
     if (filtroCampo === 'id') {
-      searchParam = { q: filtroValor }; // Busca en ID
+      searchParam = { q: filtroValor };
     } else if (filtroCampo === 'proveedor') {
-      searchParam = { q: filtroValor }; // Busca en ProveedorId
+      searchParam = { q: filtroValor };
     } else {
       searchParam = { q: filtroValor };
     }
@@ -84,7 +83,7 @@ export const buscarCompras = async (filtroCampo, filtroValor, page = 1, limit = 
 
 export const getAllCompras = async () => {
   try {
-    const response = await axios.get(`${'http://localhost:3000'}/api/compras/todas`);
+    const response = await axios.get(`${API_URL}/api/compras/todas`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("❌ Error en getAllCompras:", error);
@@ -94,7 +93,7 @@ export const getAllCompras = async () => {
 
 export const getCompraById = async (id) => {
   try {
-    const response = await axios.get(`${'http://localhost:3000'}/api/compras/${id}`);
+    const response = await axios.get(`${API_URL}/api/compras/${id}`);
     return response.data;
   } catch (error) {
     console.error("❌ Error en getCompraById:", error);
@@ -104,7 +103,7 @@ export const getCompraById = async (id) => {
 
 export const createCompra = async (compraData) => {
   try {
-    const response = await axios.post(`${'http://localhost:3000'}/api/compras`, compraData);
+    const response = await axios.post(`${API_URL}/api/compras`, compraData);
     return response.data;
   } catch (error) {
     console.error("❌ Error en createCompra:", error);
@@ -114,7 +113,7 @@ export const createCompra = async (compraData) => {
 
 export const updateCompra = async (id, compraData) => {
   try {
-    const response = await axios.put(`${'http://localhost:3000'}/api/compras/${id}`, compraData);
+    const response = await axios.put(`${API_URL}/api/compras/${id}`, compraData);
     return response.data;
   } catch (error) {
     console.error("❌ Error en updateCompra:", error);
@@ -124,7 +123,7 @@ export const updateCompra = async (id, compraData) => {
 
 export const deleteCompra = async (id) => {
   try {
-    const response = await axios.delete(`${'http://localhost:3000'}/api/compras/${id}`);
+    const response = await axios.delete(`${API_URL}/api/compras/${id}`);
     return response.data;
   } catch (error) {
     console.error("❌ Error en deleteCompra:", error);
@@ -136,7 +135,7 @@ export const deleteCompra = async (id) => {
 
 export const getDetallesByCompraId = async (compraId) => {
   try {
-    const response = await axios.get(`${'http://localhost:3000'}/api/detalle-compras/compra/${compraId}`);
+    const response = await axios.get(`${API_URL}/api/detalle-compras/compra/${compraId}`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("❌ Error en getDetallesByCompraId:", error);
@@ -166,7 +165,7 @@ export const createDetalleCompra = async (detalleData) => {
       dataToSend.colores = [];
     }
     
-    const response = await axios.post(`${'http://localhost:3000'}/api/detalle-compras`, dataToSend);
+    const response = await axios.post(`${API_URL}/api/detalle-compras`, dataToSend);
     return response.data;
   } catch (error) {
     console.error("❌ Error en createDetalleCompra:", error);
@@ -176,7 +175,7 @@ export const createDetalleCompra = async (detalleData) => {
 
 export const updateDetalleCompra = async (id, detalleData) => {
   try {
-    const response = await axios.put(`${'http://localhost:3000'}/api/detalle-compras/${id}`, detalleData);
+    const response = await axios.put(`${API_URL}/api/detalle-compras/${id}`, detalleData);
     return response.data;
   } catch (error) {
     console.error("❌ Error en updateDetalleCompra:", error);
@@ -186,7 +185,7 @@ export const updateDetalleCompra = async (id, detalleData) => {
 
 export const deleteDetalleCompra = async (id) => {
   try {
-    const response = await axios.delete(`${'http://localhost:3000'}/api/detalle-compras/${id}`);
+    const response = await axios.delete(`${API_URL}/api/detalle-compras/${id}`);
     return response.data;
   } catch (error) {
     console.error("❌ Error en deleteDetalleCompra:", error);
@@ -200,10 +199,10 @@ export const getAllProductos = async () => {
   try {
     const params = {
       page: "1",
-      limit: "1000"  // Límite alto para obtener todos
+      limit: "1000"
     };
     
-    const response = await axios.get(`${'http://localhost:3000'}/producto`, { params });
+    const response = await axios.get(`${API_URL}/producto`, { params });
     
     return response.data?.data || [];
   } catch (error) {
@@ -224,7 +223,7 @@ export const buscarProductosPorCampo = async (campo, valor, page = 1, limit = 5)
       params.filtroValor = valor.trim();
     }
 
-    const response = await axios.get(`${'http://localhost:3000'}/producto`, { params });
+    const response = await axios.get(`${API_URL}/producto`, { params });
     
     return {
       data: response.data?.data || [],
@@ -237,25 +236,11 @@ export const buscarProductosPorCampo = async (campo, valor, page = 1, limit = 5)
   }
 };
 
-// Función para búsqueda local de productos (para paginación en frontend)
-export const buscarProductosLocal = (productos, searchTerm) => {
-  if (!searchTerm || searchTerm.trim() === "") {
-    return productos;
-  }
-  
-  const term = searchTerm.toLowerCase().trim();
-  return productos.filter(producto => 
-    producto.Nombre.toLowerCase().includes(term) ||
-    (producto.SKU && producto.SKU.toLowerCase().includes(term)) ||
-    (producto.Descripcion && producto.Descripcion.toLowerCase().includes(term))
-  );
-};
-
 // ========== PROVEEDORES ==========
 
 export const getAllProveedoresSimple = async () => {
   try {
-    const response = await axios.get(`${'http://localhost:3000'}/api/proveedores/todos`);
+    const response = await axios.get(`${API_URL}/api/proveedores/todos`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("❌ Error al cargar proveedores:", error);
@@ -265,7 +250,7 @@ export const getAllProveedoresSimple = async () => {
 
 export const getProveedorById = async (id) => {
   try {
-    const response = await axios.get(`${'http://localhost:3000'}/api/proveedores/${id}`);
+    const response = await axios.get(`${API_URL}/api/proveedores/${id}`);
     return response.data;
   } catch (error) {
     console.error("❌ Error al obtener proveedor:", error);
@@ -277,7 +262,7 @@ export const getProveedorById = async (id) => {
 
 export const getAllColores = async () => {
   try {
-    const response = await axios.get(`${'http://localhost:3000'}/colores`);
+    const response = await axios.get(`${API_URL}/colores`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("❌ Error al cargar colores:", error);
@@ -287,132 +272,10 @@ export const getAllColores = async () => {
 
 export const getColorById = async (id) => {
   try {
-    const response = await axios.get(`${'http://localhost:3000'}/colores/${id}`);
+    const response = await axios.get(`${API_URL}/colores/${id}`);
     return response.data;
   } catch (error) {
     console.error("❌ Error al obtener color:", error);
     return null;
   }
-};
-
-// ========== FUNCIONES DE UTILIDAD ==========
-
-export const formatPrice = (value) => {
-  const num = Number(value);
-  return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
-};
-
-export const formatDate = (date) => {
-  if (!date) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    const [year, month, day] = date.split('-');
-    return `${day}/${month}/${year}`;
-  }
-  const d = new Date(date);
-  if (isNaN(d.getTime())) return "";
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
-};
-
-export const getShortId = (id) => {
-  if (!id) return "---";
-  const str = String(id);
-  return str.length > 3 ? str.substring(0, 3) : str;
-};
-
-export const getTodayDate = () => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-// ========== FUNCIONES PARA CÁLCULOS ==========
-
-export const calcularSubtotal = (cantidad, precioUnitario) => {
-  const cant = Number(cantidad) || 0;
-  const precio = Number(precioUnitario) || 0;
-  return cant * precio;
-};
-
-export const calcularTotalCompra = (detalles) => {
-  if (!Array.isArray(detalles)) return 0;
-  return detalles.reduce((sum, item) => {
-    return sum + (Number(item.Subtotal) || 0);
-  }, 0);
-};
-
-// ========== VALIDACIONES ==========
-
-export const validarCompra = (form, detalles, proveedores) => {
-  const errores = [];
-  
-  if (!form.ProveedorId || !proveedores.some(p => p.ProveedorId === form.ProveedorId)) {
-    errores.push("Debe seleccionar un proveedor válido.");
-  }
-  
-  if (!form.FechaRegistro) {
-    errores.push("La fecha de registro es obligatoria.");
-  }
-  
-  if (!detalles || detalles.length === 0) {
-    errores.push("Debe agregar al menos un artículo.");
-  }
-  
-  for (let i = 0; i < detalles.length; i++) {
-    const d = detalles[i];
-    if (!d.ProductoId) {
-      errores.push(`Artículo ${i + 1}: seleccione un producto.`);
-    }
-    if (!d.Cantidad || Number(d.Cantidad) <= 0) {
-      errores.push(`Artículo ${i + 1}: cantidad debe ser mayor a 0.`);
-    }
-    if (d.PrecioUnitario === undefined || d.PrecioUnitario === null || Number(d.PrecioUnitario) < 0) {
-      errores.push(`Artículo ${i + 1}: precio unitario debe ser mayor o igual a 0.`);
-    }
-  }
-  
-  return errores;
-};
-
-// ========== FUNCIONES PARA EXPORTAR/IMPORTAR ==========
-
-export const exportarCompraAJSON = (compra, detalles) => {
-  return {
-    compra,
-    detalles,
-    fechaExportacion: new Date().toISOString()
-  };
-};
-
-export const generarReporteCompra = (compra, detalles, productos, proveedores) => {
-  const proveedor = proveedores.find(p => p.ProveedorId === compra.ProveedorId);
-  
-  const detallesConProducto = detalles.map(d => {
-    const producto = productos.find(p => p.ProductoId === d.ProductoId);
-    return {
-      ...d,
-      productoNombre: producto?.Nombre || 'Producto no encontrado',
-      productoSKU: producto?.SKU || 'N/A'
-    };
-  });
-
-  return {
-    compraId: getShortId(compra.CompraId),
-    proveedor: proveedor?.NombreProveedor || 'Desconocido',
-    fecha: formatDate(compra.FechaRegistro),
-    total: formatPrice(compra.Total),
-    estado: compra.Estado || 'aprobado',
-    detalles: detallesConProducto.map(d => ({
-      producto: d.productoNombre,
-      sku: d.productoSKU,
-      cantidad: d.Cantidad,
-      precioUnitario: formatPrice(d.PrecioUnitario),
-      subtotal: formatPrice(d.Subtotal),
-      colores: d.colores || []
-    }))
-  };
 };

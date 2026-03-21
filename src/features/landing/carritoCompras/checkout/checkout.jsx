@@ -63,6 +63,8 @@ export const Checkout = () => {
     horarioAtencion: "Lunes a Viernes 8am-6pm"
   };
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   // Estados para métodos de pago
   const [metodoPago, setMetodoPago] = useState("qr");
   const [datosEntrega, setDatosEntrega] = useState({
@@ -86,10 +88,10 @@ export const Checkout = () => {
   const calcularTotalSeguro = () => {
     const total = getTotal();
     console.log('💰 Total recibido de getTotal():', total, 'Tipo:', typeof total);
-    
+
     // Convertir a número de forma segura
     let totalNumerico = 0;
-    
+
     if (total === null || total === undefined) {
       console.warn('⚠️ getTotal() devolvió null/undefined');
       totalNumerico = 0;
@@ -102,7 +104,7 @@ export const Checkout = () => {
     } else {
       totalNumerico = Number(total) || 0;
     }
-    
+
     console.log('💰 Total numérico final:', totalNumerico);
     return totalNumerico;
   };
@@ -171,18 +173,17 @@ export const Checkout = () => {
         let UrlArchivoPersonalizado = null;
         let tipoArchivo = null;
         let nombreArchivo = null;
-        
+
         if (item.customization?.archivosAdjuntos?.length > 0) {
           const archivo = item.customization.archivosAdjuntos[0];
           if (archivo.url) {
             // Construir URL completa si es necesario
-            UrlArchivoPersonalizado = archivo.url.startsWith('http') 
-              ? archivo.url 
-              : `http://localhost:3000${archivo.url}`;
-            
+            UrlArchivoPersonalizado = archivo.url.startsWith('http')
+              ? archivo.url
+              : `${API_URL}${archivo.url}`;
             tipoArchivo = archivo.tipo || archivo.type || 'desconocido';
             nombreArchivo = archivo.nombre || archivo.name || 'archivo';
-            
+
             console.log(`📎 Archivo personalizado encontrado para ${item.Nombre}:`, {
               url: UrlArchivoPersonalizado,
               tipo: tipoArchivo,
@@ -225,7 +226,7 @@ export const Checkout = () => {
 
       // 🔥 CALCULAR TOTAL DE FORMA SEGURA
       const totalSeguro = calcularTotalSeguro();
-      
+
       // Validar que el total sea un número válido
       if (isNaN(totalSeguro) || totalSeguro <= 0) {
         console.error('❌ Total inválido después de calcular:', totalSeguro);
@@ -235,7 +236,7 @@ export const Checkout = () => {
       const payload = {
         ClienteId: user.CedulaId,
         FechaRegistro: new Date().toISOString().split("T")[0],
-        Total: totalSeguro, 
+        Total: totalSeguro,
         Estado: "pendiente",
         MetodoPago: metodoPago === "entrega" ? "contra_entrega" : metodoPago,
         Origen: "cliente",
@@ -268,7 +269,7 @@ export const Checkout = () => {
         }
       });
 
-      const res = await fetch("http://localhost:3000/api/pedidos-clientes", {
+      const res = await fetch(`${API_URL}/api/pedidos-clientes`, {
         method: "POST",
         body: formData
       });
@@ -281,7 +282,7 @@ export const Checkout = () => {
 
       const data = await res.json();
       console.log('✅ Respuesta del servidor:', data);
-      
+
       // Verificar si el archivo se guardó
       if (data.detalle?.[0]?.UrlImagenPersonalizada) {
         console.log('🎉 ¡Archivo guardado correctamente en la BD!');
@@ -371,7 +372,7 @@ export const Checkout = () => {
         console.log('📤 Subiendo comprobante para pedido:', pedidoId);
         console.log('📄 Archivo:', file.name, 'Tipo:', file.type);
 
-        const res = await fetch(`http://localhost:3000/api/pedidos-clientes/${pedidoId}/voucher`, {
+        const res = await fetch(`${API_URL}/api/pedidos-clientes/${pedidoId}/voucher`, {
           method: "POST",
           body: formData
         });
@@ -900,8 +901,8 @@ export const Checkout = () => {
             onClick={enviarPedido}
             disabled={loading || cart.length === 0}
             className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${loading || cart.length === 0
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-black hover:bg-gray-800 hover:shadow-xl"
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-black hover:bg-gray-800 hover:shadow-xl"
               }`}
           >
             {loading ? (
