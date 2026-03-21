@@ -9,6 +9,8 @@ export const RecuperarContrasena = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [emailValid, setEmailValid] = useState(null);
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   const validateEmail = (email) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return regex.test(email);
@@ -22,7 +24,7 @@ export const RecuperarContrasena = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateEmail(correo)) {
       setMensaje("Por favor ingresa un correo electrónico válido");
       return;
@@ -32,7 +34,7 @@ export const RecuperarContrasena = () => {
     setMensaje("");
 
     try {
-      const response = await axios.post("http://localhost:3000/auth/forgot-password", { correo });
+      const response = await axios.post(`${API_URL}/auth/forgot-password`, { correo });
       setMensaje(response.data.message || "✅ Correo enviado con éxito. Revisa tu bandeja de entrada.");
     } catch (error) {
       setMensaje(error.response?.data?.message || "❌ Error al enviar el correo. Intenta nuevamente.");
@@ -65,13 +67,12 @@ export const RecuperarContrasena = () => {
               <input
                 type="email"
                 placeholder="ejemplo@correo.com"
-                className={`w-full border-2 rounded-xl p-3 pl-4 pr-12 focus:outline-none focus:ring-2 transition-all ${
-                  emailValid === null
+                className={`w-full border-2 rounded-xl p-3 pl-4 pr-12 focus:outline-none focus:ring-2 transition-all ${emailValid === null
                     ? 'border-gray-200 focus:border-blue-500 focus:ring-blue-100'
                     : emailValid
-                    ? 'border-green-400 focus:border-green-500 focus:ring-green-100'
-                    : 'border-red-300 focus:border-red-500 focus:ring-red-100'
-                }`}
+                      ? 'border-green-400 focus:border-green-500 focus:ring-green-100'
+                      : 'border-red-300 focus:border-red-500 focus:ring-red-100'
+                  }`}
                 value={correo}
                 onChange={handleEmailChange}
                 required
@@ -81,13 +82,12 @@ export const RecuperarContrasena = () => {
                 {emailValid === false && <XCircle className="w-5 h-5 text-red-400" />}
               </div>
             </div>
-            
+
             {/* Indicador de validación de email */}
             {correo && emailValid !== null && (
               <div className="mt-2">
-                <p className={`text-xs flex items-center ${
-                  emailValid ? 'text-green-600' : 'text-red-600'
-                }`}>
+                <p className={`text-xs flex items-center ${emailValid ? 'text-green-600' : 'text-red-600'
+                  }`}>
                   {emailValid ? (
                     <>
                       <CheckCircle className="w-3 h-3 mr-1" />
@@ -107,11 +107,10 @@ export const RecuperarContrasena = () => {
           <button
             type="submit"
             disabled={isLoading || !validateEmail(correo)}
-            className={`w-full py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center ${
-              validateEmail(correo) && !isLoading
+            className={`w-full py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center ${validateEmail(correo) && !isLoading
                 ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
+              }`}
           >
             {isLoading ? (
               <>
@@ -126,11 +125,10 @@ export const RecuperarContrasena = () => {
 
         {/* Mensaje de estado */}
         {mensaje && (
-          <div className={`mt-6 p-4 rounded-xl border ${
-            mensaje.includes('✅') || mensaje.includes('éxito')
+          <div className={`mt-6 p-4 rounded-xl border ${mensaje.includes('✅') || mensaje.includes('éxito')
               ? 'bg-green-50 border-green-200 text-green-700'
               : 'bg-red-50 border-red-200 text-red-700'
-          }`}>
+            }`}>
             <div className="flex items-start">
               {mensaje.includes('✅') || mensaje.includes('éxito') ? (
                 <CheckCircle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
@@ -162,7 +160,7 @@ export const RecuperarContrasena = () => {
         {/* Información adicional */}
         <div className="mt-6 p-4 bg-blue-50 rounded-xl">
           <p className="text-sm text-blue-800">
-            <span className="font-semibold">💡 Nota:</span> El enlace de recuperación tiene una validez de 1 hora. 
+            <span className="font-semibold">💡 Nota:</span> El enlace de recuperación tiene una validez de 1 hora.
             Asegúrate de revisar tu correo pronto.
           </p>
         </div>

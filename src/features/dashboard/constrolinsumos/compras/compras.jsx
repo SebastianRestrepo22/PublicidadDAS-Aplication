@@ -119,6 +119,8 @@ export const Compras = () => {
   const [loadingProductos, setLoadingProductos] = useState(false);
   const [currentDetailIndex, setCurrentDetailIndex] = useState(-1);
 
+  const API_URL = import.meta.env.VITE_API_URL; 
+
   // Cargar colores al iniciar
   useEffect(() => {
     cargarColores();
@@ -128,9 +130,8 @@ export const Compras = () => {
   const cargarColores = async () => {
     setLoadingColores(true);
     try {
-      console.log("Intentando cargar colores desde: http://localhost:3000/colores");
 
-      const response = await fetch('http://localhost:3000/colores');
+const response = await fetch(`${API_URL}/colores`);
 
       if (!response.ok) {
         throw new Error(`Error HTTP: ${response.status}`);

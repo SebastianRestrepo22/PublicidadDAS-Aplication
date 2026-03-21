@@ -1,5 +1,6 @@
-import axios from "axios"
-const url = 'http://localhost:3000/'
+import axios from "axios";
+
+const url = `${import.meta.env.VITE_API_URL}/`;
 
 // Cambiar estado del producto
 export const cambiarEstadoProducto = async (id, Estado) => {
@@ -74,7 +75,7 @@ export const postDataproductos = async (data) => {
 
 // Actualizar un registro - NO elimines Stock
 export const updateDataproductos = async (id, data) => {
-   console.log('========================================');
+  console.log('========================================');
   console.log('📡 SERVICIO - updateDataproductos:');
   console.log('ID:', id);
   console.log('Data recibida:', data);
@@ -83,11 +84,8 @@ export const updateDataproductos = async (id, data) => {
   console.log('========================================');
   
   try {
-    // ¡NO ELIMINES STOCK! El backend lo necesita
     const response = await axios.put(url + `producto/${id}`, data);
-
-
-       console.log('📡 Respuesta del backend:', response.status);
+    console.log('📡 Respuesta del backend:', response.status);
     console.log('Data:', response.data);
     console.log('========================================');
     return response;
@@ -99,14 +97,13 @@ export const updateDataproductos = async (id, data) => {
 
 // Eliminar un registro
 export const deleteDataproducto = async (id) => {
-    try {
-        const response = await axios.delete(url + `producto/${id}`);
-        return response;
-    } catch (error) {
-        // Lanzar la excepción para que el frontend pueda acceder a error.response
-        throw error;
-    }
-}
+  try {
+    const response = await axios.delete(url + `producto/${id}`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
 
 // Buscar productos
 export const buscarProductos = async (campo, valor, page = 1, limit = 10, estado = null, includeColors = false) => {
@@ -153,7 +150,6 @@ export const updateColoresProducto = async (productoId, coloresConStock) => {
   console.log('Enviando colores para producto:', productoId);
   console.log('Datos a enviar:', coloresConStock);
   
-  // Asegurar que estamos enviando el formato correcto
   const coloresParaEnviar = coloresConStock.map(c => {
     return {
       ColorId: String(c.ColorId),
@@ -176,7 +172,7 @@ export const updateColoresProducto = async (productoId, coloresConStock) => {
 };
 
 export const getColores = async () => {
-  const res = await axios.get("http://localhost:3000/colores");
+  const res = await axios.get(`${url}colores`);
   return res.data;
 };
 
@@ -188,10 +184,9 @@ export const getColoresProducto = async (productoId) => {
 export const getProductoByIdService = async (id) => {
   try {
     console.log("🔍 Buscando producto por ID:", id);
-    const res = await axios.get(`http://localhost:3000/producto/${id}`);
+    const res = await axios.get(`${url}producto/${id}`);
     console.log("✅ Producto encontrado:", res.data);
     
-    // El producto YA debería venir con su propiedad 'Colores'
     console.log("🎨 Colores del producto:", res.data.Colores);
     
     return res.data;
@@ -204,8 +199,7 @@ export const getProductoByIdService = async (id) => {
 // Función para obtener colores de un producto específico
 export const getColoresByProductoId = async (productoId) => {
   try {
-    // Usar la misma URL que en tu servicio getColoresProducto
-    const response = await fetch(`http://localhost:3000/producto/${productoId}/colores`);
+    const response = await fetch(`${url}producto/${productoId}/colores`);
     const data = await response.json();
     return Array.isArray(data) ? data : [];
   } catch (error) {

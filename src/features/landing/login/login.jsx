@@ -30,10 +30,12 @@ export const Login = () => {
 
   const [tiposDocumento, setTiposDocumento] = useState([]);
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   useEffect(() => {
     const fetchTiposDocumento = async () => {
       try {
-        const response = await axios.get("http://localhost:3000/tipoS-documento");
+        const response = await axios.get(`${API_URL}/tipos-documento`);
         const tiposUnicos = response.data.filter(
           (tipo, index, self) =>
             index === self.findIndex((t) => t.TipoDocumentoId === tipo.TipoDocumentoId)
@@ -111,7 +113,7 @@ export const Login = () => {
   const validarCampoUnico = async (campo, valor) => {
     if (!valor) return;
     try {
-      const response = await axios.get(`http://localhost:3000/auth/validar-${campo}`, {
+      const response = await axios.get(`${API_URL}/auth/validar-${campo}`, {
         params: { [campo]: valor }
       });
       if (response.data.exists) {
@@ -237,7 +239,7 @@ export const Login = () => {
     }
 
     try {
-      const response = await axios.post("http://localhost:3000/auth/register", values);
+const response = await axios.post(`${API_URL}/auth/register`, values);
       if (response.status === 201) {
         toast.success("Registro exitoso");
         toggleForm(true);
@@ -306,7 +308,7 @@ export const Login = () => {
     }
 
     try {
-      const response = await axios.post("http://localhost:3000/auth/login", valuesLogin);
+const response = await axios.post(`${API_URL}/auth/login`, valuesLogin);
       const token = response.data.token;
 
       const userData = response.data.user || {
@@ -417,9 +419,9 @@ export const Login = () => {
                 >
                   <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl p-5 border border-white/20">
                     <div className="text-center mb-6">
-                     <h1 className="text-2xl font-bold text-blue-600 mb-2">
-  Iniciar Sesión
-</h1>
+                      <h1 className="text-2xl font-bold text-blue-600 mb-2">
+                        Iniciar Sesión
+                      </h1>
                       <p className="text-gray-600 text-sm">
                         Ingresa tus credenciales para acceder
                       </p>
@@ -499,15 +501,15 @@ export const Login = () => {
                         )}
                       </div>
 
-                     <button
-  type="submit"
-  className="group w-full bg-blue-600 text-white py-2.5 rounded-xl font-semibold hover:bg-blue-700 hover:shadow-lg transition-all duration-300"
->
-  <span className="flex items-center justify-center gap-2">
-    Iniciar Sesión
-    <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
-  </span>
-</button>
+                      <button
+                        type="submit"
+                        className="group w-full bg-blue-600 text-white py-2.5 rounded-xl font-semibold hover:bg-blue-700 hover:shadow-lg transition-all duration-300"
+                      >
+                        <span className="flex items-center justify-center gap-2">
+                          Iniciar Sesión
+                          <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+                        </span>
+                      </button>
                     </form>
 
                     <div className="mt-4 pt-3 border-t border-gray-200 text-center">
@@ -520,11 +522,11 @@ export const Login = () => {
                       <p className="text-gray-600 text-sm">
                         ¿No tienes cuenta?{" "}
                         <button
-  onClick={() => toggleForm(false)}
-  className="text-blue-600 font-semibold hover:text-blue-700 transition-colors"
->
-  Regístrate aquí
-</button>
+                          onClick={() => toggleForm(false)}
+                          className="text-blue-600 font-semibold hover:text-blue-700 transition-colors"
+                        >
+                          Regístrate aquí
+                        </button>
                       </p>
                     </div>
                   </div>
@@ -846,27 +848,27 @@ export const Login = () => {
                         </div>
 
                         <div className="hidden md:block mt-6">
-                        <button
-  type="submit"
-  className="relative w-full bg-blue-600 text-white py-3 rounded-xl font-semibold overflow-hidden hover:bg-blue-700 hover:shadow-lg transition-all duration-300"
->
-  <span className="flex items-center justify-center gap-2">
-    Crear Cuenta
-    <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
-  </span>
-</button>
+                          <button
+                            type="submit"
+                            className="relative w-full bg-blue-600 text-white py-3 rounded-xl font-semibold overflow-hidden hover:bg-blue-700 hover:shadow-lg transition-all duration-300"
+                          >
+                            <span className="flex items-center justify-center gap-2">
+                              Crear Cuenta
+                              <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+                            </span>
+                          </button>
                         </div>
                       </form>
 
                       <div className="mt-6 pt-4 border-t border-gray-200 text-center">
                         <p className="text-gray-600 text-sm">
                           ¿Ya tienes cuenta?{" "}
-                         <button
-  onClick={() => toggleForm(true)}
-  className="text-blue-600 font-semibold hover:text-blue-700 transition-colors"
->
-  Inicia sesión aquí
-</button>
+                          <button
+                            onClick={() => toggleForm(true)}
+                            className="text-blue-600 font-semibold hover:text-blue-700 transition-colors"
+                          >
+                            Inicia sesión aquí
+                          </button>
                         </p>
                       </div>
                     </div>

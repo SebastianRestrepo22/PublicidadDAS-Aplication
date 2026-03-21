@@ -30,7 +30,9 @@ export const Perfil = () => {
     const [validating, setValidating] = useState({ correo: false, telefono: false });
     const [touched, setTouched] = useState({});
 
-    // ⛔ Estados de autenticación
+    const API_URL = import.meta.env.VITE_API_URL;
+
+    // Estados de autenticación
     if (loading) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
@@ -50,7 +52,7 @@ export const Perfil = () => {
     useEffect(() => {
         const fetchTiposDocumento = async () => {
             try {
-                const response = await axios.get("http://localhost:3000/tipos-documento");
+                const response = await axios.get(`${API_URL}/tipos-documento`);
                 setTiposDocumento(response.data);
             } catch (error) {
                 console.error("Error obteniendo tipos de documento:", error);
@@ -68,12 +70,8 @@ export const Perfil = () => {
                 const token = localStorage.getItem("token");
 
                 const response = await axios.get(
-                    `http://localhost:3000/user/${authUser.CedulaId}`,
-                    {
-                        headers: {
-                            Authorization: `Bearer ${token}`
-                        }
-                    }
+                    `${API_URL}/user/${authUser.CedulaId}`,
+                    { headers: { Authorization: `Bearer ${token}` } }
                 );
 
                 setProfile(response.data);
@@ -161,7 +159,7 @@ export const Perfil = () => {
 
         try {
             const response = await axios.get(
-                `http://localhost:3000/auth/validar-correo?correo=${correo}`
+                `${API_URL}/auth/validar-correo?correo=${correo}`
             );
 
             if (response.data.exists) {
@@ -187,7 +185,7 @@ export const Perfil = () => {
 
         try {
             const response = await axios.get(
-                `http://localhost:3000/auth/validar-telefono?telefono=${telefono}`
+                `${API_URL}/auth/validar-telefono?telefono=${telefono}`
             );
 
             if (response.data.exists) {
@@ -259,13 +257,9 @@ export const Perfil = () => {
             };
 
             const response = await axios.put(
-                `http://localhost:3000/user/${profile.CedulaId}`,
+                `${API_URL}/user/${profile.CedulaId}`,
                 payload,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
 
             if (response.status === 200) {

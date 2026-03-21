@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from "axios";
 
 // Configuración de axios
-const API_URL = 'http://localhost:3000/';
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const Inicio = () => {
     const navigate = useNavigate();
@@ -64,7 +64,7 @@ export const Inicio = () => {
     // Función para obtener productos aleatorios activos
     const cargarProductosAleatorios = async () => {
         try {
-            const response = await axios.get(`${API_URL}producto`, {
+            const response = await axios.get(`${API_URL}/producto`, {
                 params: { estado: 'Activo' }
             });
             
@@ -93,7 +93,7 @@ export const Inicio = () => {
     // Función para obtener servicios aleatorios activos
     const cargarServiciosAleatorios = async () => {
         try {
-            const response = await axios.get(`${API_URL}servicio`, {
+            const response = await axios.get(`${API_URL}/servicio`, {
                 params: { estado: 'Activo' }
             });
             

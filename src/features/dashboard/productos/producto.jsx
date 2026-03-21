@@ -42,6 +42,8 @@ export const ProductosDashboard = () => {
     Stock: 0
   });
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   const [confirmEstadoModal, setConfirmEstadoModal] = useState({
     open: false,
     productoId: null,
@@ -276,7 +278,7 @@ export const ProductosDashboard = () => {
 
     try {
       const res = await axios.get(
-        `http://localhost:3000/producto/validar-nombre`,
+        `${import.meta.env.VITE_API_URL}/producto/validar-nombre`,
         { params: { Nombre: values.Nombre } }
       );
 

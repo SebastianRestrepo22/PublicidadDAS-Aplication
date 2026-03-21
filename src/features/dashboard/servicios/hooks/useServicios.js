@@ -32,11 +32,13 @@ export const useServicios = (mode, id, onRefrescarLista) => {
         nombreServicio: ''
     })
 
+    const API_URL = import.meta.env.VITE_API_URL;
+
     useEffect(() => {
         if (mode === "view" || mode === "edit") {
             const cargarServicio = async () => {
                 try {
-                    const response = await axios.get(`http://localhost:3000/servicio/${id}`);
+                    const response = await axios.get(`${API_URL}/servicio/${id}`);
                     const servicio = response.data;
 
                     if (servicio) {
@@ -92,10 +94,9 @@ export const useServicios = (mode, id, onRefrescarLista) => {
         if (values.Nombre === originalNombre) return;
 
         try {
-            const res = await axios.get(
-                `http://localhost:3000/servicio/validar-nombre`,
-                { params: { Nombre: values.Nombre } }
-            );
+           const res = await axios.get(`${API_URL}/servicio/validar-nombre`, {
+                params: { Nombre: values.Nombre }
+            });
             setNombreError(res.data.exists ? 'Este nombre ya está registrado' : '');
         } catch (error) {
             console.error(error);

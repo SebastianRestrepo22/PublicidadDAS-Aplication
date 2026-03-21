@@ -22,6 +22,8 @@ export const RestablecerContrasena = () => {
   const [isFirstPassword, setIsFirstPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   // Detectar si es la primera contraseña o recuperación
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -51,7 +53,7 @@ export const RestablecerContrasena = () => {
 
     // Validar que la contraseña cumpla con todos los criterios
     const allCriteriaMet = Object.values(passwordCriteria).every(criterion => criterion);
-    
+
     if (!allCriteriaMet) {
       setError("La contraseña debe cumplir con todos los requisitos de seguridad");
       setIsLoading(false);
@@ -66,19 +68,17 @@ export const RestablecerContrasena = () => {
 
     try {
       let response;
-      
+
       if (isFirstPassword) {
-        // Endpoint para primera contraseña
-        response = await axios.post(`http://localhost:3000/auth/setup-password/${token}`, {
+        response = await axios.post(`${API_URL}/auth/setup-password/${token}`, {
           nuevaContrasena,
         });
       } else {
-        // Endpoint para recuperación de contraseña
-        response = await axios.post(`http://localhost:3000/auth/reset-password/${token}`, {
+        response = await axios.post(`${API_URL}/auth/reset-password/${token}`, {
           nuevaContrasena,
         });
       }
-      
+
       setMensaje(response.data.message);
       setError("");
       setTimeout(() => navigate("/login"), 3000);
@@ -92,7 +92,7 @@ export const RestablecerContrasena = () => {
   const isPasswordValid = Object.values(passwordCriteria).every(criterion => criterion);
   const passwordsMatch = nuevaContrasena === confirmarContrasena;
   const canSubmit = isPasswordValid && passwordsMatch && nuevaContrasena;
-  
+
   // Calcular allCriteriaMet para usar en el JSX
   const allCriteriaMet = Object.values(passwordCriteria).every(criterion => criterion);
   const metCriteriaCount = Object.values(passwordCriteria).filter(v => v).length;
@@ -101,9 +101,8 @@ export const RestablecerContrasena = () => {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
       <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-100">
         <div className="text-center mb-8">
-          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${
-            isFirstPassword ? 'bg-emerald-100' : 'bg-blue-100'
-          }`}>
+          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${isFirstPassword ? 'bg-emerald-100' : 'bg-blue-100'
+            }`}>
             {isFirstPassword ? (
               <UserPlus className="w-8 h-8 text-emerald-600" />
             ) : (
@@ -114,30 +113,28 @@ export const RestablecerContrasena = () => {
             {isFirstPassword ? '¡Bienvenido!' : 'Restablecer Contraseña'}
           </h2>
           <p className="text-gray-600 text-sm">
-            {isFirstPassword 
-              ? 'Establece tu contraseña para activar tu cuenta' 
+            {isFirstPassword
+              ? 'Establece tu contraseña para activar tu cuenta'
               : 'Crea una nueva contraseña para tu cuenta'}
           </p>
-          
+
           {/* Badge indicador */}
-          <div className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${
-            isFirstPassword 
-              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 
+          <div className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${isFirstPassword
+              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
               : 'bg-blue-100 text-blue-700 border border-blue-200'
-          }`}>
+            }`}>
             {isFirstPassword ? '🎯 Primera contraseña' : '🔄 Recuperación de cuenta'}
           </div>
         </div>
 
         {/* Nota informativa */}
-        <div className={`mb-6 p-4 rounded-xl border ${
-          isFirstPassword 
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+        <div className={`mb-6 p-4 rounded-xl border ${isFirstPassword
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
             : 'bg-blue-50 border-blue-200 text-blue-700'
-        }`}>
+          }`}>
           <p className="text-sm font-medium flex items-center">
             <Info className="w-4 h-4 mr-2" />
-            {isFirstPassword 
+            {isFirstPassword
               ? 'Tu cuenta ha sido creada. Establece tu contraseña para comenzar a usarla.'
               : 'Estás estableciendo una nueva contraseña para tu cuenta existente.'}
           </p>
@@ -167,7 +164,7 @@ export const RestablecerContrasena = () => {
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
-            
+
             {/* Criterios de contraseña */}
             {nuevaContrasena && (
               <div className="mt-3 space-y-2">
@@ -214,26 +211,24 @@ export const RestablecerContrasena = () => {
                     </span>
                   </div>
                 </div>
-                
+
                 {/* Indicador de fortaleza */}
                 {nuevaContrasena && (
                   <div className="pt-2">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs text-gray-600">Fortaleza:</span>
-                      <span className={`text-xs font-medium ${
-                        allCriteriaMet ? 'text-green-600' : 
-                        metCriteriaCount >= 2 ? 'text-yellow-600' : 'text-red-600'
-                      }`}>
-                        {allCriteriaMet ? 'Fuerte' : 
-                         metCriteriaCount >= 2 ? 'Media' : 'Débil'}
+                      <span className={`text-xs font-medium ${allCriteriaMet ? 'text-green-600' :
+                          metCriteriaCount >= 2 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                        {allCriteriaMet ? 'Fuerte' :
+                          metCriteriaCount >= 2 ? 'Media' : 'Débil'}
                       </span>
                     </div>
                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          allCriteriaMet ? 'w-full bg-green-500' : 
-                          metCriteriaCount >= 2 ? 'w-2/3 bg-yellow-500' : 'w-1/3 bg-red-500'
-                        }`}
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${allCriteriaMet ? 'w-full bg-green-500' :
+                            metCriteriaCount >= 2 ? 'w-2/3 bg-yellow-500' : 'w-1/3 bg-red-500'
+                          }`}
                       />
                     </div>
                   </div>
@@ -251,13 +246,12 @@ export const RestablecerContrasena = () => {
               <input
                 type={showConfirmPassword ? "text" : "password"}
                 placeholder={isFirstPassword ? "Repite tu contraseña" : "Confirma tu nueva contraseña"}
-                className={`w-full border-2 rounded-xl p-3 pl-4 pr-12 focus:outline-none focus:ring-2 transition-all ${
-                  confirmarContrasena && nuevaContrasena
+                className={`w-full border-2 rounded-xl p-3 pl-4 pr-12 focus:outline-none focus:ring-2 transition-all ${confirmarContrasena && nuevaContrasena
                     ? passwordsMatch
                       ? 'border-green-400 focus:border-green-500 focus:ring-green-100'
                       : 'border-red-300 focus:border-red-500 focus:ring-red-100'
                     : 'border-gray-200 focus:border-blue-500 focus:ring-blue-100'
-                }`}
+                  }`}
                 value={confirmarContrasena}
                 onChange={(e) => setConfirmarContrasena(e.target.value)}
                 required
@@ -270,7 +264,7 @@ export const RestablecerContrasena = () => {
                 {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
-            
+
             {/* Indicador de coincidencia */}
             {confirmarContrasena && nuevaContrasena && (
               <div className="mt-2 flex items-center">
@@ -293,13 +287,12 @@ export const RestablecerContrasena = () => {
           <button
             type="submit"
             disabled={!canSubmit || isLoading}
-            className={`w-full py-3.5 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${
-              canSubmit && !isLoading
+            className={`w-full py-3.5 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${canSubmit && !isLoading
                 ? isFirstPassword
                   ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
                   : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
+              }`}
           >
             {isLoading ? (
               <>
@@ -329,7 +322,7 @@ export const RestablecerContrasena = () => {
             </div>
           </div>
         )}
-        
+
         {mensaje && (
           <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-xl animate-pulse">
             <div className="flex items-center text-green-700">
@@ -349,9 +342,8 @@ export const RestablecerContrasena = () => {
             {isFirstPassword ? '¿Ya tienes una cuenta?' : '¿Recordaste tu contraseña?'}{' '}
             <button
               onClick={() => navigate("/login")}
-              className={`font-medium hover:underline transition-colors ${
-                isFirstPassword ? 'text-emerald-600 hover:text-emerald-800' : 'text-blue-600 hover:text-blue-800'
-              }`}
+              className={`font-medium hover:underline transition-colors ${isFirstPassword ? 'text-emerald-600 hover:text-emerald-800' : 'text-blue-600 hover:text-blue-800'
+                }`}
             >
               Iniciar sesión
             </button>
