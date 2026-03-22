@@ -387,9 +387,9 @@ export const sendPedidoEstadoEmail = async (to, nombreCliente, pedidoId, nuevoEs
               background-color: #f8fafc;
               padding: 20px;
               text-align: center;
-              color: #64748b;
+              color: #7b899c;
               font-size: 12px;
-              border-top: 1px solid #e2e8f0;
+              border-top: 1px solid #edf1f5;
             }
             .button {
               display: inline-block;
@@ -958,7 +958,7 @@ export const sendVentaRechazadaEmail = async (to, nombreCliente, ventaId, total,
           </p>
           <p style="margin-top: 10px; color: #666;">
             El voucher proporcionado no pudo ser validado o no se recibió el pago correspondiente.
-            Si crees que esto es un error, por favor contáctanos para resolver la situación.
+            Si crees que esto es un error, por favor contáctanos para resolver la situación y darte pronta solucion.
           </p>
         </div>
       </div>
