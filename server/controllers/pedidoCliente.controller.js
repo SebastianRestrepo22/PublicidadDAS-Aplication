@@ -438,9 +438,9 @@ export const createPedidoCliente = async (req, res) => {
     if (esLanding) {
       try {
         console.log(`💰 Creando venta pendiente para pedido desde landing (${MetodoPago})`);
-        
+
         const resultadoVenta = await crearVentaDesdePedidoId(pedidoCompleto.PedidoClienteId, null);
-        
+
         if (resultadoVenta.success) {
           console.log(`✅ Venta creada automáticamente como PENDIENTE: ${resultadoVenta.VentaId}`);
           pedidoCompleto.ventaCreada = {
@@ -465,8 +465,8 @@ export const createPedidoCliente = async (req, res) => {
           cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
           nuevoPedido.PedidoClienteId,
           pedidoCompleto.Estado,
-          esLanding 
-            ? "Tu pedido ha sido recibido y está pendiente de confirmación" 
+          esLanding
+            ? "Tu pedido ha sido recibido y está pendiente de confirmación"
             : "Tu pedido ha sido recibido y está pendiente de confirmación"
         );
       }
@@ -499,7 +499,7 @@ export const createPedidoCliente = async (req, res) => {
   }
 };
 
-// ✅ ACTUALIZAR PEDIDO (CON SOPORTE PARA VOUCHER)
+//✅ ACTUALIZAR PEDIDO (CON SOPORTE PARA VOUCHER)
 export const updatePedidoCliente = async (req, res) => {
   const { id } = req.params;
   let updates = { ...req.body };
@@ -522,7 +522,7 @@ export const updatePedidoCliente = async (req, res) => {
       const host = req.get('host');
       const voucherUrl = `${protocol}://${host}/uploads/vouchers/${req.file.filename}`;
       updates.Voucher = voucherUrl;
-      
+
       console.log('📎 Nuevo voucher URL:', voucherUrl);
     }
 
@@ -625,6 +625,10 @@ export const updatePedidoCliente = async (req, res) => {
 
     // Enviar correo si cambió el estado
     if (updates.Estado && pedidoActual.Estado !== updates.Estado) {
+      console.log('📧 [EMAIL] Preparando envío de correo...');
+      console.log('📧 Estado anterior:', pedidoActual.Estado);
+      console.log('📧 Nuevo estado:', updates.Estado);
+
       let destinatario = null;
       let nombreCliente = 'Cliente';
 
@@ -633,20 +637,33 @@ export const updatePedidoCliente = async (req, res) => {
         if (cliente) {
           destinatario = cliente.CorreoElectronico;
           nombreCliente = cliente.NombreCompleto;
+          console.log('📧 Cliente encontrado:', { id: cliente.CedulaId, email: destinatario });
+        } else {
+          console.log('⚠️ Cliente no encontrado para ID:', updated.ClienteId);
         }
       } else if (updated.ClienteCorreo) {
         destinatario = updated.ClienteCorreo;
         nombreCliente = updated.ClienteNombre || 'Cliente';
+        console.log('📧 Walk-in cliente:', { email: destinatario, nombre: nombreCliente });
+      } else {
+        console.log('⚠️ No se encontró destinatario para el pedido:', id);
       }
 
       if (destinatario) {
+        console.log(`📧 Enviando correo para estado '${updates.Estado}' a ${destinatario}`);
         sendPedidoEstadoEmail(
           destinatario,
           nombreCliente,
           id,
           updates.Estado,
           updates.motivo || ''
-        ).catch(err => console.error('Error enviando correo:', err));
+        ).then(() => {
+          console.log(`✅ Correo para estado '${updates.Estado}' enviado correctamente`);
+        }).catch(err => {
+          console.error(`❌ Error enviando correo para estado '${updates.Estado}':`, err);
+        });
+      } else {
+        console.log('⚠️ No se pudo enviar correo: no hay destinatario');
       }
     }
 
@@ -667,14 +684,14 @@ export const updatePedidoCliente = async (req, res) => {
 
   } catch (error) {
     console.error('❌ [PEDIDOS] Error:', error);
-    
+
     // Si hay error y se subió un archivo, eliminarlo
     if (req.file) {
       fs.unlink(req.file.path, (err) => {
         if (err) console.error('Error eliminando archivo:', err);
       });
     }
-    
+
     res.status(500).json({
       message: 'Error al actualizar el pedido',
       error: error.message

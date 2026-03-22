@@ -18,16 +18,28 @@ export const getComprasPaginated = async (page = 1, limit = 5, filtroCampo = nul
       params.append('filtroValor', filtroValor.trim());
     }
     
-    console.log("📤 getComprasPaginated - URL:", `${API_URL}/api/compras?${params}`);
+    // 🔥 CORREGIDO: Usar la ruta base '/' en lugar de '/paginated'
+    const url = `${'http://localhost:3000'}/api/compras?${params}`;
+    console.log("📤 getComprasPaginated - URL:", url);
 
-    const response = await axios.get(`${API_URL}/api/compras?${params}`);
+    const response = await axios.get(url);
     
-    console.log("✅ Respuesta:", {
+    console.log("✅ Respuesta getComprasPaginated:", {
       dataLength: response.data?.data?.length,
-      pagination: response.data?.pagination
+      pagination: response.data?.pagination,
+      fullResponse: response.data
     });
 
-    return response.data;
+    // 🔥 Asegurar que la respuesta tenga la estructura correcta
+    return {
+      data: response.data?.data || [],
+      pagination: {
+        totalItems: response.data?.pagination?.total || 0,
+        totalPages: response.data?.pagination?.totalPages || 1,
+        currentPage: response.data?.pagination?.currentPage || page,
+        itemsPerPage: response.data?.pagination?.itemsPerPage || limit
+      }
+    };
     
   } catch (error) {
     console.error("❌ Error en getComprasPaginated:", error);
@@ -45,27 +57,32 @@ export const getComprasPaginated = async (page = 1, limit = 5, filtroCampo = nul
 
 export const buscarCompras = async (filtroCampo, filtroValor, page = 1, limit = 5) => {
   try {
-    let searchParam = {};
-    
-    if (filtroCampo === 'id') {
-      searchParam = { q: filtroValor };
-    } else if (filtroCampo === 'proveedor') {
-      searchParam = { q: filtroValor };
-    } else {
-      searchParam = { q: filtroValor };
-    }
-    
     const params = new URLSearchParams({
       page: page.toString(),
-      limit: limit.toString(),
-      ...searchParam
+      limit: limit.toString()
     });
-
+    
+    // Usar 'q' como parámetro de búsqueda
+    if (filtroValor && filtroValor.trim() !== '') {
+      params.append('q', filtroValor.trim());
+    }
+    
     console.log("🔍 Buscando compras con params:", params.toString());
     
-    const response = await axios.get(`${API_URL}/api/compras/buscar?${params}`);
+    // 🔥 CORREGIDO: Usar la ruta /buscar que sí existe
+    const response = await axios.get(`${'http://localhost:3000'}/api/compras/buscar?${params}`);
     
-    return response.data;
+    console.log("✅ Respuesta buscarCompras:", response.data);
+    
+    return {
+      data: response.data?.data || [],
+      pagination: {
+        totalItems: response.data?.pagination?.totalItems || response.data?.pagination?.total || 0,
+        totalPages: response.data?.pagination?.totalPages || 1,
+        currentPage: response.data?.pagination?.currentPage || page,
+        itemsPerPage: response.data?.pagination?.itemsPerPage || limit
+      }
+    };
     
   } catch (error) {
     console.error("❌ Error en buscarCompras:", error);
@@ -83,7 +100,8 @@ export const buscarCompras = async (filtroCampo, filtroValor, page = 1, limit = 
 
 export const getAllCompras = async () => {
   try {
-    const response = await axios.get(`${API_URL}/api/compras/todas`);
+    // 🔥 CORREGIDO: Usar la ruta /todas que sí existe
+    const response = await axios.get(`${'http://localhost:3000'}/api/compras/todas`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("❌ Error en getAllCompras:", error);
@@ -93,7 +111,7 @@ export const getAllCompras = async () => {
 
 export const getCompraById = async (id) => {
   try {
-    const response = await axios.get(`${API_URL}/api/compras/${id}`);
+    const response = await axios.get(`${'http://localhost:3000'}/api/compras/${id}`);
     return response.data;
   } catch (error) {
     console.error("❌ Error en getCompraById:", error);
@@ -103,7 +121,7 @@ export const getCompraById = async (id) => {
 
 export const createCompra = async (compraData) => {
   try {
-    const response = await axios.post(`${API_URL}/api/compras`, compraData);
+    const response = await axios.post(`${'http://localhost:3000'}/api/compras`, compraData);
     return response.data;
   } catch (error) {
     console.error("❌ Error en createCompra:", error);
@@ -113,7 +131,7 @@ export const createCompra = async (compraData) => {
 
 export const updateCompra = async (id, compraData) => {
   try {
-    const response = await axios.put(`${API_URL}/api/compras/${id}`, compraData);
+    const response = await axios.put(`${'http://localhost:3000'}/api/compras/${id}`, compraData);
     return response.data;
   } catch (error) {
     console.error("❌ Error en updateCompra:", error);
@@ -123,7 +141,7 @@ export const updateCompra = async (id, compraData) => {
 
 export const deleteCompra = async (id) => {
   try {
-    const response = await axios.delete(`${API_URL}/api/compras/${id}`);
+    const response = await axios.delete(`${'http://localhost:3000'}/api/compras/${id}`);
     return response.data;
   } catch (error) {
     console.error("❌ Error en deleteCompra:", error);
@@ -135,7 +153,7 @@ export const deleteCompra = async (id) => {
 
 export const getDetallesByCompraId = async (compraId) => {
   try {
-    const response = await axios.get(`${API_URL}/api/detalle-compras/compra/${compraId}`);
+    const response = await axios.get(`${'http://localhost:3000'}/api/detalle-compras/compra/${compraId}`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("❌ Error en getDetallesByCompraId:", error);
@@ -165,7 +183,7 @@ export const createDetalleCompra = async (detalleData) => {
       dataToSend.colores = [];
     }
     
-    const response = await axios.post(`${API_URL}/api/detalle-compras`, dataToSend);
+    const response = await axios.post(`${'http://localhost:3000'}/api/detalle-compras`, dataToSend);
     return response.data;
   } catch (error) {
     console.error("❌ Error en createDetalleCompra:", error);
@@ -175,7 +193,7 @@ export const createDetalleCompra = async (detalleData) => {
 
 export const updateDetalleCompra = async (id, detalleData) => {
   try {
-    const response = await axios.put(`${API_URL}/api/detalle-compras/${id}`, detalleData);
+    const response = await axios.put(`${'http://localhost:3000'}/api/detalle-compras/${id}`, detalleData);
     return response.data;
   } catch (error) {
     console.error("❌ Error en updateDetalleCompra:", error);
@@ -185,7 +203,7 @@ export const updateDetalleCompra = async (id, detalleData) => {
 
 export const deleteDetalleCompra = async (id) => {
   try {
-    const response = await axios.delete(`${API_URL}/api/detalle-compras/${id}`);
+    const response = await axios.delete(`${'http://localhost:3000'}/api/detalle-compras/${id}`);
     return response.data;
   } catch (error) {
     console.error("❌ Error en deleteDetalleCompra:", error);
@@ -202,7 +220,7 @@ export const getAllProductos = async () => {
       limit: "1000"
     };
     
-    const response = await axios.get(`${API_URL}/producto`, { params });
+    const response = await axios.get(`${'http://localhost:3000'}/producto`, { params });
     
     return response.data?.data || [];
   } catch (error) {
@@ -211,7 +229,7 @@ export const getAllProductos = async () => {
   }
 };
 
-export const buscarProductosPorCampo = async (campo, valor, page = 1, limit = 5) => {
+export const buscarProductosPorCampo = async (campo, valor, page = 1, limit = 3) => {
   try {
     const params = {
       page: page.toString(),
@@ -223,16 +241,31 @@ export const buscarProductosPorCampo = async (campo, valor, page = 1, limit = 5)
       params.filtroValor = valor.trim();
     }
 
-    const response = await axios.get(`${API_URL}/producto`, { params });
+    console.log("🔍 Buscando productos con params:", params);
+    
+    const response = await axios.get(`${'http://localhost:3000'}/producto`, { params });
+    
+    console.log("📦 Respuesta productos:", {
+      dataLength: response.data?.data?.length,
+      pagination: response.data?.pagination
+    });
     
     return {
       data: response.data?.data || [],
-      total: response.data?.pagination?.totalItems || 0,
-      pages: response.data?.pagination?.totalPages || 1
+      totalItems: response.data?.pagination?.totalItems || 0,
+      totalPages: response.data?.pagination?.totalPages || 1,
+      currentPage: response.data?.pagination?.currentPage || page,
+      itemsPerPage: response.data?.pagination?.itemsPerPage || limit
     };
   } catch (error) {
     console.error("❌ Error en buscarProductosPorCampo:", error);
-    return { data: [], total: 0, pages: 1 };
+    return { 
+      data: [], 
+      totalItems: 0, 
+      totalPages: 1, 
+      currentPage: page, 
+      itemsPerPage: limit 
+    };
   }
 };
 
@@ -240,7 +273,7 @@ export const buscarProductosPorCampo = async (campo, valor, page = 1, limit = 5)
 
 export const getAllProveedoresSimple = async () => {
   try {
-    const response = await axios.get(`${API_URL}/api/proveedores/todos`);
+    const response = await axios.get(`${'http://localhost:3000'}/api/proveedores/todos`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("❌ Error al cargar proveedores:", error);
@@ -250,7 +283,7 @@ export const getAllProveedoresSimple = async () => {
 
 export const getProveedorById = async (id) => {
   try {
-    const response = await axios.get(`${API_URL}/api/proveedores/${id}`);
+    const response = await axios.get(`${'http://localhost:3000'}/api/proveedores/${id}`);
     return response.data;
   } catch (error) {
     console.error("❌ Error al obtener proveedor:", error);
@@ -262,7 +295,7 @@ export const getProveedorById = async (id) => {
 
 export const getAllColores = async () => {
   try {
-    const response = await axios.get(`${API_URL}/colores`);
+    const response = await axios.get(`${'http://localhost:3000'}/colores`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("❌ Error al cargar colores:", error);
@@ -272,7 +305,7 @@ export const getAllColores = async () => {
 
 export const getColorById = async (id) => {
   try {
-    const response = await axios.get(`${API_URL}/colores/${id}`);
+    const response = await axios.get(`${'http://localhost:3000'}/colores/${id}`);
     return response.data;
   } catch (error) {
     console.error("❌ Error al obtener color:", error);

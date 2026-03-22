@@ -15,7 +15,8 @@ export const ProveedorTable = ({
   onToggleEstado,
   pagination,
   onPageChange,
-  onItemsPerPageChange
+  onItemsPerPageChange,
+  cargando = false // Nuevo prop para controlar el estado de carga
 }) => {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -33,7 +34,16 @@ export const ProveedorTable = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {proveedores.length > 0 ? (
+            {cargando ? (
+              <tr>
+                <td colSpan={7} className="py-12">
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                    <p className="text-slate-600 text-base font-medium">Cargando proveedores...</p>
+                  </div>
+                </td>
+              </tr>
+            ) : proveedores.length > 0 ? (
               proveedores.map((p) => (
                 <tr key={p.ProveedorId} className="hover:bg-slate-50 transition-colors duration-150">
                   <td className="py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-slate-900 text-center align-middle font-mono">
@@ -106,7 +116,7 @@ export const ProveedorTable = ({
         </table>
       </div>
 
-      {pagination.totalItems > 0 && (
+      {!cargando && pagination.totalItems > 0 && (
         <div className="px-6 py-4 border-t border-slate-200">
           <Pagination
             currentPage={pagination.currentPage}

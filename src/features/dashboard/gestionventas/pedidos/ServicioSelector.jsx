@@ -8,7 +8,7 @@ export const ServicioSelector = ({
   isOpen,
   onClose,
   onSelect,
-  servicios: initialServicios = [], // Mantenemos como fallback
+  servicios: initialServicios = [], 
   searchTerm: externalSearchTerm,
   onSearchChange: externalOnSearchChange,
   currentPage: externalCurrentPage,
@@ -86,7 +86,7 @@ export const ServicioSelector = ({
       itemsPerPage={itemsPerPage}
       loading={loading}
     >
-      <div className="space-y-2 max-h-96 overflow-y-auto">
+      <div className="space-y-2">
         {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>

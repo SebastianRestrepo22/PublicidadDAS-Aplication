@@ -24,17 +24,15 @@ export const ProductSelector = ({
   const [totalPages, setTotalPages] = useState(externalTotalPages || 1);
   const [totalItems, setTotalItems] = useState(externalTotalItems || 0);
 
-  // 🔥 FUNCIÓN PARA CARGAR PRODUCTOS (AGREGADA)
+  // 🔥 FUNCIÓN PARA CARGAR PRODUCTOS
   const cargarProductos = async () => {
     try {
       setLoading(true);
       
       let resultado;
       if (searchTerm) {
-        // 🔥 Buscar con includeColors = true
         resultado = await buscarProductos('nombre', searchTerm, currentPage, itemsPerPage, 'Activo', true);
       } else {
-        // 🔥 Obtener productos con includeColors = true
         resultado = await GetDataproductos(true, currentPage, itemsPerPage, null, null, true);
       }
       
@@ -92,7 +90,7 @@ export const ProductSelector = ({
       itemsPerPage={itemsPerPage}
       loading={loading}
     >
-      <div className="space-y-2 max-h-96 overflow-y-auto">
+      <div className="space-y-2">
         {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -113,13 +111,10 @@ export const ProductSelector = ({
                 precioNumerico = Number(precioOriginal) || 0;
               }
 
-              console.log(`💰 ${producto.Nombre}: precio original=${precioOriginal}, numérico=${precioNumerico}, formateado=${formatPrice(precioNumerico)}`);
-
               return (
                 <button
                   key={producto.ProductoId}
                   onClick={() => {
-                    // 🔥 IMPORTANTE: Pasar el producto con sus colores
                     const productoConColores = {
                       ...producto,
                       Colores: producto.Colores || []

@@ -233,7 +233,7 @@ export const DetalleItem = ({
           </div>
         </div>
 
-        {/* Subtotal con formato de miles */}
+        {/* Subtotal con formato de miles - Formato colombiano */}
         <div className="col-span-2">
           <div className="px-3 py-2 bg-blue-50 rounded-lg text-right font-semibold text-blue-700 text-sm">
             {formatPrice(subtotal)}

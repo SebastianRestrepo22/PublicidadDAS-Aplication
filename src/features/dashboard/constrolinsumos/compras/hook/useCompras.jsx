@@ -8,7 +8,7 @@ import {
 import { toast } from "react-toastify";
 
 export const ESTADOS_COMPRA = {
-  APROBADO: 'aprobado' //  Solo un estado
+  APROBADO: 'aprobado'
 };
 
 export const useCompras = () => {
@@ -76,22 +76,22 @@ export const useCompras = () => {
       let resultado;
 
       if (filtroCampo && filtroValor && filtroValor.trim() !== '') {
-        // Usar búsqueda
         resultado = await buscarCompras(filtroCampo, filtroValor, currentPage, itemsPerPage);
       } else {
-        // Usar paginación normal
         resultado = await getComprasPaginated(currentPage, itemsPerPage);
       }
 
-      console.log("📥 fetchCompras - RESPUESTA:", resultado);
+      console.log("📥 fetchCompras - RESPUESTA COMPLETA:", resultado);
 
       if (!resultado) {
         console.error("❌ resultado es null/undefined");
+        setPaginatedData([]);
+        setTotalItems(0);
+        setTotalPages(1);
         setInitialLoading(false);
         return;
       }
 
-      // Extraer datos y paginación
       const data = resultado?.data || [];
       const pagination = resultado?.pagination || { 
         totalItems: 0, 
@@ -99,19 +99,26 @@ export const useCompras = () => {
         currentPage: currentPage, 
         itemsPerPage: itemsPerPage 
       };
-
+      
+      // 🔥 Asegurar que totalItems sea un número
+      const totalItemsValue = Number(pagination.totalItems) || 0;
+      const totalPagesValue = Number(pagination.totalPages) || 1;
+      const currentPageValue = Number(pagination.currentPage) || 1;
+      
       console.log("✅ fetchCompras - DATOS EXTRAÍDOS:", {
-        cantidad: data.length,
-        totalItems: pagination.totalItems,
-        totalPages: pagination.totalPages
+        cantidadData: data.length,
+        totalItems: totalItemsValue,
+        totalPages: totalPagesValue,
+        currentPage: currentPageValue,
+        paginationCompleto: pagination
       });
 
-      // Actualizar estados
+      // 🔥 Actualizar estados
       setPaginatedData(data);
       setCompras(data);
-      setTotalItems(pagination.totalItems);
-      setTotalPages(pagination.totalPages);
-      
+      setTotalItems(totalItemsValue);
+      setTotalPages(totalPagesValue);
+      setCurrentPage(currentPageValue);
       setInitialLoading(false);
 
     } catch (err) {
@@ -137,15 +144,18 @@ export const useCompras = () => {
 
   // Resetear a página 1 cuando cambian los filtros
   useEffect(() => {
-    if (filtroCampo || filtroValor) {
+    if (currentPage !== 1 && (filtroCampo || filtroValor)) {
       setCurrentPage(1);
     }
   }, [filtroCampo, filtroValor]);
 
   // Cargar compras cuando cambian: página, items por página o filtros
   useEffect(() => {
-    console.log("🔄 EJECUTANDO fetchCompras POR CAMBIO");
-    fetchCompras();
+    // Evitar llamada inicial duplicada
+    if (!initialLoading) {
+      console.log("🔄 EJECUTANDO fetchCompras POR CAMBIO");
+      fetchCompras();
+    }
   }, [currentPage, itemsPerPage, filtroCampo, filtroValor]);
 
   return {
@@ -156,12 +166,12 @@ export const useCompras = () => {
     loading,
     initialLoading,
     ESTADOS_COMPRA,
-    currentPage,
+    currentPage: Number(currentPage) || 1,
     setCurrentPage,
-    itemsPerPage,
+    itemsPerPage: Number(itemsPerPage) || 5,
     setItemsPerPage,
-    totalItems,
-    totalPages,
+    totalItems: Number(totalItems) || 0,
+    totalPages: Number(totalPages) || 1,
     filtroCampo,
     setFiltroCampo,
     filtroValor,

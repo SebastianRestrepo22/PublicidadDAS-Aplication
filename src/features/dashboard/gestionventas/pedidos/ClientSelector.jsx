@@ -7,7 +7,6 @@ export const ClientSelector = ({
   isOpen,
   onClose,
   onSelect,
-  clientes: initialClientes = [], // Ahora viene del padre como fallback
   searchTerm: externalSearchTerm,
   onSearchChange: externalOnSearchChange,
   currentPage: externalCurrentPage,
@@ -16,7 +15,6 @@ export const ClientSelector = ({
   totalItems: externalTotalItems,
   itemsPerPage = 5
 }) => {
-  // Estados internos para manejar la paginación
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState(externalSearchTerm || "");
@@ -24,13 +22,7 @@ export const ClientSelector = ({
   const [totalPages, setTotalPages] = useState(externalTotalPages || 1);
   const [totalItems, setTotalItems] = useState(externalTotalItems || 0);
 
-  // Cargar clientes cuando se abre el modal o cambian los filtros
-  useEffect(() => {
-    if (isOpen) {
-      cargarClientes();
-    }
-  }, [isOpen, currentPage, searchTerm]);
-
+  // 🔥 FUNCIÓN PARA CARGAR CLIENTES
   const cargarClientes = async () => {
     try {
       setLoading(true);
@@ -44,17 +36,31 @@ export const ClientSelector = ({
         resultado = await getAllClientes(currentPage, itemsPerPage);
       }
       
-      setClientes(resultado.data);
-      setTotalPages(resultado.pagination.totalPages);
-      setTotalItems(resultado.pagination.totalItems);
+      console.log('📦 Clientes cargados:', resultado.data?.map(c => ({ 
+        nombre: c.NombreCompleto || c.Nombre, 
+        telefono: c.Telefono,
+        email: c.CorreoElectronico
+      })));
+      
+      setClientes(resultado.data || []);
+      setTotalPages(resultado.pagination?.totalPages || 1);
+      setTotalItems(resultado.pagination?.totalItems || 0);
       
     } catch (error) {
       console.error('Error cargando clientes:', error);
       setClientes([]);
+      setTotalPages(1);
+      setTotalItems(0);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      cargarClientes();
+    }
+  }, [isOpen, currentPage, searchTerm]);
 
   const handleSearchChange = (term) => {
     setSearchTerm(term);
@@ -85,7 +91,7 @@ export const ClientSelector = ({
       itemsPerPage={itemsPerPage}
       loading={loading}
     >
-      <div className="space-y-2 max-h-96 overflow-y-auto">
+      <div className="space-y-2">
         {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>

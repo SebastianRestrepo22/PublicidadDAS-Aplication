@@ -67,7 +67,6 @@ export const OrderForm = ({
   // Efecto para detectar cuando el modal de colores se cierra
   useEffect(() => {
     if (!modalColoresProductoAbierto && currentDetailIndex !== null) {
-      // El modal se acaba de cerrar
       console.log('🎨 Modal cerrado, colores seleccionados:', coloresSeleccionados);
 
       if (coloresSeleccionados && coloresSeleccionados.length > 0) {
@@ -84,7 +83,6 @@ export const OrderForm = ({
         setDetallesCrear(nuevos);
         toast.success(`Color ${colorSeleccionado.Nombre} asignado al producto`);
       } else if (coloresSeleccionados.length === 0 && detallesCrear[currentDetailIndex]?.ColorId) {
-        // Si no hay colores seleccionados pero antes había uno, lo quitamos
         const nuevos = [...detallesCrear];
         nuevos[currentDetailIndex] = {
           ...nuevos[currentDetailIndex],
@@ -141,7 +139,6 @@ export const OrderForm = ({
     setModalProductosAbierto(true);
   };
 
-  // En la función seleccionarProducto (cuando se selecciona un producto)
   const seleccionarProducto = (producto) => {
     console.log('📦 Producto seleccionado:', producto);
     console.log('🎨 Colores del producto:', producto.Colores);
@@ -162,8 +159,7 @@ export const OrderForm = ({
         UsaColores: producto.UsaColores || 0,
         ProductoNombre: producto.Nombre,
         ProductoImagen: producto.Imagen || "",
-        //  GUARDAR LOS COLORES DEL PRODUCTO
-        coloresDisponibles: producto.Colores || []  // ← NUEVO
+        coloresDisponibles: producto.Colores || []
       };
 
       console.log('📦 Detalle actualizado:', nuevos[currentDetailIndex]);
@@ -203,17 +199,14 @@ export const OrderForm = ({
     console.log('🎨 Abriendo modal colores para índice:', index);
     console.log(' Detalle en índice:', detallesCrear[index]);
 
-    // Solo abrir si es producto
     if (detallesCrear[index]?.tipo === 'producto') {
       const detalleProducto = detallesCrear[index];
 
-      // Verificar que tenga un ProductoId
       if (!detalleProducto.ProductoId) {
         toast.warning("El producto no tiene un ID válido");
         return;
       }
 
-      // 🔥 OBTENER LOS COLORES DEL PRODUCTO
       const coloresDelProducto = detalleProducto.coloresDisponibles || [];
 
       if (coloresDelProducto.length === 0) {
@@ -225,7 +218,6 @@ export const OrderForm = ({
 
       setCurrentDetailIndex(index);
 
-      // Cargar el color actual si existe
       if (detalleProducto.ColorId) {
         const colorCompleto = coloresDelProducto.find(c =>
           c.ColorId === detalleProducto.ColorId ||
@@ -308,7 +300,6 @@ export const OrderForm = ({
   const eliminarDetalle = (index) => {
     if (detallesCrear.length > 1) {
       setDetallesCrear(prev => prev.filter((_, i) => i !== index));
-      // Si después de eliminar, la página actual se queda vacía, ir a la anterior
       const currentArticulos = getCurrentPageArticulos();
       if (currentArticulos.length === 1 && currentPageArticulos > 1) {
         setCurrentPageArticulos(currentPageArticulos - 1);
@@ -336,7 +327,6 @@ export const OrderForm = ({
 
   // Funciones helper
   const getItemNombre = (detalle) => {
-    // Si ya tenemos el nombre guardado en el detalle, usarlo
     if (detalle.ProductoNombre) return detalle.ProductoNombre;
 
     if (detalle.ProductoId) {
@@ -350,7 +340,6 @@ export const OrderForm = ({
   };
 
   const getItemImagen = (detalle) => {
-    // Si ya tenemos la imagen en el detalle, usarla
     if (detalle.UrlImagen) return detalle.UrlImagen;
     if (detalle.ProductoImagen) return detalle.ProductoImagen;
 
@@ -541,7 +530,7 @@ export const OrderForm = ({
             )}
           </div>
 
-          {/* MÉTODO DE PAGO - MODIFICADO */}
+          {/* MÉTODO DE PAGO */}
           <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
             <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
               <CreditCard size={20} /> Método de Pago
@@ -554,7 +543,6 @@ export const OrderForm = ({
                   onChange={(e) => setFormCrear({ ...formCrear, MetodoPago: e.target.value })}
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                  {/* MISMAS OPCIONES PARA AMBOS TIPOS DE CLIENTE */}
                   <option value="transferencia">Transferencia Bancaria</option>
                   <option value="contra_entrega">Contra Entrega</option>
                 </select>
@@ -641,10 +629,9 @@ export const OrderForm = ({
               <div className="col-span-1 text-right">ACCIÓN</div>
             </div>
 
-            {/* Contenedor de artículos - SIN altura fija */}
+            {/* Contenedor de artículos */}
             <div className="space-y-4">
               {currentArticulos.map((detalle, index) => {
-                // Calcular el índice real en el array completo
                 const realIndex = (currentPageArticulos - 1) * itemsPerPageArticulos + index;
                 const esServicio = isService(detalle);
                 const itemSeleccionado = hasItem(detalle);
@@ -677,7 +664,7 @@ export const OrderForm = ({
               })}
             </div>
 
-            {/* PAGINACIÓN - Solo visible cuando hay más de 3 artículos */}
+            {/* PAGINACIÓN */}
             {totalPagesArticulos > 1 && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
                 <div className="text-sm text-slate-600">
@@ -783,7 +770,7 @@ export const OrderForm = ({
       <ProductoColoresModal
         open={modalColoresProductoAbierto}
         onClose={() => setModalColoresProductoAbierto(false)}
-        colores={detallesCrear[currentDetailIndex]?.coloresDisponibles || colores} 
+        colores={detallesCrear[currentDetailIndex]?.coloresDisponibles || colores}
         coloresConStock={coloresSeleccionados}
         setColoresConStock={setColoresSeleccionados}
       />

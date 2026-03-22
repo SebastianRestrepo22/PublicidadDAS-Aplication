@@ -5,11 +5,11 @@ import {
   deleteCategoria as deleteCategoriaModel,
   updateCategoria as updateCategoriaModel,
   getCategoriaByNombre as getCategoriaByNombreModel,
-  //  Nuevas funciones importadas
   getCategoriasPaginated as getCategoriasPaginatedModel,
   buscarCategoriasPaginated
 } from '../models/categoria.models.js';
 import { v4 as uuidv4 } from 'uuid';
+import { dbPool } from '../lib/db.js';
 
 // ========== la mantenemos para compatibilidad) ==========
 export const getAllCategorias = async (req, res) => {
@@ -37,7 +37,6 @@ export const getCategoriasPaginated = async (req, res) => {
       filtroValor 
     });
 
-    // Si no hay datos en la página actual y es página > 1, mostrar página 1
     if (result.data.length === 0 && page > 1) {
       const fallback = await getCategoriasPaginatedModel({ 
         page: 1, 
@@ -82,7 +81,6 @@ export const getCategoriasPaginated = async (req, res) => {
 export const buscarCategorias = async (req, res) => {
   const { campo, valor, page = 1, limit = 10 } = req.query;
 
-  // Mapeo de campos amigables a nombres de columnas
   const columnasPermitidas = {
     id: 'CategoriaId',
     nombre: 'Nombre',
@@ -130,7 +128,7 @@ export const buscarCategorias = async (req, res) => {
   }
 };
 
-// ========== FUNCIONES CRUD EXISTENTES (sin cambios) ==========
+// ========== FUNCIONES CRUD EXISTENTES ==========
 
 export const getCategoriaById = async (req, res) => {
   const id = req.params.id;
@@ -146,7 +144,6 @@ export const getCategoriaById = async (req, res) => {
   }
 };
 
-// 1 Inicio 
 export const createCategoria = async (req, res) => {
   const { nombreCategoria, descripcion } = req.body;
 
@@ -185,18 +182,48 @@ export const createCategoria = async (req, res) => {
   }
 };
 
+// 🔥 MODIFICADO: Eliminar categoría con validación de productos asociados
 export const deleteCategoria = async (req, res) => {
   const id = req.params.id;
   if (!id) return res.status(400).json({ error: "ID inválido" });
 
   try {
-    const result = await deleteCategoriaModel(id);
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Categoria no encontrada" });
+    // 🔥 Verificar si hay productos usando esta categoría
+    const [productos] = await dbPool.execute(
+      "SELECT COUNT(*) as total FROM productos WHERE CategoriaId = ?",
+      [id]
+    );
+
+    const totalProductos = productos[0].total;
+
+    if (totalProductos > 0) {
+      return res.status(400).json({
+        error: "No se puede eliminar la categoría",
+        message: `La categoría tiene ${totalProductos} producto(s) asociado(s). Elimina o reasigna los productos primero.`
+      });
     }
-    res.json({ message: "Categoria eliminada correctamente" });
+
+    const result = await deleteCategoriaModel(id);
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Categoría no encontrada" });
+    }
+    
+    res.json({ 
+      message: "Categoría eliminada correctamente",
+      deleted: true
+    });
   } catch (err) {
     console.error("Error al eliminar categoria:", err.message);
+    
+    // Manejar error de foreign key por si acaso
+    if (err.code === 'ER_ROW_IS_REFERENCED_2') {
+      return res.status(400).json({
+        error: "No se puede eliminar la categoría",
+        message: "La categoría tiene productos asociados. Elimina o reasigna los productos primero."
+      });
+    }
+    
     res.status(500).json({ error: err.message });
   }
 };
