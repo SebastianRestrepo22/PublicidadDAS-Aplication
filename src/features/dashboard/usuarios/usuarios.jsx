@@ -25,6 +25,11 @@ export const Usuarios = () => {
 
   const [submitted, setSubmitted] = useState(false);
 
+  // ✅ NUEVO: Estados de loading
+  const [cargando, setCargando] = useState(true);
+  const [cargandoFormulario, setCargandoFormulario] = useState(false);
+  const [cargandoDatosIniciales, setCargandoDatosIniciales] = useState(true);
+
   //Paginación
   const [allData, setAllData] = useState([]); // TODOS LOS DATOS
   const [paginatedData, setPaginatedData] = useState([]); // DATOS PAGINADOS (USAR ESTE PARA RENDER)
@@ -39,11 +44,12 @@ export const Usuarios = () => {
   const [openEditar, setOpenEditar] = useState(false);
   const [openVer, setOpenVer] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
-   const [refresh, setRefresh] = useState(false);
+  const [refresh, setRefresh] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_URL;
 
- const cargarUsuarios = async () => {
+  const cargarUsuarios = async () => {
+    setCargando(true);
     try {
       let resultado;
 
@@ -67,9 +73,12 @@ export const Usuarios = () => {
       }
     } catch (error) {
       console.error("Error cargando usuarios:", error);
+      toast.error("Error al cargar los usuarios");
       setPaginatedData([]);
       setTotalItems(0);
       setTotalPages(1);
+    } finally {
+      setCargando(false);
     }
   };
 
@@ -102,9 +111,10 @@ export const Usuarios = () => {
         );
 
         setRoles(activos);
-
       } catch (error) {
         console.error("Error al cargar roles:", error);
+      } finally {
+        setCargandoDatosIniciales(false);
       }
     };
     fetchRoles();
@@ -349,6 +359,7 @@ export const Usuarios = () => {
       return;
     }
 
+    setCargandoFormulario(true);
     try {
       let response;
       if (editData) {
@@ -380,6 +391,8 @@ export const Usuarios = () => {
     } catch (error) {
       console.error(error);
       toast.error(error.response?.data?.message || "Error al procesar la solicitud");
+    } finally {
+      setCargandoFormulario(false);
     }
   };
 
@@ -408,13 +421,14 @@ export const Usuarios = () => {
 
   // Eliminar usuario
   const handleDelete = async (id) => {
+    setCargandoFormulario(true);
     try {
       const response = await deleteDataUser(id);
 
       if (response?.status === 200 || response?.status === 201) {
         toast.success(response.data?.message || "Usuario eliminado correctamente");
         await cargarUsuarios();
-         setRefresh(prev => !prev); 
+        setRefresh(prev => !prev); 
         setOpenEliminar(false);
       }
     } catch (error) {
@@ -434,6 +448,8 @@ export const Usuarios = () => {
       if (error.response?.status === 200 || error.response?.status === 201) {
         setOpenEliminar(false);
       }
+    } finally {
+      setCargandoFormulario(false);
     }
   };
 
@@ -492,9 +508,9 @@ export const Usuarios = () => {
             name="TipoDocumentoId"
             value={values.TipoDocumentoId || ""}
             onChange={handleChanges}
-            disabled={isReadOnly}
+            disabled={isReadOnly || cargandoFormulario}
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${submitted && !values.TipoDocumentoId ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
+      ${submitted && !values.TipoDocumentoId ? "border-red-500" : "border-gray-300"} ${(isReadOnly || cargandoFormulario) ? "bg-gray-100 cursor-not-allowed" : ""}`}
           >
             <option value="">Seleccione un tipo de documento</option>
             {tiposDocumento.map((tipo) => (
@@ -519,11 +535,12 @@ export const Usuarios = () => {
             value={values.CedulaId}
             placeholder="Ingrese su cédula (6-10 dígitos)"
             readOnly={isReadOnly || (type === "editar")}
+            disabled={cargandoFormulario}
             onChange={handleChanges}
             onBlur={!isReadOnly ? handleCedulaBlur : undefined}
             maxLength="10"
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 
-      ${(submitted && !values.CedulaId.trim()) || cedulaError || cedulaFormatoError ? "border-red-500" : "border-gray-300"} ${(isReadOnly || type === "editar") ? "bg-gray-100 cursor-not-allowed" : ""}`}
+      ${(submitted && !values.CedulaId.trim()) || cedulaError || cedulaFormatoError ? "border-red-500" : "border-gray-300"} ${(isReadOnly || type === "editar" || cargandoFormulario) ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
           <div className="min-h-[32px] mt-0.5">
             {(!values.CedulaId.trim() && submitted) ? (
@@ -549,9 +566,10 @@ export const Usuarios = () => {
             value={values.NombreCompleto}
             placeholder="Ingrese su nombre (solo letras)"
             readOnly={isReadOnly}
+            disabled={cargandoFormulario}
             onChange={handleChanges}
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${(submitted && !values.NombreCompleto.trim()) || nombreError ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
+      ${(submitted && !values.NombreCompleto.trim()) || nombreError ? "border-red-500" : "border-gray-300"} ${(isReadOnly || cargandoFormulario) ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
           <div className="min-h-[32px] mt-0.5">
             {(!values.NombreCompleto.trim() && submitted) ? (
@@ -575,9 +593,10 @@ export const Usuarios = () => {
             value={values.Direccion}
             placeholder="Ingrese su dirección"
             readOnly={isReadOnly}
+            disabled={cargandoFormulario}
             onChange={handleChanges}
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${submitted && !values.Direccion.trim() ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
+      ${submitted && !values.Direccion.trim() ? "border-red-500" : "border-gray-300"} ${(isReadOnly || cargandoFormulario) ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
           <div className="min-h-[16px] mt-0.5">
             {(!values.Direccion.trim() && submitted) && (
@@ -595,10 +614,11 @@ export const Usuarios = () => {
             value={values.CorreoElectronico}
             placeholder="ejemplo@correo.com"
             readOnly={isReadOnly}
+            disabled={cargandoFormulario}
             onChange={handleChanges}
             onBlur={!isReadOnly ? handleCorreoBlur : undefined}
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${(submitted && !values.CorreoElectronico.trim()) || correoError ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
+      ${(submitted && !values.CorreoElectronico.trim()) || correoError ? "border-red-500" : "border-gray-300"} ${(isReadOnly || cargandoFormulario) ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
           <div className="min-h-[16px] mt-0.5">
             {(!values.CorreoElectronico.trim() && submitted) ? (
@@ -618,11 +638,12 @@ export const Usuarios = () => {
             value={values.Telefono}
             placeholder="Ej: 3001234567 (10 dígitos)"
             readOnly={isReadOnly}
+            disabled={cargandoFormulario}
             onChange={handleChanges}
             onBlur={!isReadOnly ? handleTelefonoBlur : undefined}
             maxLength="10"
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-      ${(submitted && !values.Telefono.trim()) || telefonoError || telefonoFormatoError ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
+      ${(submitted && !values.Telefono.trim()) || telefonoError || telefonoFormatoError ? "border-red-500" : "border-gray-300"} ${(isReadOnly || cargandoFormulario) ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
           <div className="min-h-[32px] mt-0.5">
             {(!values.Telefono.trim() && submitted) ? (
@@ -647,9 +668,9 @@ export const Usuarios = () => {
             name="RoleId"
             value={values.RoleId || ""}
             onChange={handleChanges}
-            disabled={isReadOnly}
+            disabled={isReadOnly || cargandoFormulario}
             className={`w-full h-10 px-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-        ${submitted && !values.RoleId ? "border-red-500" : "border-gray-300"} ${isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
+        ${submitted && !values.RoleId ? "border-red-500" : "border-gray-300"} ${(isReadOnly || cargandoFormulario) ? "bg-gray-100 cursor-not-allowed" : ""}`}
           >
             <option value="">Seleccione un rol</option>
             {roles.map((rol) => (
@@ -670,15 +691,29 @@ export const Usuarios = () => {
           {type !== "ver" && (
             <button
               type="submit"
-              className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
+              disabled={cargandoFormulario}
+              className={`flex-1 py-2 rounded-lg transition-colors flex items-center justify-center gap-2
+                ${cargandoFormulario 
+                  ? 'bg-green-400 cursor-not-allowed' 
+                  : 'bg-green-500 hover:bg-green-600'} 
+                text-white`}
             >
-              {buttonLabel}
+              {cargandoFormulario ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  Guardando...
+                </>
+              ) : (
+                buttonLabel
+              )}
             </button>
           )}
 
           <button
             type="button"
-            className={`flex-1 ${type === "ver" ? "w-full" : ""} bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors`}
+            disabled={cargandoFormulario}
+            className={`flex-1 ${type === "ver" ? "w-full" : ""} bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors
+              ${cargandoFormulario ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={() => {
               setOpenCreate(false);
               setOpenEditar(false);
@@ -799,79 +834,109 @@ export const Usuarios = () => {
             <h3 className="text-lg font-black text-gray-800 mb-4">Eliminar usuario</h3>
             <p className="mb-6">¿Estás seguro de eliminar este usuario?</p>
             <div className="flex gap-4">
-              <button className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors" onClick={() => handleDelete(editData.CedulaId)}>
-                Eliminar
+              <button 
+                className={`flex-1 py-2 rounded-lg transition-colors flex items-center justify-center gap-2
+                  ${cargandoFormulario 
+                    ? 'bg-red-400 cursor-not-allowed' 
+                    : 'bg-red-500 hover:bg-red-600'} 
+                  text-white`}
+                onClick={() => handleDelete(editData?.CedulaId)}
+                disabled={cargandoFormulario}
+              >
+                {cargandoFormulario ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    Eliminando...
+                  </>
+                ) : (
+                  'Eliminar'
+                )}
               </button>
-              <button className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors" onClick={() => setOpenEliminar(false)}>
+              <button 
+                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                onClick={() => setOpenEliminar(false)}
+                disabled={cargandoFormulario}
+              >
                 Cancelar
               </button>
             </div>
           </div>
         </Modal>
 
-        {/* Tabla */}
+        {/* Tabla con loading */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="overflow-x-visible">
-            <table className="w-full">
-              <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
-                <tr>
-                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Tipo documento</th>
-                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Cédula</th>
-                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Nombre</th>
-                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Dirección</th>
-                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Correo</th>
-                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Teléfono</th>
-                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Rol</th>
-                  <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {paginatedData && paginatedData.length > 0 ? (
-                  paginatedData.map((u) => (
-                    <tr key={u.CedulaId} className="hover:bg-slate-50 transition-colors duration-150">
-                      <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[120px]">
-                        {tiposDocumento.find(tipo => tipo.TipoDocumentoId === u.TipoDocumentoId)?.Nombre || u.TipoDocumentoId}
-                      </td>
-                      <td className="py-4 px-4 text-sm text-slate-900">{u.CedulaId}</td>
-                      <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[150px]">{u.NombreCompleto}</td>
-                      <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[150px]">{u.Direccion}</td>
-                      <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[180px]">{u.CorreoElectronico}</td>
-                      <td className="py-4 px-4 text-sm text-slate-900">{u.Telefono}</td>
-                      <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[120px]">{u.RolNombre}</td>
-                      <td className="py-4 px-4">
-                        <div className="flex gap-2">
-                          <Link onClick={() => handleEditClick(u)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
-                            <Edit size={16} />
-                          </Link>
-                          <Link onClick={() => handleViewClick(u)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg">
-                            <Eye size={16} />
-                          </Link>
-                          <Link onClick={() => handleDeleteClick(u)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
-                            <Trash2 size={16} />
-                          </Link>
-                        </div>
-                      </td>
+          {cargando ? (
+            <div className="text-center py-12">
+              <div className="flex justify-center">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+              </div>
+              <p className="mt-3 text-slate-600">Cargando usuarios...</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-visible">
+                <table className="w-full">
+                  <thead className="bg-gradient-to-r from-slate-800 to-slate-700">
+                    <tr>
+                      <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Tipo documento</th>
+                      <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Cédula</th>
+                      <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Nombre</th>
+                      <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Dirección</th>
+                      <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Correo</th>
+                      <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Teléfono</th>
+                      <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Rol</th>
+                      <th className="py-4 px-4 text-sm font-semibold text-white uppercase tracking-wider w-1/8">Acciones</th>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="8" className="text-center py-4">
-                      No se encontraron usuarios
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          {paginatedData && paginatedData.length > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              itemsPerPage={itemsPerPage}
-              totalItems={totalItems}
-              onItemsPerPageChange={handleItemsPerPageChange}
-            />
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paginatedData && paginatedData.length > 0 ? (
+                      paginatedData.map((u) => (
+                        <tr key={u.CedulaId} className="hover:bg-slate-50 transition-colors duration-150">
+                          <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[120px]">
+                            {tiposDocumento.find(tipo => tipo.TipoDocumentoId === u.TipoDocumentoId)?.Nombre || u.TipoDocumentoId}
+                          </td>
+                          <td className="py-4 px-4 text-sm text-slate-900">{u.CedulaId}</td>
+                          <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[150px]">{u.NombreCompleto}</td>
+                          <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[150px]">{u.Direccion}</td>
+                          <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[180px]">{u.CorreoElectronico}</td>
+                          <td className="py-4 px-4 text-sm text-slate-900">{u.Telefono}</td>
+                          <td className="py-4 px-4 text-sm text-slate-900 truncate max-w-[120px]">{u.RolNombre}</td>
+                          <td className="py-4 px-4">
+                            <div className="flex gap-2">
+                              <Link onClick={() => handleEditClick(u)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
+                                <Edit size={16} />
+                              </Link>
+                              <Link onClick={() => handleViewClick(u)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg">
+                                <Eye size={16} />
+                              </Link>
+                              <Link onClick={() => handleDeleteClick(u)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
+                                <Trash2 size={16} />
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="8" className="text-center py-4 text-slate-500">
+                          No se encontraron usuarios
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {paginatedData && paginatedData.length > 0 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                  itemsPerPage={itemsPerPage}
+                  totalItems={totalItems}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
+              )}
+            </>
           )}
         </div>
 

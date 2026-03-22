@@ -182,7 +182,7 @@ export const getProductoById = async (req, res) => {
   const { id } = req.params;
   try {
     const [productoRows] = await dbPool.query(
-      `SELECT * FROM Productos WHERE ProductoId = ?`,
+      `SELECT * FROM productos WHERE ProductoId = ?`,
       [id]
     );
 
@@ -200,7 +200,7 @@ export const getProductoById = async (req, res) => {
         c.Hex,
         COALESCE(pcs.Stock, 0) AS Stock
       FROM detallecompras dc
-      INNER JOIN Colores c ON c.ColorId = dc.ColorId
+      INNER JOIN colores c ON c.ColorId = dc.ColorId
       LEFT JOIN productocolores_stock pcs ON pcs.ProductoId = dc.ProductoId AND pcs.ColorId = dc.ColorId
       WHERE dc.ProductoId = ? AND dc.ColorId IS NOT NULL
     `, [id]);
@@ -213,7 +213,7 @@ export const getProductoById = async (req, res) => {
         c.Hex,
         pcs.Stock
       FROM productocolores_stock pcs
-      INNER JOIN Colores c ON c.ColorId = pcs.ColorId
+      INNER JOIN colores c ON c.ColorId = pcs.ColorId
       WHERE pcs.ProductoId = ? AND pcs.Stock > 0
     `, [id]);
 
@@ -332,7 +332,7 @@ export const deleteProducto = async (req, res) => {
 
     // Verificar si el producto existe
     const [producto] = await connection.query(
-      `SELECT * FROM Productos WHERE ProductoId = ?`,
+      `SELECT * FROM productos WHERE ProductoId = ?`,
       [id]
     );
 
@@ -361,18 +361,18 @@ export const deleteProducto = async (req, res) => {
 
     // ELIMINAR PRIMERO LAS RELACIONES CON COLORES
     await connection.query(
-      `DELETE FROM ProductoColores_Stock WHERE ProductoId = ?`,
+      `DELETE FROM productocolores_stock WHERE ProductoId = ?`,
       [id]
     );
 
     await connection.query(
-      `DELETE FROM ProductoColores WHERE ProductoId = ?`,
+      `DELETE FROM productocolores WHERE ProductoId = ?`,
       [id]
     );
 
     // Luego eliminar el producto
     await connection.query(
-      `DELETE FROM Productos WHERE ProductoId = ?`,
+      `DELETE FROM productos WHERE ProductoId = ?`,
       [id]
     );
 
@@ -398,7 +398,7 @@ export const updateEstadoProducto = async (ProductoId, Estado) => {
 
   // Primero obtener el producto actual para preservar sus datos
   const [producto] = await dbPool.query(
-    `SELECT * FROM Productos WHERE ProductoId = ?`,
+    `SELECT * FROM productos WHERE ProductoId = ?`,
     [ProductoId]
   );
 
@@ -408,7 +408,7 @@ export const updateEstadoProducto = async (ProductoId, Estado) => {
 
   // Actualizar estado manteniendo otros campos
   const [rows] = await dbPool.query(
-    `UPDATE Productos SET Estado = ?, Stock = ?, UsaColores = ? WHERE ProductoId = ?`,
+    `UPDATE productos SET Estado = ?, Stock = ?, UsaColores = ? WHERE ProductoId = ?`,
     [Estado, producto[0].Stock, producto[0].UsaColores, ProductoId]
   );
 

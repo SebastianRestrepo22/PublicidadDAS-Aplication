@@ -22,7 +22,7 @@ export const getDetallePedidoByPedidoIdModel = async (PedidoClienteId) => {
         p.Nombre AS ProductoNombre,
         s.Nombre AS ServicioNombre,
         (d.Cantidad * d.Precio) AS Subtotal
-      FROM detallePedidosClientes d
+      FROM detallepedidosclientes d
       LEFT JOIN colores c ON d.ColorId = c.ColorId
       LEFT JOIN productos p ON d.ProductoId = p.ProductoId
       LEFT JOIN servicios s ON d.ServicioId = s.ServicioId
@@ -56,7 +56,7 @@ export const createDetallePedidoModel = async ({
     
     // 🔴 IMPORTANTE: Tamaño y UrlImagenPersonalizada eliminados
     const query = `
-      INSERT INTO detallePedidosClientes 
+      INSERT INTO detallepedidosclientes 
       (
         DetallePedidoClienteId, 
         PedidoClienteId, 
@@ -112,7 +112,7 @@ export const createDetallePedidoModel = async ({
         p.Nombre AS ProductoNombre,
         s.Nombre AS ServicioNombre,
         (d.Cantidad * d.Precio) AS Subtotal
-       FROM detallePedidosClientes d
+       FROM detallepedidosclientes d
        LEFT JOIN colores c ON d.ColorId = c.ColorId
        LEFT JOIN productos p ON d.ProductoId = p.ProductoId
        LEFT JOIN servicios s ON d.ServicioId = s.ServicioId
@@ -134,7 +134,7 @@ export const createDetallePedidoModel = async ({
 export const deleteDetallePedidoModel = async (id) => {
   try {
     const [result] = await dbPool.execute(
-      "DELETE FROM detallePedidosClientes WHERE DetallePedidoClienteId = ?",
+      "DELETE FROM detallepedidosclientes WHERE DetallePedidoClienteId = ?",
       [id]
     );
     return result;
@@ -152,7 +152,7 @@ export const deleteDetallesByPedidoIdModel = async (pedidoId) => {
     console.log(`🗑️ [MODEL] Eliminando todos los detalles del pedido: ${pedidoId}`);
     
     const [result] = await dbPool.execute(
-      "DELETE FROM detallePedidosClientes WHERE PedidoClienteId = ?",
+      "DELETE FROM detallepedidosclientes WHERE PedidoClienteId = ?",
       [pedidoId]
     );
     
@@ -194,7 +194,7 @@ export const updateDetallePedidoModel = async (id, data) => {
     }
 
     const query = `
-      UPDATE detallePedidosClientes
+      UPDATE detallepedidosclientes
       SET ${fields.join(', ')}
       WHERE DetallePedidoClienteId = ?
     `;

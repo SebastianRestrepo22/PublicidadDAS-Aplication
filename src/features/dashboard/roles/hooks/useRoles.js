@@ -24,7 +24,12 @@ export const useRoles = () => {
   const [rolError, setRolError] = useState('');
   const [originalNombre, setOriginalNombre] = useState('');
 
-  // ✅ AGREGAR: Estado para el modal de confirmación
+  // ✅ NUEVO: Estado para loading
+  const [cargando, setCargando] = useState(false);
+  const [cargandoPermisos, setCargandoPermisos] = useState(false);
+  const [cargandoFormulario, setCargandoFormulario] = useState(false);
+
+  // Estado para el modal de confirmación
   const [confirmEstadoModal, setConfirmEstadoModal] = useState({
     open: false,
     rolId: null,
@@ -37,6 +42,7 @@ export const useRoles = () => {
   // Cargar permisos
   useEffect(() => {
     const loadPermissions = async () => {
+      setCargandoPermisos(true);
       try {
         const permisos = await getPermissions();
         setAllPermissions(permisos);
@@ -50,6 +56,9 @@ export const useRoles = () => {
         setPermissionsByModule(grouped);
       } catch (error) {
         console.error('Error cargando permisos:', error);
+        toast.error('Error al cargar los permisos');
+      } finally {
+        setCargandoPermisos(false);
       }
     };
     loadPermissions();
@@ -57,6 +66,7 @@ export const useRoles = () => {
 
   // Cargar roles
   const cargarRoles = async () => {
+    setCargando(true);
     try {
       let resultado;
       if (filtroCampo && filtroValor) {
@@ -76,10 +86,13 @@ export const useRoles = () => {
       }
     } catch (error) {
       console.error(error);
+      toast.error("Error al cargar los roles");
       setAllData([]);
       setPaginatedData([]);
       setTotalItems(0);
       setTotalPages(1);
+    } finally {
+      setCargando(false);
     }
   };
 
@@ -91,15 +104,12 @@ export const useRoles = () => {
     cargarRoles();
   }, [currentPage, itemsPerPage, filtroCampo, filtroValor]);
 
-  // ✅ MODIFICAR: handleToggleEstado para usar el modal
   const handleToggleEstado = (roleId, nuevoEstado, nombreRol, isSystem) => {
-    // Si es rol del sistema, mostrar mensaje y no abrir modal
     if (isSystem) {
       toast.warning(`El rol "${nombreRol}" es del sistema y no se puede desactivar`);
       return;
     }
 
-    // Abrir modal de confirmación
     setConfirmEstadoModal({
       open: true,
       rolId: roleId,
@@ -108,7 +118,6 @@ export const useRoles = () => {
     });
   };
 
-  // ✅ AGREGAR: Función para confirmar el cambio de estado
   const handleConfirmToggleEstado = async () => {
     const { rolId, nuevoEstado } = confirmEstadoModal;
 
@@ -141,6 +150,7 @@ export const useRoles = () => {
 
     if (rolError) return;
 
+    setCargandoFormulario(true);
     try {
       const estadoValido = formData.Estado === true ? "Activo" : "Inactivo";
 
@@ -169,10 +179,13 @@ export const useRoles = () => {
         toast.error("Error al procesar la solicitud");
       }
       return false;
+    } finally {
+      setCargandoFormulario(false);
     }
   };
 
   const handleDelete = async (id) => {
+    setCargandoFormulario(true);
     try {
       const response = await axios.delete(
         `${API_URL}/roles/${id}`
@@ -187,10 +200,13 @@ export const useRoles = () => {
         toast.error('Error al eliminar el rol');
       }
       return false;
+    } finally {
+      setCargandoFormulario(false);
     }
   };
 
   const handleSavePermissions = async () => {
+    setCargandoFormulario(true);
     try {
       await updateRolePermissions(editData.RoleId, selectedPermissions);
       toast.success('Permisos actualizados correctamente');
@@ -199,10 +215,13 @@ export const useRoles = () => {
       toast.error('Error al actualizar permisos');
       console.error(error);
       return false;
+    } finally {
+      setCargandoFormulario(false);
     }
   };
 
   const loadRolePermissions = async (roleId) => {
+    setCargandoPermisos(true);
     try {
       const permisos = await getRolePermissions(roleId);
       const permisoIds = permisos.map(p => p.PermisoId);
@@ -210,10 +229,11 @@ export const useRoles = () => {
     } catch (error) {
       console.error('Error cargando permisos del rol:', error);
       setSelectedPermissions([]);
+    } finally {
+      setCargandoPermisos(false);
     }
   };
 
-  // Función para limpiar errores del formulario
   const resetFormErrors = () => {
     setSubmitted(false);
     setRolError('');
@@ -242,7 +262,12 @@ export const useRoles = () => {
     rolError,
     originalNombre,
 
-    // ✅ ESTO ES LO QUE FALTA - DEBE ESTAR AQUÍ
+    // ✅ NUEVOS: Estados de loading
+    cargando,
+    cargandoPermisos,
+    cargandoFormulario,
+
+    // Estados de modal
     confirmEstadoModal,
     setConfirmEstadoModal,
     handleConfirmToggleEstado,

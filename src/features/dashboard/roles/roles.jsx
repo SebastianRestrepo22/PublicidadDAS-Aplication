@@ -35,7 +35,12 @@ export const Roles = () => {
   rolError,
   originalNombre,
 
-  // ✅ ESTOS VIENEN DEL HOOK
+  // ✅ NUEVOS: Estados de loading
+  cargando,
+  cargandoPermisos,
+  cargandoFormulario,
+
+  // Estados de modal
   confirmEstadoModal,
   setConfirmEstadoModal,
   handleConfirmToggleEstado,
@@ -110,7 +115,7 @@ export const Roles = () => {
   const handleNewRol = () => {
     setEditData(null);
     setFormData({ Nombre: "", description: "", Estado: true });
-    resetFormErrors(); // Limpiar errores al abrir nuevo rol
+    resetFormErrors();
     setOpenCreate(true);
   };
 
@@ -123,7 +128,7 @@ export const Roles = () => {
     setFormData({ Nombre: "", description: "", Estado: true });
     setEditData(null);
     setSelectedPermissions([]);
-    resetFormErrors(); // Limpiar errores al cerrar cualquier modal
+    resetFormErrors();
   };
 
   const handleFormSubmit = async (e) => {
@@ -222,6 +227,7 @@ export const Roles = () => {
                 setRolError={setRolError}
                 originalNombre={originalNombre}
                 setOriginalNombre={setOriginalNombre}
+                cargando={cargandoFormulario}
               />
             </div>
           </Modal>
@@ -242,6 +248,7 @@ export const Roles = () => {
                 setRolError={setRolError}
                 originalNombre={originalNombre}
                 setOriginalNombre={setOriginalNombre}
+                cargando={cargandoFormulario}
               />
             </div>
           </Modal>
@@ -268,6 +275,8 @@ export const Roles = () => {
                 onSelectAllPermissions={handleSelectAllPermissions}
                 onSave={handleSavePermissionsClick}
                 onClose={() => setOpenPermissions(false)}
+                cargando={cargandoFormulario}
+                cargandoPermisos={cargandoPermisos}
               />
             </div>
           </Modal>
@@ -277,6 +286,7 @@ export const Roles = () => {
               editData={editData}
               onDelete={handleDeleteConfirm}
               onCancel={() => setOpenEliminar(false)}
+              cargando={cargandoFormulario}
             />
           </Modal>
 
@@ -292,26 +302,37 @@ export const Roles = () => {
             cancelText="Cancelar"
           />
 
-          {/* Tabla */}
+          {/* Tabla con loading */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <RolTable
-              roles={paginatedData}
-              onEdit={handleEditClick}
-              onPermissions={handlePermissionsClick}
-              onView={handleViewClick}
-              onDelete={handleDeleteClick}
-              onToggleEstado={handleToggleEstado}
-            />
+            {cargando ? (
+              <div className="text-center py-12">
+                <div className="flex justify-center">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                </div>
+                <p className="mt-3 text-slate-600">Cargando roles...</p>
+              </div>
+            ) : (
+              <>
+                <RolTable
+                  roles={paginatedData}
+                  onEdit={handleEditClick}
+                  onPermissions={handlePermissionsClick}
+                  onView={handleViewClick}
+                  onDelete={handleDeleteClick}
+                  onToggleEstado={handleToggleEstado}
+                />
 
-            {paginatedData.length > 0 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-                itemsPerPage={itemsPerPage}
-                totalItems={totalItems}
-                onItemsPerPageChange={handleItemsPerPageChange}
-              />
+                {paginatedData.length > 0 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={totalItems}
+                    onItemsPerPageChange={handleItemsPerPageChange}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>

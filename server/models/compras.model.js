@@ -74,7 +74,7 @@ export const getDetallesByCompraId = async (compraId) => {
 // Actualizar stock de un producto
 export const actualizarStockProducto = async (productoId, cantidad) => {
   const [producto] = await dbPool.execute(
-    'SELECT Stock FROM Productos WHERE ProductoId = ?',
+    'SELECT Stock FROM productos WHERE ProductoId = ?',
     [productoId]
   );
 
@@ -86,7 +86,7 @@ export const actualizarStockProducto = async (productoId, cantidad) => {
   const nuevoStock = stockActual + cantidad;
 
   await dbPool.execute(
-    'UPDATE Productos SET Stock = ? WHERE ProductoId = ?',
+    'UPDATE productos SET Stock = ? WHERE ProductoId = ?',
     [nuevoStock, productoId]
   );
 

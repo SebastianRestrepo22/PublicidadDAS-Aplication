@@ -6,9 +6,20 @@ const url = `${import.meta.env.VITE_API_URL}/`;
 export const cambiarEstadoProducto = async (id, Estado) => {
   try {
     const response = await axios.put(`${url}producto/${id}/estado`, { Estado });
+    
+    if (response.status === 200) {
+      const productoCompleto = await axios.get(`${url}producto/${id}`);
+      // Asegúrate de que productoCompleto.data tenga Colores
+      console.log('🎨 Producto completo recibido:', productoCompleto.data.Colores);
+      return {
+        ...response,
+        data: productoCompleto.data
+      };
+    }
     return response;
   } catch (error) {
-    return { status: false, message: "Error al cambiar estado", error };
+    console.error("Error al cambiar estado:", error);
+    throw error; // Lanzar el error para que lo capture el componente
   }
 };
 
