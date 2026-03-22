@@ -23,10 +23,11 @@ const shortenId = (id) => {
 };
 
 const formatPrice = (value, currency = '$') => {
-  if (value === null || value === undefined || value === '') return `${currency}0.00`;
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return `${currency}0.00`;
-  return `${currency}${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+    if (value === null || value === undefined || value === '') return `${currency}0`;
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(num)) return `${currency}0`;
+    // Formato colombiano: puntos como separador de miles, sin decimales
+    return `${currency} ${Math.round(num).toLocaleString('es-CO')}`;
 };
 
 const EstadoBadge = ({ estado }) => {

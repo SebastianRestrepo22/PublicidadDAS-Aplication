@@ -9,11 +9,11 @@ export const createProducto = async ({
   Precio,
   Descuento,
   CategoriaId,
-  UsaColores = 0,
+  UsaColores,
   Estado = 'Activo'  
 }) => {
   await dbPool.query(
-    `INSERT INTO Productos 
+    `INSERT INTO productos 
      (ProductoId, Nombre, Descripcion, Imagen, Precio, Descuento, CategoriaId, UsaColores, Stock, Estado)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,  // 🔥 Stock siempre 0
     [
@@ -33,7 +33,7 @@ export const createProducto = async ({
 export const getDataProductoById = async (ProductoId) => {
   const [rows] = await dbPool.query(
     `SELECT * 
-     FROM Productos 
+     FROM productos 
      WHERE ProductoId = ?`,
     [ProductoId]
   );
@@ -58,9 +58,9 @@ export const getDataAllProductos = async (soloActivos = false) => {
       c.Nombre AS ColorNombre,
       c.Hex,
       COALESCE(pcs.Stock, 0) AS StockColor
-    FROM Productos p
+    FROM productos p
     LEFT JOIN ProductoColores pc ON pc.ProductoId = p.ProductoId
-    LEFT JOIN Colores c ON c.ColorId = pc.ColorId
+    LEFT JOIN colores c ON c.ColorId = pc.ColorId
     LEFT JOIN ProductoColores_Stock pcs ON pcs.ProductoId = p.ProductoId AND pcs.ColorId = c.ColorId
     ${soloActivos ? "WHERE p.Estado = 'Activo'" : ""}
     ORDER BY p.Nombre
@@ -77,7 +77,7 @@ export const updateDataProducto = async ({
   Precio,
   Descuento,
   CategoriaId,
-  UsaColores = 0,
+  UsaColores,
   Estado  
 }) => {
   const campos = [];
@@ -123,7 +123,7 @@ export const updateDataProducto = async ({
 
   valores.push(ProductoId);
 
-  const query = `UPDATE Productos SET ${campos.join(', ')} WHERE ProductoId = ?`;
+  const query = `UPDATE productos SET ${campos.join(', ')} WHERE ProductoId = ?`;
   
   const [rows] = await dbPool.query(query, valores);
   
@@ -131,7 +131,7 @@ export const updateDataProducto = async ({
 };
 export const findDuplicateName = async ({ ProductoId, Nombre }) => {
   const [rows] = await dbPool.query(
-    'SELECT ProductoId FROM Productos WHERE Nombre = ? AND ProductoId != ?',
+    'SELECT ProductoId FROM productos WHERE Nombre = ? AND ProductoId != ?',
     [Nombre, ProductoId]
   );
   return rows;
@@ -146,7 +146,7 @@ export const deleteDataProducto = async (ProductoId) => {
 
     // Primero verificar que el producto esté inactivo
     const [producto] = await connection.query(
-      `SELECT Estado FROM Productos WHERE ProductoId = ?`,
+      `SELECT Estado FROM productos WHERE ProductoId = ?`,
       [ProductoId]
     );
 
@@ -199,7 +199,7 @@ export const deleteDataProducto = async (ProductoId) => {
 
     // Finalmente eliminar el producto
     await connection.query(
-      `DELETE FROM Productos WHERE ProductoId = ?`, 
+      `DELETE FROM productos WHERE ProductoId = ?`, 
       [ProductoId]
     );
 
@@ -217,7 +217,7 @@ export const deleteDataProducto = async (ProductoId) => {
 // Verificar si nombre de producto ya existe
 export const nombreProductoExiste = async (Nombre) => {
   const [rows] = await dbPool.query(
-    `SELECT * FROM Productos WHERE Nombre = ?`,
+    `SELECT * FROM productos WHERE Nombre = ?`,
     [Nombre]
   );
   return rows;
@@ -241,7 +241,7 @@ export const buscarProductoDB = async ({ columna, operador, parametro }) => {
   }
 
   const [productos] = await dbPool.query(
-    `SELECT * FROM Productos WHERE ${columna} ${operador} ?`,
+    `SELECT * FROM productos WHERE ${columna} ${operador} ?`,
     [parametro]
   );
 
@@ -309,7 +309,7 @@ export const getProductosPaginated = async ({
       UsaColores,
       Estado,
       Stock AS StockGeneral
-    FROM Productos
+    FROM productos
     ${whereClause}
     ORDER BY Nombre
     LIMIT ? OFFSET ?
@@ -317,7 +317,7 @@ export const getProductosPaginated = async ({
 
   const [countResult] = await dbPool.query(`
     SELECT COUNT(*) as total 
-    FROM Productos
+    FROM productos
     ${whereClause}
   `, params);
 
@@ -342,7 +342,7 @@ export const getProductosPaginated = async ({
       c.Hex,
       COALESCE(pcs.Stock, 0) AS StockColor
     FROM detallecompras dc
-    INNER JOIN Colores c ON c.ColorId = dc.ColorId
+    INNER JOIN colores c ON c.ColorId = dc.ColorId
     LEFT JOIN productocolores_stock pcs ON pcs.ProductoId = dc.ProductoId AND pcs.ColorId = dc.ColorId
     WHERE dc.ProductoId IN (?) AND dc.ColorId IS NOT NULL
   `, [productoIds]);
@@ -356,7 +356,7 @@ export const getProductosPaginated = async ({
       c.Hex,
       pcs.Stock AS StockColor
     FROM productocolores_stock pcs
-    INNER JOIN Colores c ON c.ColorId = pcs.ColorId
+    INNER JOIN colores c ON c.ColorId = pcs.ColorId
     WHERE pcs.ProductoId IN (?) AND pcs.Stock > 0
   `, [productoIds]);
 

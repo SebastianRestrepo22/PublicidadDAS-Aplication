@@ -315,7 +315,7 @@ export const cambiarEstadoService = async (req, res) => {
         }
 
         await dbPool.query(
-            'UPDATE Servicios SET Estado = ? WHERE ServicioId = ?',
+            'UPDATE servicios SET Estado = ? WHERE ServicioId = ?',
             [Estado, id]
         );
 

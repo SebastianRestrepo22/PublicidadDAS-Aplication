@@ -15,15 +15,20 @@ export const TablaServicios = ({
     totalItems,
     itemsPerPage,
     onPageChange,
-    onItemsPerPageChange
+    onItemsPerPageChange,
+    isLoading = false  // ✅ NUEVO: prop de loading
 }) => {
-    const getEstadoColor = (estado) => {
-        switch (estado) {
-            case 'Activo': return 'bg-green-100 text-green-800';
-            case 'Inactivo': return 'bg-red-100 text-red-800';
-            default: return 'bg-gray-100 text-gray-800';
-        }
-    };
+    // ✅ Si está cargando, mostrar spinner
+    if (isLoading) {
+        return (
+            <div className="bg-white rounded-xl shadow-sm border p-12 text-center">
+                <div className="flex justify-center">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                </div>
+                <p className="mt-3 text-slate-600">Cargando servicios...</p>
+            </div>
+        );
+    }
 
     if (paginatedData.length === 0) {
         return (
@@ -57,7 +62,6 @@ export const TablaServicios = ({
                                     className={`hover:bg-slate-50 transition-colors duration-150 ${estado === 'Inactivo' ? 'bg-gray-50 opacity-75' : ''
                                         }`}
                                 >
-                                    {/* Servicio (Nombre + Imagen + Descripción) */}
                                     <td className="py-3 px-4">
                                         <div className="flex items-center gap-3">
                                             {p.Imagen ? (
@@ -86,14 +90,12 @@ export const TablaServicios = ({
                                         </div>
                                     </td>
 
-                                    {/* ID (mostrar solo parte para no ocupar tanto espacio) */}
                                     <td className="py-3 px-4">
                                         <span className="text-xs text-gray-500" title={p.ServicioId}>
                                             {p.ServicioId.slice(0, 3)}...
                                         </span>
                                     </td>
 
-                                    {/* Estado */}
                                     <td className="py-3 px-4">
                                         <div className="flex items-center gap-2">
                                             <button
@@ -102,29 +104,25 @@ export const TablaServicios = ({
                                                     p.ServicioId,
                                                     estado === 'Activo' ? 'Inactivo' : 'Activo',
                                                     p.Nombre  
-                                                )} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${estado === 'Activo' ? 'bg-green-500' : 'bg-gray-300'
-                                                    }`}
+                                                )}
+                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${estado === 'Activo' ? 'bg-green-500' : 'bg-gray-300'}`}
                                             >
                                                 <span
-                                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${estado === 'Activo' ? 'translate-x-5' : 'translate-x-1'
-                                                        }`}
+                                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${estado === 'Activo' ? 'translate-x-5' : 'translate-x-1'}`}
                                                 />
                                             </button>
-                                            <span className={`text-xs font-medium ${estado === 'Activo' ? 'text-green-600' : 'text-gray-500'
-                                                }`}>
+                                            <span className={`text-xs font-medium ${estado === 'Activo' ? 'text-green-600' : 'text-gray-500'}`}>
                                                 {estado}
                                             </span>
                                         </div>
                                     </td>
 
-                                    {/* Categoría */}
                                     <td className="py-3 px-4">
                                         <span className="text-sm text-gray-700">
                                             {nombreCategoria}
                                         </span>
                                     </td>
 
-                                    {/* Acciones */}
                                     <td className="py-3 px-4">
                                         <div className="flex items-center gap-1">
                                             <button

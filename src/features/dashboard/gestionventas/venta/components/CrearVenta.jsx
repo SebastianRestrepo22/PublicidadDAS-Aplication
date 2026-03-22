@@ -16,10 +16,11 @@ import { createVentaManual } from "../services/service.ventas.js";
 import { getDataClients } from "../../../clientes/services/services.cliente.js";
 
 const formatPrice = (value, currency = '$') => {
-    if (value === null || value === undefined || value === '') return `${currency}0.00`;
+    if (value === null || value === undefined || value === '') return `${currency}0`;
     const num = typeof value === 'string' ? parseFloat(value) : value;
-    if (isNaN(num)) return `${currency}0.00`;
-    return `${currency}${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+    if (isNaN(num)) return `${currency}0`;
+    // Formato colombiano: puntos como separador de miles, sin decimales
+    return `${currency} ${Math.round(num).toLocaleString('es-CO')}`;
 };
 
 const generateTempId = () => 'temp_' + Math.random().toString(36).substr(2, 9);
