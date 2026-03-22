@@ -2,7 +2,6 @@ import axios from "axios";
 
 const API_URL = 'http://localhost:3000';
 
-// ========== COMPRAS ==========
 
 export const getComprasPaginated = async (page = 1, limit = 5, filtroCampo = null, filtroValor = null, sortBy = 'FechaRegistro', sortOrder = 'DESC') => {
   try {
@@ -30,7 +29,6 @@ export const getComprasPaginated = async (page = 1, limit = 5, filtroCampo = nul
       fullResponse: response.data
     });
 
-    // 🔥 Asegurar que la respuesta tenga la estructura correcta
     return {
       data: response.data?.data || [],
       pagination: {
@@ -42,7 +40,7 @@ export const getComprasPaginated = async (page = 1, limit = 5, filtroCampo = nul
     };
     
   } catch (error) {
-    console.error("❌ Error en getComprasPaginated:", error);
+    console.error("Error en getComprasPaginated:", error);
     return { 
       data: [], 
       pagination: { 
@@ -69,10 +67,9 @@ export const buscarCompras = async (filtroCampo, filtroValor, page = 1, limit = 
     
     console.log("🔍 Buscando compras con params:", params.toString());
     
-    // 🔥 CORREGIDO: Usar la ruta /buscar que sí existe
     const response = await axios.get(`${'http://localhost:3000'}/api/compras/buscar?${params}`);
     
-    console.log("✅ Respuesta buscarCompras:", response.data);
+    console.log("Respuesta buscarCompras:", response.data);
     
     return {
       data: response.data?.data || [],
