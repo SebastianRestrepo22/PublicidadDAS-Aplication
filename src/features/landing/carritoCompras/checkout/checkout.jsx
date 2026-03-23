@@ -88,6 +88,7 @@ export const Checkout = () => {
     let totalNumerico = 0;
 
     if (total === null || total === undefined) {
+      console.warn('⚠️ getTotal() devolvió null/undefined');
       totalNumerico = 0;
     } else if (typeof total === 'number') {
       totalNumerico = total;
@@ -122,21 +123,16 @@ export const Checkout = () => {
     try {
       // ✅ CONSTRUIR DETALLES CON VALIDACIÓN SEGURA
       const detallesValidados = cart.map(item => {
-        const ProductoId = item.ProductoId || null;
-        const ServicioId = item.ServicioId || null;
-
-        if (!ProductoId && !ServicioId) {
-          throw new Error(`El ítem "${item.Nombre || item.id}" no tiene ProductoId ni ServicioId válido`);
+        const ProductoId = item.ProductoId;
+        
+        if (!ProductoId) {
+          throw new Error(`El ítem "${item.Nombre || item.id}" no tiene ProductoId válido`);
         }
 
+        // ✅ EXTRAER COLORID SEGURO
         const ColorId = extractValidColorId(item);
 
-        let Tamaño = null;
-        if (ServicioId) {
-          const t = (item.Tamaño || item.customization?.Tamaño)?.trim();
-          Tamaño = t && ['Pequeña', 'Mediana', 'Grande'].includes(t) ? t : "Mediana";
-        }
-
+        // ✅ DESCRIPCIÓN CON COLOR SI NO ES UUID
         let descripcion = item.options?.descripcion || item.Descripcion || item.customization?.Descripcion || "";
 
         if (item.customization?.color && !ColorId) {
@@ -149,6 +145,7 @@ export const Checkout = () => {
           }
         }
 
+        // ✅ EXTRAER URL DE ARCHIVO PERSONALIZADO
         let UrlArchivoPersonalizado = null;
         let tipoArchivo = null;
         let nombreArchivo = null;
@@ -172,19 +169,19 @@ export const Checkout = () => {
 
         return {
           ProductoId,
-          ServicioId,
           Cantidad: item.quantity || 1,
           Precio: item.Precio || 0,
           Descripcion: descripcion,
           UrlImagen: item.options?.urlImagen || item.UrlImagen || null,
-          ColorId,
-          UrlArchivoPersonalizado
+          UrlImagenPersonalizada: UrlArchivoPersonalizado,
+          ColorId
         };
       });
 
+      // ✅ VALIDACIÓN FINAL
       const detallesFinales = detallesValidados.filter(detalle => {
-        if (!detalle.ProductoId && !detalle.ServicioId) {
-          console.error(`❌ Item sin ProductoId/ServicioId omitido:`, detalle);
+        if (!detalle.ProductoId) {
+          console.error(`❌ Item sin ProductoId omitido:`, detalle);
           return false;
         }
         return true;
@@ -194,13 +191,20 @@ export const Checkout = () => {
         throw new Error("No hay items válidos para procesar el pedido");
       }
 
+      console.log('🔍 DEBUG - Detalles finales con archivos:', detallesFinales.map(d => ({
+        tieneArchivoPersonalizado: !!d.UrlImagenPersonalizada,
+        urlArchivoPersonalizado: d.UrlImagenPersonalizada,
+        urlImagen: d.UrlImagen
+      })));
+
+      // 🔥 CALCULAR TOTAL DE FORMA SEGURA
       const totalSeguro = calcularTotalSeguro();
 
       if (isNaN(totalSeguro) || totalSeguro <= 0) {
+        console.error('❌ Total inválido después de calcular:', totalSeguro);
         throw new Error("El total del pedido no es válido");
       }
 
-      // ✅ PAYLOAD EXACTAMENTE COMO LO ESPERA EL MODELO
       const payload = {
         ClienteId: user.CedulaId,
         FechaRegistro: new Date().toISOString().split("T")[0],
@@ -208,14 +212,10 @@ export const Checkout = () => {
         Estado: "pendiente",
         MetodoPago: metodoPago === "entrega" ? "contra_entrega" : metodoPago,
         Origen: "cliente",
-        TipoCliente: "registrado",
-        ClienteNombre: `${user.Nombre} ${user.Apellido}`,
-        ClienteTelefono: user.Telefono || null,
-        ClienteCorreo: user.Email || null,
         detalle: detallesFinales
       };
 
-      // ✅ AGREGAR DATOS DE ENTREGA SOLO SI ES CONTRA ENTREGA
+      // ✅ AGREGAR DATOS DE ENTREGA SI ES CONTRA ENTREGA
       if (metodoPago === "entrega") {
         payload.NombreRecibe = datosEntrega.nombreRecibe;
         payload.TelefonoEntrega = datosEntrega.telefono;
@@ -224,10 +224,10 @@ export const Checkout = () => {
 
       console.log('📦 Payload a enviar:', JSON.stringify(payload, null, 2));
 
+      // ✅ ENVIAR AL BACKEND
       const formData = new FormData();
       formData.append("pedido", JSON.stringify(payload));
 
-      // Adjuntar archivos de los items (si existen y son archivos físicos)
       cart.forEach((item, index) => {
         if (item.customization?.archivosAdjuntosOriginales) {
           item.customization.archivosAdjuntosOriginales.forEach((file, fileIndex) => {
@@ -252,6 +252,12 @@ export const Checkout = () => {
 
       const data = await res.json();
       console.log('✅ Respuesta del servidor:', data);
+
+      if (data.detalle?.[0]?.UrlImagenPersonalizada) {
+        console.log('🎉 ¡Archivo guardado correctamente en la BD!');
+      } else {
+        console.warn('⚠️ El archivo NO se guardó en la BD');
+      }
 
       const pedidoId = String(data.PedidoClienteId).trim();
       clearCart();
@@ -331,7 +337,6 @@ export const Checkout = () => {
       setUploading(true);
       try {
         console.log('📤 Subiendo comprobante para pedido:', pedidoId);
-        console.log('📄 Archivo:', file.name, 'Tipo:', file.type);
 
         const res = await fetch(`${API_URL}/api/pedidos-clientes/${pedidoId}/voucher`, {
           method: "POST",
@@ -355,6 +360,7 @@ export const Checkout = () => {
               }
             });
           }, 2000);
+
         } else {
           const errorData = await res.json().catch(() => ({}));
           toast.error(errorData.error || "Error al subir el comprobante");
@@ -371,7 +377,7 @@ export const Checkout = () => {
       return (
         <div className="text-center mt-6 p-4 bg-green-50 rounded-xl">
           <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
@@ -389,7 +395,7 @@ export const Checkout = () => {
           </label>
           <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl">
             <div className="space-y-1 text-center">
-              <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+              <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                 <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <div className="flex text-sm text-gray-600">
@@ -415,12 +421,21 @@ export const Checkout = () => {
             </div>
           </div>
         </div>
+
         <button
           type="submit"
           disabled={uploading}
-          className={`w-full py-4 rounded-xl font-bold text-white transition-all ${uploading ? "bg-gray-400" : "bg-black hover:bg-gray-800 hover:shadow-lg"}`}
+          className={`w-full py-4 rounded-xl font-bold text-white transition-all ${uploading ? "bg-gray-400" : "bg-black hover:bg-gray-800"}`}
         >
-          {uploading ? "Enviando comprobante..." : "Enviar comprobante y finalizar"}
+          {uploading ? (
+            <div className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Enviando comprobante...
+            </div>
+          ) : "Enviar comprobante y finalizar"}
         </button>
       </form>
     );
@@ -433,7 +448,7 @@ export const Checkout = () => {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
@@ -441,6 +456,7 @@ export const Checkout = () => {
               {voucher.metodo === "qr" ? "Paga con QR Bancolombia" : "Transferencia Bancaria"}
             </h1>
           </div>
+
           <div className="inline-flex items-center gap-4 bg-blue-50 px-4 py-2 rounded-full">
             <span className="text-sm font-medium text-blue-700">Pedido: #{voucher.id}</span>
             <span className="text-gray-400">•</span>
@@ -454,21 +470,31 @@ export const Checkout = () => {
           <div className="lg:col-span-1 space-y-6">
             <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
               <h3 className="font-bold text-yellow-800 mb-3 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.698-.833-2.464 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
                 Información importante
               </h3>
               <ul className="space-y-2 text-sm text-yellow-700">
-                <li className="flex items-start gap-2"><span className="font-bold">•</span><span>Tu pedido se procesará solo después de confirmar el pago (24-48 horas)</span></li>
-                <li className="flex items-start gap-2"><span className="font-bold">•</span><span>Guarda el comprobante de pago de tu banco</span></li>
-                <li className="flex items-start gap-2"><span className="font-bold">•</span><span>Si tienes problemas con el pago, contacta a: {DATOS_BANCARIOS_REALES.telefonoSoporte}</span></li>
+                <li className="flex items-start gap-2">
+                  <span className="font-bold">•</span>
+                  <span>Tu pedido se procesará solo después de confirmar el pago (24-48 horas)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-bold">•</span>
+                  <span>Guarda el comprobante de pago de tu banco</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-bold">•</span>
+                  <span>Contacta a soporte: {DATOS_BANCARIOS_REALES.telefonoSoporte}</span>
+                </li>
               </ul>
             </div>
+
             <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
@@ -484,13 +510,14 @@ export const Checkout = () => {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="bg-gray-900 text-white p-5">
                 <div className="flex items-center gap-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   <h3 className="text-xl font-bold">📤 Sube tu comprobante</h3>
                 </div>
-                <p className="text-gray-300 mt-1">Después de pagar, adjunta aquí tu comprobante para confirmar tu pedido</p>
+                <p className="text-gray-300 mt-1">Después de pagar, adjunta aquí tu comprobante</p>
               </div>
+
               <div className="p-6">
                 <SubirComprobanteBanco pedidoId={voucher.id} metodo={voucher.metodo} />
               </div>
@@ -501,15 +528,13 @@ export const Checkout = () => {
         <div className="mt-6 text-center">
           <div className="inline-block bg-gray-100 rounded-xl p-4">
             <p className="text-sm text-gray-600">Total a pagar</p>
-            <p className="text-2xl font-bold text-gray-900">
-              {voucher.totalFormateado || formatCOP(voucher.total)}
-            </p>
+            <p className="text-2xl font-bold text-gray-900">{voucher.totalFormateado || formatCOP(voucher.total)}</p>
           </div>
         </div>
 
         <div className="mt-8 text-center">
-          <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             Volver al carrito
@@ -519,26 +544,15 @@ export const Checkout = () => {
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-500">
             ¿Problemas con el pago? Contacta a soporte:{" "}
-            <a href={`tel:${DATOS_BANCARIOS_REALES.telefonoSoporte}`} className="text-blue-600 hover:underline font-medium">
+            <a href={`tel:${DATOS_BANCARIOS_REALES.telefonoSoporte}`} className="text-blue-600 hover:underline">
               {DATOS_BANCARIOS_REALES.telefonoSoporte}
             </a>{" "}
             •{" "}
-            <a href={`mailto:${DATOS_BANCARIOS_REALES.emailSoporte}`} className="text-blue-600 hover:underline font-medium">
+            <a href={`mailto:${DATOS_BANCARIOS_REALES.emailSoporte}`} className="text-blue-600 hover:underline">
               {DATOS_BANCARIOS_REALES.emailSoporte}
             </a>
           </p>
         </div>
-
-        {error && (
-          <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl">
-            <div className="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <span>{error}</span>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -547,8 +561,11 @@ export const Checkout = () => {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto min-h-screen">
       <div className="mb-8 flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-gray-100 transition-colors" aria-label="Volver">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <button
+          onClick={() => navigate(-1)}
+          className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+        >
+          <svg className="h-6 w-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
@@ -561,7 +578,7 @@ export const Checkout = () => {
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl mb-8">
           <div className="flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
             <span>{error}</span>
@@ -570,10 +587,11 @@ export const Checkout = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Resumen del pedido */}
         <div className="lg:col-span-5">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4L7 13zm1 6a2 2 0 100 4 2 2 0 000-4zm6 0a2 2 0 100 4 2 2 0 000-4z" />
               </svg>
               Resumen del pedido ({cart.length} productos)
@@ -590,11 +608,12 @@ export const Checkout = () => {
                   <div className="flex-1">
                     <div className="flex justify-between">
                       <h3 className="font-medium text-gray-900">{item.Nombre}</h3>
-                      <span className="font-bold text-gray-900">{formatCOP(item.Precio * item.quantity)}</span>
+                      <span className="font-bold text-gray-900">
+                        {formatCOP(item.Precio * item.quantity)}
+                      </span>
                     </div>
                     <div className="flex items-center gap-4 mt-1">
                       <span className="text-sm text-gray-600">Cantidad: {item.quantity}</span>
-                      {item.Tamaño && <span className="text-xs bg-gray-200 px-2 py-1 rounded">Tamaño: {item.Tamaño}</span>}
                       {item.customization?.color && (
                         <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                           Color: {typeof item.customization.color === 'string'
@@ -611,24 +630,27 @@ export const Checkout = () => {
             <div className="border-t pt-6">
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold text-gray-900">Total a pagar</span>
-                <span className="text-3xl font-bold text-black">{formatCOP(calcularTotalSeguro())}</span>
+                <span className="text-3xl font-bold text-black">
+                  {formatCOP(calcularTotalSeguro())}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
+        {/* Métodos de pago */}
         <div className="lg:col-span-7 space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-5 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h10l4-8H5.4L7 13zm1 6a2 2 0 100 4 2 2 0 000-4zm6 0a2 2 0 100 4 2 2 0 000-4z" />
               </svg>
               Método de pago
             </h2>
 
-            {/* Opción 1: QR */}
+            {/* QR */}
             <div
-              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "qr" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"}`}
+              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer ${metodoPago === "qr" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"}`}
               onClick={() => setMetodoPago("qr")}
             >
               <div className="flex items-center justify-between">
@@ -638,10 +660,12 @@ export const Checkout = () => {
                   </div>
                   <div>
                     <div className="font-bold text-gray-900">Pago rápido con QR</div>
-                    <div className="text-sm text-gray-600">Escanea con la app de Bancolombia para pagar al instante</div>
+                    <div className="text-sm text-gray-600">Escanea con la app de Bancolombia</div>
                   </div>
                 </div>
-                {metodoPago === "qr" && <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">SELECCIONADO</div>}
+                {metodoPago === "qr" && (
+                  <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">SELECCIONADO</div>
+                )}
               </div>
               {metodoPago === "qr" && (
                 <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
@@ -655,9 +679,9 @@ export const Checkout = () => {
               )}
             </div>
 
-            {/* Opción 2: Transferencia */}
+            {/* Transferencia */}
             <div
-              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"}`}
+              className={`p-4 mb-4 rounded-xl border-2 cursor-pointer ${metodoPago === "transferencia" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"}`}
               onClick={() => setMetodoPago("transferencia")}
             >
               <div className="flex items-center gap-3">
@@ -681,9 +705,9 @@ export const Checkout = () => {
               )}
             </div>
 
-            {/* Opción 3: Contra entrega */}
+            {/* Contra entrega */}
             <div
-              className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${metodoPago === "entrega" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"}`}
+              className={`p-4 rounded-xl border-2 cursor-pointer ${metodoPago === "entrega" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300"}`}
               onClick={() => setMetodoPago("entrega")}
             >
               <div className="flex items-center gap-3">
@@ -699,49 +723,38 @@ export const Checkout = () => {
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <h4 className="font-semibold text-gray-800 mb-3">Datos de entrega</h4>
                   <div className="space-y-3">
-                    <div>
-                      <input
-                        type="text"
-                        placeholder="Nombre completo *"
-                        value={datosEntrega.nombreRecibe}
-                        onChange={(e) => setDatosEntrega({ ...datosEntrega, nombreRecibe: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${erroresEntrega.nombreRecibe ? "border-red-500" : "border-gray-300"}`}
-                      />
-                      {erroresEntrega.nombreRecibe && <p className="text-red-500 text-sm mt-1">{erroresEntrega.nombreRecibe}</p>}
-                    </div>
-                    <div>
-                      <input
-                        type="tel"
-                        placeholder="Teléfono *"
-                        value={datosEntrega.telefono}
-                        onChange={(e) => setDatosEntrega({ ...datosEntrega, telefono: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${erroresEntrega.telefono ? "border-red-500" : "border-gray-300"}`}
-                      />
-                      {erroresEntrega.telefono && <p className="text-red-500 text-sm mt-1">{erroresEntrega.telefono}</p>}
-                    </div>
-                    <div>
-                      <textarea
-                        placeholder="Dirección completa *"
-                        value={datosEntrega.direccion}
-                        onChange={(e) => setDatosEntrega({ ...datosEntrega, direccion: e.target.value })}
-                        className={`w-full p-3 rounded-lg border ${erroresEntrega.direccion ? "border-red-500" : "border-gray-300"}`}
-                        rows="2"
-                      />
-                      {erroresEntrega.direccion && <p className="text-red-500 text-sm mt-1">{erroresEntrega.direccion}</p>}
-                    </div>
+                    <input
+                      type="text"
+                      placeholder="Nombre completo *"
+                      value={datosEntrega.nombreRecibe}
+                      onChange={(e) => setDatosEntrega({ ...datosEntrega, nombreRecibe: e.target.value })}
+                      className={`w-full p-3 rounded-lg border ${erroresEntrega.nombreRecibe ? "border-red-500" : "border-gray-300"}`}
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Teléfono *"
+                      value={datosEntrega.telefono}
+                      onChange={(e) => setDatosEntrega({ ...datosEntrega, telefono: e.target.value })}
+                      className={`w-full p-3 rounded-lg border ${erroresEntrega.telefono ? "border-red-500" : "border-gray-300"}`}
+                    />
+                    <textarea
+                      placeholder="Dirección completa *"
+                      value={datosEntrega.direccion}
+                      onChange={(e) => setDatosEntrega({ ...datosEntrega, direccion: e.target.value })}
+                      className={`w-full p-3 rounded-lg border ${erroresEntrega.direccion ? "border-red-500" : "border-gray-300"}`}
+                      rows="2"
+                    />
                   </div>
                 </div>
               )}
             </div>
           </div>
 
+          {/* Botón confirmar */}
           <button
             onClick={enviarPedido}
             disabled={loading || cart.length === 0}
-            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${loading || cart.length === 0
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-black hover:bg-gray-800 hover:shadow-xl"
-              }`}
+            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${loading || cart.length === 0 ? "bg-gray-400" : "bg-black hover:bg-gray-800"}`}
           >
             {loading ? "Procesando..." : cart.length === 0 ? "Carrito vacío" : "Confirmar pedido"}
           </button>

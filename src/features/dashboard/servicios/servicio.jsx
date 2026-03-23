@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { ArrowLeft } from "lucide-react";
 
 import { useServicios } from "./hooks/useServicios";
-import { useCategorias } from "../categoria/hook/useCategorias"; // Hook sin parámetros
+import { useCategorias } from "../categoria/hook/useCategorias";
 import { usePaginacion } from "./hooks/usePaginacion";
 
 import { BarraAcciones } from "./components/BarraAcciones";
@@ -31,37 +31,33 @@ export const ServiciosDashboard = () => {
     const paginacion = usePaginacion(mode);
     const servicios = useServicios(mode, id, paginacion.refrescar);
 
-    // ✅ Usar el hook correctamente (sin parámetros)
-    const {
-        allData,           // ← Datos de categorías (paginados)
-        cargarCategorias   // ← Función para recargar
-    } = useCategorias();
-
-    // ✅ Estado local para manejar las categorías del modal
+    const [cargandoCategoriasModal, setCargandoCategoriasModal] = useState(false);
     const [categoriasLocales, setCategoriasLocales] = useState([]);
     const [categoriaBusquedaLocal, setCategoriaBusquedaLocal] = useState("");
     const [openCategoriasModalLocal, setOpenCategoriasModalLocal] = useState(false);
 
-    // ✅ Cargar categorías con getAllCategorias cuando se abre el modal
-    useEffect(() => {
-        const cargarCategoriasModal = async () => {
-            try {
-                const { getAllCategorias } = await import("../categoria/services/services.categoria");
-                const data = await getAllCategorias();
-                console.log("📦 Categorías cargadas manualmente:", data);
-                setCategoriasLocales(data);
-            } catch (error) {
-                console.error("Error cargando categorías:", error);
-                setCategoriasLocales([]);
-            }
-        };
+    const { allData } = useCategorias();
 
-        if (openCategoriasModalLocal) {
-            cargarCategoriasModal();
+    // Cargar categorías cuando se abre el modal
+    const cargarCategoriasModal = async () => {
+        setCargandoCategoriasModal(true);
+        try {
+            const { getAllCategorias } = await import("../categoria/services/services.categoria");
+            const data = await getAllCategorias();
+            setCategoriasLocales(data);
+        } catch (error) {
+            console.error("Error cargando categorías:", error);
+            setCategoriasLocales([]);
+        } finally {
+            setCargandoCategoriasModal(false);
         }
-    }, [openCategoriasModalLocal]);
+    };
 
-    // ✅ Filtrar categorías localmente
+    const handleOpenCategoriasModal = () => {
+        setOpenCategoriasModalLocal(true);
+        cargarCategoriasModal();
+    };
+
     const categoriasFiltradasLocales = useMemo(() => {
         if (!Array.isArray(categoriasLocales)) return [];
         if (!categoriaBusquedaLocal) return categoriasLocales;
@@ -81,16 +77,13 @@ export const ServiciosDashboard = () => {
     };
 
     const handleSelectCategoria = (categoria) => {
-        // Actualizar el formulario con la categoría seleccionada
         servicios.setValues({ ...servicios.values, CategoriaId: categoria.CategoriaId });
         setOpenCategoriasModalLocal(false);
         setCategoriaBusquedaLocal("");
     };
 
-    // ✅ Función local para obtener nombre de categoría
     const obtenerNombreCategoriaLocal = (id) => {
         if (!id) return "Seleccionar categoría";
-        // Buscar primero en categoriasLocales, luego en allData como fallback
         const cat = categoriasLocales.find(c => c.CategoriaId === id) ||
             allData?.find(c => c.CategoriaId === id);
         return cat ? cat.Nombre : "Categoría no encontrada";
@@ -123,6 +116,7 @@ export const ServiciosDashboard = () => {
                             }}
                             editData={servicios.editData}
                             onConfirm={servicios.handleDelete}
+                            cargando={servicios.isSubmitting}
                         />
 
                         <ConfirmServicioModal
@@ -144,7 +138,7 @@ export const ServiciosDashboard = () => {
 
                         <TablaServicios
                             paginatedData={paginacion.paginatedData}
-                            categorias={allData || []} // Usar allData del hook como fallback
+                            categorias={allData || []}
                             onView={handleViewClick}
                             onEdit={handleEditClick}
                             onDelete={servicios.handleDeleteClick}
@@ -155,6 +149,7 @@ export const ServiciosDashboard = () => {
                             itemsPerPage={paginacion.itemsPerPage}
                             onPageChange={paginacion.handlePageChange}
                             onItemsPerPageChange={paginacion.handleItemsPerPageChange}
+                            isLoading={paginacion.isLoading}
                         />
                     </>
                 )}
@@ -173,13 +168,22 @@ export const ServiciosDashboard = () => {
                         </div>
 
                         {mode === "view" ? (
-                            <DetalleServicio
-                                editData={servicios.editData}
-                                categorias={allData || []}
-                                onEdit={servicios.goToEdit}
-                                onDelete={servicios.handleDeleteClick}
-                                onBack={servicios.goToBackToList}
-                            />
+                            servicios.cargando ? (
+                                <div className="text-center py-12">
+                                    <div className="flex justify-center">
+                                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                                    </div>
+                                    <p className="mt-3 text-slate-600">Cargando servicio...</p>
+                                </div>
+                            ) : (
+                                <DetalleServicio
+                                    editData={servicios.editData}
+                                    categorias={allData || []}
+                                    onEdit={servicios.goToEdit}
+                                    onDelete={servicios.handleDeleteClick}
+                                    onBack={servicios.goToBackToList}
+                                />
+                            )
                         ) : (
                             <FormularioServicio
                                 mode={mode}
@@ -194,14 +198,13 @@ export const ServiciosDashboard = () => {
                                 handleNombreBlur={servicios.handleNombreBlur}
                                 handleSubmit={servicios.handleSubmit}
                                 onCancel={servicios.goToBackToList}
-                                abrirModalCategorias={() => setOpenCategoriasModalLocal(true)}
+                                abrirModalCategorias={handleOpenCategoriasModal}
                                 obtenerNombreCategoria={obtenerNombreCategoriaLocal}
                             />
                         )}
                     </div>
                 )}
 
-                {/* Modal de categorías */}
                 <ModalCategorias
                     open={openCategoriasModalLocal}
                     onClose={() => {
@@ -213,6 +216,7 @@ export const ServiciosDashboard = () => {
                     setCategoriaBusqueda={setCategoriaBusquedaLocal}
                     onSelectCategoria={handleSelectCategoria}
                     categoriaSeleccionada={servicios.values.CategoriaId}
+                    cargando={cargandoCategoriasModal}
                 />
 
                 <ToastContainer position="top-right" autoClose={3000} theme="colored" />

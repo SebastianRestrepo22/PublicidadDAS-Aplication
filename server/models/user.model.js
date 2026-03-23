@@ -13,7 +13,7 @@ export const createUsuario = async ({
 }) => {
   await dbPool.query(
     `INSERT INTO usuarios 
-     (CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId) 
+     (CedulaId, tipodocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId) 
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [CedulaId, TipoDocumentoId, NombreCompleto, Telefono, CorreoElectronico, Direccion, Contrasena, RoleId]
   );
@@ -38,7 +38,7 @@ export const getAllDataUsers = async () => {
       r.Nombre AS RolNombre
     FROM usuarios u
     JOIN roles r ON u.RoleId = r.RoleId
-    JOIN TipoDocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
+    JOIN tipodocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
     WHERE u.RoleId != ?
     ORDER BY u.NombreCompleto ASC
   `, [clienteRoleId]);
@@ -226,7 +226,7 @@ export const buscarUsuarioData = async (columna, valor) => {
       td.Nombre AS TipoDocumentoNombre
    FROM usuarios u
    JOIN roles r ON u.RoleId = r.RoleId
-   JOIN TipoDocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
+   JOIN tipodocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
    WHERE ${columna} LIKE ?`,
     [`%${valor}%`]
   );
@@ -427,7 +427,7 @@ export const getAllDataClientes = async (roleId) => {
       r.Nombre AS RolNombre
     FROM usuarios u
     JOIN roles r ON u.RoleId = r.RoleId
-    JOIN TipoDocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
+    JOIN tipodocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
     WHERE u.RoleId = ?
     ORDER BY u.NombreCompleto ASC
   `, [roleId]);
@@ -509,7 +509,7 @@ export const getUsuariosPaginated = async ({
       r.Nombre AS RolNombre
     FROM usuarios u
     JOIN roles r ON u.RoleId = r.RoleId
-    JOIN TipoDocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
+    JOIN tipodocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
     ${whereClause}
     ORDER BY u.NombreCompleto ASC
     LIMIT ? OFFSET ?
@@ -580,7 +580,7 @@ export const getClientesPaginated = async ({
       r.Nombre AS RolNombre
     FROM usuarios u
     INNER JOIN roles r ON u.RoleId = r.RoleId
-    INNER JOIN TipoDocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
+    INNER JOIN tipodocumento td ON u.TipoDocumentoId = td.TipoDocumentoId
     ${whereClause}
     ORDER BY u.NombreCompleto ASC
     LIMIT ? OFFSET ?

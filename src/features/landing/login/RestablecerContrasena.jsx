@@ -51,7 +51,6 @@ export const RestablecerContrasena = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Validar que la contraseña cumpla con todos los criterios
     const allCriteriaMet = Object.values(passwordCriteria).every(criterion => criterion);
 
     if (!allCriteriaMet) {
@@ -69,6 +68,7 @@ export const RestablecerContrasena = () => {
     try {
       let response;
 
+      //  Enviar el token directamente sin modificar
       if (isFirstPassword) {
         response = await axios.post(`${API_URL}/auth/setup-password/${token}`, {
           nuevaContrasena,
@@ -83,6 +83,7 @@ export const RestablecerContrasena = () => {
       setError("");
       setTimeout(() => navigate("/login"), 3000);
     } catch (err) {
+      console.error('Error:', err.response?.data);
       setError(err.response?.data?.message || "Error al procesar la solicitud");
     } finally {
       setIsLoading(false);
@@ -120,8 +121,8 @@ export const RestablecerContrasena = () => {
 
           {/* Badge indicador */}
           <div className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${isFirstPassword
-              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-              : 'bg-blue-100 text-blue-700 border border-blue-200'
+            ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+            : 'bg-blue-100 text-blue-700 border border-blue-200'
             }`}>
             {isFirstPassword ? '🎯 Primera contraseña' : '🔄 Recuperación de cuenta'}
           </div>
@@ -129,8 +130,8 @@ export const RestablecerContrasena = () => {
 
         {/* Nota informativa */}
         <div className={`mb-6 p-4 rounded-xl border ${isFirstPassword
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-            : 'bg-blue-50 border-blue-200 text-blue-700'
+          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+          : 'bg-blue-50 border-blue-200 text-blue-700'
           }`}>
           <p className="text-sm font-medium flex items-center">
             <Info className="w-4 h-4 mr-2" />
@@ -218,7 +219,7 @@ export const RestablecerContrasena = () => {
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs text-gray-600">Fortaleza:</span>
                       <span className={`text-xs font-medium ${allCriteriaMet ? 'text-green-600' :
-                          metCriteriaCount >= 2 ? 'text-yellow-600' : 'text-red-600'
+                        metCriteriaCount >= 2 ? 'text-yellow-600' : 'text-red-600'
                         }`}>
                         {allCriteriaMet ? 'Fuerte' :
                           metCriteriaCount >= 2 ? 'Media' : 'Débil'}
@@ -227,7 +228,7 @@ export const RestablecerContrasena = () => {
                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-300 ${allCriteriaMet ? 'w-full bg-green-500' :
-                            metCriteriaCount >= 2 ? 'w-2/3 bg-yellow-500' : 'w-1/3 bg-red-500'
+                          metCriteriaCount >= 2 ? 'w-2/3 bg-yellow-500' : 'w-1/3 bg-red-500'
                           }`}
                       />
                     </div>
@@ -247,10 +248,10 @@ export const RestablecerContrasena = () => {
                 type={showConfirmPassword ? "text" : "password"}
                 placeholder={isFirstPassword ? "Repite tu contraseña" : "Confirma tu nueva contraseña"}
                 className={`w-full border-2 rounded-xl p-3 pl-4 pr-12 focus:outline-none focus:ring-2 transition-all ${confirmarContrasena && nuevaContrasena
-                    ? passwordsMatch
-                      ? 'border-green-400 focus:border-green-500 focus:ring-green-100'
-                      : 'border-red-300 focus:border-red-500 focus:ring-red-100'
-                    : 'border-gray-200 focus:border-blue-500 focus:ring-blue-100'
+                  ? passwordsMatch
+                    ? 'border-green-400 focus:border-green-500 focus:ring-green-100'
+                    : 'border-red-300 focus:border-red-500 focus:ring-red-100'
+                  : 'border-gray-200 focus:border-blue-500 focus:ring-blue-100'
                   }`}
                 value={confirmarContrasena}
                 onChange={(e) => setConfirmarContrasena(e.target.value)}
@@ -288,10 +289,10 @@ export const RestablecerContrasena = () => {
             type="submit"
             disabled={!canSubmit || isLoading}
             className={`w-full py-3.5 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${canSubmit && !isLoading
-                ? isFirstPassword
-                  ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
-                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              ? isFirstPassword
+                ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
+                : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
           >
             {isLoading ? (

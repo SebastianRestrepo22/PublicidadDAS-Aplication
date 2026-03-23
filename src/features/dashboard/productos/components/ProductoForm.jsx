@@ -49,6 +49,48 @@ export const ProductoForm = ({
         return "";
     };
 
+    const formatPrice = (value) => {
+        if (!value) return '$ 0';
+        const num = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(num)) return '$ 0';
+        return `$ ${Math.round(num).toLocaleString('es-CO')}`;
+    };
+
+    const [displayPrice, setDisplayPrice] = useState(() =>
+        values.Precio ? formatCOP(values.Precio) : ''
+    );
+
+    // Agrega estas funciones:
+    const formatCOP = (value) => {
+        if (!value) return '';
+        const num = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(num)) return '';
+        return `$ ${Math.round(num).toLocaleString('es-CO')}`;
+    };
+
+    const handlePriceChange = (e) => {
+        let value = e.target.value.replace(/[^\d]/g, ''); // Solo números
+        setDisplayPrice(value);
+        handleChanges({
+            target: {
+                name: 'Precio',
+                value: value === '' ? '' : parseInt(value)
+            }
+        });
+    };
+
+    const handlePriceBlur = () => {
+        if (values.Precio) {
+            setDisplayPrice(formatCOP(values.Precio));
+        }
+    };
+
+    const handlePriceFocus = () => {
+        if (values.Precio) {
+            setDisplayPrice(values.Precio.toString());
+        }
+    };
+
     // Función para validar URL de imagen
     const validateImageUrl = (url) => {
         if (!url) return "";
@@ -135,7 +177,7 @@ export const ProductoForm = ({
     // Manejar cambio en UsaColores (AHORA ES SOLO INFORMATIVO)
     const handleUsaColoresChange = (e) => {
         const nuevoValor = e.target.value;
-        
+
         // Solo actualizar el valor, sin lógica compleja de stock
         setValues(prev => ({
             ...prev,
@@ -274,14 +316,14 @@ export const ProductoForm = ({
                         <Package size={16} />
                         Configuración de stock
                     </h4>
-                    
+
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <p className="text-sm text-blue-800 mb-2">
                             <strong>Importante:</strong> El stock se gestiona automáticamente desde el módulo de compras.
                         </p>
                         <p className="text-xs text-blue-600">
-                            • Si el producto usa colores, el stock se asigna por color al realizar compras<br/>
-                            • Si no usa colores, el stock se asigna de forma general al realizar compras<br/>
+                            • Si el producto usa colores, el stock se asigna por color al realizar compras<br />
+                            • Si no usa colores, el stock se asigna de forma general al realizar compras<br />
                             • El stock que ves aquí es solo informativo y refleja el inventario actual
                         </p>
                     </div>
@@ -295,7 +337,8 @@ export const ProductoForm = ({
                                 value={values.UsaColores}
                                 onChange={handleUsaColoresChange}
                                 className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                disabled={isSubmitting}
+                                disabled={isEditing || isSubmitting}
+                                title={isEditing ? 'Esta opción no se puede cambiar después de crear el producto' : ''}
                             >
                                 <option value="0">No - Stock general</option>
                                 <option value="1">Sí - Stock por color</option>
@@ -330,7 +373,6 @@ export const ProductoForm = ({
                         <div className="mt-2 p-3 bg-gray-50 rounded-lg">
                             <p className="text-xs text-gray-600">
                                 <strong>Nota:</strong> El stock actual de este producto es de <strong>{editData.Stock || 0} unidades</strong>.
-                                Para modificarlo, debes realizar una compra en el módulo de compras.
                             </p>
                         </div>
                     )}
@@ -456,15 +498,15 @@ export const ProductoForm = ({
                                     $
                                 </span>
                                 <input
-                                    type="number"
-                                    placeholder="0.00"
+                                    type="text"
+                                    placeholder="0"
                                     name="Precio"
-                                    value={values.Precio}
-                                    onChange={handleChanges}
-                                    min="0"
-                                    step="0.01"
+                                    value={displayPrice}
+                                    onChange={handlePriceChange}
+                                    onBlur={handlePriceBlur}
+                                    onFocus={handlePriceFocus}
                                     className={`w-full h-10 pl-8 pr-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500
-                                        ${submitted && (!values.Precio || parseFloat(values.Precio) <= 0) ? "border-red-500" : "border-gray-300"}`}
+        ${submitted && (!values.Precio || parseFloat(values.Precio) <= 0) ? "border-red-500" : "border-gray-300"}`}
                                     disabled={isSubmitting}
                                 />
                             </div>

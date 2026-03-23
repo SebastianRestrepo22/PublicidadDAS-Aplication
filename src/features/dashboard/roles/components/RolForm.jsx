@@ -13,12 +13,12 @@ export const RolForm = ({
   rolError,
   setRolError,
   originalNombre,
-  setOriginalNombre
+  setOriginalNombre,
+  cargando = false  // ✅ NUEVO: prop para loading
 }) => {
 
   const API_URL = import.meta.env.VITE_API_URL;
 
-  // Actualizar originalNombre cuando cambia editData
   useEffect(() => {
     if (editData) {
       setOriginalNombre(editData.Nombre || "");
@@ -63,7 +63,6 @@ export const RolForm = ({
   const changeData = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-    // Limpiar error cuando el usuario empieza a escribir
     if (rolError) {
       setRolError('');
     }
@@ -82,8 +81,10 @@ export const RolForm = ({
           value={formData.Nombre}
           onChange={changeData}
           onBlur={handleRolBlur}
+          disabled={cargando}
           className={`w-full h-11 px-4 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 
-          ${(submitted && !formData.Nombre.trim()) || rolError ? "border-red-500" : "border-gray-300"}`}
+          ${(submitted && !formData.Nombre.trim()) || rolError ? "border-red-500" : "border-gray-300"}
+          ${cargando ? 'opacity-50 cursor-not-allowed' : ''}`}
         />
         {(!formData.Nombre.trim() && submitted) ? (
           <p className="text-red-500 text-sm mt-1">El nombre no puede ir vacío</p>
@@ -93,13 +94,29 @@ export const RolForm = ({
       </div>
 
       <div className="col-span-1 flex gap-4 mt-4">
-        <button className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors">
-          {buttonLabel}
+        <button 
+          type="submit" 
+          disabled={cargando}
+          className={`flex-1 py-2 rounded-lg transition-colors flex items-center justify-center gap-2
+            ${cargando 
+              ? 'bg-green-400 cursor-not-allowed' 
+              : 'bg-green-500 hover:bg-green-600'} 
+            text-white`}
+        >
+          {cargando ? (
+            <>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              Guardando...
+            </>
+          ) : (
+            buttonLabel
+          )}
         </button>
         <button
           type="button"
           className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
           onClick={onCancel}
+          disabled={cargando}
         >
           Cancelar
         </button>

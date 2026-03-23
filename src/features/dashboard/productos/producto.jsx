@@ -30,6 +30,10 @@ export const ProductosDashboard = () => {
   }, [location.pathname, id]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // ✅ NUEVO: Estado de loading para tabla y datos iniciales
+  const [cargando, setCargando] = useState(true);
+  const [cargandoCategorias, setCargandoCategorias] = useState(true);
+
   const [values, setValues] = useState({
     ProductoId: "",
     Nombre: "",
@@ -70,10 +74,12 @@ export const ProductosDashboard = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [filtroCampo, setFiltroCampo] = useState('');
   const [filtroValor, setFiltroValor] = useState('');
+  const [skipReload, setSkipReload] = useState(false);
 
   const cargarProducto = async () => {
     if (mode !== "list") return;
 
+    setCargando(true);
     try {
       let resultado;
 
@@ -109,19 +115,22 @@ export const ProductosDashboard = () => {
       }
     } catch (error) {
       console.error("Error cargando productos:", error);
+      toast.error("Error al cargar los productos");
       setAllData([]);
       setPaginatedData([]);
       setTotalItems(0);
       setTotalPages(1);
+    } finally {
+      setCargando(false);
     }
   };
 
   useEffect(() => {
     const fetchCategoria = async () => {
+      setCargandoCategorias(true);
       try {
-        const categorias = await getAllCategorias();  // ← Ahora es un array []
+        const categorias = await getAllCategorias();
 
-        // ✅ Verificar que sea un array con datos
         if (Array.isArray(categorias) && categorias.length > 0) {
           setCategorias(categorias);
           setCategoriasFiltradas(categorias);
@@ -133,8 +142,11 @@ export const ProductosDashboard = () => {
         }
       } catch (error) {
         console.error("❌ Error cargando categorías:", error);
+        toast.error("Error al cargar las categorías");
         setCategorias([]);
         setCategoriasFiltradas([]);
+      } finally {
+        setCargandoCategorias(false);
       }
     };
     fetchCategoria();
@@ -153,6 +165,10 @@ export const ProductosDashboard = () => {
   }, [categoriaBusqueda, categorias]);
 
   useEffect(() => {
+    if (skipReload) {
+      setSkipReload(false);
+      return;
+    }
     cargarProducto();
   }, [currentPage, itemsPerPage, filtroCampo, filtroValor, filtroEstado, mode]);
 
@@ -165,6 +181,7 @@ export const ProductosDashboard = () => {
   useEffect(() => {
     if (mode === "view" || mode === "edit") {
       const cargarProducto = async () => {
+        setCargando(true);
         try {
           const todos = await GetDataproductos();
           const resultados = todos?.data || [];
@@ -185,16 +202,12 @@ export const ProductosDashboard = () => {
                 : "",
               CategoriaId: producto.CategoriaId || "",
               UsaColores: String(producto.UsaColores || "0"),
-              Stock: producto.Stock || 0  // ✅ Stock siempre 0 al crear, pero al editar mostrar el actual
+              Stock: producto.Stock || 0
             };
 
             setValues(valoresIniciales);
             setOriginalNombre(producto.Nombre);
             setNombreError('');
-
-            // ✅ YA NO CARGAMOS COLORES AQUÍ
-            // Los colores se muestran directamente desde el backend en la tabla
-
           } else {
             toast.error('Producto no encontrado');
             goToBackToList();
@@ -203,6 +216,8 @@ export const ProductosDashboard = () => {
           console.error('Error cargando producto:', error);
           toast.error('Error al cargar el producto');
           goToBackToList();
+        } finally {
+          setCargando(false);
         }
       };
 
@@ -231,7 +246,6 @@ export const ProductosDashboard = () => {
   const handleChanges = (e) => {
     const { name, value } = e.target;
 
-    // Para Stock, maneja especialmente
     if (name === "Stock") {
       setValues({
         ...values,
@@ -240,9 +254,7 @@ export const ProductosDashboard = () => {
       return;
     }
 
-    // Para Descuento, permite string vacío
     if (name === "Descuento") {
-      // Permite string vacío o números válidos
       if (value === "" || (!isNaN(value) && parseFloat(value) >= 0 && parseFloat(value) <= 100)) {
         setValues({
           ...values,
@@ -252,7 +264,6 @@ export const ProductosDashboard = () => {
       return;
     }
 
-    // Para Precio, convierte a número
     if (name === "Precio") {
       setValues({
         ...values,
@@ -261,7 +272,6 @@ export const ProductosDashboard = () => {
       return;
     }
 
-    // Para otros campos
     setValues({
       ...values,
       [name]: value
@@ -301,7 +311,6 @@ export const ProductosDashboard = () => {
     });
   };
 
-  // Agrega esta función después de handleToggleEstado
   const handleConfirmToggleEstado = async () => {
     const { productoId, nuevoEstado } = confirmEstadoModal;
 
@@ -310,7 +319,20 @@ export const ProductosDashboard = () => {
 
       if (response.status === 200) {
         toast.success(`Producto ${nuevoEstado === 'Activo' ? 'activado' : 'desactivado'} correctamente`);
-        await cargarProducto();
+        setSkipReload(true);
+        const productoActualizado = response.data;
+
+        setAllData(prevData =>
+          prevData.map(p =>
+            p.ProductoId === productoId ? productoActualizado : p
+          )
+        );
+
+        setPaginatedData(prevData =>
+          prevData.map(p =>
+            p.ProductoId === productoId ? productoActualizado : p
+          )
+        );
       } else if (response.status === 400 && response.data?.message) {
         toast.error(response.data.message);
       } else {
@@ -318,11 +340,7 @@ export const ProductosDashboard = () => {
       }
     } catch (error) {
       console.error('Error al cambiar estado:', error);
-      if (error.response?.status === 400 && error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error("Error al cambiar el estado");
-      }
+      toast.error(error.response?.data?.message || "Error al cambiar el estado");
     } finally {
       setConfirmEstadoModal({
         open: false,
@@ -381,7 +399,6 @@ export const ProductosDashboard = () => {
     const currentValues = { ...values };
     const currentUsaColores = parseInt(currentValues.UsaColores);
 
-    // Prepara los datos CORRECTAMENTE - SIN COLORES
     const datosParaEnviar = {
       Nombre: currentValues.Nombre.trim(),
       Descripcion: currentValues.Descripcion.trim(),
@@ -390,13 +407,23 @@ export const ProductosDashboard = () => {
       Descuento: currentValues.Descuento === "" ? 0 : parseFloat(currentValues.Descuento || 0),
       CategoriaId: currentValues.CategoriaId,
       UsaColores: currentUsaColores,
-      // ✅ Stock se envía SIEMPRE (el backend lo manejará)
       Stock: currentUsaColores === 0 ? (parseInt(currentValues.Stock) || 0) : 0
     };
 
     // Validaciones...
     let hasErrors = false;
-    // ... (mantén las validaciones existentes)
+    if (!datosParaEnviar.Nombre) {
+      hasErrors = true;
+    }
+    if (!datosParaEnviar.CategoriaId) {
+      hasErrors = true;
+    }
+    if (!datosParaEnviar.Precio || datosParaEnviar.Precio <= 0) {
+      hasErrors = true;
+    }
+    if (!datosParaEnviar.Imagen) {
+      hasErrors = true;
+    }
 
     if (hasErrors) {
       setIsSubmitting(false);
@@ -407,7 +434,6 @@ export const ProductosDashboard = () => {
       if (mode === "edit" && editData) {
         const response = await updateDataproductos(editData.ProductoId, datosParaEnviar);
         if (response.status === 200) {
-          // ✅ YA NO ENVIAMOS COLORES
           toast.success("Producto actualizado correctamente");
           setCurrentPage(1);
           await cargarProducto();
@@ -416,7 +442,6 @@ export const ProductosDashboard = () => {
       } else if (mode === "create") {
         const response = await postDataproductos(datosParaEnviar);
         if (response.status === 201) {
-          // ✅ YA NO ENVIAMOS COLORES
           toast.success("Producto creado correctamente");
           setCurrentPage(1);
           await cargarProducto();
@@ -424,23 +449,22 @@ export const ProductosDashboard = () => {
         }
       }
     } catch (error) {
-      // ... manejo de errores
+      console.error("Error en handleSubmit:", error);
+      toast.error(error.response?.data?.message || "Error al procesar la solicitud");
+      setIsSubmitting(false);
+    } finally {
       setIsSubmitting(false);
     }
   };
 
-  // En ProductosDashboard.jsx, reemplaza la función handleDelete completa:
-
   const handleDelete = async (id) => {
+    setIsSubmitting(true);
     try {
       const response = await deleteDataproducto(id);
 
       if (response.status === 200 || response.status === 201) {
         toast.success(response.data.message);
-
-        // 🔥 ÚNICA LÍNEA NECESARIA: recargar con paginación backend
         await cargarProducto();
-
         setOpenEliminar(false);
       } else {
         toast.error(response.data?.message || "No se pudo eliminar el producto");
@@ -454,10 +478,11 @@ export const ProductosDashboard = () => {
         toast.error("Error al eliminar el producto");
       }
 
-      // No cerrar modal si hubo error
       if (error.response?.status === 200 || error.response?.status === 201) {
         setOpenEliminar(false);
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -513,7 +538,6 @@ export const ProductosDashboard = () => {
                 <Plus size={18} /> Nuevo producto
               </button>
 
-              {/* Filtro de estado */}
               <select
                 value={filtroEstado}
                 onChange={(e) => setFiltroEstado(e.target.value)}
@@ -572,14 +596,27 @@ export const ProductosDashboard = () => {
 
                 <div className="flex gap-4">
                   <button
-                    className="flex-1 bg-red-500 text-white py-2.5 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2 font-medium"
-                    onClick={() => handleDelete(editData.ProductoId)}
+                    className={`flex-1 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 font-medium
+                      ${isSubmitting 
+                        ? 'bg-red-400 cursor-not-allowed' 
+                        : 'bg-red-500 hover:bg-red-600'} 
+                      text-white`}
+                    onClick={() => handleDelete(editData?.ProductoId)}
+                    disabled={isSubmitting}
                   >
-                    Eliminar
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        Eliminando...
+                      </>
+                    ) : (
+                      'Eliminar'
+                    )}
                   </button>
                   <button
                     className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors flex items-center justify-center gap-2 font-medium"
                     onClick={() => setOpenEliminar(false)}
+                    disabled={isSubmitting}
                   >
                     Cancelar
                   </button>
@@ -600,26 +637,37 @@ export const ProductosDashboard = () => {
             />
 
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-              <div className="overflow-x-auto">
-                <ProductosTable
-                  data={paginatedData}
-                  categorias={categorias}
-                  onEdit={handleEditClick}
-                  onView={handleViewClick}
-                  onDelete={handleDeleteClick}
-                  onToggleEstado={handleToggleEstado}
-                />
-              </div>
+              {cargando ? (
+                <div className="text-center py-12">
+                  <div className="flex justify-center">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                  </div>
+                  <p className="mt-3 text-slate-600">Cargando productos...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <ProductosTable
+                      data={paginatedData}
+                      categorias={categorias}
+                      onEdit={handleEditClick}
+                      onView={handleViewClick}
+                      onDelete={handleDeleteClick}
+                      onToggleEstado={handleToggleEstado}
+                    />
+                  </div>
 
-              {paginatedData && paginatedData.length > 0 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={handlePageChange}
-                  itemsPerPage={itemsPerPage}
-                  totalItems={totalItems}
-                  onItemsPerPageChange={handleItemsPerPageChange}
-                />
+                  {paginatedData && paginatedData.length > 0 && (
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={handlePageChange}
+                      itemsPerPage={itemsPerPage}
+                      totalItems={totalItems}
+                      onItemsPerPageChange={handleItemsPerPageChange}
+                    />
+                  )}
+                </>
               )}
             </div>
           </>
@@ -656,6 +704,7 @@ export const ProductosDashboard = () => {
               abrirModalCategorias={abrirModalCategorias}
               seleccionarCategoria={seleccionarCategoria}
               obtenerNombreCategoria={obtenerNombreCategoria}
+              cargandoCategorias={cargandoCategorias}
             />
           </div>
         )}
@@ -670,12 +719,21 @@ export const ProductosDashboard = () => {
                 Ver producto #{editData?.ProductoId || id}
               </h3>
             </div>
-            <ProductoView
-              editData={editData}
-              categorias={categorias}
-              goToEdit={() => goToEdit(editData.ProductoId)}
-              goToBackToList={goToBackToList}
-            />
+            {cargando ? (
+              <div className="text-center py-12">
+                <div className="flex justify-center">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                </div>
+                <p className="mt-3 text-slate-600">Cargando producto...</p>
+              </div>
+            ) : (
+              <ProductoView
+                editData={editData}
+                categorias={categorias}
+                goToEdit={() => goToEdit(editData?.ProductoId)}
+                goToBackToList={goToBackToList}
+              />
+            )}
           </div>
         )}
 
@@ -689,30 +747,40 @@ export const ProductosDashboard = () => {
                 Editar producto #{editData?.ProductoId || id}
               </h3>
             </div>
-            <ProductoForm
-              mode={mode}
-              values={values}
-              setValues={setValues}
-              editData={editData}
-              categorias={categorias}
-              handleSubmit={handleSubmit}
-              isSubmitting={isSubmitting}
-              submitted={submitted}
-              nombreError={nombreError}
-              imagenError={imagenError}
-              handleChanges={handleChanges}
-              handleNombreBlur={handleNombreBlur}
-              validateImagen={validateImagen}
-              goToBackToList={goToBackToList}
-              openCategoriasModal={openCategoriasModal}
-              setOpenCategoriasModal={setOpenCategoriasModal}
-              categoriaBusqueda={categoriaBusqueda}
-              setCategoriaBusqueda={setCategoriaBusqueda}
-              categoriasFiltradas={categoriasFiltradas}
-              abrirModalCategorias={abrirModalCategorias}
-              seleccionarCategoria={seleccionarCategoria}
-              obtenerNombreCategoria={obtenerNombreCategoria}
-            />
+            {cargando ? (
+              <div className="text-center py-12">
+                <div className="flex justify-center">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                </div>
+                <p className="mt-3 text-slate-600">Cargando producto...</p>
+              </div>
+            ) : (
+              <ProductoForm
+                mode={mode}
+                values={values}
+                setValues={setValues}
+                editData={editData}
+                categorias={categorias}
+                handleSubmit={handleSubmit}
+                isSubmitting={isSubmitting}
+                submitted={submitted}
+                nombreError={nombreError}
+                imagenError={imagenError}
+                handleChanges={handleChanges}
+                handleNombreBlur={handleNombreBlur}
+                validateImagen={validateImagen}
+                goToBackToList={goToBackToList}
+                openCategoriasModal={openCategoriasModal}
+                setOpenCategoriasModal={setOpenCategoriasModal}
+                categoriaBusqueda={categoriaBusqueda}
+                setCategoriaBusqueda={setCategoriaBusqueda}
+                categoriasFiltradas={categoriasFiltradas}
+                abrirModalCategorias={abrirModalCategorias}
+                seleccionarCategoria={seleccionarCategoria}
+                obtenerNombreCategoria={obtenerNombreCategoria}
+                cargandoCategorias={cargandoCategorias}
+              />
+            )}
           </div>
         )}
 
@@ -724,6 +792,7 @@ export const ProductosDashboard = () => {
           setCategoriaBusqueda={setCategoriaBusqueda}
           seleccionarCategoria={seleccionarCategoria}
           selectedCategoriaId={values.CategoriaId}
+          cargando={cargandoCategorias}
         />
 
         <ToastContainer

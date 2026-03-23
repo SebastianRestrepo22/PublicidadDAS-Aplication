@@ -5,13 +5,13 @@ const sanitize = (v) => (v === undefined ? null : v);
 
 // ========== FUNCIONES EXISTENTES ==========
 export const getAllProveedores = async () => {
-  const [rows] = await dbPool.query('SELECT * FROM Proveedores ORDER BY NombreProveedor');
+  const [rows] = await dbPool.query('SELECT * FROM proveedores ORDER BY NombreProveedor');
   return rows;
 };
 
 export const getProveedorById = async (id) => {
   const [rows] = await dbPool.query(
-    'SELECT * FROM Proveedores WHERE ProveedorId = ?',
+    'SELECT * FROM proveedores WHERE ProveedorId = ?',
     [id]
   );
   return rows[0];
@@ -19,7 +19,7 @@ export const getProveedorById = async (id) => {
 
 export const createProveedor = async ({ ProveedorId, nombreProveedor, nit, telefono, correo, direccion, estado }) => {
   await dbPool.query(
-    `INSERT INTO Proveedores
+    `INSERT INTO proveedores
     (ProveedorId, NombreProveedor, Nit, Telefono, Correo, Direccion, Estado)
     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [ProveedorId, nombreProveedor, nit, telefono, correo, direccion, estado]
@@ -29,7 +29,7 @@ export const createProveedor = async ({ ProveedorId, nombreProveedor, nit, telef
 
 export const deleteProveedor = async (id) => {
   const [result] = await dbPool.query(
-    'DELETE FROM Proveedores WHERE ProveedorId = ?',
+    'DELETE FROM proveedores WHERE ProveedorId = ?',
     [id]
   );
   return result;
@@ -38,7 +38,7 @@ export const deleteProveedor = async (id) => {
 export const updateProveedor = async (id, data) => {
   const { nombreProveedor, nit, telefono, correo, direccion, estado } = data;
   const [result] = await dbPool.query(
-    `UPDATE Proveedores
+    `UPDATE proveedores
     SET NombreProveedor = ?, Nit = ?, Telefono = ?, Correo = ?, Direccion = ?, Estado = ?
     WHERE ProveedorId = ?`,
     [
@@ -76,7 +76,7 @@ export const verificarCampoUnico = async (campo, valor, excludeId = null) => {
     throw new Error(`Campo no válido: ${campo}`);
   }
 
-  let query = `SELECT COUNT(*) as count FROM Proveedores WHERE ${columna} = ?`;
+  let query = `SELECT COUNT(*) as count FROM proveedores WHERE ${columna} = ?`;
   let params = [valor];
 
   // Si estamos editando, excluimos el registro actual
@@ -127,12 +127,12 @@ export const getProveedoresPaginated = async ({
   }
 
   const [rows] = await dbPool.query(
-    `SELECT * FROM Proveedores ${whereClause} ORDER BY NombreProveedor LIMIT ? OFFSET ?`,
+    `SELECT * FROM proveedores ${whereClause} ORDER BY NombreProveedor LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );
 
   const [countResult] = await dbPool.query(
-    `SELECT COUNT(*) as total FROM Proveedores ${whereClause}`,
+    `SELECT COUNT(*) as total FROM proveedores ${whereClause}`,
     params
   );
 

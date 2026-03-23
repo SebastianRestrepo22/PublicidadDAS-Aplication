@@ -9,7 +9,7 @@ export const createService = async ({
     CategoriaId
 }) => {
     await dbPool.query(
-        `INSERT INTO Servicios 
+        `INSERT INTO servicios 
         (ServicioId, Nombre, Descripcion, Imagen, CategoriaId)
         VALUES (?, ?, ?, ?, ?)`,
         [
@@ -32,7 +32,7 @@ export const getDataServiceById = async (ServicioId) => {
             Imagen,
             CategoriaId,
             Estado
-        FROM Servicios 
+        FROM servicios 
         WHERE ServicioId = ?`,
         [ServicioId]
     );
@@ -49,7 +49,7 @@ export const getDataAllServcios = async () => {
             Imagen,
             CategoriaId,
             Estado
-        FROM Servicios`
+        FROM servicios`
     );
     return rows;
 };
@@ -64,7 +64,7 @@ export const updateDataServicio = async ({
     Estado
 }) => {
     const [rows] = await dbPool.query(
-        `UPDATE Servicios
+        `UPDATE servicios
          SET Nombre = ?, 
              Descripcion = ?, 
              Imagen = ?, 
@@ -86,7 +86,7 @@ export const updateDataServicio = async ({
 // Verificar si un nombre de servicio ya existe
 export const findDuplicateName = async ({ ServicioId, Nombre }) => {
     const [rows] = await dbPool.query(
-        'SELECT ServicioId FROM Servicios WHERE Nombre = ? AND ServicioId != ?',
+        'SELECT ServicioId FROM servicios WHERE Nombre = ? AND ServicioId != ?',
         [Nombre, ServicioId]
     );
     return rows;
@@ -95,7 +95,7 @@ export const findDuplicateName = async ({ ServicioId, Nombre }) => {
 // Eliminar servicio
 export const deleteDataService = async (ServicioId) => {
     await dbPool.query(
-        `DELETE FROM Servicios WHERE ServicioId = ?`,
+        `DELETE FROM servicios WHERE ServicioId = ?`,
         [ServicioId]
     );
 };
@@ -103,7 +103,7 @@ export const deleteDataService = async (ServicioId) => {
 // Verificar si un nombre de servicio ya existe (para validación)
 export const nombreServiceExiste = async (Nombre) => {
     const [rows] = await dbPool.query(
-        `SELECT * FROM Servicios WHERE Nombre = ?`,
+        `SELECT * FROM servicios WHERE Nombre = ?`,
         [Nombre]
     );
     return rows;
@@ -123,7 +123,7 @@ export const buscarServicioDB = async ({ columna, operador, parametro }) => {
     }
 
     const [servicios] = await dbPool.query(
-        `SELECT * FROM Servicios WHERE ${columna} ${operador} ?`,
+        `SELECT * FROM servicios WHERE ${columna} ${operador} ?`,
         [parametro]
     );
 
@@ -189,7 +189,7 @@ export const getServiciosPaginated = async ({
             Imagen,
             CategoriaId,
             Estado
-        FROM Servicios
+        FROM servicios
         ${whereClause}
         ORDER BY Nombre
         LIMIT ? OFFSET ?
@@ -198,7 +198,7 @@ export const getServiciosPaginated = async ({
     // Contar total de registros para paginación
     const [countResult] = await dbPool.query(`
         SELECT COUNT(*) as total 
-        FROM Servicios
+        FROM servicios
         ${whereClause}
     `, params);
 
