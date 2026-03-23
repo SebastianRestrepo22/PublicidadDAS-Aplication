@@ -16,6 +16,7 @@ export const getComprasPaginated = async (page = 1, limit = 5, filtroCampo = nul
       params.append('filtroValor', filtroValor.trim());
     }
     
+    // 🔥 CORREGIDO: Usar la ruta base '/' en lugar de '/paginated'
     const url = `${API_URL}/api/compras?${params}`;
     console.log("📤 getComprasPaginated - URL:", url);
 
@@ -94,6 +95,7 @@ export const buscarCompras = async (filtroCampo, filtroValor, page = 1, limit = 
 
 export const getAllCompras = async () => {
   try {
+    // 🔥 CORREGIDO: Usar la ruta /todas que sí existe
     const response = await axios.get(`${API_URL}/api/compras/todas`);
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
@@ -219,6 +221,7 @@ export const createDetalleCompra = async (detalleData) => {
     
     const response = await axios.post(`${API_URL}/api/detalle-compras`, dataToSend);
     console.log("✅ [SERVICE] Respuesta del backend:", response.data);
+    const response = await axios.post(`${API_URL}/api/detalle-compras`, dataToSend);
     return response.data;
     
   } catch (error) {
@@ -271,6 +274,7 @@ export const updateDetalleCompra = async (id, detalleData) => {
     
     const response = await axios.put(`${API_URL}/api/detalle-compras/${id}`, dataToSend);
     console.log("✅ [SERVICE] Detalle actualizado correctamente");
+    const response = await axios.put(`${API_URL}/api/detalle-compras/${id}`, detalleData);
     return response.data;
     
   } catch (error) {
@@ -287,6 +291,7 @@ export const deleteDetalleCompra = async (id) => {
     console.log("🗑️ [SERVICE] Eliminando detalle:", id);
     const response = await axios.delete(`${API_URL}/api/detalle-compras/${id}`);
     console.log("✅ [SERVICE] Detalle eliminado correctamente");
+    const response = await axios.delete(`${API_URL}/api/detalle-compras/${id}`);
     return response.data;
   } catch (error) {
     console.error("❌ [SERVICE] Error en deleteDetalleCompra:", error);
