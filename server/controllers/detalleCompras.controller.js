@@ -103,7 +103,7 @@ export const getDetalleByCompraId = async (req, res) => {
   }
 };
 
-// Crear nuevo detalle - SIN ACTUALIZAR STOCK MANUALMENTE (el trigger se encarga)
+// Crear nuevo detalle - CON ACTUALIZACIÓN MANUAL DE STOCK
 export const createDetalle = async (req, res) => {
   const { CompraId, ProductoId, Cantidad, Descripcion, PrecioUnitario, colores } = req.body;
 
@@ -114,29 +114,46 @@ export const createDetalle = async (req, res) => {
   }
 
   try {
-    // 🔥 CREAR EL DETALLE SIN ACTUALIZAR STOCK MANUALMENTE
-    // El trigger trg_compra_stock_colores se encargará de actualizar el stock automáticamente
+    // 1. CREAR EL DETALLE
     const result = await createDetalleModel({
       CompraId,
       ProductoId: ProductoId || null,
       Cantidad,
       Descripcion: Descripcion || null,
       PrecioUnitario: PrecioUnitario || 0,
-      colores: colores || [] // Enviar array de colores
+      colores: colores || []
     });
 
-    // 🔥 ELIMINAR LA ACTUALIZACIÓN MANUAL DE STOCK
-    // NO se debe llamar a actualizarStockProducto aquí porque el trigger ya lo hace
-    // Si se mantiene esta llamada, el stock se duplicará
+    // 2. ACTUALIZAR STOCK MANUALMENTE
+    console.log("🔄 Actualizando stock manualmente...");
     
-    console.log(`✅ Detalle creado. El trigger se encargará del stock automáticamente`);
+    if (colores && colores.length > 0) {
+      // Actualizar stock por cada color
+      for (const color of colores) {
+        const stockColor = Number(color.Stock) || 0;
+        if (stockColor > 0) {
+          const resultado = await actualizarStockProducto(
+            ProductoId,
+            color.ColorId,
+            stockColor
+          );
+          console.log(`✅ Stock actualizado para color ${color.Nombre}: +${stockColor}`, resultado);
+        }
+      }
+    } else {
+      // Actualizar stock general
+      const resultado = await actualizarStockProducto(ProductoId, null, Cantidad);
+      console.log(`✅ Stock general actualizado: +${Cantidad}`, resultado);
+    }
 
-    // Obtener el detalle completo para devolverlo
+    // 3. Obtener el detalle completo
     const detalleCompleto = await getDetalleByIdModel(result.DetalleCompraId);
-
+    
+    console.log(`✅ Detalle creado y stock actualizado correctamente`);
     res.status(201).json(detalleCompleto);
+    
   } catch (err) {
-    console.error("Error al crear el detalle:", err.message);
+    console.error("❌ Error al crear el detalle:", err.message);
     res.status(500).json({ error: err.message });
   }
 };
