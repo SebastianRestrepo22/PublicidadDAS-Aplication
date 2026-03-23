@@ -56,10 +56,6 @@ export const ProductoForm = ({
         return `$ ${Math.round(num).toLocaleString('es-CO')}`;
     };
 
-    const [displayPrice, setDisplayPrice] = useState(() =>
-        values.Precio ? formatCOP(values.Precio) : ''
-    );
-
     // Agrega estas funciones:
     const formatCOP = (value) => {
         if (!value) return '';
@@ -67,6 +63,10 @@ export const ProductoForm = ({
         if (isNaN(num)) return '';
         return `$ ${Math.round(num).toLocaleString('es-CO')}`;
     };
+
+    const [displayPrice, setDisplayPrice] = useState(() =>
+        values.Precio ? formatCOP(values.Precio) : ''
+    );
 
     const handlePriceChange = (e) => {
         let value = e.target.value.replace(/[^\d]/g, ''); // Solo números
