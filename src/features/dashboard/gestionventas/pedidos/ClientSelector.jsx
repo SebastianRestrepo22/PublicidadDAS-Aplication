@@ -36,12 +36,6 @@ export const ClientSelector = ({
         resultado = await getAllClientes(currentPage, itemsPerPage);
       }
       
-      console.log('📦 Clientes cargados:', resultado.data?.map(c => ({ 
-        nombre: c.NombreCompleto || c.Nombre, 
-        telefono: c.Telefono,
-        email: c.CorreoElectronico
-      })));
-      
       setClientes(resultado.data || []);
       setTotalPages(resultado.pagination?.totalPages || 1);
       setTotalItems(resultado.pagination?.totalItems || 0);

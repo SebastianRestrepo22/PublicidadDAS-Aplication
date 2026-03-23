@@ -54,36 +54,15 @@ export const Clientes = () => {
   const cargarClientes = async () => {
     setCargando(true);
     try {
-      console.log('🔄 cargarClientes:', {
-        currentPage,
-        itemsPerPage,
-        filtroCampo,
-        filtroValor
-      });
-
       let resultado;
       if (filtroCampo && filtroValor) {
-        console.log('🔍 Buscando con filtros');
         resultado = await buscarClientes(filtroCampo, filtroValor, currentPage, itemsPerPage);
       } else {
-        console.log('📦 Listando todos los clientes');
         resultado = await getDataClients(currentPage, itemsPerPage);
       }
 
-      console.log('📥 Respuesta del servicio:', {
-        tieneData: !!resultado?.data,
-        dataLength: resultado?.data?.length,
-        pagination: resultado?.pagination
-      });
-
       const data = resultado && resultado.data && Array.isArray(resultado.data) ? resultado.data : [];
       const pagination = resultado && resultado.pagination ? resultado.pagination : {};
-
-      console.log('📊 Datos procesados:', {
-        dataLength: data.length,
-        totalItems: pagination.totalItems,
-        totalPages: pagination.totalPages
-      });
 
       setAllData(data);
       setPaginatedData(data);

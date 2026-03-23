@@ -35,7 +35,6 @@ export const useCategorias = () => {
   const cargarTodasLasCategorias = async () => {
     try {
       const data = await getAllCategorias();
-      console.log("📦 Todas las categorías cargadas:", data);
       setAllData(data); // Actualizar allData con todas las categorías
       return data;
     } catch (error) {

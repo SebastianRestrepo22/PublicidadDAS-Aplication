@@ -146,7 +146,6 @@ export const CrearVenta = () => {
                             stockMap[`${producto.ProductoId}_${c.ColorId}`] = c.Stock || 0;
                         });
 
-                        console.log(`✅ Producto ${producto.Nombre} tiene ${coloresCompletos.length} colores:`, coloresCompletos);
                     } else {
                         coloresMap[producto.ProductoId] = [];
                     }
@@ -325,7 +324,6 @@ export const CrearVenta = () => {
     useEffect(() => { validarTodosLosDetalles(); }, [detalles]);
 
     const abrirModalProductos = (index) => {
-        console.log("Abriendo modal para índice:", index);
         setItemSeleccionado(index);
         setModalAbierto('productos');
         setBusqueda('');

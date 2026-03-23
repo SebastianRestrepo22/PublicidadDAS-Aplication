@@ -31,19 +31,9 @@ const DetallePedido = () => {
       // Verificar si tiene venta asociada
       setEsVenta(!!pedido.VentaId || pedido.EsVenta === true);
 
-      // 🔥 Usar EstadoParaMostrar si existe, sino usar Estado
+      // Usar EstadoParaMostrar si existe, sino usar Estado
       const estado = pedido.EstadoParaMostrar || pedido.Estado;
       setEstadoActual(estado);
-
-      console.log('📦 Tipo de pedido:', {
-        metodo,
-        esContraEntrega: metodo === 'contra_entrega',
-        esVenta: !!pedido.VentaId || pedido.EsVenta === true,
-        estadoPedido: pedido.Estado,
-        estadoVenta: pedido.EstadoVenta,
-        estadoParaMostrar: pedido.EstadoParaMostrar,
-        estadoActual: estado
-      });
     }
   }, [pedido]);
 
@@ -68,7 +58,7 @@ const DetallePedido = () => {
     }
   }, [location.state]);
 
-  // 🔥 Función para obtener la etiqueta del estado
+  // Función para obtener la etiqueta del estado
   const getEstadoLabel = (estado) => {
     // Si es una venta (transferencia/QR/efectivo)
     if (esVenta || (!esContraEntrega && pedido?.VentaId)) {
@@ -96,7 +86,7 @@ const DetallePedido = () => {
     return estado;
   };
 
-  // 🔥 Función para obtener el color del badge
+  // Función para obtener el color del badge
   const getStatusBadgeColor = (estado) => {
     const estadoLower = estado?.toLowerCase();
 
@@ -125,7 +115,7 @@ const DetallePedido = () => {
     return 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
-  // 🔥 Función para obtener el ícono del estado
+  // Función para obtener el ícono del estado
   const getEstadoIcon = (estado) => {
     const estadoLower = estado?.toLowerCase();
 
@@ -154,7 +144,7 @@ const DetallePedido = () => {
     return <Package className="w-4 h-4" />;
   };
 
-  // 🔥 Función para obtener el texto del método de pago
+  // Función para obtener el texto del método de pago
   const getMetodoPagoLabel = (metodo) => {
     const metodoLower = metodo?.toLowerCase() || '';
     switch (metodoLower) {
@@ -186,11 +176,9 @@ const DetallePedido = () => {
 
   // Función para obtener la imagen del producto
   const getItemImage = (item) => {
-    console.log('🔍 Buscando imagen para item:', item);
 
     if (item.UrlImagen) {
       const url = normalizeImageUrl(item.UrlImagen);
-      console.log('📸 Usando UrlImagen del item:', url);
       return url;
     }
 
@@ -198,12 +186,10 @@ const DetallePedido = () => {
       const producto = productos.find(p => p.ProductoId === item.ProductoId);
       if (producto?.Imagen) {
         const url = normalizeImageUrl(producto.Imagen);
-        console.log('📸 Imagen encontrada en catálogo:', url);
         return url;
       }
     }
 
-    console.log('❌ No se encontró imagen, usando default');
     return DEFAULT_PRODUCT_IMAGE;
   };
 
@@ -294,7 +280,7 @@ const DetallePedido = () => {
                 </span>
               </div>
             </div>
-            {/* 🔥 Usar estadoActual en lugar de pedido.Estado */}
+            {/* Usar estadoActual en lugar de pedido.Estado */}
             <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border ${getStatusBadgeColor(estadoActual)}`}>
               {getEstadoIcon(estadoActual)}
               {getEstadoLabel(estadoActual)}
@@ -374,7 +360,6 @@ const DetallePedido = () => {
                             alt={itemName}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              console.log('⚠️ Error cargando imagen:', imageUrl);
                               e.target.onerror = null;
                               e.target.src = DEFAULT_PRODUCT_IMAGE;
                             }}
