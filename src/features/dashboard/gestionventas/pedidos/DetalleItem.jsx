@@ -59,8 +59,6 @@ export const DetalleItem = ({
     const precioLimpio = String(precio).replace(/\./g, '').replace(',', '.');
     const precioNumero = parseFloat(precioLimpio) || 0;
 
-    console.log('💰 Precio original:', precio, 'Limpio:', precioLimpio, 'Número:', precioNumero);
-
     // Guardar el número sin formato
     onActualizar(index, "Precio", precioNumero);
   };

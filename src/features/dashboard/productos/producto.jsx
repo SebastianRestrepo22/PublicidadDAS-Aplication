@@ -135,7 +135,6 @@ const cargarProducto = async () => {
         if (Array.isArray(categorias) && categorias.length > 0) {
           setCategorias(categorias);
           setCategoriasFiltradas(categorias);
-          console.log("✅ Categorías cargadas:", categorias.length);
         } else {
           console.warn("⚠️ No se encontraron categorías o respuesta vacía");
           setCategorias([]);
@@ -189,7 +188,6 @@ const cargarProducto = async () => {
           const producto = resultados.find(p => p.ProductoId === id);
 
           if (producto) {
-            console.log('Producto cargado para edición:', producto);
             setEditData(producto);
 
             const valoresIniciales = {

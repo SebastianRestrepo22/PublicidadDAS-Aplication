@@ -39,18 +39,18 @@ const MisPedidos = () => {
 
   const { pedidos, loading, refetch } = useMisPedidos(clienteId);
 
-  // 🔥 Función para determinar si es contra entrega
+  // Función para determinar si es contra entrega
   const esContraEntrega = (pedido) => {
     const metodo = pedido.MetodoPago?.toLowerCase() || '';
     return metodo === 'contra_entrega';
   };
 
-  // 🔥 Obtener el estado a mostrar (usa EstadoParaMostrar si existe)
+  // Obtener el estado a mostrar (usa EstadoParaMostrar si existe)
   const getEstadoActual = (pedido) => {
     return pedido.EstadoParaMostrar || pedido.Estado;
   };
 
-  // 🔥 Obtener todos los estados únicos de los pedidos
+  // Obtener todos los estados únicos de los pedidos
   const getUniqueStatuses = () => {
     const estados = new Set(['Todos']);
     pedidos.forEach(pedido => {
@@ -60,7 +60,7 @@ const MisPedidos = () => {
     return Array.from(estados);
   };
 
-  // 🔥 Función para obtener la etiqueta del estado
+  // Función para obtener la etiqueta del estado
   const getEstadoLabel = (estado) => {
     const labels = {
       pendiente: 'Pendiente',
@@ -75,7 +75,7 @@ const MisPedidos = () => {
     return labels[estado] || estado;
   };
 
-  // 🔥 Función para obtener el color del estado
+  // Función para obtener el color del estado
   const getEstadoColor = (estado) => {
     switch (estado?.toLowerCase()) {
       case 'pendiente': return 'bg-amber-50 text-amber-700 border-amber-200';
@@ -90,7 +90,7 @@ const MisPedidos = () => {
     }
   };
 
-  // 🔥 Función para obtener el ícono del estado
+  // Función para obtener el ícono del estado
   const getEstadoIcon = (estado) => {
     switch (estado?.toLowerCase()) {
       case 'pendiente': return <Clock className="w-4 h-4" />;
@@ -105,7 +105,7 @@ const MisPedidos = () => {
     }
   };
 
-  // 🔥 Función para obtener el ícono del tipo de pedido
+  // Función para obtener el ícono del tipo de pedido
   const getTipoIcon = (pedido) => {
     if (esContraEntrega(pedido)) {
       return <Truck className="w-5 h-5 text-purple-600" />;
@@ -150,7 +150,7 @@ const MisPedidos = () => {
     }
   };
 
-  // 🔥 Verificar si se puede cancelar un pedido (solo contra entrega y pendiente)
+  // Verificar si se puede cancelar un pedido (solo contra entrega y pendiente)
   const puedeCancelar = (pedido) => {
     const estado = getEstadoActual(pedido);
     // Solo contra entrega Y estado pendiente
@@ -320,7 +320,7 @@ const MisPedidos = () => {
                             <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" />
                           </div>
 
-                          {/* 🔥 Botón de Cancelar - SOLO para contra entrega Y pendiente */}
+                          {/* Botón de Cancelar - SOLO para contra entrega Y pendiente */}
                           {puedeCancelar(order) && (
                             <button
                               onClick={(e) => handleCancelarPedido(order.PedidoClienteId, e)}

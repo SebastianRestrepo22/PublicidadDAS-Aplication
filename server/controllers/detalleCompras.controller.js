@@ -40,14 +40,12 @@ export const getDetalleByCompraId = async (req, res) => {
     // Verificar si viene como query param o como param de ruta
     const CompraId = req.query.CompraId || req.params.CompraId;
     
-    console.log("🔵 [getDetalleByCompraId] Buscando detalles para compra:", CompraId);
     
     if (!CompraId) {
       return res.status(400).json({ error: "CompraId es requerido" });
     }
     
     const detalles = await getDetalleByCompraIdModel(CompraId);
-    console.log("🟢 [getDetalleByCompraId] Detalles obtenidos del modelo:", detalles.length);
     
     // Procesar cada detalle para asegurar que colores sea un array
     const detallesProcesados = detalles.map(detalle => {
@@ -76,11 +74,9 @@ export const getDetalleByCompraId = async (req, res) => {
         // Si ya es un array, dejarlo como está
         else if (Array.isArray(detalleProcesado.colores)) {
           // Ya es un array, verificar que sea válido
-          console.log("🟢 [getDetalleByCompraId] colores ya es array, longitud:", detalleProcesado.colores.length);
         } 
         // Si no es ni string ni array, establecer como array vacío
         else {
-          console.log("🟡 [getDetalleByCompraId] colores no es string ni array, tipo:", typeof detalleProcesado.colores);
           detalleProcesado.colores = [];
         }
       } else {
@@ -90,7 +86,6 @@ export const getDetalleByCompraId = async (req, res) => {
       return detalleProcesado;
     });
     
-    console.log("🟢 [getDetalleByCompraId] Enviando respuesta con", detallesProcesados.length, "detalles");
     res.json(detallesProcesados);
     
   } catch (err) {
