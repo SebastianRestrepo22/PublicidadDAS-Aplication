@@ -59,7 +59,6 @@ export const buscarCompras = async (filtroCampo, filtroValor, page = 1, limit = 
       limit: limit.toString()
     });
     
-    // Usar 'q' como parámetro de búsqueda
     if (filtroValor && filtroValor.trim() !== '') {
       params.append('q', filtroValor.trim());
     }
@@ -150,6 +149,11 @@ export const deleteCompra = async (id) => {
 export const getDetallesByCompraId = async (compraId) => {
   try {
     const response = await axios.get(`${API_URL}/api/detalle-compras/compra/${compraId}`);
+    console.log("🎨 getDetallesByCompraId - Respuesta:", {
+      compraId,
+      cantidad: response.data?.length,
+      primerDetalle: response.data?.[0]?.colores
+    });
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error("❌ Error en getDetallesByCompraId:", error);
@@ -159,50 +163,138 @@ export const getDetallesByCompraId = async (compraId) => {
 
 export const createDetalleCompra = async (detalleData) => {
   try {
+    console.log("🎨 [SERVICE] Creando detalle con datos:", detalleData);
+    
     const dataToSend = {
       CompraId: detalleData.CompraId,
       ProductoId: detalleData.ProductoId,
       Cantidad: Number(detalleData.Cantidad) || 0,
       PrecioUnitario: Number(detalleData.PrecioUnitario) || 0,
-      Descripcion: detalleData.Descripcion || null
+      Descripcion: detalleData.Descripcion || null,
+      colores: [] // Por defecto array vacío
     };
     
+    // 🔥 PROCESAR COLORES CON SU STOCK CORRECTAMENTE
     if (detalleData.colores && Array.isArray(detalleData.colores) && detalleData.colores.length > 0) {
-      const coloresProcesados = detalleData.colores.map(color => ({
-        ColorId: String(color.ColorId || color.colorId || ''),
-        Stock: Number(color.Stock || color.stock || 0),
-        Nombre: String(color.Nombre || color.nombre || 'Color'),
-        Hex: String(color.Hex || color.hex || '#CCCCCC')
-      }));
-      dataToSend.colores = coloresProcesados;
+      console.log("🎨 [SERVICE] Procesando colores con stock:", detalleData.colores);
+      
+      const coloresProcesados = detalleData.colores.map(color => {
+        // Asegurar que cada color tenga Stock (puede venir como Stock, stock o cantidad)
+        let stock = 0;
+        if (color.Stock !== undefined) stock = Number(color.Stock);
+        else if (color.stock !== undefined) stock = Number(color.stock);
+        else if (color.cantidad !== undefined) stock = Number(color.cantidad);
+        else stock = Number(color.Stock || 0);
+        
+        if (isNaN(stock)) stock = 0;
+        
+        return {
+          ColorId: String(color.ColorId || color.colorId || ''),
+          Stock: stock, // 🔥 ESTE ES EL STOCK QUE SE GUARDARÁ
+          Nombre: String(color.Nombre || color.nombre || 'Color'),
+          Hex: String(color.Hex || color.hex || '#CCCCCC')
+        };
+      });
+      
+      // Filtrar colores con stock > 0
+      const coloresConStock = coloresProcesados.filter(color => color.Stock > 0);
+      
+      if (coloresConStock.length > 0) {
+        dataToSend.colores = coloresConStock;
+        console.log("✅ [SERVICE] Colores a enviar al backend:", JSON.stringify(dataToSend.colores, null, 2));
+      } else {
+        console.warn("⚠️ [SERVICE] No hay colores con stock > 0, enviando array vacío");
+        dataToSend.colores = [];
+      }
     } else {
-      dataToSend.colores = [];
+      console.log("📦 [SERVICE] Sin colores, enviando array vacío");
     }
     
+    console.log("📤 [SERVICE] Enviando detalle al backend:", {
+      CompraId: dataToSend.CompraId,
+      ProductoId: dataToSend.ProductoId,
+      Cantidad: dataToSend.Cantidad,
+      PrecioUnitario: dataToSend.PrecioUnitario,
+      coloresCount: dataToSend.colores.length,
+      colores: dataToSend.colores
+    });
+    
+    const response = await axios.post(`${API_URL}/api/detalle-compras`, dataToSend);
+    console.log("✅ [SERVICE] Respuesta del backend:", response.data);
     const response = await axios.post(`${API_URL}/api/detalle-compras`, dataToSend);
     return response.data;
+    
   } catch (error) {
-    console.error("❌ Error en createDetalleCompra:", error);
+    console.error("❌ [SERVICE] Error en createDetalleCompra:", error);
+    if (error.response) {
+      console.error("📦 [SERVICE] Error response:", error.response.data);
+      console.error("📦 [SERVICE] Status:", error.response.status);
+    }
     throw error;
   }
 };
 
 export const updateDetalleCompra = async (id, detalleData) => {
   try {
+    console.log("🎨 [SERVICE] Actualizando detalle:", id, detalleData);
+    
+    const dataToSend = {
+      ProductoId: detalleData.ProductoId,
+      Cantidad: Number(detalleData.Cantidad) || 0,
+      PrecioUnitario: Number(detalleData.PrecioUnitario) || 0,
+      Descripcion: detalleData.Descripcion || null,
+      colores: []
+    };
+    
+    // 🔥 PROCESAR COLORES CON STOCK PARA ACTUALIZACIÓN
+    if (detalleData.colores && Array.isArray(detalleData.colores) && detalleData.colores.length > 0) {
+      console.log("🎨 [SERVICE] Procesando colores para actualización:", detalleData.colores);
+      
+      const coloresProcesados = detalleData.colores.map(color => {
+        let stock = 0;
+        if (color.Stock !== undefined) stock = Number(color.Stock);
+        else if (color.stock !== undefined) stock = Number(color.stock);
+        else if (color.cantidad !== undefined) stock = Number(color.cantidad);
+        else stock = Number(color.Stock || 0);
+        
+        if (isNaN(stock)) stock = 0;
+        
+        return {
+          ColorId: String(color.ColorId || color.colorId || ''),
+          Stock: stock,
+          Nombre: String(color.Nombre || color.nombre || 'Color'),
+          Hex: String(color.Hex || color.hex || '#CCCCCC')
+        };
+      });
+      
+      const coloresConStock = coloresProcesados.filter(color => color.Stock > 0);
+      dataToSend.colores = coloresConStock;
+      console.log("✅ [SERVICE] Colores actualizados:", dataToSend.colores);
+    }
+    
+    const response = await axios.put(`${API_URL}/api/detalle-compras/${id}`, dataToSend);
+    console.log("✅ [SERVICE] Detalle actualizado correctamente");
     const response = await axios.put(`${API_URL}/api/detalle-compras/${id}`, detalleData);
     return response.data;
+    
   } catch (error) {
-    console.error("❌ Error en updateDetalleCompra:", error);
+    console.error("❌ [SERVICE] Error en updateDetalleCompra:", error);
+    if (error.response) {
+      console.error("📦 [SERVICE] Error response:", error.response.data);
+    }
     throw error;
   }
 };
 
 export const deleteDetalleCompra = async (id) => {
   try {
+    console.log("🗑️ [SERVICE] Eliminando detalle:", id);
+    const response = await axios.delete(`${API_URL}/api/detalle-compras/${id}`);
+    console.log("✅ [SERVICE] Detalle eliminado correctamente");
     const response = await axios.delete(`${API_URL}/api/detalle-compras/${id}`);
     return response.data;
   } catch (error) {
-    console.error("❌ Error en deleteDetalleCompra:", error);
+    console.error("❌ [SERVICE] Error en deleteDetalleCompra:", error);
     throw error;
   }
 };
@@ -307,4 +399,24 @@ export const getColorById = async (id) => {
     console.error("❌ Error al obtener color:", error);
     return null;
   }
+};
+
+// ========== FUNCIÓN DE UTILIDAD PARA PROCESAR COLORES ==========
+
+export const procesarColoresConStock = (coloresSeleccionados, coloresDisponibles, cantidadesPorColor = {}) => {
+  if (!coloresSeleccionados || coloresSeleccionados.length === 0) {
+    return [];
+  }
+  
+  return coloresSeleccionados.map(colorId => {
+    const colorInfo = coloresDisponibles.find(c => c.ColorId === colorId || c.id === colorId);
+    const cantidad = cantidadesPorColor[colorId] || 1;
+    
+    return {
+      ColorId: colorId,
+      Stock: cantidad, // 🔥 Aquí va la cantidad de ese color en la compra
+      Nombre: colorInfo?.Nombre || colorInfo?.nombre || 'Color',
+      Hex: colorInfo?.Hex || colorInfo?.hex || '#CCCCCC'
+    };
+  });
 };

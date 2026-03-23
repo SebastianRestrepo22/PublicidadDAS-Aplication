@@ -107,56 +107,64 @@ export const ComprasCreate = ({
   };
 
   const manejarSetColoresConStock = (nuevosColores) => {
-    let coloresArray;
+    // Asegurar que nuevosColores es un array
+    let coloresArray = Array.isArray(nuevosColores) ? nuevosColores : [];
 
-    if (typeof nuevosColores === 'function') {
-      coloresArray = nuevosColores(coloresTemp);
-    } else {
-      coloresArray = nuevosColores;
-    }
+    console.log("🎨 manejarSetColoresConStock - Recibido:", coloresArray);
 
-    if (!Array.isArray(coloresArray)) {
-      coloresArray = [];
-    }
-
+    // Procesar cada color para asegurar que tiene Stock
     const coloresPlanos = coloresArray.map(color => ({
       ColorId: String(color.ColorId || color.colorId || ''),
-      Stock: Number(color.Stock || color.stock || 0),
+      Stock: Number(color.Stock || color.stock || 0),  // 🔥 Asegurar Stock
       Nombre: String(color.Nombre || color.nombre || 'Color'),
       Hex: String(color.Hex || color.hex || '#CCCCCC')
     }));
 
+    console.log("🎨 Colores procesados:", coloresPlanos);
+
+    // Actualizar estado local
     setColoresTemp(coloresPlanos);
 
+    // Actualizar el detalle si hay un índice seleccionado
     if (detalleIndexColor !== null) {
-      const cantidadTotal = coloresPlanos.reduce((sum, c) => {
-        return sum + (Number(c.Stock) || 0);
-      }, 0);
+      // Calcular cantidad total
+      const cantidadTotal = coloresPlanos.reduce((sum, c) => sum + (Number(c.Stock) || 0), 0);
 
+      console.log("📦 Cantidad total:", cantidadTotal);
+
+      // Actualizar colores en el detalle
       onActualizarDetalle(detalleIndexColor, "colores", coloresPlanos);
+      // Actualizar cantidad total
       onActualizarDetalle(detalleIndexColor, "Cantidad", cantidadTotal);
+      // Marcar que usa stock por color
+      onActualizarDetalle(detalleIndexColor, "tipoStock", "colores");
     }
   };
 
   const guardarColoresDesdeModal = () => {
     if (detalleIndexColor !== null) {
-      const coloresParaGuardar = coloresTemp.map(color => {
-        return {
-          ColorId: String(color.ColorId || ''),
-          Stock: Number(color.Stock || 0),
-          Nombre: String(color.Nombre || 'Color'),
-          Hex: String(color.Hex || '#CCCCCC')
-        };
-      });
+      // 🔥 Asegurar que los colores tienen el stock correcto
+      const coloresParaGuardar = coloresTemp.map(color => ({
+        ColorId: String(color.ColorId || ''),
+        Stock: Number(color.Stock || 0),  // 🔥 Asegurar que Stock es número
+        Nombre: String(color.Nombre || 'Color'),
+        Hex: String(color.Hex || '#CCCCCC')
+      }));
 
+      // Calcular cantidad total sumando todos los stocks
       const cantidadTotal = coloresParaGuardar.reduce((sum, c) => {
         return sum + (Number(c.Stock) || 0);
       }, 0);
 
+      console.log("🎨 Guardando colores en detalle:", coloresParaGuardar);
+      console.log("📦 Cantidad total calculada:", cantidadTotal);
+
+      // Actualizar el detalle con los colores
       onActualizarDetalle(detalleIndexColor, "colores", coloresParaGuardar);
       onActualizarDetalle(detalleIndexColor, "Cantidad", cantidadTotal);
       onActualizarDetalle(detalleIndexColor, "tipoStock", "colores");
 
+      // Cerrar modal
       setShowColorModal(false);
       setDetalleIndexColor(null);
       setProductoSeleccionado(null);
@@ -371,21 +379,18 @@ export const ComprasCreate = ({
                         <button
                           type="button"
                           onClick={() => onSelectProducto("create", realIndex)}
-                          className={`w-full text-left flex items-center gap-2 p-2 rounded-lg border h-10 ${
-                            tieneProducto
-                              ? 'border-emerald-500 bg-emerald-50 hover:bg-emerald-100'
-                              : 'border-dashed border-gray-300 bg-white hover:border-emerald-400 hover:bg-emerald-50'
-                          }`}
+                          className={`w-full text-left flex items-center gap-2 p-2 rounded-lg border h-10 ${tieneProducto
+                            ? 'border-emerald-500 bg-emerald-50 hover:bg-emerald-100'
+                            : 'border-dashed border-gray-300 bg-white hover:border-emerald-400 hover:bg-emerald-50'
+                            }`}
                         >
-                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                            tieneProducto ? 'bg-emerald-500' : 'bg-gray-400'
-                          }`}>
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${tieneProducto ? 'bg-emerald-500' : 'bg-gray-400'
+                            }`}>
                             <Package size={12} className="text-white" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`font-medium text-xs truncate ${
-                              tieneProducto ? 'text-emerald-800' : 'text-gray-500'
-                            }`}>
+                            <p className={`font-medium text-xs truncate ${tieneProducto ? 'text-emerald-800' : 'text-gray-500'
+                              }`}>
                               {producto?.Nombre || "Seleccionar producto"}
                             </p>
                             {producto?.SKU && (
@@ -518,16 +523,14 @@ export const ComprasCreate = ({
                                   onActualizarDetalle(realIndex, "tipoStock", "general");
                                 }
                               }}
-                              className={`flex items-center gap-2 px-3 py-2 rounded-lg border w-full ${
-                                tieneColores
-                                  ? 'border-purple-500 bg-purple-50'
-                                  : 'border-dashed border-gray-300 bg-white hover:border-purple-400'
-                              }`}
+                              className={`flex items-center gap-2 px-3 py-2 rounded-lg border w-full ${tieneColores
+                                ? 'border-purple-500 bg-purple-50'
+                                : 'border-dashed border-gray-300 bg-white hover:border-purple-400'
+                                }`}
                             >
                               <Palette size={16} className={tieneColores ? 'text-purple-600' : 'text-gray-400'} />
-                              <span className={`text-xs ${
-                                tieneColores ? 'text-purple-800 font-medium' : 'text-gray-500'
-                              }`}>
+                              <span className={`text-xs ${tieneColores ? 'text-purple-800 font-medium' : 'text-gray-500'
+                                }`}>
                                 {tieneColores
                                   ? `${d.colores.length} colores seleccionados`
                                   : 'Seleccionar colores'
@@ -588,7 +591,7 @@ export const ComprasCreate = ({
               <div className="text-sm text-gray-600">
                 Mostrando {currentArticulos.length} de {detallesCrear.length} artículos
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handlePageChange(currentPageArticulos - 1)}
@@ -598,23 +601,22 @@ export const ComprasCreate = ({
                   <ChevronLeft size={16} />
                   Anterior
                 </button>
-                
+
                 <div className="flex items-center gap-1">
                   {Array.from({ length: totalPagesArticulos }, (_, i) => i + 1).map((page) => (
                     <button
                       key={page}
                       onClick={() => handlePageChange(page)}
-                      className={`w-8 h-8 rounded-full text-sm ${
-                        currentPageArticulos === page
-                          ? 'bg-blue-600 text-white'
-                          : 'hover:bg-gray-100'
-                      }`}
+                      className={`w-8 h-8 rounded-full text-sm ${currentPageArticulos === page
+                        ? 'bg-blue-600 text-white'
+                        : 'hover:bg-gray-100'
+                        }`}
                     >
                       {page}
                     </button>
                   ))}
                 </div>
-                
+
                 <button
                   onClick={() => handlePageChange(currentPageArticulos + 1)}
                   disabled={currentPageArticulos >= totalPagesArticulos}

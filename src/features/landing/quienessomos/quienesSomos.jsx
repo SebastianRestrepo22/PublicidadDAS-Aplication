@@ -112,7 +112,7 @@ export const QuienesSomos = () => {
 
                     <div className="relative overflow-hidden rounded-2xl shadow-xl group">
                         <img
-                            src="/multimedia/carruselLanding4.png"
+                            src="/multimedia/carruselLanding5.png"
                             alt="experiencia 2"
                             className="w-full h-80 object-cover transition-transform duration-700 group-hover:scale-110"
                         />

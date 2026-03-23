@@ -120,7 +120,7 @@ export const Compras = () => {
   const [loadingProductos, setLoadingProductos] = useState(false);
   const [currentDetailIndex, setCurrentDetailIndex] = useState(-1);
 
-  const API_URL = import.meta.env.VITE_API_URL; 
+  const API_URL = import.meta.env.VITE_API_URL;
 
   // Cargar colores al iniciar
   useEffect(() => {
@@ -180,7 +180,7 @@ export const Compras = () => {
         search ? "nombre" : null,
         search,
         page,
-        3  
+        3
       );
       setProductosPaginados(resultado.data || []);
       setProductosPagination({
@@ -334,10 +334,28 @@ export const Compras = () => {
     setDetallesCrear(prev => {
       const nuevos = [...prev];
       if (campo === "colores") {
-        nuevos[index][campo] = valor;
-        const cantidadTotal = valor.reduce((sum, color) => sum + (Number(color.Stock) || 0), 0);
+        // 🔥 PROCESAR COLORES CON STOCK
+        const coloresConStock = valor.map(color => ({
+          ColorId: color.ColorId,
+          Stock: Number(color.Stock) || 0,  // 🔥 Asegurar que el stock está incluido
+          Nombre: color.Nombre,
+          Hex: color.Hex
+        }));
+
+        nuevos[index].colores = coloresConStock;
+
+        // Calcular cantidad total sumando los stocks de cada color
+        const cantidadTotal = coloresConStock.reduce((sum, color) => sum + (Number(color.Stock) || 0), 0);
         nuevos[index].Cantidad = cantidadTotal;
         nuevos[index].tipoStock = "colores";
+
+        // Recalcular subtotal
+        const precio = Number(nuevos[index].PrecioUnitario) || 0;
+        nuevos[index].Subtotal = cantidadTotal * precio;
+
+      } else if (campo === "ProductoId") {
+        nuevos[index][campo] = valor;
+        goToSelectProducto("create", index);
       } else {
         nuevos[index][campo] = valor;
         if (campo === "Cantidad" || campo === "PrecioUnitario") {
@@ -345,9 +363,6 @@ export const Compras = () => {
           const precio = Number(nuevos[index].PrecioUnitario) || 0;
           nuevos[index].Subtotal = cantidad * precio;
         }
-      }
-      if (campo === "ProductoId") {
-        goToSelectProducto("create", index);
       }
       return nuevos;
     });
@@ -368,21 +383,39 @@ export const Compras = () => {
         Total: total
       };
       const compraCreada = await createCompra(compraData);
+
       if (!compraCreada || !compraCreada.CompraId) {
         throw new Error("No se recibió el ID de la compra creada");
       }
+
       for (let i = 0; i < detallesCrear.length; i++) {
         const detalle = detallesCrear[i];
+
+        // 🔥 PROCESAR COLORES CORRECTAMENTE
+        let coloresParaEnviar = [];
+        if (detalle.colores && Array.isArray(detalle.colores) && detalle.colores.length > 0) {
+          coloresParaEnviar = detalle.colores.map(color => ({
+            ColorId: String(color.ColorId),
+            Stock: Number(color.Stock) || 0,  // 🔥 Asegurar que el stock es número
+            Nombre: String(color.Nombre || 'Color'),
+            Hex: String(color.Hex || '#CCCCCC')
+          }));
+          console.log("🎨 Enviando colores con stock:", coloresParaEnviar);
+        }
+
         const detalleData = {
           CompraId: compraCreada.CompraId,
           ProductoId: detalle.ProductoId,
           Cantidad: Number(detalle.Cantidad) || 0,
           PrecioUnitario: Number(detalle.PrecioUnitario) || 0,
           Descripcion: detalle.Descripcion || `Compra de producto`,
-          colores: detalle.colores || []
+          colores: coloresParaEnviar  // 🔥 Enviar colores con stock
         };
+
+        console.log("📤 Enviando detalle:", detalleData);
         await createDetalleCompra(detalleData);
       }
+
       setCurrentPage(1);
       await fetchCompras();
       toast.success(`Compra creada exitosamente. Total: ${formatPrice(total)}`);
@@ -472,7 +505,7 @@ export const Compras = () => {
             searchTermProductos={searchTermProductos}
             setSearchTermProductos={setSearchTermProductos}
             productosPaginados={productosPaginados}
-            productosPagination={productosPagination} 
+            productosPagination={productosPagination}
             loadingProductos={loadingProductos}
             onLoadProductos={loadProductosPaginados}
             onSelectProducto={seleccionarProductoDesdeVista}

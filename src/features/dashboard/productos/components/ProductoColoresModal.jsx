@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Modal from "../../components/modals/modal.jsx";
 import { Search, Check, X, Palette, ChevronDown, ChevronUp, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -6,17 +6,36 @@ export const ProductoColoresModal = ({
   open,
   onClose,
   colores,
-  coloresConStock,
-  setColoresConStock,
+  coloresConStock = [],  // Estado inicial del padre
+  setColoresConStock,    // Función para actualizar el padre
 }) => {
   const [busqueda, setBusqueda] = useState("");
   const [activeTab, setActiveTab] = useState("todos");
   const [expandirResumen, setExpandirResumen] = useState(false);
   const [errorStock, setErrorStock] = useState("");
-
-  // Estados para paginación
   const [paginaActual, setPaginaActual] = useState(1);
-  const coloresPorPagina = 10; // Número de colores por página
+  const coloresPorPagina = 10;
+
+  // 🔥 ESTADO LOCAL para los colores seleccionados con stock
+  const [coloresSeleccionadosLocal, setColoresSeleccionadosLocal] = useState([]);
+
+  // 🔥 Sincronizar con el padre cuando se abre el modal
+  useEffect(() => {
+    if (open) {
+      // Copiar los colores del padre al estado local
+      const coloresIniciales = coloresConStock.map(color => ({
+        ColorId: color.ColorId,
+        Stock: Number(color.Stock) || 0,
+        Nombre: color.Nombre,
+        Hex: color.Hex
+      }));
+      setColoresSeleccionadosLocal(coloresIniciales);
+      setErrorStock("");
+      setBusqueda("");
+      setActiveTab("todos");
+      setPaginaActual(1);
+    }
+  }, [open, coloresConStock]);
 
   // Colores filtrados por búsqueda
   const coloresFiltrados = useMemo(() => {
@@ -32,13 +51,13 @@ export const ProductoColoresModal = ({
   // Ordenar colores: primero los seleccionados, luego el resto
   const coloresOrdenados = useMemo(() => {
     return [...coloresFiltrados].sort((a, b) => {
-      const aSelected = coloresConStock.some(c => c.ColorId === a.ColorId);
-      const bSelected = coloresConStock.some(c => c.ColorId === b.ColorId);
+      const aSelected = coloresSeleccionadosLocal.some(c => c.ColorId === a.ColorId);
+      const bSelected = coloresSeleccionadosLocal.some(c => c.ColorId === b.ColorId);
       if (aSelected && !bSelected) return -1;
       if (!aSelected && bSelected) return 1;
       return a.Nombre.localeCompare(b.Nombre);
     });
-  }, [coloresFiltrados, coloresConStock]);
+  }, [coloresFiltrados, coloresSeleccionadosLocal]);
 
   // Calcular paginación
   const totalPaginas = useMemo(() => {
@@ -51,7 +70,7 @@ export const ProductoColoresModal = ({
     return coloresOrdenados.slice(inicio, fin);
   }, [coloresOrdenados, paginaActual]);
 
-  // Resetear página cuando cambia la búsqueda o la pestaña
+  // Resetear página cuando cambia la búsqueda
   const resetearPaginacion = () => {
     setPaginaActual(1);
   };
@@ -69,21 +88,21 @@ export const ProductoColoresModal = ({
   // Colores seleccionados para la pestaña
   const coloresSeleccionadosList = useMemo(() => {
     return colores
-      .filter(color => coloresConStock.some(c => c.ColorId === color.ColorId))
+      .filter(color => coloresSeleccionadosLocal.some(c => c.ColorId === color.ColorId))
       .map(color => ({
         ...color,
-        Stock: coloresConStock.find(c => c.ColorId === color.ColorId)?.Stock || 0
+        Stock: coloresSeleccionadosLocal.find(c => c.ColorId === color.ColorId)?.Stock || 0
       }));
-  }, [colores, coloresConStock]);
+  }, [colores, coloresSeleccionadosLocal]);
 
   // Validar que todos los colores seleccionados tengan stock > 0
   const validarStocks = () => {
-    if (coloresConStock.length === 0) {
+    if (coloresSeleccionadosLocal.length === 0) {
       setErrorStock("Debes seleccionar al menos un color");
       return false;
     }
 
-    const coloresSinStock = coloresConStock.filter(c => parseInt(c.Stock) === 0);
+    const coloresSinStock = coloresSeleccionadosLocal.filter(c => parseInt(c.Stock) === 0);
     if (coloresSinStock.length > 0) {
       setErrorStock(`Los siguientes colores deben tener stock mínimo 1: ${
         coloresSinStock.map(c => c.Nombre).join(", ")
@@ -95,12 +114,12 @@ export const ProductoColoresModal = ({
     return true;
   };
 
+  // 🔥 FUNCIÓN PARA ACTUALIZAR STOCK DE UN COLOR EN ESTADO LOCAL
   const handleStockChange = (colorId, nuevoStock) => {
-    setErrorStock(""); // Limpiar error al cambiar stock
+    setErrorStock("");
     
-    // Permitir vacío o números
     if (nuevoStock === "") {
-      setColoresConStock(prev =>
+      setColoresSeleccionadosLocal(prev =>
         prev.map(c =>
           c.ColorId === colorId
             ? { ...c, Stock: "" }
@@ -110,7 +129,7 @@ export const ProductoColoresModal = ({
     } else {
       const stockNumero = parseInt(nuevoStock, 10);
       if (!isNaN(stockNumero) && stockNumero >= 0) {
-        setColoresConStock(prev =>
+        setColoresSeleccionadosLocal(prev =>
           prev.map(c =>
             c.ColorId === colorId
               ? { ...c, Stock: stockNumero }
@@ -122,7 +141,7 @@ export const ProductoColoresModal = ({
   };
 
   const handleBlurStock = (colorId) => {
-    setColoresConStock(prev =>
+    setColoresSeleccionadosLocal(prev =>
       prev.map(c =>
         c.ColorId === colorId
           ? { ...c, Stock: c.Stock === "" ? 0 : parseInt(c.Stock) || 0 }
@@ -131,44 +150,71 @@ export const ProductoColoresModal = ({
     );
   };
 
+  // 🔥 FUNCIÓN PARA SELECCIONAR UN COLOR
   const seleccionarColor = (color) => {
-  setErrorStock(""); // Limpiar error al seleccionar
-  
-  // Verificar si el color ya está seleccionado para no duplicarlo
-  const yaSeleccionado = coloresConStock.some(c => c.ColorId === color.ColorId);
-  
-  if (!yaSeleccionado) {
-    setColoresConStock(prev => [
-      ...prev,
-      {
-        ColorId: color.ColorId,
-        Stock: 1,
-        Nombre: color.Nombre,
-        Hex: color.Hex
-      }
-    ]);
-  }
-};
+    setErrorStock("");
+    
+    const yaSeleccionado = coloresSeleccionadosLocal.some(c => c.ColorId === color.ColorId);
+    
+    if (!yaSeleccionado) {
+      setColoresSeleccionadosLocal(prev => [
+        ...prev,
+        {
+          ColorId: color.ColorId,
+          Stock: 1,
+          Nombre: color.Nombre,
+          Hex: color.Hex
+        }
+      ]);
+    }
+  };
 
+  // 🔥 FUNCIÓN PARA DESELECCIONAR UN COLOR
   const deseleccionarColor = (colorId) => {
-    setErrorStock(""); // Limpiar error al deseleccionar
-    setColoresConStock(prev =>
+    setErrorStock("");
+    setColoresSeleccionadosLocal(prev =>
       prev.filter(c => c.ColorId !== colorId)
     );
   };
 
+  // 🔥 FUNCIÓN PARA LIMPIAR TODOS LOS COLORES
+  const limpiarTodos = () => {
+    if (window.confirm("¿Estás seguro de eliminar todos los colores asignados?")) {
+      setColoresSeleccionadosLocal([]);
+      setErrorStock("");
+    }
+  };
+
   const stockTotal = useMemo(() => {
-    return coloresConStock.reduce((sum, c) => sum + (parseInt(c.Stock) || 0), 0);
-  }, [coloresConStock]);
+    return coloresSeleccionadosLocal.reduce((sum, c) => sum + (parseInt(c.Stock) || 0), 0);
+  }, [coloresSeleccionadosLocal]);
 
   const coloresSinStock = useMemo(() => {
-    return coloresConStock.filter(c => parseInt(c.Stock) === 0).length;
-  }, [coloresConStock]);
+    return coloresSeleccionadosLocal.filter(c => parseInt(c.Stock) === 0).length;
+  }, [coloresSeleccionadosLocal]);
 
+  // 🔥 GUARDAR Y CERRAR - Actualizar el padre con los cambios
   const handleGuardar = () => {
     if (validarStocks()) {
+      // Preparar los colores para guardar
+      const coloresParaGuardar = coloresSeleccionadosLocal.map(color => ({
+        ColorId: color.ColorId,
+        Stock: Number(color.Stock) || 0,
+        Nombre: color.Nombre,
+        Hex: color.Hex
+      }));
+      
+      // 🔥 Actualizar el estado del padre
+      setColoresConStock(coloresParaGuardar);
+      
+      // Cerrar el modal
       onClose();
     }
+  };
+
+  // 🔥 CANCELAR - Cerrar sin guardar cambios
+  const handleCancelar = () => {
+    onClose();
   };
 
   // Componente de paginación
@@ -189,7 +235,6 @@ export const ProductoColoresModal = ({
                 ? 'border-gray-100 text-gray-300 cursor-not-allowed'
                 : 'border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400'
             }`}
-            title="Página anterior"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -231,7 +276,6 @@ export const ProductoColoresModal = ({
                 ? 'border-gray-100 text-gray-300 cursor-not-allowed'
                 : 'border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400'
             }`}
-            title="Página siguiente"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -241,7 +285,7 @@ export const ProductoColoresModal = ({
   };
 
   return (
-    <Modal open={open} onClose={onClose}>
+    <Modal open={open} onClose={handleCancelar}>
       <div className="p-6 bg-white rounded-xl w-[600px] max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
@@ -259,7 +303,7 @@ export const ProductoColoresModal = ({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleCancelar}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <X className="w-5 h-5 text-gray-500" />
@@ -288,15 +332,15 @@ export const ProductoColoresModal = ({
             onClick={() => handleTabChange("seleccionados")}
           >
             Seleccionados
-            {coloresConStock.length > 0 && (
+            {coloresSeleccionadosLocal.length > 0 && (
               <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">
-                {coloresConStock.length}
+                {coloresSeleccionadosLocal.length}
               </span>
             )}
           </button>
         </div>
 
-        {/* Buscador - Solo en pestaña "todos" */}
+        {/* Buscador */}
         {activeTab === "todos" && (
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -307,17 +351,6 @@ export const ProductoColoresModal = ({
               onChange={handleBusquedaChange}
               className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
             />
-            {busqueda && (
-              <button
-                onClick={() => {
-                  setBusqueda("");
-                  resetearPaginacion();
-                }}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
           </div>
         )}
 
@@ -332,11 +365,10 @@ export const ProductoColoresModal = ({
         {/* Lista de colores */}
         <div className="flex-1 overflow-y-auto pr-1 -mr-1">
           {activeTab === "todos" ? (
-            // PESTAÑA: TODOS LOS COLORES
             coloresOrdenados.length > 0 ? (
               <div className="space-y-2">
                 {coloresPaginados.map(color => {
-                  const colorSeleccionado = coloresConStock.find(c => c.ColorId === color.ColorId);
+                  const colorSeleccionado = coloresSeleccionadosLocal.find(c => c.ColorId === color.ColorId);
                   const stockActual = colorSeleccionado?.Stock ?? "";
 
                   return (
@@ -406,13 +438,6 @@ export const ProductoColoresModal = ({
                           </button>
                         )}
                       </div>
-
-                      {colorSeleccionado && parseInt(stockActual) === 0 && (
-                        <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
-                          <AlertCircle className="w-3.5 h-3.5" />
-                          Debe tener al menos 1 unidad de stock
-                        </div>
-                      )}
                     </div>
                   );
                 })}
@@ -433,7 +458,7 @@ export const ProductoColoresModal = ({
             coloresSeleccionadosList.length > 0 ? (
               <div className="space-y-2">
                 {coloresSeleccionadosList.map(color => {
-                  const stockActual = coloresConStock.find(c => c.ColorId === color.ColorId)?.Stock ?? "";
+                  const stockActual = coloresSeleccionadosLocal.find(c => c.ColorId === color.ColorId)?.Stock ?? "";
 
                   return (
                     <div
@@ -480,12 +505,6 @@ export const ProductoColoresModal = ({
                           </button>
                         </div>
                       </div>
-                      {parseInt(stockActual) === 0 && (
-                        <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
-                          <AlertCircle className="w-3.5 h-3.5" />
-                          Debe tener al menos 1 unidad de stock
-                        </div>
-                      )}
                     </div>
                   );
                 })}
@@ -504,7 +523,7 @@ export const ProductoColoresModal = ({
           )}
         </div>
 
-        {/* Paginación - Solo visible en pestaña "todos" y cuando hay más de una página */}
+        {/* Paginación */}
         {activeTab === "todos" && coloresOrdenados.length > coloresPorPagina && (
           <Paginacion 
             total={totalPaginas} 
@@ -513,15 +532,14 @@ export const ProductoColoresModal = ({
           />
         )}
 
-        {/* Footer con resumen y acciones */}
+        {/* Footer */}
         <div className="mt-4 pt-4 border-t border-gray-200">
-          {/* Resumen rápido */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                 <span className="text-sm text-gray-600">
-                  <span className="font-semibold text-gray-900">{coloresConStock.length}</span> colores
+                  <span className="font-semibold text-gray-900">{coloresSeleccionadosLocal.length}</span> colores
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -540,14 +558,9 @@ export const ProductoColoresModal = ({
               )}
             </div>
 
-            {coloresConStock.length > 0 && (
+            {coloresSeleccionadosLocal.length > 0 && (
               <button
-                onClick={() => {
-                  if (window.confirm("¿Estás seguro de eliminar todos los colores asignados?")) {
-                    setColoresConStock([]);
-                    setErrorStock("");
-                  }
-                }}
+                onClick={limpiarTodos}
                 className="text-sm text-red-600 hover:text-red-700 px-3 py-1.5 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1"
               >
                 <X className="w-3.5 h-3.5" />
@@ -556,8 +569,8 @@ export const ProductoColoresModal = ({
             )}
           </div>
 
-          {/* Resumen detallado (expandible) */}
-          {coloresConStock.length > 0 && (
+          {/* Resumen detallado */}
+          {coloresSeleccionadosLocal.length > 0 && (
             <div className="mb-3">
               <button
                 onClick={() => setExpandirResumen(!expandirResumen)}
@@ -573,7 +586,7 @@ export const ProductoColoresModal = ({
 
               {expandirResumen && (
                 <div className="mt-2 grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-2 bg-gray-50 rounded-lg">
-                  {coloresConStock.map(color => (
+                  {coloresSeleccionadosLocal.map(color => (
                     <div key={color.ColorId} className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-1.5">
                         <span
@@ -603,7 +616,7 @@ export const ProductoColoresModal = ({
             </button>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleCancelar}
               className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             >
               Cancelar
