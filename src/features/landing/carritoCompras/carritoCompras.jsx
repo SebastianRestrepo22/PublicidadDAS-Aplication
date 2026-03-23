@@ -204,8 +204,6 @@ export const CarritoCompras = () => {
   const handleSelectColor = (color) => {
     if (!editingColorItem) return;
 
-    console.log("🎨 [CARRITO] Guardando ColorId UUID:", color.ColorId);
-
     if (color.Stock === 0) {
       toast.error(`El color ${color.Nombre} no tiene stock disponible`);
       return;
@@ -261,18 +259,6 @@ export const CarritoCompras = () => {
     const price = Number(item.Precio) || 0;
     const quantity = item.quantity || 1;
     return price * quantity;
-  };
-
-  const verificarDatosCarrito = () => {
-    console.log("=== VERIFICACIÓN DE DATOS DEL CARRITO ===");
-    cart.forEach((item, index) => {
-      console.log(`Item ${index + 1}: ${item.Nombre}`);
-      console.log("  - ProductoId:", item.ProductoId);
-      console.log("  - Customization:", item.customization);
-      console.log("  - Color Object:", item.customization?.color);
-      console.log("  - ColorId:", item.customization?.color?.ColorId);
-      console.log("  - Tiene ColorId?:", !!item.customization?.color?.ColorId);
-    });
   };
 
   const handleCheckout = () => {

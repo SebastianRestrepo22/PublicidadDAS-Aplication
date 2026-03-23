@@ -30,7 +30,6 @@ export const GraficosEstadisticos = () => {
   const cargarDatosDashboard = async () => {
     try {
       setCargando(true);
-      console.log('🔍 Solicitando datos del dashboard...');
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/stats`, {
         method: 'GET',
@@ -42,7 +41,6 @@ export const GraficosEstadisticos = () => {
       }
 
       const datosReales = await response.json();
-      console.log('📊 Datos dashboard recibidos:', datosReales);
 
       setDatos(datosReales);
       setCargando(false);

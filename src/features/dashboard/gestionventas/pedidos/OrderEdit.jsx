@@ -70,10 +70,7 @@ export const OrderEdit = ({
 
   // Efecto para inicializar el cliente cuando se carga el componente
   useEffect(() => {
-    console.log('🔄 Inicializando OrderEdit con pedidoOriginal:', pedidoOriginal);
-
     if (pedidoOriginal?.ClienteId && tipoClienteCrear === 'registrado') {
-      console.log('🎯 Cliente ID del pedido original:', pedidoOriginal.ClienteId);
 
       // Buscar en clientes si ya están cargados
       if (clientes.length > 0) {
@@ -84,8 +81,6 @@ export const OrderEdit = ({
         );
 
         if (clienteInicial) {
-          console.log('✅ Cliente inicial encontrado:', clienteInicial);
-
           // Crear el objeto cliente con la estructura correcta
           const clienteData = {
             CedulaId: clienteInicial.CedulaId || clienteInicial.ClienteId || clienteInicial.id,
@@ -95,12 +90,8 @@ export const OrderEdit = ({
           };
 
           setClienteSeleccionado(clienteData);
-        } else {
-          console.log('⚠️ Cliente no encontrado en lista inicial');
-        }
-      } else {
-        console.log('⚠️ Lista de clientes vacía en inicialización');
-      }
+        } 
+      } 
     }
   }, [pedidoOriginal, clientes, tipoClienteCrear]);
 
@@ -119,10 +110,6 @@ export const OrderEdit = ({
         return;
       }
 
-      console.log('🔍 Intentando cargar cliente con ID:', formCrear.ClienteId);
-      console.log('📊 Estado actual - clientes cargados:', clientes.length);
-      console.log('📊 clienteSeleccionado actual:', clienteSeleccionado);
-
       // Si ya tenemos un cliente seleccionado y coincide, no hacer nada
       if (clienteSeleccionado) {
         const idCoincide =
@@ -131,7 +118,6 @@ export const OrderEdit = ({
           clienteSeleccionado.id === formCrear.ClienteId;
 
         if (idCoincide) {
-          console.log('✅ Cliente ya seleccionado correctamente');
           return;
         }
       }
@@ -145,8 +131,6 @@ export const OrderEdit = ({
         );
 
         if (clienteEncontrado) {
-          console.log('✅ Cliente encontrado en lista:', clienteEncontrado);
-
           // Crear el objeto cliente con la estructura correcta
           const clienteData = {
             CedulaId: clienteEncontrado.CedulaId || clienteEncontrado.ClienteId || clienteEncontrado.id,
@@ -157,18 +141,7 @@ export const OrderEdit = ({
 
           setClienteSeleccionado(clienteData);
           return;
-        } else {
-          console.log('⚠️ Cliente no encontrado en la lista. IDs disponibles:',
-            clientes.map(c => ({
-              CedulaId: c.CedulaId,
-              ClienteId: c.ClienteId,
-              id: c.id,
-              Nombre: c.NombreCompleto || c.Nombre
-            }))
-          );
-        }
-      } else {
-        console.log('⚠️ Lista de clientes vacía, esperando carga...');
+        } 
       }
     };
 
@@ -199,8 +172,6 @@ export const OrderEdit = ({
   };
 
   const seleccionarCliente = (cliente) => {
-    console.log('👤 Seleccionando cliente:', cliente);
-
     // Crear el objeto cliente con la estructura correcta
     const clienteData = {
       CedulaId: cliente.CedulaId || cliente.ClienteId || cliente.id,
@@ -482,12 +453,6 @@ export const OrderEdit = ({
 
   const currentArticulos = getCurrentPageArticulos();
 
-  console.log('📊 Estado final - clienteSeleccionado:', clienteSeleccionado);
-  console.log('📊 formCrear:', {
-    ClienteId: formCrear.ClienteId,
-    NombreCliente: formCrear.NombreCliente
-  });
-
   const handleSubmit = async () => {
     // Validaciones básicas
     const errs = [];
@@ -546,7 +511,6 @@ export const OrderEdit = ({
     // Si hay un nuevo voucher, agregarlo al FormData
     if (voucherFile) {
       formData.append('voucher', voucherFile);
-      console.log('📎 Adjuntando voucher:', voucherFile.name);
     }
 
     try {
@@ -559,7 +523,6 @@ export const OrderEdit = ({
         }
       );
 
-      console.log('✅ Respuesta del servidor:', response.data);
       toast.success("Pedido actualizado correctamente");
       onBack(); // Esto llama a goToList() que recarga los datos
     } catch (err) {

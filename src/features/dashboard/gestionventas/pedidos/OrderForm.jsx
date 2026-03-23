@@ -67,8 +67,6 @@ export const OrderForm = ({
   // Efecto para detectar cuando el modal de colores se cierra
   useEffect(() => {
     if (!modalColoresProductoAbierto && currentDetailIndex !== null) {
-      console.log('🎨 Modal cerrado, colores seleccionados:', coloresSeleccionados);
-
       if (coloresSeleccionados && coloresSeleccionados.length > 0) {
         const nuevos = [...detallesCrear];
         const colorSeleccionado = coloresSeleccionados[0];
@@ -134,15 +132,11 @@ export const OrderForm = ({
 
   // Handlers para productos
   const abrirModalProductos = (index) => {
-    console.log('📦 Abriendo selector productos para índice:', index);
     setCurrentDetailIndex(index);
     setModalProductosAbierto(true);
   };
 
   const seleccionarProducto = (producto) => {
-    console.log('📦 Producto seleccionado:', producto);
-    console.log('🎨 Colores del producto:', producto.Colores);
-
     if (currentDetailIndex !== null) {
       const nuevos = [...detallesCrear];
       nuevos[currentDetailIndex] = {
@@ -162,7 +156,6 @@ export const OrderForm = ({
         coloresDisponibles: producto.Colores || []
       };
 
-      console.log('📦 Detalle actualizado:', nuevos[currentDetailIndex]);
       setDetallesCrear(nuevos);
       setModalProductosAbierto(false);
     }
@@ -170,14 +163,11 @@ export const OrderForm = ({
 
   // Handlers para servicios
   const abrirModalServicios = (index) => {
-    console.log('Abriendo selector servicios para índice:', index);
     setCurrentDetailIndex(index);
     setModalServiciosAbierto(true);
   };
 
   const seleccionarServicio = (servicio) => {
-    console.log(' Servicio seleccionado:', servicio);
-
     if (currentDetailIndex !== null) {
       const nuevos = [...detallesCrear];
       nuevos[currentDetailIndex] = {
@@ -196,9 +186,6 @@ export const OrderForm = ({
   };
 
   const abrirModalColores = (index) => {
-    console.log('🎨 Abriendo modal colores para índice:', index);
-    console.log(' Detalle en índice:', detallesCrear[index]);
-
     if (detallesCrear[index]?.tipo === 'producto') {
       const detalleProducto = detallesCrear[index];
 
@@ -213,8 +200,6 @@ export const OrderForm = ({
         toast.warning("Este producto no tiene colores disponibles");
         return;
       }
-
-      console.log('🎨 Colores disponibles para este producto:', coloresDelProducto);
 
       setCurrentDetailIndex(index);
 
@@ -246,7 +231,6 @@ export const OrderForm = ({
 
   // Handlers para detalles
   const cambiarTipoDetalle = (index, nuevoTipo) => {
-    console.log('Cambiando tipo de detalle:', index, nuevoTipo);
     const nuevos = [...detallesCrear];
 
     if (nuevoTipo === 'producto') {

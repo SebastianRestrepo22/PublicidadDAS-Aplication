@@ -4,13 +4,13 @@ import { useCart } from "../../../../context/CartContext";
 import { useAuth } from "../../../../context/AuthContext";
 import { toast } from "react-toastify";
 
-// ✅ VALIDADOR DE UUID
+// VALIDADOR DE UUID
 const isValidUUID = (str) => {
   if (typeof str !== 'string') return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 };
 
-// ✅ FUNCIÓN PARA EXTRAER COLORID SEGURO
+// FUNCIÓN PARA EXTRAER COLORID SEGURO
 const extractValidColorId = (item) => {
   if (!item?.customization?.color) return null;
 
@@ -30,7 +30,7 @@ const extractValidColorId = (item) => {
   return null;
 };
 
-// ✅ FUNCIÓN PARA FORMATEAR PRECIOS EN COP
+// FUNCIÓN PARA FORMATEAR PRECIOS EN COP
 const formatCOP = (value) => {
   if (value === undefined || value === null) return 'COP 0';
   const num = typeof value === 'number' ? value : parseFloat(value);
@@ -83,7 +83,6 @@ export const Checkout = () => {
   // ====== FUNCIÓN PARA CALCULAR TOTAL DE FORMA SEGURA ======
   const calcularTotalSeguro = () => {
     const total = getTotal();
-    console.log('💰 Total recibido de getTotal():', total, 'Tipo:', typeof total);
 
     let totalNumerico = 0;
 
@@ -99,7 +98,6 @@ export const Checkout = () => {
       totalNumerico = Number(total) || 0;
     }
 
-    console.log('💰 Total numérico final:', totalNumerico);
     return totalNumerico;
   };
 
@@ -121,7 +119,7 @@ export const Checkout = () => {
     setError("");
 
     try {
-      // ✅ CONSTRUIR DETALLES CON VALIDACIÓN SEGURA
+      // CONSTRUIR DETALLES CON VALIDACIÓN SEGURA
       const detallesValidados = cart.map(item => {
         const ProductoId = item.ProductoId;
         
@@ -129,10 +127,10 @@ export const Checkout = () => {
           throw new Error(`El ítem "${item.Nombre || item.id}" no tiene ProductoId válido`);
         }
 
-        // ✅ EXTRAER COLORID SEGURO
+        // EXTRAER COLORID SEGURO
         const ColorId = extractValidColorId(item);
 
-        // ✅ DESCRIPCIÓN CON COLOR SI NO ES UUID
+        // DESCRIPCIÓN CON COLOR SI NO ES UUID
         let descripcion = item.options?.descripcion || item.Descripcion || item.customization?.Descripcion || "";
 
         if (item.customization?.color && !ColorId) {
@@ -145,7 +143,7 @@ export const Checkout = () => {
           }
         }
 
-        // ✅ EXTRAER URL DE ARCHIVO PERSONALIZADO
+        // EXTRAER URL DE ARCHIVO PERSONALIZADO
         let UrlArchivoPersonalizado = null;
         let tipoArchivo = null;
         let nombreArchivo = null;
@@ -158,12 +156,6 @@ export const Checkout = () => {
               : `${API_URL}${archivo.url}`;
             tipoArchivo = archivo.tipo || archivo.type || 'desconocido';
             nombreArchivo = archivo.nombre || archivo.name || 'archivo';
-
-            console.log(`📎 Archivo personalizado encontrado para ${item.Nombre}:`, {
-              url: UrlArchivoPersonalizado,
-              tipo: tipoArchivo,
-              nombre: nombreArchivo
-            });
           }
         }
 
@@ -178,7 +170,7 @@ export const Checkout = () => {
         };
       });
 
-      // ✅ VALIDACIÓN FINAL
+      // VALIDACIÓN FINAL
       const detallesFinales = detallesValidados.filter(detalle => {
         if (!detalle.ProductoId) {
           console.error(`❌ Item sin ProductoId omitido:`, detalle);
@@ -191,13 +183,7 @@ export const Checkout = () => {
         throw new Error("No hay items válidos para procesar el pedido");
       }
 
-      console.log('🔍 DEBUG - Detalles finales con archivos:', detallesFinales.map(d => ({
-        tieneArchivoPersonalizado: !!d.UrlImagenPersonalizada,
-        urlArchivoPersonalizado: d.UrlImagenPersonalizada,
-        urlImagen: d.UrlImagen
-      })));
-
-      // 🔥 CALCULAR TOTAL DE FORMA SEGURA
+      // CALCULAR TOTAL DE FORMA SEGURA
       const totalSeguro = calcularTotalSeguro();
 
       if (isNaN(totalSeguro) || totalSeguro <= 0) {
@@ -215,16 +201,14 @@ export const Checkout = () => {
         detalle: detallesFinales
       };
 
-      // ✅ AGREGAR DATOS DE ENTREGA SI ES CONTRA ENTREGA
+      // AGREGAR DATOS DE ENTREGA SI ES CONTRA ENTREGA
       if (metodoPago === "entrega") {
         payload.NombreRecibe = datosEntrega.nombreRecibe;
         payload.TelefonoEntrega = datosEntrega.telefono;
         payload.DireccionEntrega = datosEntrega.direccion;
       }
 
-      console.log('📦 Payload a enviar:', JSON.stringify(payload, null, 2));
-
-      // ✅ ENVIAR AL BACKEND
+      // ENVIAR AL BACKEND
       const formData = new FormData();
       formData.append("pedido", JSON.stringify(payload));
 
@@ -233,7 +217,6 @@ export const Checkout = () => {
           item.customization.archivosAdjuntosOriginales.forEach((file, fileIndex) => {
             if (file instanceof File) {
               formData.append(`archivo_${index}_${fileIndex}`, file);
-              console.log(`📎 Adjuntando archivo físico: ${file.name} (${file.type})`);
             }
           });
         }
@@ -251,18 +234,11 @@ export const Checkout = () => {
       }
 
       const data = await res.json();
-      console.log('✅ Respuesta del servidor:', data);
-
-      if (data.detalle?.[0]?.UrlImagenPersonalizada) {
-        console.log('🎉 ¡Archivo guardado correctamente en la BD!');
-      } else {
-        console.warn('⚠️ El archivo NO se guardó en la BD');
-      }
 
       const pedidoId = String(data.PedidoClienteId).trim();
       clearCart();
 
-      // ✅ GENERAR VOUCHER PARA PAGOS ELECTRÓNICOS
+      // GENERAR VOUCHER PARA PAGOS ELECTRÓNICOS
       if (metodoPago === "qr" || metodoPago === "transferencia") {
         setVoucher({
           id: pedidoId,
@@ -336,7 +312,6 @@ export const Checkout = () => {
 
       setUploading(true);
       try {
-        console.log('📤 Subiendo comprobante para pedido:', pedidoId);
 
         const res = await fetch(`${API_URL}/api/pedidos-clientes/${pedidoId}/voucher`, {
           method: "POST",

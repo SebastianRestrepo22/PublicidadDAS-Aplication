@@ -81,9 +81,7 @@ export const Categorias = () => {
     setOpenCreate(true);
   };
 
-  const openEditarModal = (categoria) => {
-    console.log("🔍 Abriendo modal de editar con:", categoria);
-    
+  const openEditarModal = (categoria) => {    
     resetFormErrors();
     setEditData(categoria);
     setFormData({
@@ -95,13 +93,11 @@ export const Categorias = () => {
   };
 
   const openVerModal = (categoria) => {
-    console.log("🔍 Abriendo modal de ver con:", categoria);
     setEditData(categoria);
     setOpenVer(true);
   };
 
   const openEliminarModal = (categoria) => {
-    console.log("🔍 Abriendo modal de eliminar con:", categoria);
     setEditData(categoria);
     setOpenEliminar(true);
   };

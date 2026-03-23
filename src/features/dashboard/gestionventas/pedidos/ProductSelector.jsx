@@ -36,13 +36,6 @@ export const ProductSelector = ({
         resultado = await GetDataproductos(true, currentPage, itemsPerPage, null, null, true);
       }
       
-      console.log('📦 Productos cargados:', resultado.data?.map(p => ({ 
-        nombre: p.Nombre, 
-        precio: p.Precio, 
-        tieneColores: p.Colores?.length > 0,
-        coloresCount: p.Colores?.length 
-      })));
-      
       setProductos(resultado.data);
       setTotalPages(resultado.pagination.totalPages);
       setTotalItems(resultado.pagination.totalItems);

@@ -143,7 +143,6 @@ export const Compras = () => {
         throw new Error("La respuesta no es JSON");
       }
       const data = await response.json();
-      console.log("Datos recibidos del servidor:", data);
       if (Array.isArray(data)) {
         const coloresFormateados = data.map(color => ({
           ColorId: color.ColorId,
@@ -219,7 +218,6 @@ export const Compras = () => {
 
   const goToView = async (compra) => {
     try {
-      console.log("📦 [goToView] Compra recibida:", compra);
       const detalles = await getDetallesByCompraId(compra.CompraId);
       if (!detalles || detalles.length === 0) {
         const proveedor = proveedores?.find(p => p.ProveedorId === compra.ProveedorId);

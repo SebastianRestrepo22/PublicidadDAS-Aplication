@@ -51,8 +51,6 @@ export const ComprasView = ({
   onBack,
   getProveedorDisplay
 }) => {
-  console.log("[ComprasView] selectedCompra recibido:", selectedCompra);
-
   // ✅ Validación temprana
   if (!selectedCompra) {
     console.warn("[ComprasView] No hay selectedCompra, retornando null");
@@ -79,9 +77,7 @@ export const ComprasView = ({
   const detalleCompra = Array.isArray(selectedCompra.detalle) ? selectedCompra.detalle : [];
 
   const handleDescargarFactura = () => {
-    try {
-      console.log(" DATOS COMPLETOS DE LA COMPRA:", JSON.stringify(selectedCompra, null, 2));
-      
+    try {      
       // Buscar el proveedor
       const proveedor = proveedores.find(p => p.ProveedorId === selectedCompra.ProveedorId);
       

@@ -65,12 +65,6 @@ export const useCompras = () => {
   };
 
   const fetchCompras = async () => {
-    console.log("🔍 fetchCompras - INICIANDO con:", {
-      currentPage,
-      itemsPerPage,
-      filtroCampo,
-      filtroValor
-    });
 
     try {
       let resultado;
@@ -80,8 +74,6 @@ export const useCompras = () => {
       } else {
         resultado = await getComprasPaginated(currentPage, itemsPerPage);
       }
-
-      console.log("📥 fetchCompras - RESPUESTA COMPLETA:", resultado);
 
       if (!resultado) {
         console.error("❌ resultado es null/undefined");
@@ -104,14 +96,6 @@ export const useCompras = () => {
       const totalItemsValue = Number(pagination.totalItems) || 0;
       const totalPagesValue = Number(pagination.totalPages) || 1;
       const currentPageValue = Number(pagination.currentPage) || 1;
-      
-      console.log("✅ fetchCompras - DATOS EXTRAÍDOS:", {
-        cantidadData: data.length,
-        totalItems: totalItemsValue,
-        totalPages: totalPagesValue,
-        currentPage: currentPageValue,
-        paginationCompleto: pagination
-      });
 
       // 🔥 Actualizar estados
       setPaginatedData(data);
@@ -138,7 +122,6 @@ export const useCompras = () => {
 
   // Cargar compras al montar el componente
   useEffect(() => {
-    console.log("🔄 Cargando compras iniciales...");
     fetchCompras();
   }, []);
 
@@ -153,7 +136,6 @@ export const useCompras = () => {
   useEffect(() => {
     // Evitar llamada inicial duplicada
     if (!initialLoading) {
-      console.log("🔄 EJECUTANDO fetchCompras POR CAMBIO");
       fetchCompras();
     }
   }, [currentPage, itemsPerPage, filtroCampo, filtroValor]);
