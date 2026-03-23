@@ -47,7 +47,6 @@ export const Login = () => {
     };
     fetchTiposDocumento();
   }, []);
-
   const [loginErrors, setLoginErrors] = useState({});
   const [registerErrors, setRegisterErrors] = useState({});
 

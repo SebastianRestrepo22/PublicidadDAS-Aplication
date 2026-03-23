@@ -92,6 +92,7 @@ export const Compras = () => {
   // Estado para colores
   const [colores, setColores] = useState([]);
   const [loadingColores, setLoadingColores] = useState(false);
+  const [cargandoDatos, setCargandoDatos] = useState(true); // Nuevo estado para el loading de la tabla
 
   const [viewMode, setViewMode] = useState("list");
   const [selectedCompra, setSelectedCompra] = useState(null);
@@ -130,13 +131,10 @@ export const Compras = () => {
   const cargarColores = async () => {
     setLoadingColores(true);
     try {
-
-const response = await fetch(`${API_URL}/colores`);
-
+      const response = await fetch(`${API_URL}/colores`);
       if (!response.ok) {
         throw new Error(`Error HTTP: ${response.status}`);
       }
-
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes('application/json')) {
         console.error("Content-Type no es JSON:", contentType);
@@ -144,100 +142,67 @@ const response = await fetch(`${API_URL}/colores`);
         console.error("Respuesta no JSON:", text.substring(0, 200));
         throw new Error("La respuesta no es JSON");
       }
-
       const data = await response.json();
       console.log("Datos recibidos del servidor:", data);
-
       if (Array.isArray(data)) {
-        console.log("Es un array directo, longitud:", data.length);
-
         const coloresFormateados = data.map(color => ({
           ColorId: color.ColorId,
           Nombre: color.Nombre,
           Hex: color.Hex || '#CCCCCC'
         }));
-
-        console.log("Colores formateados:", coloresFormateados);
         setColores(coloresFormateados);
-
         if (coloresFormateados.length === 0) {
           toast.warning("No se encontraron colores en la base de datos");
-        } else {
-          toast.success(`${coloresFormateados.length} colores cargados correctamente`);
         }
       } else {
         console.error("Los datos no son un array:", data);
         toast.error("Formato de datos incorrecto");
         setColores([]);
       }
-
     } catch (error) {
       console.error("Error detallado al cargar colores:", error);
       toast.error(`Error al cargar colores: ${error.message}`);
-
-      // Datos de prueba por si falla
       const coloresPrueba = [
         { ColorId: "1", Nombre: "Rojo", Hex: "#FF0000" },
         { ColorId: "2", Nombre: "Azul", Hex: "#0000FF" },
         { ColorId: "3", Nombre: "Verde", Hex: "#00FF00" },
       ];
       setColores(coloresPrueba);
-      console.log("Usando colores de prueba:", coloresPrueba);
-
     } finally {
       setLoadingColores(false);
     }
   };
 
   const loadProductosPaginados = async (page = 1, search = "") => {
-  setLoadingProductos(true);
-  try {
-    console.log("🔍 Cargando productos - página:", page, "búsqueda:", search);
-    
-    const resultado = await buscarProductosPorCampo(
-      search ? "nombre" : null,
-      search,
-      page,
-      3  
-    );
-
-    console.log("📦 RESULTADO DEL BACKEND - COMPLETO:", resultado);
-    console.log("📊 totalItems:", resultado.totalItems);
-    console.log("📊 totalPages:", resultado.totalPages);
-    console.log("📊 currentPage:", resultado.currentPage);
-    console.log("📊 itemsPerPage:", resultado.itemsPerPage);
-    console.log("📊 productos recibidos:", resultado.data?.length);
-
-    // ✅ Actualizar estados
-    setProductosPaginados(resultado.data || []);
-    setProductosPagination({
-      currentPage: resultado.currentPage || page,
-      totalPages: resultado.totalPages || 1,
-      totalItems: resultado.totalItems || 0,
-      itemsPerPage: resultado.itemsPerPage || 3
-    });
-
-    // ✅ Verificación explícita
-    if (resultado.totalPages > 1) {
-      console.log(`✅ ¡PAGINACIÓN ACTIVADA! ${resultado.totalPages} páginas disponibles`);
-    } else {
-      console.log("ℹ️ Sin paginación (una sola página)");
+    setLoadingProductos(true);
+    try {
+      const resultado = await buscarProductosPorCampo(
+        search ? "nombre" : null,
+        search,
+        page,
+        3  
+      );
+      setProductosPaginados(resultado.data || []);
+      setProductosPagination({
+        currentPage: resultado.currentPage || page,
+        totalPages: resultado.totalPages || 1,
+        totalItems: resultado.totalItems || 0,
+        itemsPerPage: resultado.itemsPerPage || 3
+      });
+    } catch (error) {
+      console.error("Error:", error);
+      setProductosPaginados([]);
+      setProductosPagination({
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 0,
+        itemsPerPage: 3
+      });
+      toast.error("Error al cargar productos");
+    } finally {
+      setLoadingProductos(false);
     }
-
-  } catch (error) {
-    console.error("Error:", error);
-    setProductosPaginados([]);
-    setProductosPagination({
-      currentPage: 1,
-      totalPages: 1,
-      totalItems: 0,
-      itemsPerPage: 3
-    });
-    toast.error("Error al cargar productos");
-  } finally {
-    setLoadingProductos(false);
-  }
-};
+  };
 
   // Navigation
   const goToCreate = () => {
@@ -255,15 +220,10 @@ const response = await fetch(`${API_URL}/colores`);
   const goToView = async (compra) => {
     try {
       console.log("📦 [goToView] Compra recibida:", compra);
-
       const detalles = await getDetallesByCompraId(compra.CompraId);
-      console.log("📦 [goToView] Detalles recuperados de la BD:", detalles);
-
       if (!detalles || detalles.length === 0) {
-        console.warn("📦 [goToView] No hay detalles para esta compra");
         const proveedor = proveedores?.find(p => p.ProveedorId === compra.ProveedorId);
         const nombreProveedor = proveedor?.NombreProveedor || "";
-
         setSelectedCompra({
           ...compra,
           detalle: [],
@@ -272,18 +232,13 @@ const response = await fetch(`${API_URL}/colores`);
         setViewMode("view");
         return;
       }
-
       const proveedor = proveedores?.find(p => p.ProveedorId === compra.ProveedorId);
       const nombreProveedor = proveedor?.NombreProveedor || "";
-
       const detallesConProducto = (detalles || []).map(d => {
         const precioUnitario = Number(d.PrecioUnitario) || 0;
         const cantidad = Number(d.Cantidad) || 0;
-
-        // Procesar colores si existen
         let coloresDetalle = [];
         if (d.colores) {
-          console.log(`📦 Procesando colores para detalle ${d.DetalleCompraId}:`, d.colores);
           if (Array.isArray(d.colores)) {
             coloresDetalle = d.colores;
           } else if (typeof d.colores === 'string') {
@@ -294,9 +249,7 @@ const response = await fetch(`${API_URL}/colores`);
             }
           }
         }
-
         const producto = productos?.find(p => p.ProductoId === d.ProductoId);
-
         return {
           ...d,
           DetalleCompraId: d.DetalleCompraId,
@@ -309,13 +262,11 @@ const response = await fetch(`${API_URL}/colores`);
           colores: coloresDetalle
         };
       });
-
       setSelectedCompra({
         ...compra,
         detalle: detallesConProducto,
         nombreProveedor
       });
-
       setViewMode("view");
     } catch (err) {
       console.error("❌ Error al cargar datos para vista detallada:", err);
@@ -334,7 +285,6 @@ const response = await fetch(`${API_URL}/colores`);
     setReturnTo(from);
     setCurrentDetailIndex(index);
     setSearchTermProductos("");
-    // Resetear paginación al abrir el selector
     setProductosPagination({
       currentPage: 1,
       totalPages: 1,
@@ -355,7 +305,6 @@ const response = await fetch(`${API_URL}/colores`);
         }
         return nuevos;
       });
-
       await fetchProductos();
     }
     setViewMode(returnTo || "list");
@@ -384,28 +333,22 @@ const response = await fetch(`${API_URL}/colores`);
   const actualizarDetalleCrear = (index, campo, valor) => {
     setDetallesCrear(prev => {
       const nuevos = [...prev];
-
       if (campo === "colores") {
-        console.log(`Actualizando colores en índice ${index}:`, valor);
         nuevos[index][campo] = valor;
-
         const cantidadTotal = valor.reduce((sum, color) => sum + (Number(color.Stock) || 0), 0);
         nuevos[index].Cantidad = cantidadTotal;
         nuevos[index].tipoStock = "colores";
       } else {
         nuevos[index][campo] = valor;
-
         if (campo === "Cantidad" || campo === "PrecioUnitario") {
           const cantidad = Number(nuevos[index].Cantidad) || 0;
           const precio = Number(nuevos[index].PrecioUnitario) || 0;
           nuevos[index].Subtotal = cantidad * precio;
         }
       }
-
       if (campo === "ProductoId") {
         goToSelectProducto("create", index);
       }
-
       return nuevos;
     });
   };
@@ -418,28 +361,18 @@ const response = await fetch(`${API_URL}/colores`);
       return;
     }
     setErrores([]);
-
     try {
-      console.log("Detalles a guardar:", detallesCrear);
-
       const total = detallesCrear.reduce((sum, item) => sum + (Number(item.Subtotal) || 0), 0);
-
       const compraData = {
         ProveedorId: formCrear.ProveedorId,
         Total: total
       };
-
       const compraCreada = await createCompra(compraData);
-      console.log("✅ Compra creada:", compraCreada);
-
       if (!compraCreada || !compraCreada.CompraId) {
         throw new Error("No se recibió el ID de la compra creada");
       }
-
-      // Crear cada detalle
       for (let i = 0; i < detallesCrear.length; i++) {
         const detalle = detallesCrear[i];
-
         const detalleData = {
           CompraId: compraCreada.CompraId,
           ProductoId: detalle.ProductoId,
@@ -448,25 +381,18 @@ const response = await fetch(`${API_URL}/colores`);
           Descripcion: detalle.Descripcion || `Compra de producto`,
           colores: detalle.colores || []
         };
-
-        console.log(`Enviando detalle ${i}:`, detalleData);
         await createDetalleCompra(detalleData);
       }
-
       setCurrentPage(1);
       await fetchCompras();
-
       toast.success(`Compra creada exitosamente. Total: ${formatPrice(total)}`);
-
       goToBackToList();
-
     } catch (err) {
       console.error("ERROR DETALLADO:", err);
       const errorMsg = err.response?.data?.error ||
         err.response?.data?.message ||
         err.message ||
         "Error al crear la compra.";
-
       setErrores([errorMsg]);
       toast.error(` Error: ${errorMsg}`);
     }
@@ -506,6 +432,7 @@ const response = await fetch(`${API_URL}/colores`);
             itemsPerPage={itemsPerPage}
             totalItems={totalItems}
             onItemsPerPageChange={handleItemsPerPageChange}
+            cargandoDatos={!paginatedData || paginatedData.length === 0 && totalItems === 0} // Pasar estado de carga
           />
         )}
 
@@ -569,3 +496,5 @@ const response = await fetch(`${API_URL}/colores`);
     </div>
   );
 };
+
+export default Compras;

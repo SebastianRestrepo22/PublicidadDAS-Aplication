@@ -103,7 +103,7 @@ export const getDetalleByCompraId = async (req, res) => {
   }
 };
 
-// Crear nuevo detalle - AHORA CON COLORES
+// Crear nuevo detalle - SIN ACTUALIZAR STOCK MANUALMENTE (el trigger se encarga)
 export const createDetalle = async (req, res) => {
   const { CompraId, ProductoId, Cantidad, Descripcion, PrecioUnitario, colores } = req.body;
 
@@ -114,6 +114,8 @@ export const createDetalle = async (req, res) => {
   }
 
   try {
+    // 🔥 CREAR EL DETALLE SIN ACTUALIZAR STOCK MANUALMENTE
+    // El trigger trg_compra_stock_colores se encargará de actualizar el stock automáticamente
     const result = await createDetalleModel({
       CompraId,
       ProductoId: ProductoId || null,
@@ -123,24 +125,13 @@ export const createDetalle = async (req, res) => {
       colores: colores || [] // Enviar array de colores
     });
 
-     if (colores && colores.length > 0) {
-      // Producto con colores - actualizar cada color
-      console.log(`🎨 Actualizando stock por color para producto ${ProductoId}`);
-      for (const color of colores) {
-        await actualizarStockProducto(
-          ProductoId, 
-          color.ColorId, 
-          color.Stock  // Usar color.Stock (la cantidad de ese color)
-        );
-        console.log(`   - Color ${color.ColorId}: +${color.Stock} unidades`);
-      }
-    } else {
-      // Producto sin color - stock general
-      console.log(`📦 Actualizando stock general para producto ${ProductoId}: +${Cantidad} unidades`);
-      await actualizarStockProducto(ProductoId, null, Cantidad);
-    }
+    // 🔥 ELIMINAR LA ACTUALIZACIÓN MANUAL DE STOCK
+    // NO se debe llamar a actualizarStockProducto aquí porque el trigger ya lo hace
+    // Si se mantiene esta llamada, el stock se duplicará
+    
+    console.log(`✅ Detalle creado. El trigger se encargará del stock automáticamente`);
 
-    // 3. Obtener el detalle completo para devolverlo
+    // Obtener el detalle completo para devolverlo
     const detalleCompleto = await getDetalleByIdModel(result.DetalleCompraId);
 
     res.status(201).json(detalleCompleto);
@@ -150,8 +141,7 @@ export const createDetalle = async (req, res) => {
   }
 };
 
-// Actualizar detalle - AHORA CON COLORES
-// Actualizar detalle - AHORA CON ACTUALIZACIÓN DE STOCK
+// Actualizar detalle - CON ACTUALIZACIÓN DE STOCK MANUAL
 export const updateDetalle = async (req, res) => {
   const id = req.params.id;
   const { ProductoId, Cantidad, Descripcion, PrecioUnitario, colores } = req.body;
@@ -219,7 +209,7 @@ export const updateDetalle = async (req, res) => {
   }
 };
 
-// Eliminar detalle 
+// Eliminar detalle - REVERTIR STOCK MANUALMENTE
 export const deleteDetalle = async (req, res) => {
   const id = req.params.id;
 

@@ -3,15 +3,23 @@ import { ArrowLeft, Search, ChevronLeft, ChevronRight } from "lucide-react";
 
 const formatPrice = (value) => {
   const num = Number(value);
-  return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
+  if (isNaN(num)) return "$0";
+  
+  // Formato colombiano: punto para miles, coma para decimales
+  // Ejemplo: 1.200.000,00
+  return num.toLocaleString('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
 };
 
 export const ComprasSelectProducto = ({
   searchTermProductos,
   setSearchTermProductos,
   productosPaginados,
-  productosPagination, // ← NUEVO PROP con la paginación del backend
-  loadingProductos,
+  productosPagination,
   onLoadProductos,
   onSelectProducto,
   onCancel
@@ -19,12 +27,10 @@ export const ComprasSelectProducto = ({
   const handleSearchChange = (e) => {
     const term = e.target.value;
     setSearchTermProductos(term);
-    // Llamar al backend con la página 1 y el término de búsqueda
     onLoadProductos(1, term);
   };
 
   const handlePageChange = (page) => {
-    // Llamar al backend con la página seleccionada
     onLoadProductos(page, searchTermProductos);
   };
 
@@ -32,7 +38,6 @@ export const ComprasSelectProducto = ({
   const currentPage = productosPagination?.currentPage || 1;
   const totalPages = productosPagination?.totalPages || 1;
   const totalItems = productosPagination?.totalItems || 0;
-  const itemsPerPage = productosPagination?.itemsPerPage || 3;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -74,14 +79,9 @@ export const ComprasSelectProducto = ({
             Página {currentPage} de {totalPages || 1}
           </span>
         </div>
-        
+
         <div className="bg-gray-50 rounded-lg border" style={{ minHeight: '200px' }}>
-          {loadingProductos ? (
-            <div className="p-8 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-              <p className="mt-2 text-gray-600">Cargando productos...</p>
-            </div>
-          ) : productosPaginados.length > 0 ? (
+          {productosPaginados.length > 0 ? (
             <div className="divide-y">
               {productosPaginados.map((item) => (
                 <div
@@ -111,18 +111,18 @@ export const ComprasSelectProducto = ({
         </div>
       </div>
 
-      {/* Paginación del backend - solo visible cuando hay más de 1 página */}
+      {/* Paginación - color azul */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
           <button
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage <= 1}
-            className="flex items-center gap-1 px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            className="flex items-center gap-1 px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-blue-600 border-blue-300 hover:border-blue-400"
           >
             <ChevronLeft size={16} />
             Anterior
           </button>
-          
+
           <div className="flex items-center gap-2">
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               let pageNum;
@@ -139,10 +139,10 @@ export const ComprasSelectProducto = ({
                 <button
                   key={pageNum}
                   onClick={() => handlePageChange(pageNum)}
-                  className={`w-8 h-8 rounded-full ${
+                  className={`w-8 h-8 rounded-full transition-colors ${
                     currentPage === pageNum
-                      ? 'bg-emerald-600 text-white'
-                      : 'hover:bg-gray-100'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-blue-600 hover:bg-blue-100 border border-blue-300'
                   }`}
                 >
                   {pageNum}
@@ -150,11 +150,11 @@ export const ComprasSelectProducto = ({
               );
             })}
           </div>
-          
+
           <button
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage >= totalPages}
-            className="flex items-center gap-1 px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            className="flex items-center gap-1 px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-blue-600 border-blue-300 hover:border-blue-400"
           >
             Siguiente
             <ChevronRight size={16} />

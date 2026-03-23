@@ -24,7 +24,13 @@ const formatearFecha = (f) => {
 
 const formatPrice = (value) => {
   const num = Number(value);
-  return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
+  if (isNaN(num)) return "$0";
+  return num.toLocaleString('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
 };
 
 // Configuración de estados - AHORA SOLO APROBADO
@@ -49,8 +55,33 @@ export const ComprasList = ({
   onPageChange,
   itemsPerPage,
   totalItems,
-  onItemsPerPageChange
+  onItemsPerPageChange,
+  cargandoDatos = false
 }) => {
+  // Filtrar localmente para la UI (igual que en Categorias)
+  const comprasFiltradas = paginatedData.filter((compra) => {
+    if (!filtroText) return true;
+    const busqueda = filtroText.toLowerCase();
+    
+    if (filtroCampo === "id") {
+      return compra.CompraId?.toLowerCase().includes(busqueda);
+    } else if (filtroCampo === "proveedor") {
+      return compra.ProveedorId?.toLowerCase().includes(busqueda);
+    } else if (filtroCampo === "fecha") {
+      return formatearFecha(compra.FechaRegistro).includes(busqueda);
+    } else if (filtroCampo === "total") {
+      return formatPrice(compra.Total).includes(busqueda);
+    } else {
+      // Búsqueda general
+      return (
+        compra.CompraId?.toLowerCase().includes(busqueda) ||
+        compra.ProveedorId?.toLowerCase().includes(busqueda) ||
+        formatearFecha(compra.FechaRegistro).includes(busqueda) ||
+        formatPrice(compra.Total).includes(busqueda)
+      );
+    }
+  });
+
   return (
     <>
       <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
@@ -76,7 +107,10 @@ export const ComprasList = ({
           <div className="flex gap-2 items-center">
             <select
               value={filtroCampo}
-              onChange={(e) => setFiltroCampo(e.target.value)}
+              onChange={(e) => {
+                setFiltroCampo(e.target.value);
+                if (!e.target.value) setFiltroText("");
+              }}
               className="border rounded-lg px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Filtrar por campo</option>
@@ -102,8 +136,17 @@ export const ComprasList = ({
             </tr>
           </thead>
           <tbody className="divide-y">
-            {paginatedData && paginatedData.length > 0 ? (
-              paginatedData.map((compra) => {
+            {cargandoDatos ? (
+              <tr>
+                <td colSpan={6} className="py-12 text-center">
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                    <p className="text-slate-600 text-base font-medium">Cargando compras...</p>
+                  </div>
+                </td>
+              </tr>
+            ) : comprasFiltradas.length > 0 ? (
+              comprasFiltradas.map((compra) => {
                 const estado = compra.Estado || ESTADOS_COMPRA.APROBADO;
                 const config = estadoConfig[estado] || estadoConfig[ESTADOS_COMPRA.APROBADO];
 
@@ -118,7 +161,6 @@ export const ComprasList = ({
                     <td className="py-4 px-6 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${config.color}`}>
-                          <span>{config.icon}</span>
                           <span>{config.label}</span>
                         </span>
                       </div>
@@ -139,14 +181,22 @@ export const ComprasList = ({
               })
             ) : (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-gray-500">
-                  {paginatedData === undefined ? "Cargando compras..." : "No hay compras a mostrar"}
+                <td colSpan={6} className="py-12 text-center">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <svg className="w-16 h-16 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                    <p className="text-gray-500 text-lg">No hay compras registradas</p>
+                    <p className="text-gray-400 text-sm mt-1">Haz clic en "Nueva compra" para comenzar</p>
+                  </div>
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-        {paginatedData && paginatedData.length > 0 && (
+        
+        {/* 🔥 PAGINACIÓN - EXACTAMENTE COMO EN CATEGORIAS */}
+        {!cargandoDatos && totalItems > 0 && (
           <div className="px-6 py-4 border-t border-slate-200">
             <Pagination
               currentPage={currentPage}
@@ -162,3 +212,5 @@ export const ComprasList = ({
     </>
   );
 };
+
+export default ComprasList;

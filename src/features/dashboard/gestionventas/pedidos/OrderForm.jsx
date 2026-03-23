@@ -67,7 +67,6 @@ export const OrderForm = ({
   // Efecto para detectar cuando el modal de colores se cierra
   useEffect(() => {
     if (!modalColoresProductoAbierto && currentDetailIndex !== null) {
-      // El modal se acaba de cerrar
       console.log('🎨 Modal cerrado, colores seleccionados:', coloresSeleccionados);
 
       if (coloresSeleccionados && coloresSeleccionados.length > 0) {
@@ -84,7 +83,6 @@ export const OrderForm = ({
         setDetallesCrear(nuevos);
         toast.success(`Color ${colorSeleccionado.Nombre} asignado al producto`);
       } else if (coloresSeleccionados.length === 0 && detallesCrear[currentDetailIndex]?.ColorId) {
-        // Si no hay colores seleccionados pero antes había uno, lo quitamos
         const nuevos = [...detallesCrear];
         nuevos[currentDetailIndex] = {
           ...nuevos[currentDetailIndex],
@@ -143,7 +141,7 @@ export const OrderForm = ({
 
   const seleccionarProducto = (producto) => {
     console.log('📦 Producto seleccionado:', producto);
-    console.log('📦 Para índice:', currentDetailIndex);
+    console.log('🎨 Colores del producto:', producto.Colores);
 
     if (currentDetailIndex !== null) {
       const nuevos = [...detallesCrear];
@@ -156,19 +154,17 @@ export const OrderForm = ({
         Descripcion: producto.Descripcion || "",
         UrlImagen: producto.Imagen || "",
         ColorId: null,
-        tipoStock: 'general',
+        tipoStock: producto.UsaColores === 1 ? 'colores' : 'general',
         Stock: producto.Stock || 0,
         UsaColores: producto.UsaColores || 0,
         ProductoNombre: producto.Nombre,
-        ProductoImagen: producto.Imagen || ""
+        ProductoImagen: producto.Imagen || "",
+        coloresDisponibles: producto.Colores || []
       };
 
       console.log('📦 Detalle actualizado:', nuevos[currentDetailIndex]);
       setDetallesCrear(nuevos);
       setModalProductosAbierto(false);
-    } else {
-      console.error(' No hay índice seleccionado');
-      toast.error('Error al seleccionar producto');
     }
   };
 
@@ -199,44 +195,44 @@ export const OrderForm = ({
     setModalServiciosAbierto(false);
   };
 
-  // Handlers para colores (solo para productos)
   const abrirModalColores = (index) => {
-    console.log(' Abriendo modal colores para índice:', index);
+    console.log('🎨 Abriendo modal colores para índice:', index);
     console.log(' Detalle en índice:', detallesCrear[index]);
 
-    // Solo abrir si es producto
     if (detallesCrear[index]?.tipo === 'producto') {
       const detalleProducto = detallesCrear[index];
 
-      // Verificar que tenga un ProductoId
       if (!detalleProducto.ProductoId) {
         toast.warning("El producto no tiene un ID válido");
         return;
       }
 
+      const coloresDelProducto = detalleProducto.coloresDisponibles || [];
+
+      if (coloresDelProducto.length === 0) {
+        toast.warning("Este producto no tiene colores disponibles");
+        return;
+      }
+
+      console.log('🎨 Colores disponibles para este producto:', coloresDelProducto);
+
       setCurrentDetailIndex(index);
 
-      // Cargar el color actual si existe en el formato que espera el modal
       if (detalleProducto.ColorId) {
-        // Buscar el color completo en la lista de colores
-        const colorCompleto = colores.find(c => c.ColorId === detalleProducto.ColorId);
+        const colorCompleto = coloresDelProducto.find(c =>
+          c.ColorId === detalleProducto.ColorId ||
+          c.id === detalleProducto.ColorId
+        );
 
         if (colorCompleto) {
-          // El modal espera un array de objetos con ColorId, Stock, Nombre, Hex
           setColoresSeleccionados([{
             ColorId: colorCompleto.ColorId,
-            Stock: 1,
+            Stock: colorCompleto.Stock || 1,
             Nombre: colorCompleto.Nombre,
-            Hex: colorCompleto.Hex || colorCompleto.CodigoHex
+            Hex: colorCompleto.Hex || colorCompleto.CodigoHex || '#ccc'
           }]);
         } else {
-          // Si no encontramos el color completo, usamos la info del detalle
-          setColoresSeleccionados([{
-            ColorId: detalleProducto.ColorId,
-            Stock: 1,
-            Nombre: detalleProducto.ColorNombre || 'Color',
-            Hex: detalleProducto.ColorHex || '#ccc'
-          }]);
+          setColoresSeleccionados([]);
         }
       } else {
         setColoresSeleccionados([]);
@@ -304,7 +300,6 @@ export const OrderForm = ({
   const eliminarDetalle = (index) => {
     if (detallesCrear.length > 1) {
       setDetallesCrear(prev => prev.filter((_, i) => i !== index));
-      // Si después de eliminar, la página actual se queda vacía, ir a la anterior
       const currentArticulos = getCurrentPageArticulos();
       if (currentArticulos.length === 1 && currentPageArticulos > 1) {
         setCurrentPageArticulos(currentPageArticulos - 1);
@@ -332,7 +327,6 @@ export const OrderForm = ({
 
   // Funciones helper
   const getItemNombre = (detalle) => {
-    // Si ya tenemos el nombre guardado en el detalle, usarlo
     if (detalle.ProductoNombre) return detalle.ProductoNombre;
 
     if (detalle.ProductoId) {
@@ -346,7 +340,6 @@ export const OrderForm = ({
   };
 
   const getItemImagen = (detalle) => {
-    // Si ya tenemos la imagen en el detalle, usarla
     if (detalle.UrlImagen) return detalle.UrlImagen;
     if (detalle.ProductoImagen) return detalle.ProductoImagen;
 
@@ -413,8 +406,8 @@ export const OrderForm = ({
                     setClienteSeleccionado(null);
                   }}
                   className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${tipoClienteCrear === 'registrado'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                 >
                   <UserCheck size={24} className="mb-2" />
@@ -431,8 +424,8 @@ export const OrderForm = ({
                     setClienteSeleccionado(null);
                   }}
                   className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center ${tipoClienteCrear === 'walkin'
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                 >
                   <Store size={24} className="mb-2" />
@@ -537,7 +530,7 @@ export const OrderForm = ({
             )}
           </div>
 
-          {/* MÉTODO DE PAGO - MODIFICADO */}
+          {/* MÉTODO DE PAGO */}
           <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
             <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
               <CreditCard size={20} /> Método de Pago
@@ -550,7 +543,6 @@ export const OrderForm = ({
                   onChange={(e) => setFormCrear({ ...formCrear, MetodoPago: e.target.value })}
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                  {/* MISMAS OPCIONES PARA AMBOS TIPOS DE CLIENTE */}
                   <option value="transferencia">Transferencia Bancaria</option>
                   <option value="contra_entrega">Contra Entrega</option>
                 </select>
@@ -637,10 +629,9 @@ export const OrderForm = ({
               <div className="col-span-1 text-right">ACCIÓN</div>
             </div>
 
-            {/* Contenedor de artículos - SIN altura fija */}
+            {/* Contenedor de artículos */}
             <div className="space-y-4">
               {currentArticulos.map((detalle, index) => {
-                // Calcular el índice real en el array completo
                 const realIndex = (currentPageArticulos - 1) * itemsPerPageArticulos + index;
                 const esServicio = isService(detalle);
                 const itemSeleccionado = hasItem(detalle);
@@ -673,7 +664,7 @@ export const OrderForm = ({
               })}
             </div>
 
-            {/* PAGINACIÓN - Solo visible cuando hay más de 3 artículos */}
+            {/* PAGINACIÓN */}
             {totalPagesArticulos > 1 && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
                 <div className="text-sm text-slate-600">
@@ -696,8 +687,8 @@ export const OrderForm = ({
                         key={page}
                         onClick={() => handlePageChange(page)}
                         className={`w-8 h-8 rounded-full text-sm ${currentPageArticulos === page
-                            ? 'bg-blue-600 text-white'
-                            : 'hover:bg-slate-100'
+                          ? 'bg-blue-600 text-white'
+                          : 'hover:bg-slate-100'
                           }`}
                       >
                         {page}
@@ -779,7 +770,7 @@ export const OrderForm = ({
       <ProductoColoresModal
         open={modalColoresProductoAbierto}
         onClose={() => setModalColoresProductoAbierto(false)}
-        colores={colores}
+        colores={detallesCrear[currentDetailIndex]?.coloresDisponibles || colores}
         coloresConStock={coloresSeleccionados}
         setColoresConStock={setColoresSeleccionados}
       />

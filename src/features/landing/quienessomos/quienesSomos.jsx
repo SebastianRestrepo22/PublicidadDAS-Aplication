@@ -66,7 +66,7 @@ export const QuienesSomos = () => {
                             </div>
                         </div>
                         <h3 className="text-2xl font-bold text-gray-900 mb-2">Calidad en cada servicio</h3>
-                        <p className="text-gray-600 font-medium">Calidad en cada servicio</p>
+                        <p className="text-gray-600 font-medium">Calidad en cada servicio y productos</p>
                     </div>
 
                     <div className="bg-white p-8 rounded-2xl border-2 border-gray-200 hover:border-blue-900 hover:shadow-xl transition-all duration-300 hover:-translate-y-2 text-center group">
@@ -76,7 +76,7 @@ export const QuienesSomos = () => {
                             </div>
                         </div>
                         <h3 className="text-2xl font-bold text-gray-900 mb-2">Atención</h3>
-                        <p className="text-gray-600 font-medium">Atención cercana</p>
+                        <p className="text-gray-600 font-medium">Atención detallada</p>
                     </div>
 
                     <div className="bg-white p-8 rounded-2xl border-2 border-gray-200 hover:border-blue-900 hover:shadow-xl transition-all duration-300 hover:-translate-y-2 text-center group">
@@ -94,7 +94,7 @@ export const QuienesSomos = () => {
             {/* Experience Gallery - Fondo Blanco */}
             <section className="bg-white py-16 px-8 lg:px-20">
                 <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-4">
-                    Nuestra Experiencia
+                    Nuestra Experiencia 
                 </h2>
                 <p className="text-center text-gray-600 mb-12 max-w-2xl mx-auto">
                     Comprometidos con brindar soluciones prácticas para el estudio, el trabajo y la organización diaria.
@@ -112,7 +112,7 @@ export const QuienesSomos = () => {
 
                     <div className="relative overflow-hidden rounded-2xl shadow-xl group">
                         <img
-                            src="/multimedia/experiencia-2.jpg"
+                            src="/multimedia/carruselLanding4.png"
                             alt="experiencia 2"
                             className="w-full h-80 object-cover transition-transform duration-700 group-hover:scale-110"
                         />

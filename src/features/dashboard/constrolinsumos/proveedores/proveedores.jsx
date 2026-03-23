@@ -103,6 +103,7 @@ export const Proveedores = () => {
   const [openConfirmarEstado, setOpenConfirmarEstado] = useState(false);
   const [estadoPendiente, setEstadoPendiente] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [cargandoDatos, setCargandoDatos] = useState(true); // Nuevo estado para el loading de la tabla
 
   // Estados de paginación
   const [paginatedData, setPaginatedData] = useState([]);
@@ -216,6 +217,7 @@ export const Proveedores = () => {
 
   // ========== FUNCIONES DE DATOS ==========
   const fetchProveedores = async () => {
+    setCargandoDatos(true); // Activar loading antes de cargar
     try {
       let resultado;
       if (campoFiltro && busqueda.trim()) {
@@ -240,6 +242,8 @@ export const Proveedores = () => {
       toast.error("Error al obtener proveedores");
       setPaginatedData([]);
       setProveedores([]);
+    } finally {
+      setCargandoDatos(false); // Desactivar loading después de cargar
     }
   };
 
@@ -312,7 +316,7 @@ export const Proveedores = () => {
       };
 
       await createProveedor(proveedorData);
-      toast.success(" Proveedor creado exitosamente");
+      toast.success("✓ Proveedor creado exitosamente");
       setOpenCreate(false);
       resetCreateForm();
       await fetchProveedores();
@@ -363,7 +367,7 @@ export const Proveedores = () => {
       };
 
       await updateProveedor(selectedProveedor.ProveedorId, proveedorData);
-      toast.success(" Proveedor actualizado correctamente");
+      toast.success("✓ Proveedor actualizado correctamente");
       await fetchProveedores();
       setOpenEditar(false);
       setSelectedProveedor(null);
@@ -393,7 +397,7 @@ export const Proveedores = () => {
     setIsLoading(true);
     try {
       await deleteProveedor(selectedProveedor.ProveedorId);
-      toast.success(" Proveedor eliminado correctamente");
+      toast.success("✓ Proveedor eliminado correctamente");
       await fetchProveedores();
       setOpenEliminar(false);
       setSelectedProveedor(null);
@@ -471,7 +475,7 @@ export const Proveedores = () => {
         )
       );
 
-      toast.success(` Proveedor ${estadoPendiente.nuevoEstado === 1 ? 'activado' : 'inactivado'} correctamente`);
+      toast.success(`✓ Proveedor ${estadoPendiente.nuevoEstado === 1 ? 'activado' : 'inactivado'} correctamente`);
       setOpenConfirmarEstado(false);
       setEstadoPendiente(null);
     } catch (error) {
@@ -558,7 +562,16 @@ export const Proveedores = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginatedData.length > 0 ? (
+                {cargandoDatos ? (
+                  <tr>
+                    <td colSpan={7} className="py-12">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                        <p className="text-slate-600 text-base font-medium">Cargando proveedores...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : paginatedData.length > 0 ? (
                   paginatedData.map((p) => (
                     <tr key={p.ProveedorId} className="hover:bg-slate-50 transition-colors duration-150">
                       <td className="py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-slate-900 text-center align-middle font-mono">
@@ -589,7 +602,7 @@ export const Proveedores = () => {
                             <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform transform peer-checked:translate-x-5"></div>
                           </div>
                           <span className="ml-2 text-xs text-slate-700">
-                            {estadoActivos[p.ProveedorId] === 1}
+                            {estadoActivos[p.ProveedorId] === 1 ? "Activo" : "Inactivo"}
                           </span>
                         </label>
                       </td>
@@ -638,7 +651,7 @@ export const Proveedores = () => {
           </div>
 
           {/* Paginación */}
-          {totalItems > 0 && (
+          {!cargandoDatos && totalItems > 0 && (
             <div className="px-6 py-4 border-t border-slate-200">
               <Pagination
                 currentPage={currentPage}

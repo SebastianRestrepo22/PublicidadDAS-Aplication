@@ -23,8 +23,7 @@ export const cambiarEstadoProducto = async (id, Estado) => {
   }
 };
 
-// Listar todos los datos con filtro de estado
-export const GetDataproductos = async (soloActivos = false, page = 1, limit = 10, filtroCampo = null, filtroValor = null) => {
+export const GetDataproductos = async (soloActivos = false, page = 1, limit = 10, filtroCampo = null, filtroValor = null, includeColors = false) => {
   try {
     const params = {
       page: page.toString(),
@@ -38,6 +37,11 @@ export const GetDataproductos = async (soloActivos = false, page = 1, limit = 10
     if (filtroCampo && filtroValor) {
       params.filtroCampo = filtroCampo;
       params.filtroValor = filtroValor;
+    }
+    
+    // 🔥 NUEVO: Incluir colores si se solicita
+    if (includeColors) {
+      params.includeColors = 'true';
     }
     
     const response = await axios.get(`${url}producto`, { params });
@@ -113,7 +117,7 @@ export const deleteDataproducto = async (id) => {
 };
 
 // Buscar productos
-export const buscarProductos = async (campo, valor, page = 1, limit = 10, estado = null) => {
+export const buscarProductos = async (campo, valor, page = 1, limit = 10, estado = null, includeColors = false) => {
   try {
     const params = {
       campo,
@@ -123,6 +127,11 @@ export const buscarProductos = async (campo, valor, page = 1, limit = 10, estado
     };
     
     if (estado) params.estado = estado;
+    
+    // 🔥 NUEVO: Incluir colores si se solicita
+    if (includeColors) {
+      params.includeColors = 'true';
+    }
     
     const response = await axios.get(`${url}producto/buscar`, { params });
     

@@ -17,7 +17,8 @@ export const OrderList = ({
   handleItemsPerPageChange,
   goToCreate,
   goToView,
-  tipoPago
+  tipoPago,
+  cargandoDatos = false // Nuevo prop para controlar el estado de carga
 }) => {
   // Estado local para el input de búsqueda
   const [localSearchText, setLocalSearchText] = useState(filtroText);
@@ -64,7 +65,6 @@ export const OrderList = ({
           <button
             onClick={goToCreate}
             className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow"
-
           >
             <Plus size={18} /> Nuevo pedido
           </button>
@@ -137,7 +137,16 @@ export const OrderList = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {Array.isArray(paginatedData) && paginatedData.length > 0 ? (
+            {cargandoDatos ? (
+              <tr>
+                <td colSpan="7" className="px-6 py-12 text-center">
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                    <p className="text-slate-600 text-base font-medium">Cargando pedidos...</p>
+                  </div>
+                </td>
+              </tr>
+            ) : Array.isArray(paginatedData) && paginatedData.length > 0 ? (
               paginatedData.map((pedido) => (
                 <tr key={pedido.PedidoClienteId} className="hover:bg-slate-50">
                   <td className="px-6 py-4 text-sm text-slate-700 font-mono font-bold">
@@ -149,7 +158,7 @@ export const OrderList = ({
                   </td>
                   <td className="px-6 py-4 text-sm">{formatDate(pedido.FechaRegistro)}</td>
                   <td className="px-6 py-4 text-sm font-bold text-blue-600">
-                    {formatPrice(pedido.Total)} 
+                    {formatPrice(pedido.Total)}
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm font-medium capitalize">
@@ -199,7 +208,7 @@ export const OrderList = ({
         </table>
         
         {/* Paginación */}
-        {paginatedData.length > 0 && (
+        {!cargandoDatos && paginatedData.length > 0 && (
           <div className="px-6 py-4 border-t">
             <Pagination
               currentPage={currentPage}

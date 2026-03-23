@@ -54,6 +54,18 @@ export const Categorias = () => {
   const [openEliminar, setOpenEliminar] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  const [cargandoDatos, setCargandoDatos] = useState(true);
+
+  // Simular carga de datos inicial
+  useEffect(() => {
+    // Aquí normalmente harías la llamada a la API para cargar categorías
+    // Simulamos una carga de 2 segundos
+    const timer = setTimeout(() => {
+      setCargandoDatos(false);
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -65,41 +77,32 @@ export const Categorias = () => {
   };
 
   const openCreateModal = () => {
-    resetForm(); // Usamos la función del hook
+    resetForm();
     setOpenCreate(true);
   };
 
   const openEditarModal = (categoria) => {
     console.log("🔍 Abriendo modal de editar con:", categoria);
     
-    // 1. Limpiamos errores previos usando la función del hook
     resetFormErrors();
-    
-    // 2. Establecemos el editData usando el setter del hook
     setEditData(categoria);
-    
-    // 3. Establecemos formData con los valores de la categoría usando el setter del hook
     setFormData({
       nombreCategoria: categoria.Nombre || "",
       descripcion: categoria.Descripcion || ""
     });
-    
-    // 4. Guardamos el nombre original para validaciones usando el setter del hook
     setOriginalNombre(categoria.Nombre);
-    
-    // 5. Abrimos el modal
     setOpenEditar(true);
   };
 
   const openVerModal = (categoria) => {
     console.log("🔍 Abriendo modal de ver con:", categoria);
-    setEditData(categoria); // Usamos el setter del hook
+    setEditData(categoria);
     setOpenVer(true);
   };
 
   const openEliminarModal = (categoria) => {
     console.log("🔍 Abriendo modal de eliminar con:", categoria);
-    setEditData(categoria); // Usamos el setter del hook
+    setEditData(categoria);
     setOpenEliminar(true);
   };
 
@@ -108,13 +111,13 @@ export const Categorias = () => {
     setOpenEditar(false);
     setOpenVer(false);
     setOpenEliminar(false);
-    resetForm(); // Usamos la función del hook para limpiar todo
+    resetForm();
   };
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const success = await handleSubmit(e); // Usamos la función del hook
+    const success = await handleSubmit(e);
     if (success) {
       handleCloseModal();
     }
@@ -124,14 +127,14 @@ export const Categorias = () => {
   const handleDeleteConfirm = async () => {
     if (!editData?.CategoriaId) return;
     setLoading(true);
-    const success = await handleDelete(editData.CategoriaId); // Usamos la función del hook
+    const success = await handleDelete(editData.CategoriaId);
     if (success) {
       setOpenEliminar(false);
     }
     setLoading(false);
   };
 
-  // Filtrar localmente solo para la UI (búsqueda en tiempo real)
+  // Filtrar localmente solo para la UI
   const categoriasFiltradas = paginatedData.filter((c) => {
     if (!busqueda) return true;
     return (
@@ -218,7 +221,16 @@ export const Categorias = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-100">
-                  {categoriasFiltradas.length > 0 ? (
+                  {cargandoDatos ? (
+                    <tr>
+                      <td colSpan="4" className="py-12">
+                        <div className="flex flex-col items-center justify-center gap-3">
+                          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                          <p className="text-slate-600 text-base font-medium">Cargando categorías...</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : categoriasFiltradas.length > 0 ? (
                     categoriasFiltradas.map((c) => (
                       <tr
                         key={c.CategoriaId}
@@ -271,7 +283,7 @@ export const Categorias = () => {
               </table>
             </div>
 
-            {totalItems > 0 && (
+            {!cargandoDatos && totalItems > 0 && (
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}

@@ -58,9 +58,9 @@ export const DetalleItem = ({
     // Limpiar el string: eliminar puntos (separadores de miles) y convertir a número
     const precioLimpio = String(precio).replace(/\./g, '').replace(',', '.');
     const precioNumero = parseFloat(precioLimpio) || 0;
-    
+
     console.log('💰 Precio original:', precio, 'Limpio:', precioLimpio, 'Número:', precioNumero);
-    
+
     // Guardar el número sin formato
     onActualizar(index, "Precio", precioNumero);
   };
@@ -68,13 +68,13 @@ export const DetalleItem = ({
   // Formatear el precio para mostrarlo con puntos de miles
   const precioFormateado = () => {
     if (!detalle.Precio && detalle.Precio !== 0) return '';
-    
+
     // Si es string, intentar limpiarlo primero
     let valorNumerico = detalle.Precio;
     if (typeof valorNumerico === 'string') {
       valorNumerico = parseFloat(valorNumerico.replace(/\./g, '').replace(',', '.')) || 0;
     }
-    
+
     // Formatear con puntos de miles (ej: 1.200.000)
     return valorNumerico.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   };
@@ -115,9 +115,9 @@ export const DetalleItem = ({
           {itemSeleccionado ? (
             <div className="flex items-center gap-2 px-3 py-2 border border-slate-300 rounded-lg bg-slate-50">
               {imagenAMostrar ? (
-                <img 
-                  src={imagenAMostrar} 
-                  alt="" 
+                <img
+                  src={imagenAMostrar}
+                  alt=""
                   className="w-6 h-6 object-cover rounded"
                   onError={(e) => {
                     e.target.onerror = null;
@@ -156,7 +156,7 @@ export const DetalleItem = ({
                 </span>
                 <ChevronDown size={14} className="text-slate-400" />
               </button>
-              
+
               {mostrarOpcionesStock && (
                 <div className="absolute top-full left-0 mt-1 w-full bg-white border rounded-lg shadow-lg z-20">
                   <button
@@ -190,23 +190,42 @@ export const DetalleItem = ({
             onChange={handleCantidadChange}
             onBlur={handleCantidadBlur}
             placeholder="0"
-            className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-center text-sm ${
-              tipoStock === 'por_color' ? 'bg-slate-100 opacity-60' : 'bg-white'
-            }`}
+            className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-center text-sm ${tipoStock === 'por_color' ? 'bg-slate-100 opacity-60' : 'bg-white'
+              }`}
             disabled={!itemSeleccionado || tipoStock === 'por_color'}
           />
         </div>
 
-        {/*  Precio Unitario con signo $ y formato de miles */}
+        {/* Precio Unitario con signo $ */}
         <div className="col-span-2">
           <div className="relative">
             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 font-medium">$</span>
             <input
               type="text"
               inputMode="numeric"
-              value={precioFormateado()}
-              onChange={handlePrecioChange}
-              onBlur={handlePrecioBlur}
+              // 🔥 MOSTRAR EL VALOR SIN FORMATO (NÚMERO PLANO)
+              value={detalle.Precio === undefined || detalle.Precio === null ? '' : detalle.Precio}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Permitir solo números y punto decimal
+                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                  onActualizar(index, "Precio", value);
+                }
+              }}
+              onBlur={(e) => {
+                let value = e.target.value;
+                if (value === '') {
+                  onActualizar(index, "Precio", 0);
+                } else {
+                  // Convertir a número y guardar sin formato
+                  const num = parseFloat(value);
+                  if (!isNaN(num)) {
+                    onActualizar(index, "Precio", num);
+                  } else {
+                    onActualizar(index, "Precio", 0);
+                  }
+                }
+              }}
               placeholder="0"
               className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-right text-sm bg-white"
               disabled={!itemSeleccionado}
@@ -214,13 +233,13 @@ export const DetalleItem = ({
           </div>
         </div>
 
-        {/* Subtotal con formato de miles */}
+        {/* Subtotal con formato de miles - Formato colombiano */}
         <div className="col-span-2">
           <div className="px-3 py-2 bg-blue-50 rounded-lg text-right font-semibold text-blue-700 text-sm">
-              {formatPrice(subtotal)}  
+            {formatPrice(subtotal)}
           </div>
         </div>
-
+        
         {/* Acción - Eliminar */}
         <div className="col-span-1 text-right">
           {puedeEliminar && (
@@ -242,9 +261,8 @@ export const DetalleItem = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onAbrirColores(index)}
-                className={`flex-1 px-3 py-2 border rounded-lg text-left flex items-center gap-2 text-sm ${
-                  detalle.ColorId ? 'bg-blue-50 border-blue-300' : 'border-slate-300 hover:bg-slate-50'
-                }`}
+                className={`flex-1 px-3 py-2 border rounded-lg text-left flex items-center gap-2 text-sm ${detalle.ColorId ? 'bg-blue-50 border-blue-300' : 'border-slate-300 hover:bg-slate-50'
+                  }`}
               >
                 {detalle.ColorId ? (
                   <>
@@ -292,7 +310,7 @@ export const DetalleItem = ({
           </div>
         </div>
       )}
-      
+
       {/* Mensaje de error si no hay item seleccionado */}
       {!itemSeleccionado && (
         <div className="mt-2 grid grid-cols-12 gap-4">

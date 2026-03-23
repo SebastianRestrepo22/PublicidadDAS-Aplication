@@ -53,41 +53,17 @@ export const generateTempId = () => {
 export const formatPrice = (price) => {
   if (price === undefined || price === null) return '$0';
   
-  // Si ya es un número, formatear directamente
-  if (typeof price === 'number') {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(price);
-  }
+  // Convertir a número
+  const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+  if (isNaN(numPrice)) return '$0';
   
-  // Si es string, intentar limpiarlo
-  if (typeof price === 'string') {
-    // Si ya tiene formato (ej: "$1.200.000"), extraer el número
-    if (price.includes('$') || price.includes('.')) {
-      const numeros = price.replace(/[^0-9]/g, '');
-      const precioNumerico = parseInt(numeros) || 0;
-      return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      }).format(precioNumerico);
-    }
-    
-    // Si es un número sin formato (ej: "1200000")
-    const precioNumerico = parseFloat(price) || 0;
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(precioNumerico);
-  }
-  
-  return '$0';
+  // Formato colombiano: punto para miles, coma para decimales
+  return numPrice.toLocaleString('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
 };
 
 // Parsear precio formateado a número

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";  // ← CORREGIDO
+import "react-toastify/dist/ReactToastify.css";
 
 import axios from "axios";
 
@@ -36,7 +36,7 @@ export const PedidosClientes = () => {
   const [viewMode, setViewMode] = useState("list");
   const [selectedPedido, setSelectedPedido] = useState(null);
   const [updating, setUpdating] = useState(false);
-  // ELIMINADO: const [loading, setLoading] = useState(false);
+  const [cargandoDatos, setCargandoDatos] = useState(true); // Nuevo estado para el loading de la tabla
 
   // Catálogos
   const [productos, setProductos] = useState([]);
@@ -125,9 +125,8 @@ export const PedidosClientes = () => {
 
   // Función para cargar pedidos con paginación
   const fetchPedidos = async (page = currentPage) => {
+    setCargandoDatos(true); // Activar loading antes de cargar
     try {
-      // ELIMINADO: setLoading(true);
-
       const params = new URLSearchParams({
         page: page,
         limit: itemsPerPage
@@ -170,15 +169,23 @@ export const PedidosClientes = () => {
     } catch (err) {
       console.error("Error cargando pedidos:", err);
       toast.error("Error al cargar pedidos");
+      setPaginatedData([]);
     } finally {
-      // ELIMINADO: setLoading(false);
+      setCargandoDatos(false); // Desactivar loading después de cargar
     }
   };
 
-  // Cargar pedidos al montar el componente una sola vez
+  // Cargar pedidos al montar el componente
   useEffect(() => {
     fetchPedidos(1);
-  }, []); // ← SOLO SE EJECUTA UNA VEZ AL MONTAR
+  }, []);
+
+  // Cargar pedidos cuando cambian los filtros o paginación
+  useEffect(() => {
+    if (viewMode === "list") {
+      fetchPedidos(1);
+    }
+  }, [filtroCampo, filtroText, itemsPerPage]);
 
   // Navegación
   const goToList = () => {
@@ -414,8 +421,6 @@ export const PedidosClientes = () => {
         detalle: detallesLimpios
       };
 
-      console.log('📦 Enviando actualización:', pedidoActualizado);
-
       const response = await axios.put(
         `${API_URL}/api/pedidos-clientes/${pedidoId}`,
         pedidoActualizado,
@@ -444,8 +449,6 @@ export const PedidosClientes = () => {
         payload.motivo = motivo;
       }
 
-      console.log('Enviando actualización:', payload);
-
       const response = await axios.put(
         `${API_URL}/api/pedidos-clientes/${selectedPedido.PedidoClienteId}`,
         payload,
@@ -472,20 +475,19 @@ export const PedidosClientes = () => {
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
-    fetchPedidos(page); // Cargar pedidos de la nueva página
+    fetchPedidos(page);
   };
 
   const handleItemsPerPageChange = (newItems) => {
     setItemsPerPage(newItems);
     setCurrentPage(1);
-    fetchPedidos(1); // Cargar con nuevos items por página
+    fetchPedidos(1);
   };
 
   const handleFiltroChange = (campo, valor) => {
     setFiltroCampo(campo);
     setFiltroText(valor);
     setCurrentPage(1);
-    fetchPedidos(1); // Cargar con nuevos filtros
   };
 
   return (
@@ -508,6 +510,7 @@ export const PedidosClientes = () => {
             handleItemsPerPageChange={handleItemsPerPageChange}
             goToCreate={goToCreate}
             goToView={goToView}
+            cargandoDatos={cargandoDatos} // Pasar estado de carga
           />
         )}
 
