@@ -76,54 +76,55 @@ export const ProductosDashboard = () => {
   const [filtroValor, setFiltroValor] = useState('');
   const [skipReload, setSkipReload] = useState(false);
 
-  const cargarProducto = async () => {
-    if (mode !== "list") return;
+const cargarProducto = async () => {
+  if (mode !== "list") return;
 
-    setCargando(true);
-    try {
-      let resultado;
+  setCargando(true);
+  try {
+    let resultado;
 
-      console.log('Cargando productos - Filtros:', {
-        filtroCampo,
-        filtroValor,
-        filtroEstado,
-        currentPage,
-        itemsPerPage
-      });
-
-      if (filtroCampo && filtroValor) {
-        resultado = await buscarProductos(filtroCampo, filtroValor, currentPage, itemsPerPage, filtroEstado || null);
-      } else {
-        resultado = await GetDataproductos(filtroEstado === 'Activo', currentPage, itemsPerPage);
-      }
-
-      console.log('Resultado de la API:', resultado);
-
-      const data = resultado?.data && Array.isArray(resultado.data) ? resultado.data : [];
-      const pagination = resultado?.pagination || {};
-
-      console.log('Datos procesados:', data);
-      console.log('Paginación:', pagination);
-
-      setAllData(data);
-      setPaginatedData(data);
-      setTotalItems(pagination.totalItems || 0);
-      setTotalPages(pagination.totalPages || 1);
-
-      if (currentPage > (pagination.totalPages || 1) && (pagination.totalPages || 0) > 0) {
-        setCurrentPage(pagination.totalPages);
-      }
-    } catch (error) {
-      console.error("Error cargando productos:", error);
-      toast.error("Error al cargar los productos");
-      setAllData([]);
-      setPaginatedData([]);
-      setTotalItems(0);
-      setTotalPages(1);
-    } finally {
-      setCargando(false);
+    if (filtroCampo && filtroValor) {
+      resultado = await buscarProductos(
+        filtroCampo, 
+        filtroValor, 
+        currentPage, 
+        itemsPerPage, 
+        filtroEstado || null
+      );
+    } else {
+      // Usar buscarProductos con un campo genérico para obtener todos
+      // Esto asume que tu backend soporta búsqueda sin campo específico
+      resultado = await buscarProductos(
+        'nombre',  // Campo temporal
+        '',        // Valor vacío para obtener todos
+        currentPage, 
+        itemsPerPage, 
+        filtroEstado || null
+      );
     }
-  };
+
+    const data = resultado?.data && Array.isArray(resultado.data) ? resultado.data : [];
+    const pagination = resultado?.pagination || {};
+
+    setAllData(data);
+    setPaginatedData(data);
+    setTotalItems(pagination.totalItems || 0);
+    setTotalPages(pagination.totalPages || 1);
+
+    if (currentPage > (pagination.totalPages || 1) && (pagination.totalPages || 0) > 0) {
+      setCurrentPage(pagination.totalPages);
+    }
+  } catch (error) {
+    console.error("Error cargando productos:", error);
+    toast.error("Error al cargar los productos");
+    setAllData([]);
+    setPaginatedData([]);
+    setTotalItems(0);
+    setTotalPages(1);
+  } finally {
+    setCargando(false);
+  }
+};
 
   useEffect(() => {
     const fetchCategoria = async () => {
