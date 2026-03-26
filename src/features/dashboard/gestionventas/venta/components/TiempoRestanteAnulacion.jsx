@@ -7,14 +7,15 @@ export const TiempoRestanteAnulacion = ({ fechaVenta, onAnular }) => {
 
   useEffect(() => {
     const calcularTiempo = () => {
-      const fechaVentaDate = new Date(fechaVenta);
+      const safeFecha = typeof fechaVenta === 'string' ? fechaVenta.replace(' ', 'T') : fechaVenta;
+      const fechaVentaDate = new Date(safeFecha);
       const ahora = new Date();
       const diferenciaMs = ahora - fechaVentaDate;
       const diferenciaHoras = diferenciaMs / (1000 * 60 * 60);
       
       const TIEMPO_LIMITE_HORAS = 1;
       
-      if (diferenciaHoras > TIEMPO_LIMITE_HORAS) {
+      if (diferenciaHoras > TIEMPO_LIMITE_HORAS || isNaN(diferenciaHoras)) {
         setTiempoRestante('Expirado');
         setPuedeAnular(false);
       } else {

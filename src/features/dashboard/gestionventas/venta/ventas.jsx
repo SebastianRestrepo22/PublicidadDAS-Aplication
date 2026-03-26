@@ -11,7 +11,8 @@ import { generarFacturaPDF } from "../../../../utils/generarFacturaPDF.js";
 
 const formatDate = (dateString) => {
   if (!dateString) return "—";
-  const date = new Date(dateString);
+  const safeDateString = typeof dateString === 'string' ? dateString.replace(' ', 'T') : dateString;
+  const date = new Date(safeDateString);
   if (isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
 };
@@ -411,7 +412,7 @@ const ModalVerVenta = ({ open, onClose, venta, onEstadoActualizado }) => {
                 </div>
               )}
 
-              {/* 🔥 MODIFICADO: Sección de Comprobante/Voucher con apertura en modal */}
+              {/* Sección de Comprobante/Voucher con apertura en modal */}
               {ventaLocal.Voucher && (
                 <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <h5 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
