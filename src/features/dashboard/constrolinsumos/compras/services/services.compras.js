@@ -17,15 +17,8 @@ export const getComprasPaginated = async (page = 1, limit = 5, filtroCampo = nul
     }
     
     const url = `${API_URL}/api/compras?${params}`;
-    console.log("📤 getComprasPaginated - URL:", url);
 
     const response = await axios.get(url);
-    
-    console.log("✅ Respuesta getComprasPaginated:", {
-      dataLength: response.data?.data?.length,
-      pagination: response.data?.pagination,
-      fullResponse: response.data
-    });
 
     return {
       data: response.data?.data || [],
@@ -61,13 +54,9 @@ export const buscarCompras = async (filtroCampo, filtroValor, page = 1, limit = 
     if (filtroValor && filtroValor.trim() !== '') {
       params.append('q', filtroValor.trim());
     }
-    
-    console.log("🔍 Buscando compras con params:", params.toString());
-    
+        
     const response = await axios.get(`${API_URL}/api/compras/buscar?${params}`);
-    
-    console.log("Respuesta buscarCompras:", response.data);
-    
+        
     return {
       data: response.data?.data || [],
       pagination: {
@@ -318,15 +307,8 @@ export const buscarProductosPorCampo = async (campo, valor, page = 1, limit = 3)
       params.filtroCampo = campo;
       params.filtroValor = valor.trim();
     }
-
-    console.log("🔍 Buscando productos con params:", params);
     
     const response = await axios.get(`${API_URL}/producto`, { params });
-    
-    console.log("📦 Respuesta productos:", {
-      dataLength: response.data?.data?.length,
-      pagination: response.data?.pagination
-    });
     
     return {
       data: response.data?.data || [],

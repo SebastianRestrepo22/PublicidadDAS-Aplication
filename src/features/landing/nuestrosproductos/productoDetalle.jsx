@@ -75,7 +75,6 @@ useEffect(() => {
 
       // Si no tenemos el producto del state, cargarlo
       if (!prod) {
-        console.log("🔄 Cargando producto desde servicio...");
         prod = await getProductoByIdService(id);
         
         if (!prod) {
@@ -87,9 +86,6 @@ useEffect(() => {
         
         setProducto(prod);
       }
-
-      // ✅ Los colores YA VIENEN en el producto
-      console.log("🎨 Colores del producto:", prod.Colores);
       
       // Calcular stocks con los colores que ya vienen en el producto
       calcularStocks(prod, prod.Colores || []);

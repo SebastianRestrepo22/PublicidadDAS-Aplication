@@ -679,17 +679,10 @@ export const Ventas = () => {
 
   const handleVerClick = async (venta) => {
     try {
-      console.log('🔍 Venta seleccionada:', venta);
-      console.log('🔍 Detalles en venta:', venta.detalle);
-
       if (venta.detalle && venta.detalle.length > 0) {
-        console.log('✅ Usando detalles existentes:', venta.detalle.length);
         setVentaSeleccionada(venta);
       } else {
-        console.log('🔄 Obteniendo detalles del backend para:', venta.VentaId);
         const ventaCompleta = await getVentaById(venta.VentaId);
-        console.log('📦 Venta completa recibida:', ventaCompleta);
-        console.log('📦 Detalles en venta completa:', ventaCompleta?.detalle);
 
         // Verificar si ventaCompleta tiene la estructura correcta
         if (!ventaCompleta) {

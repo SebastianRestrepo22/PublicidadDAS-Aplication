@@ -221,8 +221,6 @@ export const PedidosClientes = () => {
   // Función goToEdit
   const goToEdit = async (pedido) => {
     try {
-      console.log('✏️ Editando pedido:', pedido.PedidoClienteId);
-
       const det = await getDetallesByPedidoId(pedido.PedidoClienteId);
 
       const pedidoAEditar = {

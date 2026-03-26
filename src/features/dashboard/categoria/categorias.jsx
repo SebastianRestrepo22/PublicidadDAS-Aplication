@@ -93,13 +93,11 @@ export const Categorias = () => {
   };
 
   const openVerModal = (categoria) => {
-    console.log("🔍 Abriendo modal de ver con:", categoria);
     setEditData(categoria);
     setOpenVer(true);
   };
 
   const openEliminarModal = (categoria) => {
-    console.log("🔍 Abriendo modal de eliminar con:", categoria);
     setEditData(categoria);
     setOpenEliminar(true);
   };

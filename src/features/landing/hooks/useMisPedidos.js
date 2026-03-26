@@ -20,8 +20,6 @@ export const useMisPedidos = (clienteId) => {
       setLoading(true);
       setError(null);
 
-      console.log('Cargando pedidos para clienteId:', clienteId);
-
       const { data } = await axios.get(
         `${API_URL}/api/pedidos-clientes/mis-pedidos`,
         {
@@ -32,7 +30,6 @@ export const useMisPedidos = (clienteId) => {
         }
       );
 
-      console.log('Pedidos recibidos:', data);
       setPedidos(data);
     } catch (err) {
       console.error("Error al cargar mis pedidos:", err);

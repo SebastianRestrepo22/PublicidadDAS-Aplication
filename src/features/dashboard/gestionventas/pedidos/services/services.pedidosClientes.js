@@ -88,14 +88,10 @@ export const getPedidoById = async (id) => {
  */
 export const createPedidoCliente = async (pedidoData) => {
   try {
-    console.log('📤 Enviando pedido al backend...');
-    console.log('📦 Datos estructurados:', JSON.stringify(pedidoData, null, 2));
-    
     const response = await axios.post(`${API_URL}/api/pedidos-clientes`, pedidoData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     
-    console.log('✅ Respuesta del backend:', response.data);
     return response.data;
   } catch (error) {
     console.error('❌ Error completo:', error);
@@ -164,12 +160,7 @@ export const deletePedidoCliente = async (id) => {
  */
 export const getDetallesByPedidoId = async (pedidoId) => {
   try {
-    console.log(`🔍 [FRONT-SERVICE] GET detalles para: ${pedidoId}`);
     const response = await axios.get(`${API_URL}/api/detalle-pedido/${pedidoId}`);
-    console.log(`📬 [FRONT-SERVICE] Respuesta:`, {
-      status: response.status,
-      dataLength: Array.isArray(response.data) ? response.data.length : 'N/A'
-    });
     
     if (!response.data) return [];
     if (Array.isArray(response.data)) return response.data;

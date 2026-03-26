@@ -61,10 +61,8 @@ export const Usuarios = () => {
 
       const data = resultado && resultado.data && Array.isArray(resultado.data) ? resultado.data : [];
       const pagination = resultado && resultado.pagination ? resultado.pagination : {};
-
-      console.log("Datos cargados:", data.length); // 👈 Para debug
       
-      setPaginatedData([...data]); // 👈 Crear una nueva referencia
+      setPaginatedData([...data]); // Crear una nueva referencia
       setTotalItems(pagination.totalItems || 0);
       setTotalPages(pagination.totalPages || 1);
 

@@ -109,15 +109,6 @@ export const FormularioServicio = ({
             }
         }
 
-        if (name === "Descripcion") {
-            // Validar longitud de la descripción
-            const descError = validateDescripcionLength(value);
-            if (descError) {
-                // Puedes manejar el error de descripción si quieres mostrarlo
-                console.log(descError);
-            }
-        }
-
         if (name === "Imagen" && imagenTab === "url") {
             const urlError = validateImageUrl(value);
             setImagenError(urlError);

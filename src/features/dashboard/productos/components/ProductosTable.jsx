@@ -9,8 +9,6 @@ export const ProductosTable = ({
     onDelete,
     onToggleEstado,
 }) => {
-    console.log('ProductosTable data:', data);
-
     const formatPrice = (value, currency = '$') => {
         if (value === null || value === undefined || value === '') return `${currency}0`;
         const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -81,7 +79,6 @@ export const ProductosTable = ({
                 <tbody className="divide-y divide-slate-200">
                     {data.length > 0 ? (
                         data.map((p) => {
-                            console.log('Producto individual:', p);
                             const estado = p.Estado || 'Activo';
                             const stockTotal = getStockTotal(p);
                             const nombreCategoria = categorias.find(c => c.CategoriaId === p.CategoriaId)?.Nombre || "—";

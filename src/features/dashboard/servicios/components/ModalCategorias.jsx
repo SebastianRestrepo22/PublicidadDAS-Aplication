@@ -11,10 +11,6 @@ export const ModalCategorias = ({
     onSelectCategoria,
     categoriaSeleccionada
 }) => {
-    // Log para debug
-    console.log("🎯 ModalCategorias - categoriasFiltradas:", categoriasFiltradas);
-    console.log("🎯 ¿Es array?", Array.isArray(categoriasFiltradas));
-
     return (
         <Modal open={open} onClose={onClose}>
             <div className="p-6 bg-white rounded-xl w-[500px] max-h-[80vh] overflow-hidden flex flex-col">
