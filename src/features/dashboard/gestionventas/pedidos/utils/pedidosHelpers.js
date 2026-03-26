@@ -8,6 +8,7 @@ export const formatDate = (dateString) => {
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat('es-ES', {
+    timeZone: 'UTC',
     day: 'numeric',
     month: 'long',
     year: 'numeric'
@@ -19,9 +20,9 @@ export const formatDateForInput = (dateString) => {
   if (!dateString) return "";
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return "";
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
 
@@ -51,19 +52,14 @@ export const generateTempId = () => {
 };
 
 export const formatPrice = (price) => {
-  if (price === undefined || price === null) return '$0';
+  if (price === undefined || price === null) return '$ 0';
   
-  // Convertir a número
+  // Convertir a número entero (redondeado)
   const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-  if (isNaN(numPrice)) return '$0';
+  if (isNaN(numPrice)) return '$ 0';
   
-  // Formato colombiano: punto para miles, coma para decimales
-  return numPrice.toLocaleString('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2
-  });
+  // Formato visual colombiano estándar estricto: $ X.XXX (sin decimales)
+  return '$ ' + Math.round(numPrice).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 };
 
 // Parsear precio formateado a número

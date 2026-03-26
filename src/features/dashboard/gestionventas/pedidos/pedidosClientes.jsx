@@ -328,11 +328,7 @@ export const PedidosClientes = () => {
       setUploading(true);
 
       const detallesLimpios = detallesCrear.map(d => {
-        let precioLimpio = 0;
-        if (d.Precio) {
-          const precioStr = String(d.Precio).replace(/\./g, '').replace(',', '.');
-          precioLimpio = parseFloat(precioStr) || 0;
-        }
+        const precioLimpio = parseFloat(d.Precio) || 0;
 
         return {
           ProductoId: d.ProductoId?.trim() || null,
@@ -388,11 +384,7 @@ export const PedidosClientes = () => {
       setUploading(true);
 
       const detallesLimpios = detallesCrear.map(d => {
-        let precioLimpio = 0;
-        if (d.Precio) {
-          const precioStr = String(d.Precio).replace(/\./g, '').replace(',', '.');
-          precioLimpio = parseFloat(precioStr) || 0;
-        }
+        const precioLimpio = parseFloat(d.Precio) || 0;
 
         return {
           DetallePedidoClienteId: d.DetallePedidoClienteId || null,
