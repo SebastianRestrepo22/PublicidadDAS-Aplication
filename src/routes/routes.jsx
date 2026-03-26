@@ -28,7 +28,7 @@ import { ProductosDashboard } from "../features/dashboard/productos/producto";
 import { ServiciosDashboard } from "../features/dashboard/servicios/servicio";
 import { ProductoDetalle } from "../features/landing/nuestrosproductos/productoDetalle";
 import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidosClientes";
-import DetallePedido from "../features/landing/historial/detallePedidos";
+import DetallePedido from "../features/landing/historial/DetallePedidos";
 import { Clientes } from "../features/dashboard/clientes/clientes";
 import { SinAcceso } from "../features/dashboard/SinAcceso/SinAcceso";
 import { RequirePermission } from "../components/RequirePermission";
