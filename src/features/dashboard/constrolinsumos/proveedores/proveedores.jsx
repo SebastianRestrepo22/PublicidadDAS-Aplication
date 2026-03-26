@@ -164,7 +164,7 @@ export const Proveedores = () => {
 
     try {
       const resultado = await validarCampoUnico(campo, valor, excludeId);
-      
+
       // Actualizar el ref para evitar llamadas duplicadas
       if (campo === 'nombreProveedor') {
         ultimaValidacionNombre.current = valor;
@@ -281,9 +281,9 @@ export const Proveedores = () => {
     const error = validaciones[campo] ? validaciones[campo](valor) : '';
     setValidacionesEstado(prev => ({
       ...prev,
-      [campo]: { 
-        ...prev[campo], 
-        mensaje: error, 
+      [campo]: {
+        ...prev[campo],
+        mensaje: error,
         valido: !error
         // NO tocamos verificando aquí para mantener el estado del backend
       }
@@ -298,7 +298,7 @@ export const Proveedores = () => {
 
     // Verificar si hay errores
     const hayErrores = Object.values(validacionesEstado).some(v => !v.valido && !v.verificando);
-    
+
     if (hayErrores || !validacionesEstado.nombreProveedor.valido || !validacionesEstado.correo.valido) {
       toast.error("Por favor corrige los errores en el formulario");
       return;
@@ -349,7 +349,7 @@ export const Proveedores = () => {
     });
 
     const hayErrores = Object.values(validacionesEstado).some(v => !v.valido && !v.verificando);
-    
+
     if (hayErrores || !validacionesEstado.nombreProveedor.valido || !validacionesEstado.correo.valido) {
       toast.error("Por favor corrige los errores en el formulario");
       return;
@@ -453,7 +453,7 @@ export const Proveedores = () => {
     setIsLoading(true);
     try {
       const provActual = proveedores.find(p => p.ProveedorId === estadoPendiente.id);
-      
+
       await updateProveedor(estadoPendiente.id, {
         nombreProveedor: provActual.NombreProveedor,
         nit: provActual.Nit,
@@ -666,7 +666,7 @@ export const Proveedores = () => {
         </div>
 
         {/* MODALES */}
-        
+
         {/* Modal Crear */}
         <Modal open={openCreate} onClose={() => {
           setOpenCreate(false);
@@ -690,11 +690,10 @@ export const Proveedores = () => {
                     <input
                       placeholder="Ingrese nombre proveedor"
                       value={formCrear.nombreProveedor}
-                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                        validacionesEstado.nombreProveedor.mensaje || !validacionesEstado.nombreProveedor.valido
-                          ? "border-red-500 focus:ring-red-200"
-                          : "border-gray-300 focus:ring-blue-500"
-                      }`}
+                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${validacionesEstado.nombreProveedor.mensaje || !validacionesEstado.nombreProveedor.valido
+                        ? "border-red-500 focus:ring-red-200"
+                        : "border-gray-300 focus:ring-blue-500"
+                        }`}
                       onChange={(e) => {
                         const valor = e.target.value;
                         setFormCrear({ ...formCrear, nombreProveedor: valor });
@@ -711,9 +710,8 @@ export const Proveedores = () => {
                       </span>
                     )}
                     {!validacionesEstado.nombreProveedor.verificando && validacionesEstado.nombreProveedor.mensaje && (
-                      <span className={`text-xs mt-1 flex items-center gap-1 ${
-                        validacionesEstado.nombreProveedor.valido ? 'text-green-600' : 'text-red-500'
-                      }`}>
+                      <span className={`text-xs mt-1 flex items-center gap-1 ${validacionesEstado.nombreProveedor.valido ? 'text-green-600' : 'text-red-500'
+                        }`}>
                         {!validacionesEstado.nombreProveedor.valido && (
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -729,9 +727,8 @@ export const Proveedores = () => {
                     <input
                       placeholder="Contener 8 digitos"
                       value={formCrear.nit}
-                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                        validacionesEstado.nit.mensaje ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"
-                      }`}
+                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${validacionesEstado.nit.mensaje ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"
+                        }`}
                       onChange={(e) => {
                         const valor = e.target.value;
                         setFormCrear({ ...formCrear, nit: valor });
@@ -754,9 +751,8 @@ export const Proveedores = () => {
                     <input
                       placeholder="Ej: 3001234567"
                       value={formCrear.telefono}
-                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                        validacionesEstado.telefono.mensaje ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"
-                      }`}
+                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${validacionesEstado.telefono.mensaje ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"
+                        }`}
                       onChange={(e) => {
                         const valor = e.target.value.replace(/\D/g, "");
                         setFormCrear({ ...formCrear, telefono: valor });
@@ -780,11 +776,10 @@ export const Proveedores = () => {
                       type="email"
                       placeholder="proveedor@ejemplo.com"
                       value={formCrear.correo}
-                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                        validacionesEstado.correo.mensaje || !validacionesEstado.correo.valido
-                          ? "border-red-500 focus:ring-red-200"
-                          : "border-gray-300 focus:ring-blue-500"
-                      }`}
+                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${validacionesEstado.correo.mensaje || !validacionesEstado.correo.valido
+                        ? "border-red-500 focus:ring-red-200"
+                        : "border-gray-300 focus:ring-blue-500"
+                        }`}
                       onChange={(e) => {
                         const valor = e.target.value;
                         setFormCrear({ ...formCrear, correo: valor });
@@ -801,9 +796,8 @@ export const Proveedores = () => {
                       </span>
                     )}
                     {!validacionesEstado.correo.verificando && validacionesEstado.correo.mensaje && (
-                      <span className={`text-xs mt-1 flex items-center gap-1 ${
-                        validacionesEstado.correo.valido ? 'text-green-600' : 'text-red-500'
-                      }`}>
+                      <span className={`text-xs mt-1 flex items-center gap-1 ${validacionesEstado.correo.valido ? 'text-green-600' : 'text-red-500'
+                        }`}>
                         {!validacionesEstado.correo.valido && (
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -821,9 +815,8 @@ export const Proveedores = () => {
                     <input
                       placeholder="Ingrese dirección completa"
                       value={formCrear.direccion}
-                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                        validacionesEstado.direccion.mensaje ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"
-                      }`}
+                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${validacionesEstado.direccion.mensaje ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"
+                        }`}
                       onChange={(e) => {
                         const valor = e.target.value;
                         setFormCrear({ ...formCrear, direccion: valor });
@@ -885,11 +878,10 @@ export const Proveedores = () => {
                     <input
                       placeholder="Nombre del proveedor"
                       value={formEditar.nombreProveedor}
-                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                        validacionesEstado.nombreProveedor.mensaje || !validacionesEstado.nombreProveedor.valido
-                          ? "border-red-500 focus:ring-red-200"
-                          : "border-gray-300 focus:ring-blue-500"
-                      }`}
+                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${validacionesEstado.nombreProveedor.mensaje || !validacionesEstado.nombreProveedor.valido
+                        ? "border-red-500 focus:ring-red-200"
+                        : "border-gray-300 focus:ring-blue-500"
+                        }`}
                       onChange={(e) => {
                         const valor = e.target.value;
                         setFormEditar({ ...formEditar, nombreProveedor: valor });
@@ -910,9 +902,8 @@ export const Proveedores = () => {
                     <input
                       placeholder="Ej: 312345678-9"
                       value={formEditar.nit}
-                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                        validacionesEstado.nit.mensaje ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"
-                      }`}
+                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${validacionesEstado.nit.mensaje ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"
+                        }`}
                       onChange={(e) => {
                         const valor = e.target.value;
                         setFormEditar({ ...formEditar, nit: valor });
@@ -931,9 +922,8 @@ export const Proveedores = () => {
                     <input
                       placeholder="Ej: 3001234567"
                       value={formEditar.telefono}
-                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                        validacionesEstado.telefono.mensaje ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"
-                      }`}
+                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${validacionesEstado.telefono.mensaje ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"
+                        }`}
                       onChange={(e) => {
                         const valor = e.target.value.replace(/\D/g, "");
                         setFormEditar({ ...formEditar, telefono: valor });
@@ -955,11 +945,10 @@ export const Proveedores = () => {
                       type="email"
                       placeholder="proveedor@ejemplo.com"
                       value={formEditar.correo}
-                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                        validacionesEstado.correo.mensaje || !validacionesEstado.correo.valido
-                          ? "border-red-500 focus:ring-red-200"
-                          : "border-gray-300 focus:ring-blue-500"
-                      }`}
+                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${validacionesEstado.correo.mensaje || !validacionesEstado.correo.valido
+                        ? "border-red-500 focus:ring-red-200"
+                        : "border-gray-300 focus:ring-blue-500"
+                        }`}
                       onChange={(e) => {
                         const valor = e.target.value;
                         setFormEditar({ ...formEditar, correo: valor });
@@ -982,9 +971,8 @@ export const Proveedores = () => {
                     <input
                       placeholder="Ingrese dirección completa"
                       value={formEditar.direccion}
-                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
-                        validacionesEstado.direccion.mensaje ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"
-                      }`}
+                      className={`w-full h-11 px-4 border rounded-lg focus:outline-none focus:ring-2 ${validacionesEstado.direccion.mensaje ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"
+                        }`}
                       onChange={(e) => {
                         const valor = e.target.value;
                         setFormEditar({ ...formEditar, direccion: valor });
@@ -1028,73 +1016,62 @@ export const Proveedores = () => {
           setOpenVer(false);
           setSelectedProveedor(null);
         }}>
-          <div className="w-[95vw] max-w-[600px] p-4 mx-auto">
-            <h3 className="text-xl font-bold text-gray-800 mb-6 text-center border-b pb-3">
-              Detalles del proveedor
+          <div className="w-[95vw] max-w-[600px] p-6 mx-auto">
+            <h3 className="text-xl font-bold text-gray-800 mb-6 text-center">
+              Ver proveedor
             </h3>
+
             {selectedProveedor && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-4">
-                  <div className="flex flex-col">
-                    <label className="mb-1 text-sm font-medium text-gray-600">ID</label>
-                    <div className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-gray-100 flex items-center text-gray-700 font-mono">
-                      {getShortId(selectedProveedor.ProveedorId)}
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <label className="mb-1 text-sm font-medium text-gray-600">NIT</label>
-                    <div className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-gray-100 flex items-center text-gray-700">
-                      {selectedProveedor.Nit || '-'}
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <label className="mb-1 text-sm font-medium text-gray-700">Teléfono</label>
-                    <div className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-gray-100 flex items-center text-gray-700">
-                      {selectedProveedor.Telefono}
-                    </div>
-                  </div>
+              <div className="space-y-3">
+                <div className="flex">
+                  <p className="font-semibold text-black-800 w-36">ID</p>
+                  <p className="text-gray-600 flex-1">{getShortId(selectedProveedor.ProveedorId)}</p>
                 </div>
-                <div className="space-y-4">
-                  <div className="flex flex-col">
-                    <label className="mb-1 text-sm font-medium text-gray-600">Nombre</label>
-                    <div className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-gray-100 flex items-center text-gray-700">
-                      {selectedProveedor.NombreProveedor}
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <label className="mb-1 text-sm font-medium text-gray-600">Correo</label>
-                    <div className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-gray-100 flex items-center text-gray-700 truncate">
-                      {selectedProveedor.Correo}
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <label className="mb-1 text-sm font-medium text-gray-600">Dirección</label>
-                    <div className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-gray-100 flex items-center text-gray-700">
-                      {selectedProveedor.Direccion}
-                    </div>
-                  </div>
+
+                <div className="flex">
+                  <p className="font-semibold text-black-800 w-36">Nombre del proveedor</p>
+                  <p className="text-gray-800 flex-1">{selectedProveedor.NombreProveedor}</p>
                 </div>
-                <div className="flex flex-col md:col-span-2">
-                  <label className="mb-1 text-sm font-medium text-gray-600">Estado</label>
-                  <div className="w-full h-11 px-4 border border-gray-300 rounded-lg bg-gray-100 flex items-center">
-                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
-                      Number(selectedProveedor.Estado) === 1
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+
+                <div className="flex">
+                  <p className="font-semibold text-black-800 w-36">NIT</p>
+                  <p className="text-gray-800 flex-1">{selectedProveedor.Nit || '-'}</p>
+                </div>
+
+                <div className="flex">
+                  <p className="font-semibold text-black-800 w-36">Correo electrónico</p>
+                  <p className="text-gray-800 flex-1 break-all">{selectedProveedor.Correo}</p>
+                </div>
+
+                <div className="flex">
+                  <p className="font-semibold text-black-800 w-36">Teléfono</p>
+                  <p className="text-gray-800 flex-1">{selectedProveedor.Telefono}</p>
+                </div>
+
+                <div className="flex">
+                  <p className="font-semibold text-black-800 w-36">Dirección</p>
+                  <p className="text-gray-800 flex-1">{selectedProveedor.Direccion}</p>
+                </div>
+
+                <div className="flex items-center">
+                  <p className="font-semibold text-black-800 w-36">Estado</p>
+                  <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${Number(selectedProveedor.Estado) === 1
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
                     }`}>
-                      {Number(selectedProveedor.Estado) === 1 ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </div>
+                    {Number(selectedProveedor.Estado) === 1 ? 'Activo' : 'Inactivo'}
+                  </span>
                 </div>
               </div>
             )}
-            <div className="border-t pt-4 mt-4">
+
+            <div className="mt-8">
               <button
                 onClick={() => {
                   setOpenVer(false);
                   setSelectedProveedor(null);
                 }}
-                className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                className="w-full bg-grey-400 text-black py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
                 Cerrar
               </button>
