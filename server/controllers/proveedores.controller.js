@@ -318,7 +318,7 @@ export const updateProveedor = async (req, res) => {
   }
 
   // [3] Obtener req.body
-  const { nombreProveedor, nit, telefono, correo, direccion, estado } = req.body;
+  const { nombreProveedor, nit, telefono, correo, direccion, estado } = req.body || {};
 
   // [4] Try catch
   try {
