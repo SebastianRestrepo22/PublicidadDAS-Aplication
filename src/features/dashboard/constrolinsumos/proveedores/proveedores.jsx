@@ -103,7 +103,7 @@ export const Proveedores = () => {
   const [openConfirmarEstado, setOpenConfirmarEstado] = useState(false);
   const [estadoPendiente, setEstadoPendiente] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [cargandoDatos, setCargandoDatos] = useState(true); // Nuevo estado para el loading de la tabla
+  const [cargandoDatos, setCargandoDatos] = useState(true);
 
   // Estados de paginación
   const [paginatedData, setPaginatedData] = useState([]);
@@ -217,7 +217,7 @@ export const Proveedores = () => {
 
   // ========== FUNCIONES DE DATOS ==========
   const fetchProveedores = async () => {
-    setCargandoDatos(true); // Activar loading antes de cargar
+    setCargandoDatos(true);
     try {
       let resultado;
       if (campoFiltro && busqueda.trim()) {
@@ -243,7 +243,7 @@ export const Proveedores = () => {
       setPaginatedData([]);
       setProveedores([]);
     } finally {
-      setCargandoDatos(false); // Desactivar loading después de cargar
+      setCargandoDatos(false);
     }
   };
 
@@ -285,7 +285,6 @@ export const Proveedores = () => {
         ...prev[campo],
         mensaje: error,
         valido: !error
-        // NO tocamos verificando aquí para mantener el estado del backend
       }
     }));
   };
@@ -557,6 +556,7 @@ export const Proveedores = () => {
                   <th className="py-2.5 px-3 sm:py-3 sm:px-6 text-xs sm:text-sm font-semibold text-white uppercase tracking-wider text-center">NIT</th>
                   <th className="py-2.5 px-3 sm:py-3 sm:px-6 text-xs sm:text-sm font-semibold text-white uppercase tracking-wider text-center">Teléfono</th>
                   <th className="py-2.5 px-3 sm:py-3 sm:px-6 text-xs sm:text-sm font-semibold text-white uppercase tracking-wider text-center">Correo</th>
+                  <th className="py-2.5 px-3 sm:py-3 sm:px-6 text-xs sm:text-sm font-semibold text-white uppercase tracking-wider text-center">Dirección</th>
                   <th className="py-2.5 px-3 sm:py-3 sm:px-6 text-xs sm:text-sm font-semibold text-white uppercase tracking-wider text-center">Estado</th>
                   <th className="py-2.5 px-3 sm:py-3 sm:px-6 text-xs sm:text-sm font-semibold text-white uppercase tracking-wider text-center">Acciones</th>
                 </tr>
@@ -564,7 +564,7 @@ export const Proveedores = () => {
               <tbody className="divide-y divide-slate-100">
                 {cargandoDatos ? (
                   <tr>
-                    <td colSpan={7} className="py-12">
+                    <td colSpan={8} className="py-12">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
                         <p className="text-slate-600 text-base font-medium">Cargando proveedores...</p>
@@ -590,6 +590,9 @@ export const Proveedores = () => {
                         {p.Correo}
                       </td>
                       <td className="py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-slate-900 text-center align-middle">
+                        {p.Direccion}
+                      </td>
+                      <td className="py-2.5 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm font-medium text-slate-900 text-center align-middle">
                         <label className="inline-flex items-center cursor-pointer">
                           <div className="relative">
                             <input
@@ -602,7 +605,7 @@ export const Proveedores = () => {
                             <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform transform peer-checked:translate-x-5"></div>
                           </div>
                           <span className="ml-2 text-xs text-slate-700">
-                            {estadoActivos[p.ProveedorId] === 1 ? "Activo" : "Inactivo"}
+                            {estadoActivos[p.ProveedorId] === 1}
                           </span>
                         </label>
                       </td>
@@ -641,7 +644,7 @@ export const Proveedores = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="py-4 sm:py-6 text-center text-gray-500 text-sm sm:text-base">
+                    <td colSpan={8} className="py-4 sm:py-6 text-center text-gray-500 text-sm sm:text-base">
                       No se encontraron proveedores
                     </td>
                   </tr>
