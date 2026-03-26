@@ -17,7 +17,7 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/footer";
-import { getAllCategorias } from "../../dashboard/categoria/services/services.categoria";
+import { getCategoriasPaginated } from "../../dashboard/categoria/services/services.categoria";
 
 export const Productos = () => {
   const navigate = useNavigate();
@@ -72,7 +72,7 @@ export const Productos = () => {
         setIsLoading(true);
         const [productosRes, categoriasRes] = await Promise.all([
           GetDataproductos(),
-          getAllCategorias(),
+          getCategoriasPaginated(),
         ]);
 
         if (!isMounted) return;
