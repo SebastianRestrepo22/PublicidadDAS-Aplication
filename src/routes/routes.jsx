@@ -28,7 +28,6 @@ import { ProductosDashboard } from "../features/dashboard/productos/producto";
 import { ServiciosDashboard } from "../features/dashboard/servicios/servicio";
 import { ProductoDetalle } from "../features/landing/nuestrosproductos/productoDetalle";
 import { PedidosClientes } from "../features/dashboard/gestionventas/pedidos/pedidosClientes";
-import DetallePedido from "../features/landing/historial/DetallePedidos";
 import { Clientes } from "../features/dashboard/clientes/clientes";
 import { SinAcceso } from "../features/dashboard/SinAcceso/SinAcceso";
 import { RequirePermission } from "../components/RequirePermission";
@@ -36,6 +35,7 @@ import { CrearVenta } from "../features/dashboard/gestionventas/venta/components
 import { Categorias } from "../features/dashboard/categoria/categorias";
 import { RouteTracker } from "../components/RouteTracker";
 import { RedirectIfAuthenticated } from "../components/RedirectIfAuthenticated";
+import DetallePedido from "../features/landing/historial/DetallePedidos";
 
 export const Routers = () => {
   return (
