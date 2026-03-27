@@ -59,6 +59,7 @@ export const OrderEdit = ({
   const [voucherFile, setVoucherFile] = useState(null);
   const [voucherPreview, setVoucherPreview] = useState(null);
   const [uploadingVoucher, setUploadingVoucher] = useState(false);
+  const [erroresLocal, setErrores] = useState([]);
 
   const API_URL = import.meta.env.VITE_API_URL;
 
@@ -189,6 +190,7 @@ export const OrderEdit = ({
       TelefonoEntrega: cliente.Telefono || ""
     });
     setModalClientesAbierto(false);
+    toast.success(`Cliente ${cliente.NombreCompleto || cliente.Nombre} seleccionado`);
   };
 
   // Handlers para productos
@@ -209,14 +211,16 @@ export const OrderEdit = ({
         Descripcion: producto.Descripcion || "",
         UrlImagen: producto.Imagen || "",
         ColorId: null,
-        tipoStock: 'general',
+        tipoStock: producto.UsaColores === 1 ? 'colores' : 'general',
         Stock: producto.Stock || 0,
         UsaColores: producto.UsaColores || 0,
         ProductoNombre: producto.Nombre,
-        ProductoImagen: producto.Imagen || ""
+        ProductoImagen: producto.Imagen || "",
+        coloresDisponibles: producto.Colores || []
       };
       setDetallesCrear(nuevos);
       setModalProductosAbierto(false);
+      toast.success(`Producto ${producto.Nombre} agregado`);
     }
   };
 
@@ -240,8 +244,9 @@ export const OrderEdit = ({
         ColorId: null
       };
       setDetallesCrear(nuevos);
+      setModalServiciosAbierto(false);
+      toast.success(`Servicio ${servicio.Nombre} agregado`);
     }
-    setModalServiciosAbierto(false);
   };
 
   // Handlers para colores
@@ -254,16 +259,27 @@ export const OrderEdit = ({
         return;
       }
 
+      const coloresDelProducto = detalleProducto.coloresDisponibles || [];
+
+      if (coloresDelProducto.length === 0) {
+        toast.warning("Este producto no tiene colores disponibles");
+        return;
+      }
+
       setCurrentDetailIndex(index);
 
       if (detalleProducto.ColorId) {
-        const colorCompleto = colores.find(c => c.ColorId === detalleProducto.ColorId);
+        const colorCompleto = coloresDelProducto.find(c =>
+          c.ColorId === detalleProducto.ColorId ||
+          c.id === detalleProducto.ColorId
+        );
+
         if (colorCompleto) {
           setColoresSeleccionados([{
             ColorId: colorCompleto.ColorId,
-            Stock: 1,
+            Stock: colorCompleto.Stock || 1,
             Nombre: colorCompleto.Nombre,
-            Hex: colorCompleto.Hex || colorCompleto.CodigoHex
+            Hex: colorCompleto.Hex || colorCompleto.CodigoHex || '#ccc'
           }]);
         } else {
           setColoresSeleccionados([{
@@ -293,6 +309,16 @@ export const OrderEdit = ({
           ColorId: colorSeleccionado.ColorId,
           ColorNombre: colorSeleccionado.Nombre,
           ColorHex: colorSeleccionado.Hex
+        };
+        setDetallesCrear(nuevos);
+        toast.success(`Color ${colorSeleccionado.Nombre} asignado al producto`);
+      } else if (coloresSeleccionados.length === 0 && detallesCrear[currentDetailIndex]?.ColorId) {
+        const nuevos = [...detallesCrear];
+        nuevos[currentDetailIndex] = {
+          ...nuevos[currentDetailIndex],
+          ColorId: null,
+          ColorNombre: null,
+          ColorHex: null
         };
         setDetallesCrear(nuevos);
       }
@@ -347,6 +373,7 @@ export const OrderEdit = ({
         tipoStock: 'general'
       }
     ]);
+    toast.info("Nuevo ítem agregado");
   };
 
   const eliminarDetalle = (index) => {
@@ -356,6 +383,7 @@ export const OrderEdit = ({
       if (currentArticulos.length === 1 && currentPageArticulos > 1) {
         setCurrentPageArticulos(currentPageArticulos - 1);
       }
+      toast.info("Ítem eliminado");
     } else {
       toast.warning("El pedido debe tener al menos un artículo");
     }
@@ -457,14 +485,29 @@ export const OrderEdit = ({
     // Validaciones básicas
     const errs = [];
     if (!formCrear.FechaRegistro) errs.push("La fecha es obligatoria.");
-    if (tipoClienteCrear === 'walkin' && !clienteWalkinCrear.Nombre) {
-      errs.push("El nombre del cliente es obligatorio");
+    
+    // Validación de cliente
+    if (tipoClienteCrear === 'registrado') {
+      if (!formCrear.ClienteId && !clienteSeleccionado) {
+        errs.push("Debe seleccionar un cliente registrado.");
+      }
+    } else if (tipoClienteCrear === 'walkin') {
+      if (!clienteWalkinCrear.Nombre) {
+        errs.push("El nombre del cliente es obligatorio");
+      }
+      if (!clienteWalkinCrear.Telefono) {
+        errs.push("El teléfono del cliente es obligatorio");
+      }
+      if (!clienteWalkinCrear.Correo) {
+        errs.push("El correo del cliente es obligatorio");
+      }
     }
+    
     if (!detallesCrear?.length) errs.push("Agregue al menos un producto/servicio.");
 
     if (errs.length) {
       setErrores(errs);
-      toast.error("Corrija los errores");
+      toast.error("Corrija los errores antes de guardar");
       return;
     }
 
@@ -490,7 +533,7 @@ export const OrderEdit = ({
     const pedidoActualizado = {
       ClienteId: tipoClienteCrear === 'registrado' ? formCrear.ClienteId?.trim() || null : null,
       FechaRegistro: formCrear.FechaRegistro,
-      Total: Number(formCrear.Total) || 0,
+      Total: calcularTotalDetalles(detallesCrear),
       MetodoPago: formCrear.MetodoPago,
       NombreRecibe: formCrear.MetodoPago === "contra_entrega" ? formCrear.NombreRecibe || null : null,
       TelefonoEntrega: formCrear.MetodoPago === "contra_entrega" ? formCrear.TelefonoEntrega || null : null,
@@ -529,13 +572,6 @@ export const OrderEdit = ({
     }
   };
 
-  // Función para determinar si la URL es una imagen
-  const esImagen = (url) => {
-    if (!url) return false;
-    const extension = url.split('.').pop().toLowerCase();
-    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension);
-  };
-
   return (
     <>
       <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -554,10 +590,10 @@ export const OrderEdit = ({
         </div>
 
         {/* Errores */}
-        {errores.length > 0 && (
+        {erroresLocal.length > 0 && (
           <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm border border-red-200">
             <ul className="list-disc pl-5 space-y-1">
-              {errores.map((e, i) => <li key={i}>{e}</li>)}
+              {erroresLocal.map((e, i) => <li key={i}>{e}</li>)}
             </ul>
           </div>
         )}
@@ -612,13 +648,13 @@ export const OrderEdit = ({
               </div>
             </div>
 
-            {/* Cliente Registrado */}
+            {/* Cliente Registrado - SIN BOTÓN DE ELIMINAR */}
             {tipoClienteCrear === 'registrado' && (
               <div>
                 {(clienteSeleccionado || formCrear.ClienteId) ? (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex justify-between items-center">
-                      <div>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
                         <p className="font-medium text-green-800">Cliente seleccionado:</p>
                         <p className="text-sm mt-1">
                           <span className="font-medium">
@@ -638,21 +674,7 @@ export const OrderEdit = ({
                           </p>
                         )}
                       </div>
-                      <button
-                        onClick={() => {
-                          setClienteSeleccionado(null);
-                          setFormCrear({
-                            ...formCrear,
-                            ClienteId: "",
-                            NombreCliente: "",
-                            NombreRecibe: "",
-                            TelefonoEntrega: ""
-                          });
-                        }}
-                        className="text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded-lg"
-                      >
-                        <X size={20} />
-                      </button>
+                      {/* NOTA: Se ha eliminado el botón con la X para no permitir eliminar el cliente en edición */}
                     </div>
                   </div>
                 ) : (
@@ -695,7 +717,13 @@ export const OrderEdit = ({
                     value={clienteWalkinCrear.Telefono}
                     onChange={(e) => {
                       const value = e.target.value.replace(/\D/g, '');
-                      setClienteWalkinCrear({ ...clienteWalkinCrear, Telefono: value });
+                      if (value && value[0] !== '3') {
+                        toast.warning('El teléfono debe comenzar con 3');
+                        return;
+                      }
+                      if (value.length <= 10) {
+                        setClienteWalkinCrear({ ...clienteWalkinCrear, Telefono: value });
+                      }
                     }}
                     className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
                     placeholder="3XXXXXXXXX"
@@ -751,6 +779,11 @@ export const OrderEdit = ({
                 <p className="text-xs text-slate-500 mt-2">
                   Formatos permitidos: JPG, PNG, GIF, WEBP, PDF. Máximo 10MB.
                 </p>
+                {voucherPreview && (
+                  <div className="mt-3 p-3 bg-green-50 rounded-lg">
+                    <p className="text-sm text-green-700">Archivo seleccionado para subir</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
