@@ -54,7 +54,8 @@ export const updateDatauser = async (id, data) => {
     const response = await axios.put(`${API_URL}/user/${id}`, data);
     return response;
   } catch (error) {
-    return { status: false, message: "No se puede actualizar el usuario : ", error };
+    // Propagar el error para que el frontend lo maneje
+    throw error;
   }
 };
 

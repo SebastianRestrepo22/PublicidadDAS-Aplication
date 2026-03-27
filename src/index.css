@@ -7,9 +7,13 @@ body.menu-open main {
   margin-top: 20rem;
 }
 
-@theme{
+/* @theme{
   --color-green: #22C55E;
 
+} */
+
+:root {
+  --color-green: #22C55E;
 }
 
 /*Carrusel inicio*/

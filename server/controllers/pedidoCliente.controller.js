@@ -423,7 +423,7 @@ export const createPedidoCliente = async (req, res) => {
 
     // [13] Obtener pedido completo con detalles para respuesta
     const pedidoCompleto = await getPedidoClienteByIdModel(nuevoPedido.PedidoClienteId);
-    pedidoCompleto.detalle = await getDetallePedidoByPedidoIdModel(nuevoPedido.PedidoClienteId)
+    pedidoCompleto.detalle = await getDetallePedidoByPedidoIdModel(nuevoPedido.PedidoClienteId);
 
     // [14] Validar si requiere envío de correo al cliente
     if (pedidoCompleto.ClienteId) {
@@ -435,9 +435,7 @@ export const createPedidoCliente = async (req, res) => {
           cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
           nuevoPedido.PedidoClienteId,
           pedidoCompleto.Estado,
-          esLanding
-            ? "Tu pedido ha sido recibido y está pendiente de confirmación"
-            : "Tu pedido ha sido recibido y está pendiente de confirmación"
+          "Tu pedido ha sido recibido y está pendiente de confirmación"
         );
       }
     }

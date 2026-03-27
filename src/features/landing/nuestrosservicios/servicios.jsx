@@ -14,7 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { GetDataservicios } from "../../dashboard/servicios/services/services.servicios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { getAllCategorias } from "../../dashboard/categoria/services/services.categoria";
+import { getCategoriasPaginated } from "../../dashboard/categoria/services/services.categoria";
 
 const WHATSAPP_NUMBER = "3218319494";
 
@@ -49,7 +49,7 @@ export const Servicios = () => {
         setIsLoading(true);
         const [serviciosRes, categoriasRes] = await Promise.all([
           GetDataservicios(),
-          getAllCategorias(),
+          getCategoriasPaginated(),
         ]);
 
         if (!isMounted) return;
