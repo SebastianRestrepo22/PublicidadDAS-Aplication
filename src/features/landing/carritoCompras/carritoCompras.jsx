@@ -262,7 +262,6 @@ export const CarritoCompras = () => {
   };
 
   const handleCheckout = () => {
-    verificarDatosCarrito();
     const total = getTotal();
     if (total === 0) {
       toast.error("No puedes finalizar una compra con valor $0");

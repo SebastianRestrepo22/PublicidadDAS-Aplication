@@ -188,7 +188,8 @@ export const getColores = async () => {
 };
 
 export const getColoresProducto = async (productoId) => {
-  const res = await axios.get(`${url}producto/${productoId}/colores`);
+  // Ahora usa la ruta de colores en lugar de producto
+  const res = await axios.get(`${url}colores/producto/${productoId}`);
   return res.data;
 };
 
