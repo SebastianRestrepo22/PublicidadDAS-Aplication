@@ -98,6 +98,57 @@ export const OrderForm = ({
     setCurrentPageArticulos(1);
   }, [detallesCrear.length]);
 
+  // Función de validación antes de crear el pedido
+  const validarClienteAntesDeCrear = () => {
+    // Validación para cliente registrado
+    if (tipoClienteCrear === 'registrado') {
+      if (!clienteSeleccionado && !formCrear.ClienteId) {
+        toast.error("Debe seleccionar un cliente registrado antes de crear el pedido");
+        return false;
+      }
+      if (!formCrear.ClienteId) {
+        toast.error("Cliente registrado no válido");
+        return false;
+      }
+    }
+    
+    // Validación para cliente walk-in
+    if (tipoClienteCrear === 'walkin') {
+      if (!clienteWalkinCrear.Nombre || clienteWalkinCrear.Nombre.trim() === "") {
+        toast.error("Debe ingresar el nombre del cliente no registrado");
+        return false;
+      }
+      if (!clienteWalkinCrear.Telefono || clienteWalkinCrear.Telefono.trim() === "") {
+        toast.error("Debe ingresar el teléfono del cliente no registrado");
+        return false;
+      }
+      if (!clienteWalkinCrear.Correo || clienteWalkinCrear.Correo.trim() === "") {
+        toast.error("Debe ingresar el correo del cliente no registrado");
+        return false;
+      }
+      // Validación de formato de correo
+      const emailRegex = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/;
+      if (!emailRegex.test(clienteWalkinCrear.Correo)) {
+        toast.error("Ingrese un correo electrónico válido");
+        return false;
+      }
+      // Validación de teléfono (10 dígitos y comienza con 3)
+      if (clienteWalkinCrear.Telefono.length !== 10 || !clienteWalkinCrear.Telefono.startsWith('3')) {
+        toast.error("El teléfono debe tener 10 dígitos y comenzar con 3");
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
+  // Handler para crear pedido con validación
+  const handleCreateOrder = () => {
+    if (validarClienteAntesDeCrear()) {
+      onCreate();
+    }
+  };
+
   // Calcular artículos a mostrar en la página actual
   const getCurrentPageArticulos = () => {
     const startIndex = (currentPageArticulos - 1) * itemsPerPageArticulos;
@@ -128,6 +179,7 @@ export const OrderForm = ({
       TelefonoEntrega: cliente.Telefono || ""
     });
     setModalClientesAbierto(false);
+    toast.success(`Cliente ${cliente.NombreCompleto || cliente.Nombre} seleccionado`);
   };
 
   // Handlers para productos
@@ -158,6 +210,7 @@ export const OrderForm = ({
 
       setDetallesCrear(nuevos);
       setModalProductosAbierto(false);
+      toast.success(`Producto ${producto.Nombre} agregado`);
     }
   };
 
@@ -181,8 +234,9 @@ export const OrderForm = ({
         ColorId: null
       };
       setDetallesCrear(nuevos);
+      setModalServiciosAbierto(false);
+      toast.success(`Servicio ${servicio.Nombre} agregado`);
     }
-    setModalServiciosAbierto(false);
   };
 
   const abrirModalColores = (index) => {
@@ -288,6 +342,7 @@ export const OrderForm = ({
       if (currentArticulos.length === 1 && currentPageArticulos > 1) {
         setCurrentPageArticulos(currentPageArticulos - 1);
       }
+      toast.info("Ítem eliminado");
     } else {
       const nuevos = [...detallesCrear];
       nuevos[0] = {
@@ -300,6 +355,7 @@ export const OrderForm = ({
         tipoStock: 'general'
       };
       setDetallesCrear(nuevos);
+      toast.info("Se ha limpiado el único ítem del pedido");
     }
   };
 
@@ -373,7 +429,7 @@ export const OrderForm = ({
           {/* INFORMACIÓN DEL CLIENTE */}
           <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
             <h4 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2">
-              <User size={20} /> Información del Cliente
+              <User size={20} /> Información del Cliente *
             </h4>
 
             <div className="mb-6">
@@ -442,6 +498,7 @@ export const OrderForm = ({
                             NombreRecibe: "",
                             TelefonoEntrega: ""
                           });
+                          toast.info("Cliente removido");
                         }}
                         className="text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded-lg"
                       >
@@ -493,7 +550,9 @@ export const OrderForm = ({
                         toast.warning('El teléfono debe comenzar con 3');
                         return;
                       }
-                      setClienteWalkinCrear({ ...clienteWalkinCrear, Telefono: value });
+                      if (value.length <= 10) {
+                        setClienteWalkinCrear({ ...clienteWalkinCrear, Telefono: value });
+                      }
                     }}
                     className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
                     placeholder="3XXXXXXXXX"
@@ -706,7 +765,7 @@ export const OrderForm = ({
           {/* BOTONES */}
           <div className="flex gap-4 pt-4">
             <button
-              onClick={onCreate}
+              onClick={handleCreateOrder}
               disabled={uploading}
               className={`flex-1 ${uploading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'
                 } text-white py-3.5 rounded-lg font-medium flex items-center justify-center gap-2`}
@@ -718,6 +777,7 @@ export const OrderForm = ({
                 </>
               ) : (
                 <>
+                  <Check size={20} />
                   Crear Pedido
                 </>
               )}
