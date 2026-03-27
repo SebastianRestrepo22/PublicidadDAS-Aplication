@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
 
-const parseFechaUTC = (fechaStr) => {
+const parseFechaLocal = (fechaStr) => {
   if (!fechaStr) return new Date(NaN);
-  // Si ya tiene zona, lo dejamos
+  
+  // Si ya tiene zona horaria, usarla
   if (fechaStr.includes('Z') || fechaStr.includes('+') || fechaStr.includes('-')) {
     return new Date(fechaStr);
   }
-  // Caso común: "2025-04-08 15:30:00" → añadir 'Z' para UTC
-  return new Date(fechaStr.replace(' ', 'T') + 'Z');
+  
+  // Si es formato "YYYY-MM-DD HH:MM:SS" (sin zona), tratarlo como fecha local
+  // Reemplazar espacio por T pero NO añadir Z
+  const fechaLocal = fechaStr.replace(' ', 'T');
+  return new Date(fechaLocal);
 };
 
 export const TiempoRestanteAnulacion = ({ fechaVenta, onAnular }) => {
@@ -17,7 +21,7 @@ export const TiempoRestanteAnulacion = ({ fechaVenta, onAnular }) => {
 
   useEffect(() => {
     const calcularTiempo = () => {
-      const fechaVentaDate = parseFechaUTC(fechaVenta);
+      const fechaVentaDate = parseFechaLocal(fechaVenta);
       const ahora = new Date();
       const diferenciaMs = ahora - fechaVentaDate;
       const TIEMPO_LIMITE_HORAS = 1;
