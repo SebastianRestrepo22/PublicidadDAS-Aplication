@@ -13,6 +13,7 @@ import {
   validarCampoUnico
 } from "../proveedores/services/services.proveedores";
 import { Pagination } from "../../components/paginacion/pagination";
+import HelpModal from "../../components/modals/HelpModal";
 
 // ========== UTILIDADES ==========
 const getShortId = (id) => {
@@ -81,6 +82,14 @@ export const Proveedores = () => {
   const [proveedores, setProveedores] = useState([]);
   const [estadoActivos, setEstadoActivo] = useState({});
   const [selectedProveedor, setSelectedProveedor] = useState(null);
+
+  const [open, setOpen] = useState(false);
+  const helpVideos = [
+    { key: "create", label: "Crear proveedor", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=18._Crear_proveedor_wi1onr" },
+    { key: "status", label: "Cambiar estado del proveedor", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=19._Cambiar_el_estado_del_proveedor_kgfhpf" },
+    { key: "update", label: "Editar proveedor", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=20._Editar_proveedor_s0rugl" },
+    { key: "delete", label: "Eliminar proveedor", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=21._Eliminar_proveedor_mncseu" },
+  ];
 
   // Estados de filtros
   const [campoFiltro, setCampoFiltro] = useState("");
@@ -540,6 +549,18 @@ export const Proveedores = () => {
                   <option value="direccion">Dirección</option>
                   <option value="estado">Estado</option>
                 </select>
+
+                <button
+                  onClick={() => setOpen(true)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+                >
+                  ?
+                </button>
+                <HelpModal
+                  isOpen={open}
+                  onClose={() => setOpen(false)}
+                  videos={helpVideos}
+                />
               </div>
             </div>
           </div>
@@ -1059,8 +1080,8 @@ export const Proveedores = () => {
                 <div className="flex items-center">
                   <p className="font-semibold text-black-800 w-36">Estado</p>
                   <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${Number(selectedProveedor.Estado) === 1
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-red-100 text-red-800'
                     }`}>
                     {Number(selectedProveedor.Estado) === 1 ? 'Activo' : 'Inactivo'}
                   </span>

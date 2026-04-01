@@ -16,6 +16,7 @@ import { ProductoView } from "./components/ProductoView.jsx";
 import { ProductosTable } from "./components/ProductosTable.jsx";
 import { CategoriaModal } from "./components/CategoriaModal.jsx";
 import { getAllCategorias } from "../categoria/services/services.categoria.js";
+import HelpModal from "../components/modals/HelpModal.jsx";
 
 export const ProductosDashboard = () => {
   const navigate = useNavigate();
@@ -29,8 +30,16 @@ export const ProductosDashboard = () => {
     return "list";
   }, [location.pathname, id]);
 
+  const [open, setOpen] = useState(false);
+    const helpVideos = [
+      { key: "create", label: "Crear producto", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=14._Crear_producto_pmbww7" },
+      { key: "status", label: "Cambiar el estado del producto", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=15._Cambio_de_estado_del_producto_si36zw" },
+      { key: "update", label: "Editar producto", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=16._Editar_producto_pvknyb" },
+      { key: "delete", label: "Eliminar producto", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=17._Eliminar_producto_hqclte" },
+    ];
+
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // ✅ NUEVO: Estado de loading para tabla y datos iniciales
+  // Estado de loading para tabla y datos iniciales
   const [cargando, setCargando] = useState(true);
   const [cargandoCategorias, setCargandoCategorias] = useState(true);
 
@@ -571,6 +580,18 @@ const cargarProducto = async () => {
                 <option value="stock">Stock</option>
                 <option value="categoria">CategoriaId</option>
               </select>
+
+              <button
+          onClick={() => setOpen(true)}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+        >
+          ?
+        </button>
+        <HelpModal
+          isOpen={open}
+          onClose={() => setOpen(false)}
+          videos={helpVideos}
+        />
             </div>
 
             <Modal open={openEliminar} onClose={() => setOpenEliminar(false)}>

@@ -1,14 +1,24 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Plus } from 'lucide-react';
+import { useState } from "react";
+import HelpModal from '../../components/modals/HelpModal';
 
-export const RolFilters = ({ 
-  filtroCampo, 
-  setFiltroCampo, 
-  filtroValor, 
-  setFiltroValor, 
-  onNewRol 
+export const RolFilters = ({
+  filtroCampo,
+  setFiltroCampo,
+  filtroValor,
+  setFiltroValor,
+  onNewRol
 }) => {
+  const [open, setOpen] = useState(false);
+  const helpVideos = [
+    { key: "create", label: "Crear rol", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=3._Crear_rol_fikdi4" },
+    { key: "status", label: "Cambiar el estado", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=4._Cambio_de_estado_en_el_rol_gpovo6" },
+    { key: "update", label: "Editar rol", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=5._editar_rol_idx2ai" },
+    { key: "asing", label: "Asignar permisos", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=6._Asignar_permisos_hhlkkf" },
+    { key: "delete", label: "Eliminar rol", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=7._Eliminar_rol_xrmawb" },
+  ];
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
@@ -51,6 +61,18 @@ export const RolFilters = ({
           <option value="nombre">Nombre</option>
           <option value="estado">Estado</option>
         </select>
+
+        <button
+          onClick={() => setOpen(true)}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+        >
+          ?
+        </button>
+        <HelpModal
+          isOpen={open}
+          onClose={() => setOpen(false)}
+          videos={helpVideos}
+        />
       </div>
     </div>
   );
