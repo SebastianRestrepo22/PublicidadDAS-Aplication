@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, Plus } from "lucide-react";
+import HelpModal from "../../components/modals/HelpModal";
 
 export const UsuarioFilters = ({
   filtroCampo,
@@ -9,6 +10,12 @@ export const UsuarioFilters = ({
   setFiltroValor,
   onNewUser
 }) => {
+  const [open, setOpen] = useState(false);
+    const helpVideos = [
+      { key: "create", label: "Crear usuario", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=8._Crear_un_usuario_imlnes" },
+      { key: "update", label: "Editar usuario", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=9._Editar_usuario_oo7b1d" },
+      { key: "delete", label: "Eliminar usuario", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=10._Eliminar_usuarios_sezui2" },
+    ];
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
@@ -44,6 +51,18 @@ export const UsuarioFilters = ({
           <option value="telefono">Telefono</option>
           <option value="rol">Rol</option>
         </select>
+
+        <button
+          onClick={() => setOpen(true)}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+        >
+          ?
+        </button>
+        <HelpModal
+          isOpen={open}
+          onClose={() => setOpen(false)}
+          videos={helpVideos}
+        />
       </div>
     </div>
   );
