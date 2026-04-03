@@ -293,11 +293,16 @@ export const createPedidoCliente = async (req, res) => {
   try {
     // [2] Procesar datos del pedido (JSON string o Body)
     let pedidoData;
+    console.log("📦 [PEDIDO] Body recibido:", req.body);
+    console.log("📄 [PEDIDO] Archivo recibido:", req.file ? req.file.filename : "Ninguno");
+
     if (typeof req.body.pedido === 'string') {
       try {
         pedidoData = JSON.parse(req.body.pedido);
+        console.log("📋 [PEDIDO] Datos parseados (JSON):", pedidoData);
       } catch (error) {
         // [25] Retornar error si los datos son inválidos
+        console.error("❌ [PEDIDO] Error parseando JSON:", error.message);
         return res.status(400).json({
           error: 'Datos del pedido inválidos',
           details: error.message
@@ -305,6 +310,7 @@ export const createPedidoCliente = async (req, res) => {
       }
     } else {
       pedidoData = req.body;
+      console.log("📋 [PEDIDO] Datos obtenidos (Body directo):", pedidoData);
     }
 
     // [3] Extraer campos del objeto pedidoData
@@ -339,12 +345,10 @@ export const createPedidoCliente = async (req, res) => {
       return res.status(400).json({ error: "El pedido debe contener al menos un producto" });
     }
 
-    // [6] Procesar archivo de voucher si existe
+    // [6] Procesar archivo de voucher si existe (Cloudinary)
     let voucherUrl = null;
     if (req.file) {
-      const protocol = req.protocol;
-      const host = req.get('host');
-      voucherUrl = `${protocol}://${host}/uploads/vouchers/${req.file.filename}`;
+      voucherUrl = req.file.path;
     }
 
     // [7] Procesar fecha de registro
@@ -375,6 +379,7 @@ export const createPedidoCliente = async (req, res) => {
     });
 
     // [10] Iterar e insertar detalles del pedido
+    console.log(`🛒 [PEDIDO] Procesando ${detalle.length} detalles...`);
     for (let i = 0; i < detalle.length; i++) {
       const item = detalle[i];
 
@@ -383,60 +388,56 @@ export const createPedidoCliente = async (req, res) => {
       const Cantidad = item.Cantidad ? parseInt(item.Cantidad) : 1;
       const Precio = parseFloat(item.PrecioUnitario || item.Precio || 0);
       const ColorId = item.ColorId || null;
-      const Tamaño = null;
       const Descripcion = item.Descripcion || null;
       const UrlImagen = item.UrlImagen ? item.UrlImagen.trim() : null;
-      const UrlImagenPersonalizada = null;
-
-      const Subtotal = parseFloat((Cantidad * Precio).toFixed(2));
 
       // [11] Validar integridad de cada detalle
       if (!ProductoId && !ServicioId) {
-        // [28] Error Se requiere ProductoId o ServicioId
         throw new Error(`Detalle ${i + 1}: Se requiere ProductoId o ServicioId`);
       }
       if (Cantidad <= 0) {
-        // [29] Error Cantidad inválida
         throw new Error(`Detalle ${i + 1}: Cantidad inválida (${Cantidad})`);
       }
       if (isNaN(Precio) || Precio <= 0) {
-        // [30] Error Precio inválido
         throw new Error(`Detalle ${i + 1}: Precio inválido (${Precio})`);
       }
 
       // [12] Intentar crear detalle en BD
       await createDetallePedidoModel({
-        DetallePedidoClienteId: uuidv4(),
         PedidoClienteId: nuevoPedido.PedidoClienteId,
         ProductoId,
         ServicioId,
         Cantidad,
         Precio,
         ColorId,
-        Tamaño,
         Descripcion,
-        UrlImagen,
-        UrlImagenPersonalizada,
-        Subtotal
+        UrlImagen
       });
     }
+    console.log("✅ [PEDIDO] Detalles insertados correctamente.");
 
     // [13] Obtener pedido completo con detalles para respuesta
     const pedidoCompleto = await getPedidoClienteByIdModel(nuevoPedido.PedidoClienteId);
     pedidoCompleto.detalle = await getDetallePedidoByPedidoIdModel(nuevoPedido.PedidoClienteId);
 
-    // [14] Validar si requiere envío de correo al cliente
+    // [14] Validar si requiere envío de correo al cliente (PROTEGIDO)
     if (pedidoCompleto.ClienteId) {
-      const cliente = await getClienteByIdModel(pedidoCompleto.ClienteId);
-      if (cliente?.CorreoElectronico) {
-        // [15] Enviar correo informativo
-        await sendPedidoEstadoEmail(
-          cliente.CorreoElectronico,
-          cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
-          nuevoPedido.PedidoClienteId,
-          pedidoCompleto.Estado,
-          "Tu pedido ha sido recibido y está pendiente de confirmación"
-        );
+      try {
+        const cliente = await getClienteByIdModel(pedidoCompleto.ClienteId);
+        if (cliente?.CorreoElectronico) {
+          // [15] Enviar correo informativo
+          await sendPedidoEstadoEmail(
+            cliente.CorreoElectronico,
+            cliente.NombreCompleto || `${cliente.Nombre} ${cliente.Apellido}`,
+            nuevoPedido.PedidoClienteId,
+            pedidoCompleto.Estado,
+            "Tu pedido ha sido recibido y está pendiente de confirmación"
+          );
+          console.log(`✉️ [PEDIDO] Correo enviado a ${cliente.CorreoElectronico}`);
+        }
+      } catch (emailError) {
+        // Solo logueamos el error, NO lanzamos throw para no borrar el pedido
+        console.error("⚠️ [PEDIDO] Error enviando correo informativo:", emailError.message);
       }
     }
 
@@ -457,12 +458,7 @@ export const createPedidoCliente = async (req, res) => {
       }
     }
 
-    // [19] Eliminar archivo físico si falló la operación
-    if (req.file) {
-      fs.unlink(req.file.path, (err) => {
-        if (err) console.error('Error eliminando archivo:', err);
-      });
-    }
+    // [19] Nota: Con Cloudinary no es necesario eliminar el archivo físico localmente
 
     // [20] Retornar error de servidor
     res.status(500).json({
@@ -501,12 +497,9 @@ export const updatePedidoCliente = async (req, res) => {
       delete updates.detalle;
     }
 
-    // [5] Procesar nuevo voucher si se adjuntó archivo
+    // [5] Procesar nuevo voucher si se adjuntó archivo (Cloudinary)
     if (req.file) {
-      const protocol = req.protocol;
-      const host = req.get('host');
-      const voucherUrl = `${protocol}://${host}/uploads/vouchers/${req.file.filename}`;
-      updates.Voucher = voucherUrl;
+      updates.Voucher = req.file.path;
     }
 
     // [6] Validar cambio de estado según método de pago
@@ -694,12 +687,7 @@ export const updatePedidoCliente = async (req, res) => {
     // [23] Manejar error de proceso de actualización
     console.error(' [PEDIDOS] Error:', error);
 
-    // [24] Eliminar archivo físico si falló la operación
-    if (req.file) {
-      fs.unlink(req.file.path, (err) => {
-        if (err) console.error('Error eliminando archivo:', err);
-      });
-    }
+    // [24] Nota: Con Cloudinary no es necesario eliminar el archivo físico localmente
 
     // [25] Retornar error de servidor
     res.status(500).json({
@@ -814,18 +802,13 @@ export const uploadVoucherToPedido = async (req, res) => {
     // [3] Verificar existencia del pedido
     const pedidoExistente = await getPedidoClienteByIdModel(id);
     if (!pedidoExistente) {
-      // [4] Eliminar archivo físico si el pedido no existe (huerfano)
-      fs.unlink(file.path, (err) => {
-        if (err) console.error('Error eliminando archivo huérfano:', err);
-      });
+      // [4] Nota: Con Cloudinary no es necesario eliminar el archivo local
       // [16] Retornar 404
       return res.status(404).json({ error: 'Pedido no encontrado' });
     }
 
-    // [5] Construir URL del voucher
-    const protocol = req.protocol;
-    const host = req.get('host');
-    const voucherUrl = `${req.protocol}://${req.get('host')}/uploads/vouchers/${file.filename}`;
+    // [5] Construir URL del voucher (Cloudinary)
+    const voucherUrl = file.path;
 
     // [6] Actualizar voucher en el modelo
     const result = await updatePedidoClienteModel(id, { Voucher: voucherUrl });

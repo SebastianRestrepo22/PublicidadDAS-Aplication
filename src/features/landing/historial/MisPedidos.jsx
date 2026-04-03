@@ -19,6 +19,31 @@ const MisPedidos = () => {
 
   const API_URL = import.meta.env.VITE_API_URL;
 
+  // Función para ajustar la fecha UTC a la zona horaria local
+  const ajustarFechaLocal = (fechaUTC) => {
+    if (!fechaUTC) return null;
+    const date = new Date(fechaUTC);
+    const offset = date.getTimezoneOffset();
+    const fechaAjustada = new Date(date.getTime() - offset * 60000);
+    return fechaAjustada;
+  };
+
+  // Función para formatear la fecha de manera legible
+  const formatearFecha = (fechaUTC, formatoLargo = true) => {
+    const fechaAjustada = ajustarFechaLocal(fechaUTC);
+    if (!fechaAjustada) return 'Fecha no disponible';
+    
+    if (formatoLargo) {
+      return fechaAjustada.toLocaleDateString('es-ES', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } else {
+      return fechaAjustada.toLocaleDateString('es-ES');
+    }
+  };
+
   useEffect(() => {
     if (user?.CedulaId) {
       const loadUser = async () => {
@@ -320,11 +345,7 @@ const MisPedidos = () => {
                               {esContraEntrega(order) ? 'Pedido' : 'Venta'} #{String(order.PedidoClienteId).substring(0, 4)}
                             </h3>
                             <p className="text-sm text-gray-500">
-                              {new Date(order.FechaRegistro).toLocaleDateString('es-ES', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric'
-                              })}
+                              {formatearFecha(order.FechaRegistro, true)}
                             </p>
                           </div>
                         </div>
@@ -409,7 +430,7 @@ const MisPedidos = () => {
                                 {esContraEntrega(order) ? 'Pedido' : 'Venta'} #{String(order.PedidoClienteId).substring(0, 4)}
                               </h3>
                               <p className="text-sm text-gray-500">
-                                {new Date(order.FechaRegistro).toLocaleDateString('es-ES')}
+                                {formatearFecha(order.FechaRegistro, false)}
                               </p>
                             </div>
                           </div>
@@ -461,4 +482,4 @@ const MisPedidos = () => {
   );
 };
 
-export default MisPedidos;   
+export default MisPedidos;
