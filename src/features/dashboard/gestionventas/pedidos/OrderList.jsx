@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Eye, Plus, Search } from "lucide-react";
 import { Pagination } from "../../components/paginacion/pagination";
 import { formatDate, shortenId, formatPrice } from "../pedidos/utils/pedidosHelpers";
+import HelpModal from "../../components/modals/HelpModal";
 
 export const OrderList = ({
   paginatedData,
@@ -22,6 +23,13 @@ export const OrderList = ({
 }) => {
   // Estado local para el input de búsqueda
   const [localSearchText, setLocalSearchText] = useState(filtroText);
+
+  const [open, setOpen] = useState(false);
+  const helpVideos = [
+    { key: "create", label: "Crear pedido", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=30._Crear_pedido_pv74zo" },
+    { key: "status", label: "Cambiar el estado de un pedido", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=31._Cambio_del_estado_del_pedido_o2ijvv" },
+    { key: "update", label: "Editar pedido", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=Editar_pedido_i4hcjo" },
+  ];
 
   // Sincronizar el estado local cuando cambia el filtroText desde fuera
   useEffect(() => {
@@ -119,6 +127,18 @@ export const OrderList = ({
             <option value="MetodoPago">Método Pago</option>
             <option value="Estado">Estado</option>
           </select>
+
+          <button
+            onClick={() => setOpen(true)}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+          >
+            ?
+          </button>
+          <HelpModal
+            isOpen={open}
+            onClose={() => setOpen(false)}
+            videos={helpVideos}
+          />
         </div>
       </div>
 
@@ -166,24 +186,23 @@ export const OrderList = ({
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      pedido.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${pedido.Estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
                       pedido.Estado === 'aprobado' ? 'bg-blue-100 text-blue-800' :
-                      pedido.Estado === 'finalizado' ? 'bg-green-100 text-green-800' :
-                      pedido.Estado === 'en_proceso' ? 'bg-purple-100 text-purple-800' :
-                      pedido.Estado === 'en_camino' ? 'bg-orange-100 text-orange-800' :
-                      pedido.Estado === 'entregado' ? 'bg-emerald-100 text-emerald-800' :
-                      pedido.Estado === 'cancelado' ? 'bg-red-100 text-red-800' :
-                      'bg-slate-100 text-slate-800'
-                    }`}>
+                        pedido.Estado === 'finalizado' ? 'bg-green-100 text-green-800' :
+                          pedido.Estado === 'en_proceso' ? 'bg-purple-100 text-purple-800' :
+                            pedido.Estado === 'en_camino' ? 'bg-orange-100 text-orange-800' :
+                              pedido.Estado === 'entregado' ? 'bg-emerald-100 text-emerald-800' :
+                                pedido.Estado === 'cancelado' ? 'bg-red-100 text-red-800' :
+                                  'bg-slate-100 text-slate-800'
+                      }`}>
                       {pedido.Estado === 'pendiente' ? 'Pendiente' :
-                       pedido.Estado === 'aprobado' ? 'Aprobado' :
-                       pedido.Estado === 'finalizado' ? 'Finalizado' :
-                       pedido.Estado === 'en_proceso' ? 'En Proceso' :
-                       pedido.Estado === 'en_camino' ? 'En Camino' :
-                       pedido.Estado === 'entregado' ? 'Entregado' :
-                       pedido.Estado === 'cancelado' ? 'Cancelado' :
-                       pedido.Estado}
+                        pedido.Estado === 'aprobado' ? 'Aprobado' :
+                          pedido.Estado === 'finalizado' ? 'Finalizado' :
+                            pedido.Estado === 'en_proceso' ? 'En Proceso' :
+                              pedido.Estado === 'en_camino' ? 'En Camino' :
+                                pedido.Estado === 'entregado' ? 'Entregado' :
+                                  pedido.Estado === 'cancelado' ? 'Cancelado' :
+                                    pedido.Estado}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -206,7 +225,7 @@ export const OrderList = ({
             )}
           </tbody>
         </table>
-        
+
         {/* Paginación */}
         {!cargandoDatos && paginatedData.length > 0 && (
           <div className="px-6 py-4 border-t">

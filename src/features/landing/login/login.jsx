@@ -16,6 +16,7 @@ import {
   CreditCard,
   ArrowRight,
 } from "lucide-react";
+import HelpModal from "../../dashboard/components/modals/HelpModal";
 
 export const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -23,6 +24,12 @@ export const Login = () => {
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const navigate = useNavigate();
+
+  const [open, setOpen] = useState(false);
+  const helpVideos = [
+    { key: "create", label: "Crear usuario", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=2._Registro_cfazew" },
+    { key: "login", label: "Iniciar sesión", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=1._Inicio_de_sesi%C3%B3n_j44kgd" },
+  ];
 
   const [step, setStep] = useState(1);
 
@@ -238,7 +245,7 @@ export const Login = () => {
     }
 
     try {
-const response = await axios.post(`${API_URL}/auth/register`, values);
+      const response = await axios.post(`${API_URL}/auth/register`, values);
       if (response.status === 201) {
         toast.success("Registro exitoso");
         toggleForm(true);
@@ -307,7 +314,7 @@ const response = await axios.post(`${API_URL}/auth/register`, values);
     }
 
     try {
-const response = await axios.post(`${API_URL}/auth/login`, valuesLogin);
+      const response = await axios.post(`${API_URL}/auth/login`, valuesLogin);
       const token = response.data.token;
 
       const userData = response.data.user || {
@@ -394,6 +401,19 @@ const response = await axios.post(`${API_URL}/auth/login`, valuesLogin);
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
 
         <div className="w-full max-w-7xl z-10 mt-6">
+          <div className="grid justify-items-end">
+            <button
+              onClick={() => setOpen(true)}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-all"
+            >
+              ?
+            </button>
+            <HelpModal
+              isOpen={open}
+              onClose={() => setOpen(false)}
+              videos={helpVideos}
+            />
+          </div>
           <div className="flex flex-col lg:flex-row items-center justify-center gap-12">
             <div className="hidden lg:flex w-2/5 items-center justify-start relative -ml-10">
               <div className="relative group">

@@ -6,6 +6,7 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Pagination } from "../components/paginacion/pagination.jsx";
 import { useCategorias } from "./hook/useCategorias.js";
+import HelpModal from "../components/modals/HelpModal.jsx";
 
 export const Categorias = () => {
   const {
@@ -46,6 +47,13 @@ export const Categorias = () => {
     resetFormErrors,
     resetForm
   } = useCategorias();
+
+  const [open, setOpen] = useState(false);
+  const helpVideos = [
+    { key: "create", label: "Crear categoría", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=11._Crear_categor%C3%ADa_gcddpm" },
+    { key: "update", label: "Editar categoría", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=12._Editar_categor%C3%ADa_hovgv9" },
+    { key: "delete", label: "Eliminar categoría", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=13._Eliminar_categor%C3%ADa_ou7nyv" },
+  ];
 
   // Solo estados para controlar la apertura de modales
   const [openCreate, setOpenCreate] = useState(false);
@@ -192,6 +200,18 @@ export const Categorias = () => {
                     className="border border-slate-300 rounded-lg px-3 py-2.5 sm:py-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px] text-sm sm:text-base"
                   />
                 )}
+
+                <button
+                  onClick={() => setOpen(true)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+                >
+                  ?
+                </button>
+                <HelpModal
+                  isOpen={open}
+                  onClose={() => setOpen(false)}
+                  videos={helpVideos}
+                />
               </div>
             </div>
           </div>

@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { Eye, Plus, Search } from "lucide-react";
 import { Pagination } from "../../../components/paginacion/pagination";
 import { ESTADOS_COMPRA } from "../hook/useCompras";
+import HelpModal from "../../../components/modals/HelpModal";
 
 const getShortId = (id) => {
   const str = String(id || "");
@@ -62,7 +63,7 @@ export const ComprasList = ({
   const comprasFiltradas = paginatedData.filter((compra) => {
     if (!filtroText) return true;
     const busqueda = filtroText.toLowerCase();
-    
+
     if (filtroCampo === "id") {
       return compra.CompraId?.toLowerCase().includes(busqueda);
     } else if (filtroCampo === "proveedor") {
@@ -81,6 +82,11 @@ export const ComprasList = ({
       );
     }
   });
+
+  const [open, setOpen] = useState(false);
+  const helpVideos = [
+    { key: "create", label: "Crear una compra", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=22._Crear_una_compra_cdpzzl" },
+  ];
 
   return (
     <>
@@ -119,6 +125,18 @@ export const ComprasList = ({
               <option value="fecha">Fecha</option>
               <option value="total">Total</option>
             </select>
+
+            <button
+              onClick={() => setOpen(true)}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+            >
+              ?
+            </button>
+            <HelpModal
+              isOpen={open}
+              onClose={() => setOpen(false)}
+              videos={helpVideos}
+            />
           </div>
         </div>
       </div>
@@ -194,7 +212,7 @@ export const ComprasList = ({
             )}
           </tbody>
         </table>
-        
+
         {/* 🔥 PAGINACIÓN - EXACTAMENTE COMO EN CATEGORIAS */}
         {!cargandoDatos && totalItems > 0 && (
           <div className="px-6 py-4 border-t border-slate-200">
