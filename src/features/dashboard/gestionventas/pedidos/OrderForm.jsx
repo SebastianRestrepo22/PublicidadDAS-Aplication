@@ -59,7 +59,7 @@ export const OrderForm = ({
   // Efecto para fecha automática
   useEffect(() => {
     if (!formCrear.FechaRegistro) {
-      const hoy = new Date().toISOString().split('T')[0];
+        const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
       setFormCrear({ ...formCrear, FechaRegistro: hoy });
     }
   }, [formCrear, setFormCrear]);

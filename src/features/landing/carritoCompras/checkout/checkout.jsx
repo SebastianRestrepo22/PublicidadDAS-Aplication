@@ -193,7 +193,7 @@ export const Checkout = () => {
 
       const payload = {
         ClienteId: user.CedulaId,
-        FechaRegistro: new Date().toISOString().split("T")[0],
+        FechaRegistro: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split("T")[0],
         Total: totalSeguro,
         Estado: "pendiente",
         MetodoPago: metodoPago === "entrega" ? "contra_entrega" : metodoPago,
