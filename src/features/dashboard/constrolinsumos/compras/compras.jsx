@@ -119,6 +119,7 @@ export const Compras = () => {
   });
   const [loadingProductos, setLoadingProductos] = useState(false);
   const [currentDetailIndex, setCurrentDetailIndex] = useState(-1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_URL;
 
@@ -374,6 +375,7 @@ export const Compras = () => {
       return;
     }
     setErrores([]);
+    setIsSubmitting(true);
     try {
       const total = detallesCrear.reduce((sum, item) => sum + (Number(item.Subtotal) || 0), 0);
       const compraData = {
@@ -426,6 +428,8 @@ export const Compras = () => {
         "Error al crear la compra.";
       setErrores([errorMsg]);
       toast.error(` Error: ${errorMsg}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -484,6 +488,7 @@ export const Compras = () => {
             onCreate={handleCreate}
             getProductoDisplay={getProductoDisplay}
             calcularTotal={calcularTotal}
+            isSubmitting={isSubmitting}
           />
         )}
 
