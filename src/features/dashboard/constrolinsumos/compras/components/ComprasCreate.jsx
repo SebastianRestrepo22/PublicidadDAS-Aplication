@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, ChevronRight, Package, Palette, Plus, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon } from "lucide-react";
+import { ArrowLeft, ChevronRight, Package, Palette, Plus, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Loader2 } from "lucide-react";
 import { ProductoColoresModal } from "../../../productos/components/ProductoColoresModal";
 import { ComprasSelectProveedorSimple } from "../components/ComprasSelectProveedorSimple";
 import { toast } from "react-toastify";
@@ -32,7 +32,8 @@ export const ComprasCreate = ({
   onEliminarDetalle,
   onCreate,
   getProductoDisplay,
-  calcularTotal
+  calcularTotal,
+  isSubmitting
 }) => {
   // Estados para paginación de artículos
   const [currentPageArticulos, setCurrentPageArticulos] = useState(1);
@@ -644,9 +645,11 @@ export const ComprasCreate = ({
           <button
             type="button"
             onClick={onCreate}
-            className="flex-1 h-11 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-lg hover:from-emerald-600 hover:to-green-600 transition-all font-medium text-sm shadow-lg shadow-emerald-500/30"
+            disabled={isSubmitting}
+            className={`flex-1 h-11 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-lg transition-all font-medium text-sm shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:from-emerald-600 hover:to-green-600'}`}
           >
-            Crear Compra
+            {isSubmitting && <Loader2 className="animate-spin" size={18} />}
+            {isSubmitting ? 'Creando...' : 'Crear Compra'}
           </button>
           <button
             type="button"
