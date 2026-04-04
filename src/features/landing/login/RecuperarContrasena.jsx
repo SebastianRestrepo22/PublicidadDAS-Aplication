@@ -35,9 +35,9 @@ export const RecuperarContrasena = () => {
 
     try {
       const response = await axios.post(`${API_URL}/auth/forgot-password`, { correo });
-      setMensaje(response.data.message || "✅ Correo enviado con éxito. Revisa tu bandeja de entrada.");
+      setMensaje(response.data.message || "Correo enviado con éxito. Revisa tu bandeja de entrada y la carpeta de spam si no lo encuentras.");
     } catch (error) {
-      setMensaje(error.response?.data?.message || "❌ Error al enviar el correo. Intenta nuevamente.");
+      setMensaje(error.response?.data?.message || "Error al enviar el correo. Intenta nuevamente.");
     } finally {
       setIsLoading(false);
     }
@@ -125,19 +125,19 @@ export const RecuperarContrasena = () => {
 
         {/* Mensaje de estado */}
         {mensaje && (
-          <div className={`mt-6 p-4 rounded-xl border ${mensaje.includes('✅') || mensaje.includes('éxito')
+          <div className={`mt-6 p-4 rounded-xl border ${!mensaje.includes('Error') && !mensaje.includes('error') && mensaje !== "Por favor ingresa un correo electrónico válido"
               ? 'bg-green-50 border-green-200 text-green-700'
               : 'bg-red-50 border-red-200 text-red-700'
             }`}>
             <div className="flex items-start">
-              {mensaje.includes('✅') || mensaje.includes('éxito') ? (
+              {!mensaje.includes('Error') && !mensaje.includes('error') && mensaje !== "Por favor ingresa un correo electrónico válido" ? (
                 <CheckCircle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
               ) : (
                 <XCircle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
               )}
               <div>
-                <p className="font-medium">{mensaje.replace(/[✅❌]/g, '').trim()}</p>
-                {mensaje.includes('éxito') && (
+                <p className="font-medium">{mensaje}</p>
+                {!mensaje.includes('Error') && !mensaje.includes('error') && mensaje !== "Por favor ingresa un correo electrónico válido" && (
                   <p className="text-sm opacity-90 mt-1">
                     Revisa tu bandeja de entrada y la carpeta de spam si no encuentras el correo.
                   </p>

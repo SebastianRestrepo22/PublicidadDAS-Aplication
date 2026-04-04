@@ -254,6 +254,24 @@ const MisPedidos = () => {
         <div className="mb-8 pt-16">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Mis Pedidos</h1>
           <p className="text-gray-600">Gestiona y realiza seguimiento de tus pedidos</p>
+          <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <svg className="w-5 h-5 text-amber-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-800">
+                  📬 Importante: Revisa tu carpeta de spam
+                </p>
+                <p className="text-sm text-amber-700 mt-1">
+                  Para no perderte ninguna actualización de tus pedidos, te recomendamos revisar tu carpeta de spam o correos no deseados.
+                  Si encuentras nuestros correos allí, márcalos como "no es spam" para recibirlos en tu bandeja de entrada principal.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Search Bar */}
@@ -282,8 +300,8 @@ const MisPedidos = () => {
                 key={status}
                 onClick={() => setFilterStatus(status)}
                 className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${filterStatus === status
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 hover:shadow-sm'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 hover:shadow-sm'
                   }`}
               >
                 {status === 'Todos' ? 'Todos los pedidos' : getEstadoLabel(status)}

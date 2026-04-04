@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, X } from 'lucide-react';
+import HelpModal from '../../../components/modals/HelpModal';
 
 export const VentasFilters = ({
   campoFiltro,
@@ -10,6 +11,14 @@ export const VentasFilters = ({
   onLimpiarFiltros,
 }) => {
   const navigate = useNavigate();
+
+  const [open, setOpen] = useState(false);
+  const helpVideos = [
+    { key: "create", label: "Crear una venta", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=32._Crear_venta_n8gtgh" },
+    { key: "rechazar", label: "Rechazar una venta", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=33._Rechazar_venta_sb34gy" },
+    { key: "pagada", label: "Pagar una venta", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=34._Poner_venta_pagada_ijsum6" },
+    { key: "anular", label: "Anular una venta", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=35._Anular_venta_tsevt4" },
+  ];
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
@@ -78,6 +87,18 @@ export const VentasFilters = ({
             <X size={16} />Limpiar filtros
           </button>
         )}
+
+        <button
+          onClick={() => setOpen(true)}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+        >
+          ?
+        </button>
+        <HelpModal
+          isOpen={open}
+          onClose={() => setOpen(false)}
+          videos={helpVideos}
+        />
       </div>
     </div>
   );

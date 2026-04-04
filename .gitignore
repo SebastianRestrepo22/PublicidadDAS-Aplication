@@ -23,3 +23,5 @@ server
 *.njsproj
 *.sln
 *.sw?
+
+echo "server/" >> .gitignore

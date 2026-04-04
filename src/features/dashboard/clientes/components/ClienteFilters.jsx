@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Plus, Search, X } from 'lucide-react';
+import HelpModal from '../../components/modals/HelpModal';
 
 export const ClienteFilters = ({
   filtroCampo,
@@ -9,6 +10,12 @@ export const ClienteFilters = ({
   onLimpiarFiltros,
   onNuevoCliente,
 }) => {
+  const [open, setOpen] = useState(false);
+  const helpVideos = [
+    { key: "create", label: "Crear cliente", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=27._Crear_cliente_xctgo2" },
+    { key: "update", label: "Editar cliente", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=28._Editar_cliente_eikwpl" },
+    { key: "delete", label: "Eliminar cliente", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=29._Eliminar_cliente_cvjxvq" },
+  ];
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
@@ -52,6 +59,18 @@ export const ClienteFilters = ({
             <X size={16} />Limpiar filtros
           </button>
         )}
+
+        <button
+          onClick={() => setOpen(true)}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+        >
+          ?
+        </button>
+        <HelpModal
+          isOpen={open}
+          onClose={() => setOpen(false)}
+          videos={helpVideos}
+        />
       </div>
     </div>
   );

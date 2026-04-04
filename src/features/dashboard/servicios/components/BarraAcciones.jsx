@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Plus, Search } from "lucide-react";
+import HelpModal from "../../components/modals/HelpModal";
 
 export const BarraAcciones = ({
     onNewClick,
@@ -10,6 +11,13 @@ export const BarraAcciones = ({
     filtroCampo,
     setFiltroCampo
 }) => {
+    const [open, setOpen] = useState(false);
+    const helpVideos = [
+        { key: "create", label: "Crear un servicio", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=23._Crear_servicio_rrtqco" },
+        { key: "status", label: "Cambiar el estado de un servicio", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=24._Cambiar_el_estado_del_servicio_kzbs04" },
+        { key: "update", label: "Editar un servicio", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=25._Editar_servicio_haj9bz" },
+        { key: "delete", label: "Eliminar un servicio", url: "https://player.cloudinary.com/embed/?cloud_name=dosxzk3sr&public_id=26._Eliminar_servicio_rs9cws" },
+    ];
     return (
         <div className="bg-white rounded-xl shadow-sm border p-6 mb-6 flex flex-wrap gap-4 items-center">
             <button
@@ -51,6 +59,18 @@ export const BarraAcciones = ({
                 <option value="categoria">Categoría</option>
                 <option value="estado">Estado</option>
             </select>
+
+            <button
+                onClick={() => setOpen(true)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+            >
+                ?
+            </button>
+            <HelpModal
+                isOpen={open}
+                onClose={() => setOpen(false)}
+                videos={helpVideos}
+            />
         </div>
     );
 };
