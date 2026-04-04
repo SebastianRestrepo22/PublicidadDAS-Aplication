@@ -24,7 +24,7 @@ const MisPedidos = () => {
     if (!fechaUTC) return null;
     const date = new Date(fechaUTC);
     const offset = date.getTimezoneOffset();
-    const fechaAjustada = new Date(date.getTime() - offset * 60000);
+    const fechaAjustada = new Date(date.getTime() + offset * 60000);
     return fechaAjustada;
   };
 
